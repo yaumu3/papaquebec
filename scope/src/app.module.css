@@ -1,0 +1,31 @@
+/* Two docked columns over the scope on desktop; one bottom sheet plus a tab bar on a phone. */
+.column {
+  position: fixed;
+  top: var(--panel-top);
+  bottom: var(--edge);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  pointer-events: none;
+  z-index: var(--z-panel);
+}
+.left {
+  left: var(--edge);
+  width: 220px;
+}
+.right {
+  right: var(--edge);
+  width: 370px;
+  justify-content: space-between;
+}
+@media (max-width: 720px) {
+  .column {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    width: auto;
+    max-height: 55vh;
+    gap: 0;
+  }
+}
