@@ -1,0 +1,33 @@
+{
+  "name": "papaquebec",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "bunx --bun vite",
+    "map": "bun scripts/build-coast.ts && bun scripts/build-aero.ts",
+    "build": "bunx --bun tsc --noEmit && bunx --bun vite build",
+    "preview": "bunx --bun vite preview",
+    "sim": "bun scripts/sim.ts",
+    "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select JAL317 --scale 1 --out ../docs/screenshot.png",
+    "test": "bun test",
+    "lint": "bunx --bun oxlint --type-aware",
+    "format": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt",
+    "format:check": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt --check"
+  },
+  "dependencies": {
+    "solid-js": "^1.9.15"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@webgpu/types": "^0.1.74",
+    "oxfmt": "^0.68.0",
+    "oxlint": "^1.83.0",
+    "oxlint-tsgolint": "^7.0.2002",
+    "playwright": "^1.63.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "vite-plugin-solid": "^2.11.14"
+  }
+}

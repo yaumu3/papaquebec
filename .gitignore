@@ -1,0 +1,8 @@
+node_modules/
+scope/dist/
+.DS_Store
+*.log
+.vite/
+coverage/
+scope/public/map/coast.json
+scope/public/map/aero.json

@@ -1,0 +1,14 @@
+{
+  "$schema": "./scope/node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "singleQuote": true,
+  "trailingComma": "all",
+  "sortImports": true,
+  "ignorePatterns": [
+    "scope/dist",
+    "scope/node_modules",
+    "scope/public/map",
+    "scope/scripts/countries.json",
+    "docs"
+  ]
+}
