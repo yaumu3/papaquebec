@@ -1,0 +1,61 @@
+/* Design tokens. Components style themselves only through these. */
+:root {
+  /* State colors: mirrored in palette.ts for the canvas (guarded by palette.test.ts). */
+  --color-bg: #2a2a2a;
+  --color-level: #8ac060;
+  --color-climb: #5ac8d4;
+  --color-descend: #e8b848;
+  --color-stale: #808080;
+  --color-selected: #ffffff;
+  --color-selbox: #ff9040;
+  --color-emergency: #d04040;
+  --color-enriched: #7aa8c8;
+
+  /* Chrome */
+  --panel-bg: #1c1c1c;
+  --panel-glass: rgba(28, 28, 28, 0.82);
+  --panel-border: #5a5a5a;
+  --panel-outline: #000;
+  --panel-chrome: #c0c0b8;
+  --panel-chrome-text: #000;
+  --text: #c8c8c8;
+  --text-dim: #808080;
+  --text-muted: #555;
+  --control-bg: #333;
+  --control-hover: #444;
+  --control-on-bg: #3a4a2a;
+  --control-on-hover: #4a5a3a;
+  --control-on-border: #5a7040;
+  --row-hover: #2a2a2a;
+  --row-selected: #3a3a3a;
+  --accent: var(--color-level);
+
+  /* Type */
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --text-xs: 9px;
+  --text-sm: 10px;
+  --text-md: 11px;
+  --text-lg: 13px;
+  --text-xl: 14px;
+  --tracking: 0.5px;
+  --tracking-wide: 1px;
+
+  /* Space */
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 10px;
+  --space-6: 12px;
+
+  /* Layout */
+  --topbar-height: 28px;
+  --tabbar-height: 44px;
+  /* Phone breakpoint: 720px, repeated in each module's media query (custom properties cannot be). */
+  --panel-top: 40px;
+  --edge: 12px;
+  --z-panel: 10;
+  --z-topbar: 15;
+  --z-overlay: 20;
+  --z-menu: 1000;
+}
