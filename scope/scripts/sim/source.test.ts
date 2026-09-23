@@ -1,0 +1,82 @@
+import { describe, expect, it } from 'bun:test';
+
+import { createSimSource } from './source';
+
+const site = { lat: 33.5844, lon: 130.4517 }; // RJFF
+
+describe('createSimSource', () => {
+  it('reports the configured site as the receiver', () => {
+    // Arrange
+    const source = createSimSource(site, () => 1000);
+
+    // Act
+    const rx = source.receiver();
+
+    // Assert
+    expect(rx).toEqual({ lat: 33.5844, lon: 130.4517, refresh: 1000 });
+  });
+
+  it('moves every aircraft along its track between polls', () => {
+    // Arrange
+    let t = 1000;
+    const source = createSimSource(site, () => t);
+    const first = source.poll();
+    t += 10;
+
+    // Act
+    const second = source.poll();
+
+    // Assert
+    expect(second.now).toBe(1010);
+    expect(second.messages).toBeGreaterThan(first.messages);
+    second.aircraft.forEach((a, i) => {
+      const before = first.aircraft[i];
+      expect(a.hex).toBe(before?.hex ?? '');
+      const moved = Math.hypot(
+        (a.lat ?? 0) - (before?.lat ?? 0),
+        (a.lon ?? 0) - (before?.lon ?? 0),
+      );
+      expect(moved).toBeGreaterThan(0);
+    });
+  });
+
+  it('counts messages in proportion to elapsed sim time', () => {
+    // Arrange
+    let t = 1000;
+    const source = createSimSource(site, () => t);
+    const first = source.poll();
+    t += 10;
+
+    // Act
+    const second = source.poll();
+
+    // Assert
+    expect(second.messages - first.messages).toBe(120);
+  });
+
+  it('includes one MLAT target and one emergency so every glyph and color is exercised', () => {
+    // Arrange
+    const source = createSimSource(site, () => 1000);
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    expect(snap.aircraft.some((a) => a.mlat?.includes('lat'))).toBe(true);
+    expect(snap.aircraft.some((a) => a.squawk === '7700')).toBe(true);
+    expect(snap.aircraft.every((a) => a.seen !== undefined && a.seen_pos !== undefined)).toBe(true);
+  });
+
+  it('puts the emergency on a fictional target with no airline callsign', () => {
+    // Arrange
+    const source = createSimSource(site, () => 1000);
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    const emergency = snap.aircraft.filter((a) => a.squawk === '7700');
+    expect(emergency.length).toBe(1);
+    expect(emergency[0]?.flight).toBeUndefined();
+  });
+});
