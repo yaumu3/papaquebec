@@ -1,0 +1,135 @@
+import { describe, expect, it } from 'bun:test';
+
+import type { ListSort } from './listSort';
+import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
+import { DEFAULT_SETTINGS } from './settings';
+
+function memoryStorage(initial: Record<string, string> = {}): Storage {
+  const map = new Map(Object.entries(initial));
+  return {
+    getItem: (k) => map.get(k) ?? null,
+    setItem: (k, v) => void map.set(k, v),
+    removeItem: (k) => void map.delete(k),
+    clear: () => map.clear(),
+    key: (i) => [...map.keys()][i] ?? null,
+    get length() {
+      return map.size;
+    },
+  };
+}
+
+const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
+const DEFAULT_SORT: ListSort = { key: 'id', dir: 'asc' };
+
+describe('loadPersisted', () => {
+  it('returns defaults when nothing is stored or the entry is unreadable', () => {
+    // Arrange
+    const empty = memoryStorage();
+    const broken = memoryStorage({ [PERSIST_KEY]: '{not json' });
+
+    // Act
+    const a = loadPersisted(empty, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
+    const b = loadPersisted(broken, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
+
+    // Assert
+    expect(a).toEqual({
+      settings: DEFAULT_SETTINGS,
+      panels: DEFAULT_PANELS,
+      listSort: DEFAULT_SORT,
+    });
+    expect(b).toEqual({
+      settings: DEFAULT_SETTINGS,
+      panels: DEFAULT_PANELS,
+      listSort: DEFAULT_SORT,
+    });
+  });
+
+  it('accepts valid fields and falls back per field on invalid ones', () => {
+    // Arrange
+    const stored = {
+      settings: {
+        rangeNm: 55,
+        vectorMin: 99,
+        trailSec: 120,
+        filter: { lowerFl: 100, upperFl: 50, squawk: 'nonvfr' },
+        layers: { coast: false, airspace: 'yes' },
+        labelDensity: 'loud',
+        altimeter: { transitionAltFt: 5000, qnhInHg: 99 },
+      },
+      panels: { list: false, detail: 'no' },
+      listSort: { key: 'dist', dir: 'sideways' },
+    };
+    const storage = memoryStorage({ [PERSIST_KEY]: JSON.stringify(stored) });
+
+    // Act
+    const { settings, panels, listSort } = loadPersisted(
+      storage,
+      DEFAULT_SETTINGS,
+      DEFAULT_PANELS,
+      DEFAULT_SORT,
+    );
+
+    // Assert
+    expect(settings.rangeNm).toBe(55);
+    expect(settings.vectorMin).toBe(DEFAULT_SETTINGS.vectorMin);
+    expect(settings.trailSec).toBe(120);
+    expect(settings.filter).toEqual({ ...DEFAULT_SETTINGS.filter, squawk: 'nonvfr' });
+    expect(settings.layers).toEqual({ ...DEFAULT_SETTINGS.layers, coast: false });
+    expect(settings.labelDensity).toBe(DEFAULT_SETTINGS.labelDensity);
+    expect(settings.altimeter).toEqual({ ...DEFAULT_SETTINGS.altimeter, transitionAltFt: 5000 });
+    expect(panels).toEqual({ ...DEFAULT_PANELS, list: false });
+    expect(listSort).toEqual({ key: 'dist', dir: 'asc' });
+  });
+});
+
+describe('savePersisted', () => {
+  it('round-trips through storage', () => {
+    // Arrange
+    const storage = memoryStorage();
+    const state: Persisted = {
+      settings: { ...DEFAULT_SETTINGS, rangeNm: 20, labelDensity: 'dense' },
+      panels: { ...DEFAULT_PANELS, maps: false },
+      listSort: { key: 'alt', dir: 'desc' },
+    };
+
+    // Act
+    savePersisted(storage, state);
+    const back = loadPersisted(storage, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
+
+    // Assert
+    expect(back).toEqual(state);
+  });
+
+  it('rejects ranges outside the zoom limits', () => {
+    // Arrange
+    const storage = memoryStorage({
+      [PERSIST_KEY]: JSON.stringify({ settings: { rangeNm: 3 } }),
+    });
+
+    // Act
+    const { settings } = loadPersisted(storage, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
+
+    // Assert
+    expect(settings.rangeNm).toBe(DEFAULT_SETTINGS.rangeNm);
+  });
+});
+
+describe('loadPersisted qnh', () => {
+  it('keeps a valid station and auto flag and falls back field by field otherwise', () => {
+    // Arrange
+    const good = memoryStorage({
+      [PERSIST_KEY]: JSON.stringify({ settings: { qnh: { auto: false, station: 'RJAA' } } }),
+    });
+    const bad = memoryStorage({
+      [PERSIST_KEY]: JSON.stringify({ settings: { qnh: { auto: 'yes', station: 'narita' } } }),
+    });
+
+    // Act
+    const a = loadPersisted(good, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT).settings.qnh;
+    const b = loadPersisted(bad, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT).settings.qnh;
+
+    // Assert
+    expect(a).toEqual({ auto: false, station: 'RJAA' });
+    expect(b).toEqual(DEFAULT_SETTINGS.qnh);
+  });
+});
