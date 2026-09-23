@@ -1,0 +1,6 @@
+.git
+.github
+docs
+scope/node_modules
+scope/dist
+scope/public/map/*.json
