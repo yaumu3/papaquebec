@@ -1,0 +1,16 @@
+.title {
+  margin: var(--space-4) 0 3px;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking);
+}
+.title:first-child {
+  margin-top: 0;
+}
+.lit {
+  color: var(--text);
+}
+.divider {
+  margin: var(--space-4) 0;
+  border-top: 1px solid var(--panel-border);
+}

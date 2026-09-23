@@ -1,0 +1,19 @@
+.toggle {
+  padding: 3px var(--space-3);
+  background: var(--control-bg);
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.toggle:hover {
+  background: var(--control-hover);
+}
+.on {
+  background: var(--control-on-bg);
+  color: var(--accent);
+  border-color: var(--control-on-border);
+}
+.on:hover {
+  background: var(--control-on-hover);
+}

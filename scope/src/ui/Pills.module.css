@@ -1,0 +1,30 @@
+.pills {
+  display: flex;
+  gap: var(--space-1);
+}
+.pill {
+  flex: 1;
+  padding: var(--space-1) 0;
+  background: var(--control-bg);
+  color: var(--text-dim);
+  border: 1px solid var(--panel-border);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+.small {
+  font-size: var(--text-xs);
+}
+.pill:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+.active {
+  background: var(--accent);
+  color: var(--panel-chrome-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.active:hover {
+  background: var(--accent);
+  color: var(--panel-chrome-text);
+}
