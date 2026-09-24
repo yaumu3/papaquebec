@@ -8,12 +8,12 @@ import {
   STATION_RE,
   TRANSITION_ALT_MAX_FT,
 } from '../state/settings';
-import { BandSlider } from '../ui/BandSlider';
 import { Field, FieldRow, FieldSlot } from '../ui/Field';
 import { Pills } from '../ui/Pills';
 import { Divider, SectionTitle } from '../ui/Section';
 import { Toggle } from '../ui/Toggle';
 import { Window } from '../ui/Window';
+import { AltitudeAxis } from './AltitudeAxis';
 
 import s from './DisplayPanel.module.css';
 
@@ -39,8 +39,6 @@ function setStation(input: string): void {
   const station = input.trim().toUpperCase();
   if (station === '' || STATION_RE.test(station)) setSettings('qnh', 'station', station);
 }
-
-const fl = (v: number) => `FL${String(v).padStart(3, '0')}`;
 
 export function DisplayPanel() {
   return (
@@ -68,18 +66,8 @@ export function DisplayPanel() {
         onChange={(v) => setSettings('trailSec', v)}
       />
       <Divider />
-      <SectionTitle lit={`${fl(settings.filter.lowerFl)} – ${fl(settings.filter.upperFl)}`}>
-        ALTITUDE
-      </SectionTitle>
-      <BandSlider
-        min={0}
-        max={600}
-        step={10}
-        gap={10}
-        lower={settings.filter.lowerFl}
-        upper={settings.filter.upperFl}
-        onChange={(lo, hi) => setSettings('filter', { lowerFl: lo, upperFl: hi })}
-      />
+      <SectionTitle>ALTITUDE</SectionTitle>
+      <AltitudeAxis />
       <SectionTitle>ALTIMETER</SectionTitle>
       <FieldRow>
         <Field label="TA ft">

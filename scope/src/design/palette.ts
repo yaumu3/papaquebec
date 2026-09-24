@@ -5,6 +5,7 @@ export const PALETTE = {
   climb: '#5ac8d4',
   descend: '#e8b848',
   stale: '#808080',
+  ground: '#b09470',
   selected: '#ffffff',
   selbox: '#ff9040',
   emergency: '#d04040',

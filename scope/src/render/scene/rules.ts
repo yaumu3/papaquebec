@@ -28,6 +28,7 @@ export const THEME = {
   climb: PALETTE.climb,
   descend: PALETTE.descend,
   stale: PALETTE.stale,
+  ground: PALETTE.ground,
   selected: PALETTE.selected,
   selbox: PALETTE.selbox,
   emergency: PALETTE.emergency,
@@ -56,11 +57,12 @@ export function isEmergency(t: Track): boolean {
   return emergencyCode(t.squawk, t.emergency) !== null;
 }
 
-/** Emergency over selected over stale over climb state. */
+/** Emergency over selected over stale over ground over climb state. */
 export function trackColor(t: Track, selected: string | null): string {
   if (isEmergency(t)) return THEME.emergency;
   if (t.hex === selected) return THEME.selected;
   if (isStale(t)) return THEME.stale;
+  if (t.alt === 'ground') return THEME.ground;
   switch (climbState(t.baroRate)) {
     case 'climbing':
       return THEME.climb;

@@ -11,6 +11,8 @@ export interface SimAircraft {
   gs: number;
   track: number;
   baroRate: number;
+  /** Reports "ground" instead of an altitude; `gs` is then taxi speed. */
+  ground?: boolean;
   mlat?: boolean;
   type: string;
   reg: string;
@@ -142,5 +144,35 @@ export const FLEET: SimAircraft[] = [
     baroRate: -1200,
     type: 'C68A',
     reg: 'JA00PQ',
+  },
+  {
+    hex: '867a0a',
+    flight: 'ANA857',
+    category: 'A3',
+    squawk: '2201',
+    x: 0.6,
+    y: -0.4,
+    alt: 0,
+    gs: 18,
+    track: 340,
+    baroRate: 0,
+    ground: true,
+    type: 'A321',
+    reg: 'JA131A',
+  },
+  {
+    hex: '867a0b',
+    flight: 'JAL903',
+    category: 'A5',
+    squawk: '3112',
+    x: -0.5,
+    y: 0.3,
+    alt: 0,
+    gs: 6,
+    track: 160,
+    baroRate: 0,
+    ground: true,
+    type: 'B773',
+    reg: 'JA752J',
   },
 ];

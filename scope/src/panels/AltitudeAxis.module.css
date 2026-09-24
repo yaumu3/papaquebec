@@ -1,0 +1,139 @@
+/* Column widths and the readout lane, shared by the axis and the GND row below it. */
+.altitude {
+  --scale: 26px;
+  --slider: 22px; /* BandSlider's vertical width */
+  --readout: 42px;
+  --lane: calc(var(--readout) + var(--space-4));
+}
+.axis {
+  position: relative;
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 var(--space-4);
+  font-size: var(--text-sm);
+}
+.scale {
+  position: relative;
+  width: var(--scale);
+  color: var(--text-dim);
+  text-align: right;
+}
+.tick {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+}
+.minor {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.side {
+  position: relative;
+  flex: 1;
+}
+.profile {
+  position: absolute;
+  inset: 0 var(--lane) 0 0;
+}
+.bar {
+  position: absolute;
+  left: 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--panel-bg);
+  background: var(--text-muted);
+}
+.lit {
+  background: var(--control-on-border);
+}
+.grid {
+  position: absolute;
+  left: calc(var(--scale) + var(--slider) + 2 * var(--space-2));
+  right: 0;
+  border-top: 1px solid var(--control-bg);
+  transform: translateY(1px);
+}
+.ta {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--text-muted);
+  transform: translateY(1px);
+}
+.edge {
+  position: absolute;
+  inset: auto 0 auto 0;
+  display: flex;
+  align-items: center;
+  transform: translateY(50%);
+}
+.lead {
+  flex: 1;
+  border-top: 1px solid var(--text-dim);
+}
+.edge input {
+  box-sizing: border-box;
+  width: var(--readout);
+  padding: var(--space-1) var(--space-2);
+  background: var(--control-glass);
+  color: var(--text);
+  border: 1px solid var(--panel-border);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.edge input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--control-bg);
+}
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+.foot .side {
+  display: flex;
+  align-items: center;
+  height: 14px;
+}
+.gnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+  font: inherit;
+}
+.gndLabel {
+  width: var(--scale);
+  text-align: right;
+}
+.swatch {
+  box-sizing: border-box;
+  width: var(--slider);
+  height: 14px;
+  background: var(--control-bg);
+  border: 1px solid var(--panel-border);
+}
+.gnd:hover .swatch {
+  background: var(--control-hover);
+}
+.gndOn .swatch {
+  background: var(--color-ground);
+  border-color: var(--color-ground);
+}
+.gndBar {
+  position: static;
+  max-width: calc(100% - var(--lane));
+}
+.gndLit {
+  background: var(--color-ground);
+}
+/* Last so it wins over the band and GND tones. */
+.picked {
+  background: var(--color-selected);
+}

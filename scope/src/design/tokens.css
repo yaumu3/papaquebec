@@ -6,6 +6,7 @@
   --color-climb: #5ac8d4;
   --color-descend: #e8b848;
   --color-stale: #808080;
+  --color-ground: #b09470;
   --color-selected: #ffffff;
   --color-selbox: #ff9040;
   --color-emergency: #d04040;
@@ -22,6 +23,7 @@
   --text-dim: #808080;
   --text-muted: #555;
   --control-bg: #333;
+  --control-glass: rgba(51, 51, 51, 0.7);
   --control-hover: #444;
   --control-on-bg: #3a4a2a;
   --control-on-hover: #4a5a3a;

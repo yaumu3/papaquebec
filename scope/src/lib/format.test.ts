@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  formatListCount,
   climbArrow,
   climbState,
   emergencyCode,
@@ -130,5 +131,22 @@ describe('formatMach', () => {
 
     // Assert
     expect(out).toEqual(['M0.43', 'M0.85', 'M1.02', '---']);
+  });
+});
+
+describe('formatListCount', () => {
+  it('names the hidden traffic only while the filter is cutting some', () => {
+    // Arrange
+    const cases: [number, number][] = [
+      [9, 9],
+      [6, 9],
+      [0, 0],
+    ];
+
+    // Act
+    const out = cases.map(([shown, total]) => formatListCount(shown, total));
+
+    // Assert
+    expect(out).toEqual(['9', '6 · 3 hidden', '0']);
   });
 });

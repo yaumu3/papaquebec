@@ -33,6 +33,7 @@ describe('design tokens', () => {
       [THEME.climb, PALETTE.climb],
       [THEME.descend, PALETTE.descend],
       [THEME.stale, PALETTE.stale],
+      [THEME.ground, PALETTE.ground],
       [THEME.selected, PALETTE.selected],
       [THEME.selbox, PALETTE.selbox],
       [THEME.emergency, PALETTE.emergency],

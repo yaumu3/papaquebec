@@ -80,3 +80,19 @@ describe('createSimSource', () => {
     expect(emergency[0]?.flight).toBeUndefined();
   });
 });
+
+describe('createSimSource ground traffic', () => {
+  it('reports the taxiing targets on the ground, at taxi speed', () => {
+    // Arrange
+    const source = createSimSource(site, () => 1000);
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    const ground = snap.aircraft.filter((a) => a.alt_baro === 'ground');
+    expect(ground.length).toBeGreaterThanOrEqual(2);
+    expect(ground.every((a) => (a.gs ?? 0) > 0 && (a.gs ?? 0) < 40)).toBe(true);
+    expect(ground.every((a) => a.baro_rate === 0)).toBe(true);
+  });
+});

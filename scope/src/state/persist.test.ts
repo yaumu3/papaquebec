@@ -120,3 +120,21 @@ describe('loadPersisted qnh', () => {
     expect(b).toEqual(DEFAULT_SETTINGS.qnh);
   });
 });
+
+describe('loadPersisted filter', () => {
+  it('keeps a stored ground switch and falls back when it is missing or malformed', () => {
+    // Arrange
+    const stores = [{ ground: false }, {}, { ground: 'no' }].map((filter) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ settings: { filter } }) }),
+    );
+
+    // Act
+    const grounds = stores.map(
+      (s) =>
+        loadPersisted(s, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT).settings.filter.ground,
+    );
+
+    // Assert
+    expect(grounds).toEqual([false, true, true]);
+  });
+});

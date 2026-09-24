@@ -69,6 +69,9 @@
 .descending {
   color: var(--color-descend);
 }
+.ground {
+  color: var(--color-ground);
+}
 .stale {
   color: var(--color-stale);
 }

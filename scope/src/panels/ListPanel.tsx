@@ -3,7 +3,7 @@ import { createMemo, For } from 'solid-js';
 import { targetMenu } from '../canvas/menus';
 import { cx } from '../design/cx';
 import { formatAltitude } from '../lib/altitude';
-import { climbArrow, climbState, formatGsWake, padTrack } from '../lib/format';
+import { climbArrow, climbState, formatGsWake, formatListCount, padTrack } from '../lib/format';
 import { isEmergency, isStale, trackLabel } from '../render/scene/rules';
 import { classify } from '../state/filter';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
@@ -33,10 +33,11 @@ const COLUMNS: [SortKey, string][] = [
   ['source', 'SRC'],
 ];
 
-/** Row tone: emergency over stale over climb state, matching the scope's colors. */
+/** Row tone: emergency over stale over ground over climb state, matching the scope's colors. */
 function rowTone(t: Track): string | undefined {
   if (isEmergency(t)) return s.emergency;
   if (isStale(t)) return s.stale;
+  if (t.alt === 'ground') return s.ground;
   const c = climbState(t.baroRate);
   return c === 'climbing' ? s.climbing : c === 'descending' ? s.descending : undefined;
 }
@@ -49,14 +50,18 @@ function formatDistance(t: Track): string {
 export function ListPanel() {
   const rows = createMemo(() => {
     snapshotVersion();
-    const { lowerFl, upperFl, squawk } = settings.filter;
     const shown = [...trackStore.tracks.values()].filter(
-      (t) => classify(t, { lowerFl, upperFl, squawk }) === 'shown',
+      (t) => classify(t, settings.filter, settings.altimeter) === 'shown',
     );
     return sortTracks(shown, listSort());
   });
   return (
-    <Window id="list" title={<>Aircraft ({rows().length})</>} class={s.panel} bodyClass={s.body}>
+    <Window
+      id="list"
+      title={<>Aircraft ({formatListCount(rows().length, trackStore.tracks.size)})</>}
+      class={s.panel}
+      bodyClass={s.body}
+    >
       <div class={s.header}>
         <For each={COLUMNS}>
           {([key, label]) => (

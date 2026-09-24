@@ -43,11 +43,15 @@ export interface BlockHit {
   dy: number;
 }
 
+/** A filtered target draws no block, unless it is the selected one. */
+const hidden = (t: Track) =>
+  t.hex !== selected() && classify(t, settings.filter, settings.altimeter) === 'filtered';
+
 /** The data block under a screen point, if any; the selected target's block counts even when filtered, as it is drawn. */
 export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
   for (const t of trackStore.tracks.values()) {
     const s = targetScreen(view, t.hex);
-    if (!s || (t.hex !== selected() && classify(t, settings.filter) === 'filtered')) continue;
+    if (!s || hidden(t)) continue;
     const corner = t.ops.pinnedCorner ?? t.ops.autoCorner;
     const r = labelRect(s.cx, s.cy, corner, isEmergency(t));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)
