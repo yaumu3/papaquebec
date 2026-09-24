@@ -1,4 +1,4 @@
-import { type Accessor, createSignal } from 'solid-js';
+import type { Accessor } from 'solid-js';
 import { createStore } from 'solid-js/store';
 
 import {
@@ -9,6 +9,7 @@ import {
   validateAero,
 } from '../lib/mapdata';
 import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
+import { versioned } from './versioned';
 
 /** The set generated around the site at container start; a preset that cannot be removed. */
 export const BUILTIN_ID = 'openaip';
@@ -50,7 +51,11 @@ export function createMapSets(storage: Storage | null): MapSets {
     ],
   });
 
-  const save = (): boolean => {
+  const aero = versioned(() => mergeAero(store.sets.filter((s) => s.enabled).map((s) => s.data)));
+
+  /** After every change: the merge is stale, and the sets go back to storage. */
+  const commit = (): boolean => {
+    aero.invalidate();
     if (!storage) return true;
     const builtin = store.sets.find((s) => s.builtin);
     return saveMapSets(storage, {
@@ -61,26 +66,9 @@ export function createMapSets(storage: Storage | null): MapSets {
     });
   };
 
-  // Merged once per change and tracked through the version, so a pointer move does not merge.
-  const [version, setVersion] = createSignal(0);
-  let merged: { version: number; data: AeroLayers } | null = null;
-  const aero = (): AeroLayers => {
-    const v = version();
-    if (merged?.version !== v) {
-      merged = {
-        version: v,
-        data: mergeAero(store.sets.filter((s) => s.enabled).map((s) => s.data)),
-      };
-    }
-    return merged.data;
-  };
-  const changed = (): void => {
-    setVersion((v) => v + 1);
-  };
-
   return {
     mapSets: () => store.sets,
-    aero,
+    aero: aero.get,
     setBuiltinAero(data) {
       // Assigned whole: a value set at the `data` path would merge into the placeholder.
       setStore(
@@ -88,7 +76,7 @@ export function createMapSets(storage: Storage | null): MapSets {
         (s) => s.builtin,
         (set) => ({ ...set, data }),
       );
-      changed();
+      aero.invalidate();
     },
     importMapSet(text, id = freshId()) {
       let raw: unknown;
@@ -104,8 +92,7 @@ export function createMapSets(storage: Storage | null): MapSets {
         const at = sets.findIndex((s) => !s.builtin && s.data.title === set.data.title);
         return at >= 0 ? sets.with(at, set) : [...sets, set];
       });
-      changed();
-      return { ok: true, kept: save() };
+      return { ok: true, kept: commit() };
     },
     toggleMapSet(id) {
       setStore(
@@ -114,19 +101,14 @@ export function createMapSets(storage: Storage | null): MapSets {
         'enabled',
         (v) => !v,
       );
-      changed();
-      save();
+      commit();
     },
     removeMapSet(id) {
       setStore('sets', (sets) => sets.filter((s) => s.id !== id || s.builtin));
-      changed();
-      save();
+      commit();
     },
   };
 }
-
-const sets = createMapSets(typeof localStorage === 'undefined' ? null : localStorage);
-export const { mapSets, aero, setBuiltinAero, importMapSet, toggleMapSet, removeMapSet } = sets;
 
 /** What the Maps panel says after an import; null when there is nothing to say. */
 export function importNote(result: ImportResult): string | null {
@@ -141,3 +123,6 @@ export function armRemoval(
 ): { armed: string | null; remove: string | null } {
   return armed === clicked ? { armed: null, remove: clicked } : { armed: clicked, remove: null };
 }
+
+const sets = createMapSets(typeof localStorage === 'undefined' ? null : localStorage);
+export const { mapSets, aero, setBuiltinAero, importMapSet, toggleMapSet, removeMapSet } = sets;
