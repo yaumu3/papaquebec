@@ -87,9 +87,13 @@ export function createMapSets(storage: Storage | null): MapSets {
       }
       const valid = validateAero(raw);
       if (!valid.ok) return valid;
+      const title = valid.data.title;
+      if (store.sets.some((s) => s.builtin && s.data.title === title)) {
+        return { ok: false, message: `already built in: ${title}` };
+      }
       const set: MapSet = { id, data: valid.data, enabled: true, builtin: false };
       setStore('sets', (sets) => {
-        const at = sets.findIndex((s) => !s.builtin && s.data.title === set.data.title);
+        const at = sets.findIndex((s) => !s.builtin && s.data.title === title);
         return at >= 0 ? sets.with(at, set) : [...sets, set];
       });
       return { ok: true, kept: commit() };

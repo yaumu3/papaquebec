@@ -67,6 +67,19 @@ describe('createMapSets', () => {
     expect(sets.aero().waypoints).toEqual([]);
   });
 
+  it('refuses a set titled like the built-in one', () => {
+    // Arrange
+    const sets = fresh();
+    sets.setBuiltinAero({ ...EMPTY_AERO, title: 'openAIP JP 2026-09-24' });
+
+    // Act
+    const out = sets.importMapSet(JSON.stringify({ title: 'openAIP JP 2026-09-24' }), 'a');
+
+    // Assert
+    expect(out).toEqual({ ok: false, message: 'already built in: openAIP JP 2026-09-24' });
+    expect(sets.mapSets()).toHaveLength(1);
+  });
+
   it('rejects text that is not JSON or not a valid set, changing nothing', () => {
     // Arrange
     const sets = fresh();
