@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER } from '../lib/altitude';
-import { classify, type Filter, FL_MAX, FL_MIN } from './filter';
+import { altitudeUnfiltered, classify, type Filter, FL_MAX, FL_MIN } from './filter';
 
 const base: Filter = { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' };
 
@@ -132,5 +132,24 @@ describe('classify at the stops', () => {
 
     // Assert
     expect(results).toEqual(['shown', 'shown']);
+  });
+});
+
+describe('altitudeUnfiltered', () => {
+  it('is true only with ground shown and both edges at their stops', () => {
+    // Arrange
+    const filters: Filter[] = [
+      base,
+      { ...base, ground: false },
+      { ...base, lowerFl: 10 },
+      { ...base, upperFl: FL_MAX - 10 },
+      { ...base, squawk: 'nonvfr' },
+    ];
+
+    // Act
+    const out = filters.map(altitudeUnfiltered);
+
+    // Assert
+    expect(out).toEqual([true, false, false, false, true]);
   });
 });

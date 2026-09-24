@@ -30,6 +30,9 @@ export const BAND_LIMITS: BandLimits = { min: FL_MIN, max: FL_MAX, gap: 10 };
 
 const bandActive = (f: Filter) => f.lowerFl > FL_MIN || f.upperFl < FL_MAX;
 
+/** Nothing to reset: ground shown and both edges resting on their stops. */
+export const altitudeUnfiltered = (f: Filter) => f.ground && !bandActive(f);
+
 /**
  * Emergency is additive: a filter never hides one. With a band set, a target
  * whose altitude is unknown cannot be shown to be inside it, so it is filtered.

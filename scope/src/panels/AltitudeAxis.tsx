@@ -20,7 +20,7 @@ import {
   withLower,
   withUpper,
 } from '../state/band';
-import { BAND_LIMITS } from '../state/filter';
+import { altitudeUnfiltered, BAND_LIMITS, FL_MAX, FL_MIN } from '../state/filter';
 import { selected, snapshotVersion } from '../state/scope';
 import { setSettings, settings } from '../state/settings';
 import { trackStore } from '../state/tracks';
@@ -148,9 +148,17 @@ function pickedBin(): number | 'ground' | null {
   return level === null ? null : binIndex(level, BAND_LIMITS, BIN);
 }
 
+/** Back to the full band with ground traffic shown. */
+const resetBand = () => setSettings('filter', { ground: true, lowerFl: FL_MIN, upperFl: FL_MAX });
+
 function Axis(props: { traffic: Accessor<Traffic> }) {
   return (
-    <div class={s.axis} style={{ height: `${AXIS_PX}px` }}>
+    <div
+      class={s.axis}
+      style={{ height: `${AXIS_PX}px` }}
+      title={altitudeUnfiltered(settings.filter) ? undefined : 'Double-click to reset'}
+      onDblClick={resetBand}
+    >
       <For each={TICKS}>{(t) => <div class={s.grid} style={{ bottom: at(t.at) }} />}</For>
       <div class={s.scale}>
         <For each={scaleLabels(TICKS, transitionLevel(settings.altimeter), LABEL_GAP)}>
