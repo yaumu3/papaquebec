@@ -105,15 +105,9 @@ export function mergeAero(sets: readonly AeroLayers[]): AeroLayers {
 
 const isPairList = (v: unknown): v is LonLat[] => PairList.safeParse(v).success;
 
-/** The well-formed entries of a list, in order; anything else is dropped. */
-function list<T>(v: unknown, schema: z.ZodMiniType<T>): T[] {
-  if (!Array.isArray(v)) return [];
-  const out: T[] = [];
-  for (const item of v) {
-    const r = schema.safeParse(item);
-    if (r.success) out.push(r.data);
-  }
-  return out;
+/** The entries of a list that fit their schema, in order; anything else is dropped. */
+function wellFormed(v: unknown, schema: z.ZodMiniType): unknown[] {
+  return Array.isArray(v) ? v.filter((item) => schema.safeParse(item).success) : [];
 }
 
 export function parseCoast(raw: unknown): CoastData {
@@ -126,16 +120,12 @@ export function parseCoast(raw: unknown): CoastData {
 /** Lenient: a malformed entry is dropped, not fatal, so a partial chart still draws. */
 export function parseAero(raw: unknown): AeroData {
   if (!isRecord(raw)) throw new Error('aero.json: unexpected shape');
-  return {
+  const kept = Object.entries(LISTS).map(([k, schema]) => [k, wellFormed(raw[k], schema)]);
+  return AeroSchema.parse({
+    ...Object.fromEntries(kept),
     title: typeof raw.title === 'string' && raw.title ? raw.title : UNTITLED_AERO,
     ...(typeof raw.note === 'string' ? { note: raw.note } : {}),
-    waypoints: list(raw.waypoints, LISTS.waypoints),
-    navaids: list(raw.navaids, LISTS.navaids),
-    airways: list(raw.airways, LISTS.airways),
-    airspace: list(raw.airspace, LISTS.airspace),
-    sectors: list(raw.sectors, LISTS.sectors),
-    airports: list(raw.airports, LISTS.airports),
-  };
+  });
 }
 
 export type AeroValidation = { ok: true; data: AeroData } | { ok: false; message: string };
