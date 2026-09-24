@@ -116,3 +116,21 @@ describe('classify with a local altimeter', () => {
     expect(results).toEqual(['shown', 'filtered', 'filtered']);
   });
 });
+
+describe('classify at the stops', () => {
+  it('treats an edge at its stop as open, whatever the block shows beyond it', () => {
+    // Arrange
+    const filter: Filter = { ...base, lowerFl: 0, upperFl: 600 };
+    const low = { transitionAltFt: 14000, qnhInHg: 28.5 }; // blocks read below 000 near sea level
+    const targets = [
+      { alt: 65000, squawk: '2000', emergency: undefined },
+      { alt: 100, squawk: '2000', emergency: undefined },
+    ];
+
+    // Act
+    const results = targets.map((t) => classify(t, filter, low));
+
+    // Assert
+    expect(results).toEqual(['shown', 'shown']);
+  });
+});
