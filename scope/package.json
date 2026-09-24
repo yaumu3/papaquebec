@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "bunx --bun vite",
     "map": "bun scripts/build-coast.ts && bun scripts/build-aero.ts",
-    "build": "bunx --bun tsc --noEmit && bunx --bun vite build",
+    "schema": "bun scripts/build-schema.ts",
+    "build": "bun run schema && bunx --bun tsc --noEmit && bunx --bun vite build",
     "preview": "bunx --bun vite preview",
     "sim": "bun scripts/sim.ts",
     "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select JAL317 --scale 1 --out ../docs/screenshot.png",
@@ -17,7 +18,8 @@
     "format:check": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt --check"
   },
   "dependencies": {
-    "solid-js": "^1.9.15"
+    "solid-js": "^1.9.15",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "latest",

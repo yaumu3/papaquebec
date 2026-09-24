@@ -6,3 +6,4 @@ scope/dist/
 coverage/
 scope/public/map/coast.json
 scope/public/map/aero.json
+scope/public/aero.schema.json

@@ -14,16 +14,9 @@ import { MapsPanel } from './panels/MapsPanel';
 import { Overlays } from './panels/Overlays';
 import { TabBar } from './panels/TabBar';
 import { TopBar } from './panels/TopBar';
+import { setBuiltinAero } from './state/mapsets';
 import { QNH_POLL_MS, qnhReport, setQnhError, setQnhReport, stationCandidates } from './state/qnh';
-import {
-  listSort,
-  panels,
-  selected,
-  setAero,
-  setCoast,
-  setSelectedTrace,
-  setTick,
-} from './state/scope';
+import { listSort, panels, selected, setCoast, setSelectedTrace, setTick } from './state/scope';
 import { persist, setSettings, settings } from './state/settings';
 import { projectNm } from './state/tracks';
 
@@ -64,7 +57,7 @@ export function App() {
       .then((raw) => setCoast(parseCoast(raw)))
       .catch((err: unknown) => console.warn('coast.json unavailable', err));
     void loadJson('./map/aero.json')
-      .then((raw) => setAero(parseAero(raw)))
+      .then((raw) => setBuiltinAero(parseAero(raw)))
       .catch((err: unknown) => console.warn('aero.json unavailable', err));
   });
 

@@ -96,13 +96,18 @@ access allowed; NOAA's own Aviation Weather Center does not, hence the `?wx=` pr
   domain) within 300 NM of the site; skipped while the file already covers the same site.
 - `public/map/aero.json`: airspace, navaids, airports and reporting points within 150 NM from
   [openAIP](https://www.openaip.net)'s daily exports (anonymous download, CC BY-NC-SA 4.0), for
-  every country in range. The Maps panel shows the fetch date; when the exports cannot be reached
-  the previous file is kept.
+  every country in range, titled with the fetch date. When the exports cannot be reached the
+  previous file is kept.
 
 The site comes from `PQ_SITE` (`lat,lon`) or the tar1090 at `PQ_TAR1090`; pass `<lat> <lon>` and
 optionally a radius to either script to override it.
 
-openAIP carries no IFR waypoints or airways, so those layers stay empty.
+openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
+brought in through the Maps panel: `IMPORT JSON…` takes a file in the `aero.json` format, checked
+against `/aero.schema.json` (served by the scope, generated from the code) before it is accepted.
+Each set lists under `SOURCES` by its title and can be toggled or removed; the openAIP
+set generated at start is the one that stays. Imported sets live in the browser's storage, so they
+are per device.
 
 ## Design
 

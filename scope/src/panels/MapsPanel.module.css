@@ -6,3 +6,73 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--space-1);
 }
+.sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.set {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+.setToggle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.remove,
+.cancel {
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking);
+}
+.remove {
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+.remove:hover {
+  background: var(--control-hover);
+  color: var(--color-emergency);
+}
+.armed:hover {
+  background: var(--color-emergency);
+  color: var(--panel-chrome-text);
+}
+.armed {
+  color: var(--color-emergency);
+  border-color: var(--color-emergency);
+  font-size: var(--text-xs);
+  line-height: inherit;
+}
+.cancel {
+  border-color: var(--panel-border);
+}
+.cancel:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+.import {
+  padding: 3px var(--space-3);
+  border: 1px dashed var(--panel-border);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.import:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+.file {
+  display: none;
+}
+.note {
+  color: var(--color-descend);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

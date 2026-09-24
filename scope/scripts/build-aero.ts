@@ -56,8 +56,8 @@ try {
     OUT,
     JSON.stringify(
       {
+        title: `openAIP ${countries.join(' ')} ${fetched}`,
         note: `openAIP (https://www.openaip.net, CC BY-NC-SA 4.0) within ${radiusNm} NM of ${site.lat}, ${site.lon}; countries ${countries.join(', ')}; fetched ${fetched}.`,
-        fetched,
         ...aero,
       },
       null,

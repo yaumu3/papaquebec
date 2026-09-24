@@ -1,4 +1,4 @@
-import type { AeroData, CoastData, LatLon } from '../../lib/mapdata';
+import type { AeroLayers, CoastData, LatLon } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
 import type { ProjectFn } from '../../state/trackStore';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
@@ -8,7 +8,7 @@ import { airspaceColor, THEME } from './rules';
 
 export interface StaticInput {
   coast: CoastData;
-  aero: AeroData;
+  aero: AeroLayers;
   project: ProjectFn;
   layers: Layers;
   labelDensity: LabelDensity;

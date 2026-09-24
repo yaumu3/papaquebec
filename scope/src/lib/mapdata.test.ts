@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { parseAero, parseCoast } from './mapdata';
+import {
+  EMPTY_AERO,
+  mergeAero,
+  parseAero,
+  parseCoast,
+  UNTITLED_AERO,
+  validateAero,
+} from './mapdata';
 
 describe('parseCoast', () => {
   it('keeps well-formed lines and drops the rest', () => {
@@ -88,17 +95,98 @@ describe('parseAero', () => {
   });
 });
 
-describe('parseAero fetched', () => {
-  it('keeps the fetch date when it is a string and omits it otherwise', () => {
+describe('parseAero title', () => {
+  it('keeps the title and note only, and names an untitled file after itself', () => {
     // Arrange
-    const dated = { fetched: '2026-09-22' };
-    const undated = { fetched: 42 };
+    const titled = {
+      title: 'openAIP JP 2026-09-24',
+      note: 'CC BY-NC-SA 4.0',
+      fetched: '2026-09-24',
+    };
+    const untitled = { title: 7 };
 
     // Act
-    const out = [parseAero(dated), parseAero(undated)];
+    const out = [parseAero(titled), parseAero(untitled)];
 
     // Assert
-    expect(out[0]?.fetched).toBe('2026-09-22');
-    expect(out[1]).not.toHaveProperty('fetched');
+    expect(out[0]?.title).toBe('openAIP JP 2026-09-24');
+    expect(out[0]?.note).toBe('CC BY-NC-SA 4.0');
+    expect(out[0]).not.toHaveProperty('fetched');
+    expect(out[1]?.title).toBe(UNTITLED_AERO);
+    expect(out[1]).not.toHaveProperty('note');
+  });
+});
+
+describe('validateAero', () => {
+  it('accepts a titled file, filling missing lists and dropping unknown keys', () => {
+    // Arrange
+    const raw = {
+      $schema: './aero.schema.json',
+      title: 'My fixes',
+      waypoints: [{ id: 'ORAMO', lat: 33.8, lon: 130.7 }], // north-east of RJFF
+    };
+
+    // Act
+    const out = validateAero(raw);
+
+    // Assert
+    expect(out).toEqual({
+      ok: true,
+      data: {
+        ...EMPTY_AERO,
+        title: 'My fixes',
+        waypoints: [{ id: 'ORAMO', lat: 33.8, lon: 130.7 }],
+      },
+    });
+  });
+
+  it('rejects a malformed file with the offending paths', () => {
+    // Arrange
+    const raw = {
+      waypoints: [
+        { id: 'ORAMO', lat: 33.8, lon: 130.7 },
+        { id: 'BAD', lat: 'x', lon: 130 },
+      ],
+    };
+
+    // Act
+    const out = validateAero(raw);
+
+    // Assert
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.message).toContain('title');
+    expect(out.message).toContain('waypoints[1].lat');
+  });
+
+  it('rejects anything that is not an object', () => {
+    // Arrange
+    const raw = [1, 2, 3];
+
+    // Act
+    const out = validateAero(raw);
+
+    // Assert
+    expect(out.ok).toBe(false);
+  });
+});
+
+describe('mergeAero', () => {
+  it('concatenates every list in set order', () => {
+    // Arrange
+    const a = { ...EMPTY_AERO, waypoints: [{ id: 'ORAMO', lat: 33.8, lon: 130.7 }] }; // north-east of RJFF
+    const b = {
+      ...EMPTY_AERO,
+      waypoints: [{ id: 'CHIBA', lat: 35.6, lon: 140.1 }], // Chiba
+      airports: [{ id: 'RJAA', name: 'NARITA INTL', lat: 35.765, lon: 140.386 }],
+    };
+
+    // Act
+    const merged = mergeAero([a, b]);
+
+    // Assert
+    expect(merged.waypoints.map((w) => w.id)).toEqual(['ORAMO', 'CHIBA']);
+    expect(merged.airports.map((p) => p.id)).toEqual(['RJAA']);
+    expect(merged.airways).toEqual([]);
   });
 });

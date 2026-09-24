@@ -19,6 +19,7 @@ import {
   TRAIL_STEPS,
   VECTOR_STEPS,
 } from './settingsDefaults';
+import { readJson, writeJson } from './storageJson';
 
 export const PERSIST_KEY = 'papaquebec.settings';
 
@@ -117,13 +118,7 @@ export function loadPersisted(
   panels: Panels,
   listSort: ListSort,
 ): Persisted {
-  let raw: unknown = null;
-  try {
-    const text = storage.getItem(PERSIST_KEY);
-    raw = text ? JSON.parse(text) : null;
-  } catch {
-    raw = null;
-  }
+  const raw = readJson(storage, PERSIST_KEY);
   const r = isRecord(raw) ? raw : {};
   return {
     settings: settingsFrom(r.settings, settings),
@@ -132,10 +127,7 @@ export function loadPersisted(
   };
 }
 
+/** Best effort: the scope works without storage. */
 export function savePersisted(storage: Storage, state: Persisted): void {
-  try {
-    storage.setItem(PERSIST_KEY, JSON.stringify(state));
-  } catch {
-    // Storage may be full or disabled; the scope works without it.
-  }
+  writeJson(storage, PERSIST_KEY, state);
 }

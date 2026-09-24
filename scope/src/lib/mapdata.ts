@@ -1,5 +1,14 @@
-/** Static geography the scope draws, as shipped in `public/map/*.json`. All positions are lat/lon degrees. */
-import { isRecord, isNum } from './guards';
+/**
+ * Static geography the scope draws, as shipped in `public/map/*.json`. All positions are
+ * lat/lon degrees. The aero schema is the one source of truth: the types are inferred from
+ * it, imports are validated against it, and `aero.schema.json` is generated from it.
+ */
+import * as z from 'zod/mini';
+import { _default as orDefault } from 'zod/mini';
+
+import { isRecord } from './guards';
+
+z.config(z.locales.en());
 
 export type LonLat = [number, number];
 export type LatLon = [number, number];
@@ -8,53 +17,72 @@ export interface CoastData {
   lines: LonLat[][];
 }
 
-export interface Waypoint {
-  id: string;
-  lat: number;
-  lon: number;
-}
-export interface Navaid extends Waypoint {
-  kind?: string;
-}
-export interface Route {
-  name: string;
-  points: LatLon[];
-}
-export interface AirspaceCircle {
-  name: string;
-  center: LatLon;
-  radiusNm: number;
-  dashed?: boolean;
-}
-
+const Pair = z.tuple([z.number(), z.number()]);
+const PairList = z.array(Pair);
+const Fix = z.object({ id: z.string(), lat: z.number(), lon: z.number() });
+const NavaidSchema = z.extend(Fix, { kind: z.optional(z.string()) });
+const RouteSchema = z.object({ name: z.string(), points: PairList });
+const CircleSchema = z.object({
+  name: z.string(),
+  center: Pair,
+  radiusNm: z.number(),
+  dashed: z.optional(z.boolean()),
+});
 /** A polygon airspace with optional vertical limits in feet. */
-export interface AirspacePolygon {
-  name: string;
-  kind?: string;
-  points: LatLon[];
-  dashed?: boolean;
-  lowerFt?: number;
-  upperFt?: number;
-}
+const PolygonSchema = z.object({
+  name: z.string(),
+  kind: z.optional(z.string()),
+  points: PairList.check(z.minLength(3)),
+  dashed: z.optional(z.boolean()),
+  lowerFt: z.optional(z.number()),
+  upperFt: z.optional(z.number()),
+});
+const AirspaceSchema = z.union([CircleSchema, PolygonSchema]);
+const AirportSchema = z.extend(Fix, { name: z.string() });
 
-export type Airspace = AirspaceCircle | AirspacePolygon;
+const LISTS = {
+  waypoints: Fix,
+  navaids: NavaidSchema,
+  airways: RouteSchema,
+  airspace: AirspaceSchema,
+  sectors: RouteSchema,
+  airports: AirportSchema,
+};
 
-export interface Airport extends Waypoint {
-  name: string;
-}
+/** The title a lenient parse gives a file that names none. */
+export const UNTITLED_AERO = 'aero.json';
 
-export interface AeroData {
-  waypoints: Waypoint[];
-  navaids: Navaid[];
-  airways: Route[];
-  airspace: Airspace[];
-  sectors: Route[];
-  airports: Airport[];
-  /** ISO date the data was fetched from its source, when known. */
-  fetched?: string;
-}
+/** The drawn lists alone; what several map sets merge into. */
+export const AeroLayersSchema = z.object({
+  waypoints: orDefault(z.array(LISTS.waypoints), []),
+  navaids: orDefault(z.array(LISTS.navaids), []),
+  airways: orDefault(z.array(LISTS.airways), []),
+  airspace: orDefault(z.array(LISTS.airspace), []),
+  sectors: orDefault(z.array(LISTS.sectors), []),
+  airports: orDefault(z.array(LISTS.airports), []),
+});
+
+export const AeroSchema = z.extend(AeroLayersSchema, {
+  title: z.string().check(z.minLength(1)).register(z.globalRegistry, {
+    description: 'Names the map set on the Maps panel; say where and when it is from.',
+  }),
+  note: z.optional(z.string()).register(z.globalRegistry, {
+    description: 'Attribution, license or provenance, free text.',
+  }),
+});
+
+export type Waypoint = z.infer<typeof Fix>;
+export type Navaid = z.infer<typeof NavaidSchema>;
+export type Route = z.infer<typeof RouteSchema>;
+export type AirspaceCircle = z.infer<typeof CircleSchema>;
+export type AirspacePolygon = z.infer<typeof PolygonSchema>;
+export type Airspace = z.infer<typeof AirspaceSchema>;
+export type Airport = z.infer<typeof AirportSchema>;
+export type AeroLayers = z.infer<typeof AeroLayersSchema>;
+export type AeroData = z.infer<typeof AeroSchema>;
 
 export const EMPTY_AERO: AeroData = {
+  title: UNTITLED_AERO,
   waypoints: [],
   navaids: [],
   airways: [],
@@ -63,23 +91,23 @@ export const EMPTY_AERO: AeroData = {
   airports: [],
 };
 
-const isPair = (v: unknown): v is [number, number] =>
-  Array.isArray(v) && isNum(v[0]) && isNum(v[1]);
-const isPairList = (v: unknown): v is [number, number][] => Array.isArray(v) && v.every(isPair);
-const isFix = (v: unknown): v is Waypoint =>
-  isRecord(v) && typeof v.id === 'string' && isNum(v.lat) && isNum(v.lon);
-const isRoute = (v: unknown): v is Route =>
-  isRecord(v) && typeof v.name === 'string' && isPairList(v.points);
-const isCircle = (v: unknown): v is AirspaceCircle =>
-  isRecord(v) && typeof v.name === 'string' && isPair(v.center) && isNum(v.radiusNm);
-const isPolygon = (v: unknown): v is AirspacePolygon =>
-  isRecord(v) && typeof v.name === 'string' && isPairList(v.points) && v.points.length >= 3;
-const isAirspace = (v: unknown): v is Airspace => isCircle(v) || isPolygon(v);
-const isAirport = (v: unknown): v is Airport =>
-  isFix(v) && 'name' in v && typeof v.name === 'string';
+/** The enabled map sets as one chart: every list concatenated in set order. */
+export function mergeAero(sets: readonly AeroLayers[]): AeroLayers {
+  return {
+    waypoints: sets.flatMap((s) => s.waypoints),
+    navaids: sets.flatMap((s) => s.navaids),
+    airways: sets.flatMap((s) => s.airways),
+    airspace: sets.flatMap((s) => s.airspace),
+    sectors: sets.flatMap((s) => s.sectors),
+    airports: sets.flatMap((s) => s.airports),
+  };
+}
 
-function list<T>(v: unknown, guard: (x: unknown) => x is T): T[] {
-  return Array.isArray(v) ? v.filter(guard) : [];
+const isPairList = (v: unknown): v is LonLat[] => PairList.safeParse(v).success;
+
+/** The entries of a list that fit their schema, in order; anything else is dropped. */
+function wellFormed(v: unknown, schema: z.ZodMiniType): unknown[] {
+  return Array.isArray(v) ? v.filter((item) => schema.safeParse(item).success) : [];
 }
 
 export function parseCoast(raw: unknown): CoastData {
@@ -92,13 +120,32 @@ export function parseCoast(raw: unknown): CoastData {
 /** Lenient: a malformed entry is dropped, not fatal, so a partial chart still draws. */
 export function parseAero(raw: unknown): AeroData {
   if (!isRecord(raw)) throw new Error('aero.json: unexpected shape');
-  return {
-    ...(typeof raw.fetched === 'string' ? { fetched: raw.fetched } : {}),
-    waypoints: list(raw.waypoints, isFix),
-    navaids: list(raw.navaids, isFix),
-    airways: list(raw.airways, isRoute),
-    airspace: list(raw.airspace, isAirspace),
-    sectors: list(raw.sectors, isRoute),
-    airports: list(raw.airports, isAirport),
-  };
+  const kept = Object.entries(LISTS).map(([k, schema]) => [k, wellFormed(raw[k], schema)]);
+  return AeroSchema.parse({
+    ...Object.fromEntries(kept),
+    title: typeof raw.title === 'string' && raw.title ? raw.title : UNTITLED_AERO,
+    ...(typeof raw.note === 'string' ? { note: raw.note } : {}),
+  });
+}
+
+export type AeroValidation = { ok: true; data: AeroData } | { ok: false; message: string };
+
+const SHOWN_ISSUES = 3;
+
+const pathOf = (path: readonly PropertyKey[]): string =>
+  path.reduce<string>(
+    (acc, k) => (typeof k === 'number' ? `${acc}[${k}]` : acc ? `${acc}.${String(k)}` : String(k)),
+    '',
+  );
+
+/** Strict: the whole file must match the schema, and the answer says where it does not. */
+export function validateAero(raw: unknown): AeroValidation {
+  const r = AeroSchema.safeParse(raw);
+  if (r.success) return { ok: true, data: r.data };
+  const issues = r.error.issues;
+  const lines = issues
+    .slice(0, SHOWN_ISSUES)
+    .map((i) => (i.path.length ? `${pathOf(i.path)}: ${i.message}` : i.message));
+  const more = issues.length - lines.length;
+  return { ok: false, message: lines.join('; ') + (more > 0 ? `; and ${more} more` : '') };
 }
