@@ -1,4 +1,4 @@
-import { type Altimeter, displayAltitude } from '../lib/altitude';
+import { type Altimeter, displayLevel } from '../lib/altitude';
 import { emergencyCode } from '../lib/format';
 import type { BandLimits } from './band';
 
@@ -42,15 +42,14 @@ export const altitudeUnfiltered = (f: Filter) => f.ground && !bandActive(f);
  */
 export function classify(t: Filterable, filter: Filter, altimeter: Altimeter): Visibility {
   if (emergencyCode(t.squawk, t.emergency)) return 'shown';
-  const d = displayAltitude(t.alt, altimeter);
-  if (d.kind === 'ground') {
+  const level = displayLevel(t.alt, altimeter);
+  if (level === 'ground') {
     if (!filter.ground) return 'filtered';
-  } else if (d.kind === 'unknown') {
+  } else if (level === undefined) {
     if (bandActive(filter)) return 'filtered';
   } else {
-    const hundreds = Math.round(d.feet / 100);
-    if (filter.lowerFl > FL_MIN && hundreds < filter.lowerFl) return 'filtered';
-    if (filter.upperFl < FL_MAX && hundreds > filter.upperFl) return 'filtered';
+    if (filter.lowerFl > FL_MIN && level < filter.lowerFl) return 'filtered';
+    if (filter.upperFl < FL_MAX && level > filter.upperFl) return 'filtered';
   }
   if (filter.squawk === 'nonvfr' && t.squawk !== undefined && VFR_SQUAWKS.has(t.squawk)) {
     return 'filtered';

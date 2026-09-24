@@ -32,10 +32,21 @@ export function displayAltitude(alt: number | 'ground' | undefined, a: Altimeter
     : { kind: 'level', feet: alt };
 }
 
+/** The hundreds of feet a data block prints for `alt`; ground and unknown pass through. */
+export function displayLevel(
+  alt: number | 'ground' | undefined,
+  a: Altimeter,
+): number | 'ground' | undefined {
+  const d = displayAltitude(alt, a);
+  if (d.kind === 'unknown') return undefined;
+  if (d.kind === 'ground') return 'ground';
+  return Math.round(d.feet / 100);
+}
+
 /** Three digits of hundreds of feet in whichever regime applies. */
 export function formatAltitude(alt: number | 'ground' | undefined, a: Altimeter): string {
-  const d = displayAltitude(alt, a);
-  if (d.kind === 'unknown') return '---';
-  if (d.kind === 'ground') return 'GND';
-  return String(Math.max(0, Math.round(d.feet / 100))).padStart(3, '0');
+  const level = displayLevel(alt, a);
+  if (level === undefined) return '---';
+  if (level === 'ground') return 'GND';
+  return String(Math.max(0, level)).padStart(3, '0');
 }

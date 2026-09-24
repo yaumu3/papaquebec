@@ -1,11 +1,11 @@
 import { type Accessor, createMemo, For } from 'solid-js';
 
 import { cx } from '../design/cx';
+import { displayLevel } from '../lib/altitude';
 import {
   altitudeProfile,
   axisTicks,
   binIndex,
-  displayLevel,
   edgeSpread,
   groundCount,
   scaleLabels,
@@ -143,9 +143,9 @@ function pickedBin(): number | 'ground' | null {
   const hex = selected();
   const t = hex === null ? undefined : trackStore.tracks.get(hex);
   if (t === undefined) return null;
-  if (t.alt === 'ground') return 'ground';
   const level = displayLevel(t.alt, settings.altimeter);
-  return level === null ? null : binIndex(level, BAND_LIMITS, BIN);
+  if (level === undefined) return null;
+  return level === 'ground' ? level : binIndex(level, BAND_LIMITS, BIN);
 }
 
 /** Back to the full band with ground traffic shown. */

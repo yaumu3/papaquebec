@@ -4,7 +4,6 @@ import {
   altitudeProfile,
   axisTicks,
   binIndex,
-  displayLevel,
   edgeSpread,
   groundCount,
   scaleLabels,
@@ -126,20 +125,6 @@ describe('groundCount', () => {
 
     // Assert
     expect(out).toBe(2);
-  });
-});
-
-describe('displayLevel', () => {
-  it('is the three-digit value the block shows, or null when there is none', () => {
-    // Arrange
-    const std = { transitionAltFt: 14000, qnhInHg: 29.92 };
-    const alts: (number | 'ground' | undefined)[] = [4950, 35000, 'ground', undefined];
-
-    // Act
-    const out = alts.map((alt) => displayLevel(alt, std));
-
-    // Assert
-    expect(out).toEqual([50, 350, null, null]);
   });
 });
 

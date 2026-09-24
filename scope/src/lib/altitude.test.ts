@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
-import { displayAltitude, formatAltitude, qnhAltitudeFt, STANDARD_ALTIMETER } from './altitude';
+import {
+  displayAltitude,
+  displayLevel,
+  formatAltitude,
+  qnhAltitudeFt,
+  STANDARD_ALTIMETER,
+} from './altitude';
 
 describe('qnhAltitudeFt', () => {
   it('corrects pressure altitude by about 925 ft per inHg', () => {
@@ -62,5 +68,19 @@ describe('formatAltitude', () => {
 
     // Assert
     expect(out).toEqual(['047', '330', 'GND', '---']);
+  });
+});
+
+describe('displayLevel', () => {
+  it('is the hundreds of feet the block prints, passing ground and unknown through', () => {
+    // Arrange
+    const altimeter = { transitionAltFt: 14000, qnhInHg: 29.62 };
+    const cases: (number | 'ground' | undefined)[] = [5000, 33000, 'ground', undefined];
+
+    // Act
+    const out = cases.map((alt) => displayLevel(alt, altimeter));
+
+    // Assert
+    expect(out).toEqual([47, 330, 'ground', undefined]);
   });
 });

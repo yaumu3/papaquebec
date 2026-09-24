@@ -1,4 +1,4 @@
-import { type Altimeter, displayAltitude } from '../lib/altitude';
+import { type Altimeter, displayLevel } from '../lib/altitude';
 import { type Band, type BandLimits, formatEdge, fraction } from './band';
 
 export interface AxisTick {
@@ -39,12 +39,6 @@ export function edgeSpread(b: Band, l: BandLimits, g: EdgeGeometry): number {
   return Math.max(0, (g.field - gap) / 2);
 }
 
-/** The three-digit value a block shows for `alt`, or null for ground and unknown. */
-export function displayLevel(alt: number | 'ground' | undefined, a: Altimeter): number | null {
-  const d = displayAltitude(alt, a);
-  return d.kind === 'ground' || d.kind === 'unknown' ? null : Math.round(d.feet / 100);
-}
-
 const binCount = (l: BandLimits, bin: number) => Math.ceil((l.max - l.min) / bin);
 
 /** Which profile bin a level falls in; anything past the top stop lands in the last. */
@@ -65,7 +59,7 @@ export function altitudeProfile(
   const out = Array.from({ length: binCount(l, bin) }, () => 0);
   for (const t of tracks) {
     const level = displayLevel(t.alt, a);
-    if (level === null) continue;
+    if (typeof level !== 'number') continue;
     const k = binIndex(level, l, bin);
     out[k] = (out[k] ?? 0) + 1;
   }
