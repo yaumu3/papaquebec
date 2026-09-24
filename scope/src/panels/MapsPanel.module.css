@@ -1,6 +1,3 @@
-.panel {
-  flex-shrink: 0;
-}
 .layers {
   display: grid;
   grid-template-columns: 1fr 1fr;

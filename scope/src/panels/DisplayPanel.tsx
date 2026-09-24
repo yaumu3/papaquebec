@@ -15,8 +15,6 @@ import { Toggle } from '../ui/Toggle';
 import { Window } from '../ui/Window';
 import { AltitudeAxis } from './AltitudeAxis';
 
-import s from './DisplayPanel.module.css';
-
 const RANGES = {
   transitionAltFt: [0, TRANSITION_ALT_MAX_FT],
   qnhInHg: [QNH_MIN_INHG, QNH_MAX_INHG],
@@ -42,7 +40,7 @@ function setStation(input: string): void {
 
 export function DisplayPanel() {
   return (
-    <Window id="display" title="Display" class={s.panel}>
+    <Window id="display" title="Display">
       <SectionTitle>VECTOR</SectionTitle>
       <Pills
         options={[

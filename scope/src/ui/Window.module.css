@@ -1,6 +1,8 @@
+/* Docked windows keep their height; the phone sheet shrinks them and scrolls the body instead. */
 .win {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   min-height: 0;
   background: var(--panel-glass);
   border: 1px solid var(--panel-border);
