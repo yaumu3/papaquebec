@@ -38,6 +38,21 @@ describe('createMapSets', () => {
     expect(sets.aero().waypoints.map((w) => w.id)).toEqual(['CHIBA']);
   });
 
+  it('drops an import titled like the built-in set once that set loads', () => {
+    // Arrange
+    const storage = memoryStorage();
+    const sets = createMapSets(storage);
+    sets.importMapSet(JSON.stringify({ ...fixes, title: 'openAIP JP 2026-09-24' }), 'a');
+
+    // Act
+    sets.setBuiltinAero({ ...EMPTY_AERO, title: 'openAIP JP 2026-09-24' });
+
+    // Assert
+    expect(sets.mapSets().map((s) => s.id)).toEqual([BUILTIN_ID]);
+    expect(sets.aero().waypoints).toEqual([]);
+    expect(loadMapSets(storage).imported).toEqual([]);
+  });
+
   it('adds a valid import, enabled and persisted', () => {
     // Arrange
     const storage = memoryStorage();

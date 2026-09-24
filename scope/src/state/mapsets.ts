@@ -70,13 +70,14 @@ export function createMapSets(storage: Storage | null): MapSets {
     mapSets: () => store.sets,
     aero: aero.get,
     setBuiltinAero(data) {
-      // Assigned whole: a value set at the `data` path would merge into the placeholder.
-      setStore(
-        'sets',
-        (s) => s.builtin,
-        (set) => ({ ...set, data }),
+      // The built-in set is assigned whole, since a value set at its `data` path would merge
+      // into the placeholder. An import titled like it, made while it had another title, goes.
+      setStore('sets', (sets) =>
+        sets
+          .map((set) => (set.builtin ? { ...set, data } : set))
+          .filter((set) => set.builtin || set.data.title !== data.title),
       );
-      aero.invalidate();
+      commit();
     },
     importMapSet(text, id = freshId()) {
       let raw: unknown;
