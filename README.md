@@ -102,7 +102,12 @@ access allowed; NOAA's own Aviation Weather Center does not, hence the `?wx=` pr
 The site comes from `PQ_SITE` (`lat,lon`) or the tar1090 at `PQ_TAR1090`; pass `<lat> <lon>` and
 optionally a radius to either script to override it.
 
-openAIP carries no IFR waypoints or airways, so those layers stay empty.
+openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
+brought in through the Maps panel: `IMPORT JSON…` takes a file in the `aero.json` format, checked
+against `/aero.schema.json` (served by the scope, generated from the code) before it is accepted.
+Each set lists under `DATA` with its title and fetch date and can be toggled or removed; the openAIP
+set generated at start is the one that stays. Imported sets live in the browser's storage, so they
+are per device.
 
 ## Design
 
