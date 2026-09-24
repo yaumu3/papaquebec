@@ -1,5 +1,4 @@
-import { type Band, formatEdge, parseEdge, withLower, withUpper } from '../state/band';
-import { BAND_LIMITS, type SquawkFilter } from '../state/filter';
+import type { SquawkFilter } from '../state/filter';
 import { qnhStation } from '../state/qnh';
 import {
   QNH_MAX_INHG,
@@ -9,12 +8,12 @@ import {
   STATION_RE,
   TRANSITION_ALT_MAX_FT,
 } from '../state/settings';
-import { BandSlider } from '../ui/BandSlider';
 import { Field, FieldRow, FieldSlot } from '../ui/Field';
 import { Pills } from '../ui/Pills';
 import { Divider, SectionTitle } from '../ui/Section';
 import { Toggle } from '../ui/Toggle';
 import { Window } from '../ui/Window';
+import { AltitudeAxis } from './AltitudeAxis';
 
 import s from './DisplayPanel.module.css';
 
@@ -39,30 +38,6 @@ function setManualQnh(value: number): void {
 function setStation(input: string): void {
   const station = input.trim().toUpperCase();
   if (station === '' || STATION_RE.test(station)) setSettings('qnh', 'station', station);
-}
-
-const band = () => ({ lower: settings.filter.lowerFl, upper: settings.filter.upperFl });
-const setBand = (b: Band) => setSettings('filter', { lowerFl: b.lower, upperFl: b.upper });
-const withLowerEdge = (b: Band, v: number) => withLower(b, v, BAND_LIMITS);
-const withUpperEdge = (b: Band, v: number) => withUpper(b, v, BAND_LIMITS);
-
-/** A typed edge moves like a dragged thumb; unreadable input is put back as it was. */
-function BandEdge(props: { label: string; value: number; move: (b: Band, v: number) => Band }) {
-  return (
-    <Field label={props.label}>
-      <input
-        type="text"
-        maxlength={3}
-        spellcheck={false}
-        value={formatEdge(props.value, BAND_LIMITS)}
-        onChange={(e) => {
-          const v = parseEdge(e.currentTarget.value, BAND_LIMITS);
-          if (v === null) e.currentTarget.value = formatEdge(props.value, BAND_LIMITS);
-          else setBand(props.move(band(), v));
-        }}
-      />
-    </Field>
-  );
 }
 
 export function DisplayPanel() {
@@ -92,19 +67,7 @@ export function DisplayPanel() {
       />
       <Divider />
       <SectionTitle>ALTITUDE</SectionTitle>
-      <BandSlider
-        min={BAND_LIMITS.min}
-        max={BAND_LIMITS.max}
-        step={10}
-        gap={BAND_LIMITS.gap}
-        lower={settings.filter.lowerFl}
-        upper={settings.filter.upperFl}
-        onChange={(lo, hi) => setBand({ lower: lo, upper: hi })}
-      />
-      <FieldRow>
-        <BandEdge label="LOWER" value={settings.filter.lowerFl} move={withLowerEdge} />
-        <BandEdge label="UPPER" value={settings.filter.upperFl} move={withUpperEdge} />
-      </FieldRow>
+      <AltitudeAxis />
       <SectionTitle>ALTIMETER</SectionTitle>
       <FieldRow>
         <Field label="TA ft">

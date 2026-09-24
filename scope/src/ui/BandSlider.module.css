@@ -57,3 +57,45 @@
   border-radius: 0;
   cursor: grab;
 }
+
+.vertical {
+  width: 22px;
+  height: 100%;
+  margin: 0;
+}
+.vertical .track {
+  inset: 0 auto 0 9px;
+  width: 4px;
+  height: auto;
+}
+.vertical .fill {
+  top: auto;
+  left: 9px;
+  width: 4px;
+}
+.vertical input[type='range'] {
+  inset: 0;
+  width: 22px;
+  height: 100%;
+  writing-mode: vertical-lr;
+  direction: rtl;
+  touch-action: none;
+}
+.vertical input[type='range']::-webkit-slider-runnable-track {
+  width: 22px;
+  height: 100%;
+}
+.vertical input[type='range']::-moz-range-track {
+  width: 22px;
+  height: 100%;
+}
+.vertical input[type='range']::-webkit-slider-thumb {
+  width: 16px;
+  height: var(--thumb);
+  margin-top: 0;
+  margin-left: 3px;
+}
+.vertical input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: var(--thumb);
+}

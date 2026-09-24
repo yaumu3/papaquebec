@@ -40,3 +40,8 @@ export function parseEdge(text: string, l: BandLimits): number | null {
   const v = Number(t);
   return v >= l.min && v <= l.max ? v : null;
 }
+
+/** Where a value sits between the stops, 0 at min and 1 at max. */
+export function fraction(v: number, l: BandLimits): number {
+  return Math.min(1, Math.max(0, (v - l.min) / (l.max - l.min)));
+}
