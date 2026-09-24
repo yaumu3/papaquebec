@@ -49,9 +49,9 @@ function formatDistance(t: Track): string {
 export function ListPanel() {
   const rows = createMemo(() => {
     snapshotVersion();
-    const { lowerFl, upperFl, squawk } = settings.filter;
+    const { ground, lowerFl, upperFl, squawk } = settings.filter;
     const shown = [...trackStore.tracks.values()].filter(
-      (t) => classify(t, { lowerFl, upperFl, squawk }) === 'shown',
+      (t) => classify(t, { ground, lowerFl, upperFl, squawk }) === 'shown',
     );
     return sortTracks(shown, listSort());
   });

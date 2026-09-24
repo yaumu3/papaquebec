@@ -3,6 +3,8 @@ import { emergencyCode } from '../lib/format';
 export type SquawkFilter = 'all' | 'nonvfr' | 'emergency';
 
 export interface Filter {
+  /** Whether ground traffic is shown; the band governs airborne traffic only. */
+  ground: boolean;
   lowerFl: number;
   upperFl: number;
   squawk: SquawkFilter;
@@ -30,10 +32,12 @@ const bandActive = (f: Filter) => f.lowerFl > FL_MIN || f.upperFl < FL_MAX;
  */
 export function classify(t: Filterable, filter: Filter): Visibility {
   if (emergencyCode(t.squawk, t.emergency)) return 'shown';
-  if (t.alt === undefined) {
+  if (t.alt === 'ground') {
+    if (!filter.ground) return 'filtered';
+  } else if (t.alt === undefined) {
     if (bandActive(filter)) return 'filtered';
   } else {
-    const fl = t.alt === 'ground' ? 0 : t.alt / 100;
+    const fl = t.alt / 100;
     if (fl < filter.lowerFl || fl > filter.upperFl) return 'filtered';
   }
   if (filter.squawk === 'nonvfr' && t.squawk !== undefined && VFR_SQUAWKS.has(t.squawk)) {

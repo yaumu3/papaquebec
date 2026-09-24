@@ -62,7 +62,7 @@ function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
   return {
     tracks,
     now: 1008,
-    filter: { lowerFl: 0, upperFl: 600, squawk: 'all' },
+    filter: { ground: true, lowerFl: 0, upperFl: 600, squawk: 'all' },
     vectorMin: 2,
     trailSec: 60,
     selected: null,
@@ -104,7 +104,7 @@ describe('buildTargets', () => {
 
     // Act
     const { batches } = buildTargets(
-      input([t], { filter: { lowerFl: 0, upperFl: 200, squawk: 'all' } }),
+      input([t], { filter: { ground: true, lowerFl: 0, upperFl: 200, squawk: 'all' } }),
     );
 
     // Assert
@@ -116,7 +116,7 @@ describe('buildTargets', () => {
   it('renders a filtered target in full while it is selected', () => {
     // Arrange
     const t = track({ alt: 45000 });
-    const band = { lowerFl: 0, upperFl: 200, squawk: 'all' as const };
+    const band = { ground: true, lowerFl: 0, upperFl: 200, squawk: 'all' as const };
 
     // Act
     const { batches } = buildTargets(input([t], { filter: band, selected: '867a01' }));

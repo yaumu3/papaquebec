@@ -108,7 +108,7 @@ export const DEFAULT_SETTINGS: Settings = {
   rangeNm: 40,
   vectorMin: 2,
   trailSec: 60,
-  filter: { lowerFl: 0, upperFl: 600, squawk: 'all' },
+  filter: { ground: true, lowerFl: 0, upperFl: 600, squawk: 'all' },
   layers: { ...MAP_PRESETS.approach },
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },

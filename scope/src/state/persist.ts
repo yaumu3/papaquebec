@@ -43,7 +43,11 @@ function filterFrom(raw: unknown, fallback: Filter): Filter {
     lower >= FL_MIN && upper <= FL_MAX && lower < upper
       ? { lowerFl: lower, upperFl: upper }
       : fallback;
-  return { ...band, squawk: oneOf(SQUAWK_FILTERS, raw.squawk, fallback.squawk) };
+  return {
+    ...band,
+    ground: bool(raw.ground, fallback.ground),
+    squawk: oneOf(SQUAWK_FILTERS, raw.squawk, fallback.squawk),
+  };
 }
 
 function layersFrom(raw: unknown, fallback: Layers): Layers {
