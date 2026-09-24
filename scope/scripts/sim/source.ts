@@ -57,7 +57,7 @@ export function createSimSource(
           squawk: a.squawk,
           lat,
           lon,
-          alt_baro: Math.round(a.alt),
+          alt_baro: a.ground ? 'ground' : Math.round(a.alt),
           gs: a.gs,
           track: a.track,
           baro_rate: a.baroRate,
