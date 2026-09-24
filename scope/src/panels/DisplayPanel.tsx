@@ -1,4 +1,5 @@
-import type { SquawkFilter } from '../state/filter';
+import { type Band, formatEdge, parseEdge, withLower, withUpper } from '../state/band';
+import { BAND_LIMITS, type SquawkFilter } from '../state/filter';
 import { qnhStation } from '../state/qnh';
 import {
   QNH_MAX_INHG,
@@ -40,7 +41,29 @@ function setStation(input: string): void {
   if (station === '' || STATION_RE.test(station)) setSettings('qnh', 'station', station);
 }
 
-const fl = (v: number) => `FL${String(v).padStart(3, '0')}`;
+const band = () => ({ lower: settings.filter.lowerFl, upper: settings.filter.upperFl });
+const setBand = (b: Band) => setSettings('filter', { lowerFl: b.lower, upperFl: b.upper });
+const withLowerEdge = (b: Band, v: number) => withLower(b, v, BAND_LIMITS);
+const withUpperEdge = (b: Band, v: number) => withUpper(b, v, BAND_LIMITS);
+
+/** A typed edge moves like a dragged thumb; unreadable input is put back as it was. */
+function BandEdge(props: { label: string; value: number; move: (b: Band, v: number) => Band }) {
+  return (
+    <Field label={props.label}>
+      <input
+        type="text"
+        maxlength={3}
+        spellcheck={false}
+        value={formatEdge(props.value, BAND_LIMITS)}
+        onChange={(e) => {
+          const v = parseEdge(e.currentTarget.value, BAND_LIMITS);
+          if (v === null) e.currentTarget.value = formatEdge(props.value, BAND_LIMITS);
+          else setBand(props.move(band(), v));
+        }}
+      />
+    </Field>
+  );
+}
 
 export function DisplayPanel() {
   return (
@@ -68,18 +91,20 @@ export function DisplayPanel() {
         onChange={(v) => setSettings('trailSec', v)}
       />
       <Divider />
-      <SectionTitle lit={`${fl(settings.filter.lowerFl)} – ${fl(settings.filter.upperFl)}`}>
-        ALTITUDE
-      </SectionTitle>
+      <SectionTitle>ALTITUDE</SectionTitle>
       <BandSlider
-        min={0}
-        max={600}
+        min={BAND_LIMITS.min}
+        max={BAND_LIMITS.max}
         step={10}
-        gap={10}
+        gap={BAND_LIMITS.gap}
         lower={settings.filter.lowerFl}
         upper={settings.filter.upperFl}
-        onChange={(lo, hi) => setSettings('filter', { lowerFl: lo, upperFl: hi })}
+        onChange={(lo, hi) => setBand({ lower: lo, upper: hi })}
       />
+      <FieldRow>
+        <BandEdge label="LOWER" value={settings.filter.lowerFl} move={withLowerEdge} />
+        <BandEdge label="UPPER" value={settings.filter.upperFl} move={withUpperEdge} />
+      </FieldRow>
       <SectionTitle>ALTIMETER</SectionTitle>
       <FieldRow>
         <Field label="TA ft">

@@ -1,5 +1,6 @@
 import { type Altimeter, displayAltitude } from '../lib/altitude';
 import { emergencyCode } from '../lib/format';
+import type { BandLimits } from './band';
 
 export type SquawkFilter = 'all' | 'nonvfr' | 'emergency';
 
@@ -24,6 +25,8 @@ const VFR_SQUAWKS = new Set(['1200', '1201', '1202', '7000']);
 
 export const FL_MIN = 0;
 export const FL_MAX = 600;
+/** The band slider's range and the least width it can be squeezed to, in hundreds of feet. */
+export const BAND_LIMITS: BandLimits = { min: FL_MIN, max: FL_MAX, gap: 10 };
 
 const bandActive = (f: Filter) => f.lowerFl > FL_MIN || f.upperFl < FL_MAX;
 
