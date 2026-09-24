@@ -63,12 +63,15 @@ export const AeroLayersSchema = z.object({
 });
 
 export const AeroSchema = z.extend(AeroLayersSchema, {
-  /** Names the map set on the Maps panel. */
-  title: z.string().check(z.minLength(1)),
-  /** Attribution, license or provenance, free text. */
-  note: z.optional(z.string()),
-  /** ISO date the data was fetched from its source, when known. */
-  fetched: z.optional(z.string()),
+  title: z.string().check(z.minLength(1)).register(z.globalRegistry, {
+    description: 'Names the map set on the Maps panel.',
+  }),
+  note: z.optional(z.string()).register(z.globalRegistry, {
+    description: 'Attribution, license or provenance, free text.',
+  }),
+  fetched: z.optional(z.string()).register(z.globalRegistry, {
+    description: 'ISO date the data was fetched from its source, when known.',
+  }),
 });
 
 export type Waypoint = z.infer<typeof Fix>;
