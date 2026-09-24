@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { aeroJsonSchema } from './schema';
 
 describe('aeroJsonSchema', () => {
-  it('describes a titled file whose lists may be omitted', () => {
+  it('describes a titled file whose lists may be omitted and whose unknown keys pass', () => {
     // Arrange
     const lists = ['waypoints', 'navaids', 'airways', 'airspace', 'sectors', 'airports'];
 
@@ -18,6 +18,7 @@ describe('aeroJsonSchema', () => {
       expect.arrayContaining([...lists, 'title', 'note']),
     );
     expect(schema.properties).not.toHaveProperty('fetched');
+    expect(schema.additionalProperties).toBeUndefined();
     expect(schema.properties.title).toMatchObject({
       description: expect.stringMatching(/Maps panel/),
     });
