@@ -1,5 +1,6 @@
 import { isRecord } from '../lib/guards';
 import { type AeroData, validateAero } from '../lib/mapdata';
+import { readJson, writeJson } from './storageJson';
 
 export const MAPSETS_KEY = 'papaquebec.mapsets';
 
@@ -25,13 +26,7 @@ function importedFrom(raw: unknown): ImportedMapSet | null {
 
 /** Every stored set is validated again; one that no longer fits the schema is dropped. */
 export function loadMapSets(storage: Storage): MapSetsPersisted {
-  let raw: unknown = null;
-  try {
-    const text = storage.getItem(MAPSETS_KEY);
-    raw = text ? JSON.parse(text) : null;
-  } catch {
-    raw = null;
-  }
+  const raw = readJson(storage, MAPSETS_KEY);
   if (!isRecord(raw)) return { ...DEFAULT_MAPSETS };
   const imported = Array.isArray(raw.imported) ? raw.imported : [];
   return {
@@ -43,10 +38,5 @@ export function loadMapSets(storage: Storage): MapSetsPersisted {
 
 /** False when the browser refused the write, typically for want of space. */
 export function saveMapSets(storage: Storage, state: MapSetsPersisted): boolean {
-  try {
-    storage.setItem(MAPSETS_KEY, JSON.stringify(state));
-    return true;
-  } catch {
-    return false;
-  }
+  return writeJson(storage, MAPSETS_KEY, state);
 }
