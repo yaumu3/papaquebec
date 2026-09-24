@@ -12,3 +12,20 @@ export function memoryStorage(initial: Record<string, string> = {}): Storage {
     },
   };
 }
+
+/** A storage that refuses every write, as a browser does once its quota is spent. */
+export function fullStorage(): Storage {
+  const inner = memoryStorage();
+  return {
+    getItem: (k) => inner.getItem(k),
+    setItem: () => {
+      throw new Error('quota exceeded');
+    },
+    removeItem: (k) => inner.removeItem(k),
+    clear: () => inner.clear(),
+    key: (i) => inner.key(i),
+    get length() {
+      return inner.length;
+    },
+  };
+}

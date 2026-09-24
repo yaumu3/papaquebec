@@ -1,6 +1,6 @@
 import { For } from 'solid-js';
 
-import { aero } from '../state/scope';
+import { mapSets, toggleMapSet } from '../state/mapsets';
 import {
   activePreset,
   applyPreset,
@@ -53,7 +53,21 @@ export function MapsPanel() {
         </For>
       </div>
       <Divider />
-      <SectionTitle lit={`openAIP · ${aero().fetched ?? '----'}`}>DATA</SectionTitle>
+      <SectionTitle>DATA</SectionTitle>
+      <div class={s.sets}>
+        <For each={mapSets()}>
+          {(set) => (
+            <div class={s.set}>
+              <Toggle
+                label={set.data.title}
+                on={set.enabled}
+                onToggle={() => toggleMapSet(set.id)}
+              />
+              <span class={s.fetched}>{set.data.fetched ?? ''}</span>
+            </div>
+          )}
+        </For>
+      </div>
       <Divider />
       <SectionTitle>LABEL DENSITY</SectionTitle>
       <Pills

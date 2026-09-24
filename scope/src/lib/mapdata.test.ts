@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { EMPTY_AERO, parseAero, parseCoast, UNTITLED_AERO, validateAero } from './mapdata';
+import {
+  EMPTY_AERO,
+  mergeAero,
+  parseAero,
+  parseCoast,
+  UNTITLED_AERO,
+  validateAero,
+} from './mapdata';
 
 describe('parseCoast', () => {
   it('keeps well-formed lines and drops the rest', () => {
@@ -171,5 +178,25 @@ describe('validateAero', () => {
 
     // Assert
     expect(out.ok).toBe(false);
+  });
+});
+
+describe('mergeAero', () => {
+  it('concatenates every list in set order', () => {
+    // Arrange
+    const a = { ...EMPTY_AERO, waypoints: [{ id: 'ORAMO', lat: 33.8, lon: 130.7 }] }; // north-east of RJFF
+    const b = {
+      ...EMPTY_AERO,
+      waypoints: [{ id: 'CHIBA', lat: 35.6, lon: 140.1 }], // Chiba
+      airports: [{ id: 'RJAA', name: 'NARITA INTL', lat: 35.765, lon: 140.386 }],
+    };
+
+    // Act
+    const merged = mergeAero([a, b]);
+
+    // Assert
+    expect(merged.waypoints.map((w) => w.id)).toEqual(['ORAMO', 'CHIBA']);
+    expect(merged.airports.map((p) => p.id)).toEqual(['RJAA']);
+    expect(merged.airways).toEqual([]);
   });
 });

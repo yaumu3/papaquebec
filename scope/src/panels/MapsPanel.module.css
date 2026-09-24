@@ -6,3 +6,24 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--space-1);
 }
+.sets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.set {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.set > button:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fetched {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+}

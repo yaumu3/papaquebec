@@ -1,11 +1,14 @@
 import { createSignal } from 'solid-js';
 
 import type { Vec2 } from '../lib/geo';
-import { type AeroData, type CoastData, EMPTY_AERO } from '../lib/mapdata';
+import type { CoastData } from '../lib/mapdata';
 import type { ListSort } from './listSort';
+import { aero } from './mapsets';
 import { type PanelId, persisted } from './settings';
 
 export type { PanelId };
+/** The enabled map sets merged; see `mapsets`. */
+export { aero };
 import type { Fix } from './track';
 
 /** Feed liveness, as readsb reports it; the scope keeps no timer of its own beyond "when did we last hear". */
@@ -110,4 +113,3 @@ export const [modeText, setModeText] = createSignal<string | null>(null);
 /** One-hertz wall clock for the top bar and feed staleness. */
 export const [tick, setTick] = createSignal(Date.now());
 export const [coast, setCoast] = createSignal<CoastData>({ lines: [] });
-export const [aero, setAero] = createSignal<AeroData>(EMPTY_AERO);

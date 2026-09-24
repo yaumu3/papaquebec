@@ -94,6 +94,18 @@ export const EMPTY_AERO: AeroData = {
   airports: [],
 };
 
+/** The enabled map sets as one chart: every list concatenated in set order. */
+export function mergeAero(sets: readonly AeroLayers[]): AeroLayers {
+  return {
+    waypoints: sets.flatMap((s) => s.waypoints),
+    navaids: sets.flatMap((s) => s.navaids),
+    airways: sets.flatMap((s) => s.airways),
+    airspace: sets.flatMap((s) => s.airspace),
+    sectors: sets.flatMap((s) => s.sectors),
+    airports: sets.flatMap((s) => s.airports),
+  };
+}
+
 const isPairList = (v: unknown): v is LonLat[] => PairList.safeParse(v).success;
 
 /** The well-formed entries of a list, in order; anything else is dropped. */
