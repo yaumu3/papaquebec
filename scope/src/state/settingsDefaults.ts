@@ -1,5 +1,5 @@
 import { type Altimeter, STANDARD_ALTIMETER } from '../lib/altitude';
-import type { Filter } from './filter';
+import { FL_MAX, type Filter } from './filter';
 
 /** Range presets on the Display panel; the wheel zooms continuously between the limits. */
 export const RANGE_STEPS = [10, 20, 40, 80, 200] as const;
@@ -108,7 +108,7 @@ export const DEFAULT_SETTINGS: Settings = {
   rangeNm: 40,
   vectorMin: 2,
   trailSec: 60,
-  filter: { ground: true, lowerFl: 0, upperFl: 600, squawk: 'all' },
+  filter: { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' },
   layers: { ...MAP_PRESETS.approach },
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },

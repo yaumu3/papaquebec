@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER } from '../lib/altitude';
-import { classify, type Filter } from './filter';
+import { classify, type Filter, FL_MAX, FL_MIN } from './filter';
 
-const base: Filter = { ground: true, lowerFl: 0, upperFl: 600, squawk: 'all' };
+const base: Filter = { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' };
 
 describe('classify', () => {
   it('shows a target of unknown altitude only while no band is set', () => {
@@ -120,7 +120,7 @@ describe('classify with a local altimeter', () => {
 describe('classify at the stops', () => {
   it('treats an edge at its stop as open, whatever the block shows beyond it', () => {
     // Arrange
-    const filter: Filter = { ...base, lowerFl: 0, upperFl: 600 };
+    const filter: Filter = { ...base, lowerFl: FL_MIN, upperFl: FL_MAX };
     const low = { transitionAltFt: 14000, qnhInHg: 28.5 }; // blocks read below 000 near sea level
     const targets = [
       { alt: 65000, squawk: '2000', emergency: undefined },

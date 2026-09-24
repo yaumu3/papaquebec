@@ -24,7 +24,7 @@ export type Visibility = 'shown' | 'filtered';
 const VFR_SQUAWKS = new Set(['1200', '1201', '1202', '7000']);
 
 export const FL_MIN = 0;
-export const FL_MAX = 600;
+export const FL_MAX = 500;
 /** The band slider's range and the least width it can be squeezed to, in hundreds of feet. */
 export const BAND_LIMITS: BandLimits = { min: FL_MIN, max: FL_MAX, gap: 10 };
 

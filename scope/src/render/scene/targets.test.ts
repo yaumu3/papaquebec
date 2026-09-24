@@ -62,7 +62,7 @@ function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
   return {
     tracks,
     now: 1008,
-    filter: { ground: true, lowerFl: 0, upperFl: 600, squawk: 'all' },
+    filter: { ground: true, lowerFl: 0, upperFl: 500, squawk: 'all' },
     vectorMin: 2,
     trailSec: 60,
     selected: null,
