@@ -14,6 +14,7 @@ import { MapsPanel } from './panels/MapsPanel';
 import { Overlays } from './panels/Overlays';
 import { TabBar } from './panels/TabBar';
 import { TopBar } from './panels/TopBar';
+import { keepUnscrolled } from './state/layout';
 import { setBuiltinAero } from './state/mapsets';
 import { QNH_POLL_MS, qnhReport, setQnhError, setQnhReport, stationCandidates } from './state/qnh';
 import { listSort, panels, selected, setCoast, setSelectedTrace, setTick } from './state/scope';
@@ -49,9 +50,11 @@ export function App() {
         setSelectedTrace({ hex, fixes });
       });
     });
+    const unscroll = keepUnscrolled(window);
     onCleanup(() => {
       clearInterval(clock);
       disconnect();
+      unscroll();
     });
     void loadJson('./map/coast.json')
       .then((raw) => setCoast(parseCoast(raw)))
