@@ -1,4 +1,4 @@
-import type { Altimeter } from '../lib/altitude';
+import { type Altimeter, displayAltitude } from '../lib/altitude';
 import { type Band, type BandLimits, formatEdge, fraction } from './band';
 
 export interface AxisTick {
@@ -37,4 +37,44 @@ export interface EdgeGeometry {
 export function edgeSpread(b: Band, l: BandLimits, g: EdgeGeometry): number {
   const gap = (fraction(b.upper, l) - fraction(b.lower, l)) * g.track;
   return Math.max(0, (g.field - gap) / 2);
+}
+
+/** The three-digit value a block shows for `alt`, or null for ground and unknown. */
+export function displayLevel(alt: number | 'ground' | undefined, a: Altimeter): number | null {
+  const d = displayAltitude(alt, a);
+  return d.kind === 'ground' || d.kind === 'unknown' ? null : Math.round(d.feet / 100);
+}
+
+const binCount = (l: BandLimits, bin: number) => Math.ceil((l.max - l.min) / bin);
+
+/** Which profile bin a level falls in; anything past the top stop lands in the last. */
+export function binIndex(level: number, l: BandLimits, bin: number): number {
+  return Math.min(binCount(l, bin) - 1, Math.max(0, Math.floor((level - l.min) / bin)));
+}
+
+/**
+ * Airborne targets per bin of the value their blocks show, from the bottom stop up;
+ * a target above the top stop lands in the last bin. Ground and unknown count nowhere.
+ */
+export function altitudeProfile(
+  tracks: Iterable<{ alt: number | 'ground' | undefined }>,
+  a: Altimeter,
+  l: BandLimits,
+  bin: number,
+): number[] {
+  const out = Array.from({ length: binCount(l, bin) }, () => 0);
+  for (const t of tracks) {
+    const level = displayLevel(t.alt, a);
+    if (level === null) continue;
+    const k = binIndex(level, l, bin);
+    out[k] = (out[k] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** Targets reporting on the ground: the bin below the scale. */
+export function groundCount(tracks: Iterable<{ alt: number | 'ground' | undefined }>): number {
+  let n = 0;
+  for (const t of tracks) if (t.alt === 'ground') n += 1;
+  return n;
 }

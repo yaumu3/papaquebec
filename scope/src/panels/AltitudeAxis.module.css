@@ -1,4 +1,4 @@
-/* Column widths and the readout lane. */
+/* Column widths and the readout lane, shared by the axis and the GND row below it. */
 .altitude {
   --scale: 26px;
   --slider: 22px; /* BandSlider's vertical width */
@@ -30,6 +30,20 @@
 .side {
   position: relative;
   flex: 1;
+}
+.profile {
+  position: absolute;
+  inset: 0 var(--lane) 0 0;
+}
+.bar {
+  position: absolute;
+  left: 0;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--panel-bg);
+  background: var(--text-muted);
+}
+.lit {
+  background: var(--control-on-border);
 }
 .ta {
   position: absolute;
@@ -64,4 +78,51 @@
   outline: none;
   border-color: var(--accent);
   background: var(--control-bg);
+}
+.foot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-1);
+  font-size: var(--text-sm);
+}
+.foot .side {
+  display: flex;
+  align-items: center;
+  height: 14px;
+}
+.gnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--text-dim);
+  font: inherit;
+}
+.gndLabel {
+  width: var(--scale);
+  text-align: right;
+}
+.swatch {
+  box-sizing: border-box;
+  width: var(--slider);
+  height: 14px;
+  background: var(--control-bg);
+  border: 1px solid var(--panel-border);
+}
+.gnd:hover .swatch {
+  background: var(--control-hover);
+}
+.gndOn .swatch {
+  background: var(--color-ground);
+  border-color: var(--color-ground);
+}
+.gndBar {
+  position: static;
+  max-width: calc(100% - var(--lane));
+}
+.gndLit {
+  background: var(--color-ground);
 }
