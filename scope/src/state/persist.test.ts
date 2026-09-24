@@ -1,22 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ListSort } from './listSort';
+import { memoryStorage } from './memoryStorage';
 import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
 import { DEFAULT_SETTINGS } from './settings';
-
-function memoryStorage(initial: Record<string, string> = {}): Storage {
-  const map = new Map(Object.entries(initial));
-  return {
-    getItem: (k) => map.get(k) ?? null,
-    setItem: (k, v) => void map.set(k, v),
-    removeItem: (k) => void map.delete(k),
-    clear: () => map.clear(),
-    key: (i) => [...map.keys()][i] ?? null,
-    get length() {
-      return map.size;
-    },
-  };
-}
 
 const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
 const DEFAULT_SORT: ListSort = { key: 'id', dir: 'asc' };
