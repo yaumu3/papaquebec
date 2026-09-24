@@ -133,6 +133,7 @@ function GroundRow(props: { traffic: Accessor<Traffic> }) {
 function Axis(props: { traffic: Accessor<Traffic> }) {
   return (
     <div class={s.axis} style={{ height: `${AXIS_PX}px` }}>
+      <For each={TICKS}>{(t) => <div class={s.grid} style={{ bottom: at(t.at) }} />}</For>
       <div class={s.scale}>
         <For each={scaleLabels(TICKS, transitionLevel(settings.altimeter), LABEL_GAP)}>
           {(t) => (

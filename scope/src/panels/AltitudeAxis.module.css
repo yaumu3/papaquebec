@@ -45,6 +45,13 @@
 .lit {
   background: var(--control-on-border);
 }
+.grid {
+  position: absolute;
+  left: calc(var(--scale) + var(--slider) + 2 * var(--space-2));
+  right: 0;
+  border-top: 1px solid var(--control-bg);
+  transform: translateY(1px);
+}
 .ta {
   position: absolute;
   left: 0;
