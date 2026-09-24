@@ -5,6 +5,7 @@ import {
   armRemoval,
   importMapSet,
   importNote,
+  type MapSet,
   mapSets,
   removeMapSet,
   toggleMapSet,
@@ -75,14 +76,66 @@ function MapSetImport() {
   );
 }
 
-export function MapsPanel() {
-  // The set whose remove control was clicked once; the next click on it removes, CANCEL or Escape disarms.
+/** One source: its toggle, and for an imported set the two-step remove control. */
+function MapSetRow(props: {
+  set: MapSet;
+  armed: boolean;
+  onRemoveClick: () => void;
+  onDisarm: () => void;
+}) {
+  return (
+    <div class={s.set}>
+      <Toggle
+        label={props.set.data.title}
+        on={props.set.enabled}
+        onToggle={() => toggleMapSet(props.set.id)}
+      />
+      <Show when={!props.set.builtin}>
+        <button
+          type="button"
+          class={cx(s.remove, props.armed && s.armed)}
+          title="Remove"
+          onClick={() => props.onRemoveClick()}
+          onKeyDown={(e) => e.key === 'Escape' && props.onDisarm()}
+        >
+          {props.armed ? 'REMOVE' : '×'}
+        </button>
+        <Show when={props.armed}>
+          <button type="button" class={s.cancel} onClick={() => props.onDisarm()}>
+            CANCEL
+          </button>
+        </Show>
+      </Show>
+    </div>
+  );
+}
+
+/** The sources list with its import control. Removal is armed on one set at a time. */
+function MapSetList() {
   const [armed, setArmed] = createSignal<string | null>(null);
   const clickRemove = (id: string) => {
     const next = armRemoval(armed(), id);
     setArmed(next.armed);
     if (next.remove) removeMapSet(next.remove);
   };
+  return (
+    <div class={s.sets}>
+      <For each={mapSets()}>
+        {(set) => (
+          <MapSetRow
+            set={set}
+            armed={armed() === set.id}
+            onRemoveClick={() => clickRemove(set.id)}
+            onDisarm={() => setArmed(null)}
+          />
+        )}
+      </For>
+      <MapSetImport />
+    </div>
+  );
+}
+
+export function MapsPanel() {
   return (
     <Window id="maps" title="Maps" class={s.panel}>
       <SectionTitle>PRESET</SectionTitle>
@@ -118,36 +171,7 @@ export function MapsPanel() {
       />
       <Divider />
       <SectionTitle>SOURCES</SectionTitle>
-      <div class={s.sets}>
-        <For each={mapSets()}>
-          {(set) => (
-            <div class={s.set}>
-              <Toggle
-                label={set.data.title}
-                on={set.enabled}
-                onToggle={() => toggleMapSet(set.id)}
-              />
-              <Show when={!set.builtin}>
-                <button
-                  type="button"
-                  class={cx(s.remove, armed() === set.id && s.armed)}
-                  title="Remove"
-                  onClick={() => clickRemove(set.id)}
-                  onKeyDown={(e) => e.key === 'Escape' && setArmed(null)}
-                >
-                  {armed() === set.id ? 'REMOVE' : '×'}
-                </button>
-                <Show when={armed() === set.id}>
-                  <button type="button" class={s.cancel} onClick={() => setArmed(null)}>
-                    CANCEL
-                  </button>
-                </Show>
-              </Show>
-            </div>
-          )}
-        </For>
-        <MapSetImport />
-      </div>
+      <MapSetList />
     </Window>
   );
 }
