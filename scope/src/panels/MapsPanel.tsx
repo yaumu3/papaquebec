@@ -105,8 +105,19 @@ export function MapsPanel() {
           )}
         </For>
       </div>
+      <SectionTitle>LABEL DENSITY</SectionTitle>
+      <Pills
+        options={[
+          { value: 'off', label: 'OFF' },
+          { value: 'sparse', label: 'SPARSE' },
+          { value: 'normal', label: 'NORMAL' },
+          { value: 'dense', label: 'DENSE' },
+        ]}
+        value={settings.labelDensity}
+        onChange={(v: LabelDensity) => setSettings('labelDensity', v)}
+      />
       <Divider />
-      <SectionTitle>DATA</SectionTitle>
+      <SectionTitle>SOURCES</SectionTitle>
       <div class={s.sets}>
         <For each={mapSets()}>
           {(set) => (
@@ -137,18 +148,6 @@ export function MapsPanel() {
         </For>
         <MapSetImport />
       </div>
-      <Divider />
-      <SectionTitle>LABEL DENSITY</SectionTitle>
-      <Pills
-        options={[
-          { value: 'off', label: 'OFF' },
-          { value: 'sparse', label: 'SPARSE' },
-          { value: 'normal', label: 'NORMAL' },
-          { value: 'dense', label: 'DENSE' },
-        ]}
-        value={settings.labelDensity}
-        onChange={(v: LabelDensity) => setSettings('labelDensity', v)}
-      />
     </Window>
   );
 }
