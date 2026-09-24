@@ -35,14 +35,12 @@ const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean'
 
 const SQUAWK_FILTERS: readonly SquawkFilter[] = ['all', 'nonvfr', 'emergency'];
 
+/** A saved upper edge past the top stop reads as UNL, as a typed one does; the stop itself may have moved. */
 function filterFrom(raw: unknown, fallback: Filter): Filter {
   if (!isRecord(raw)) return fallback;
   const lower = typeof raw.lowerFl === 'number' ? raw.lowerFl : fallback.lowerFl;
-  const upper = typeof raw.upperFl === 'number' ? raw.upperFl : fallback.upperFl;
-  const band =
-    lower >= FL_MIN && upper <= FL_MAX && lower < upper
-      ? { lowerFl: lower, upperFl: upper }
-      : fallback;
+  const upper = typeof raw.upperFl === 'number' ? Math.min(raw.upperFl, FL_MAX) : fallback.upperFl;
+  const band = lower >= FL_MIN && lower < upper ? { lowerFl: lower, upperFl: upper } : fallback;
   return {
     ...band,
     ground: bool(raw.ground, fallback.ground),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { FL_MAX } from './filter';
 import type { ListSort } from './listSort';
 import { memoryStorage } from './memoryStorage';
 import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
@@ -136,5 +137,26 @@ describe('loadPersisted filter', () => {
 
     // Assert
     expect(grounds).toEqual([false, true, true]);
+  });
+});
+
+describe('loadPersisted band', () => {
+  it('reads a saved upper edge past the top stop as UNL and keeps the lower edge', () => {
+    // Arrange
+    const storage = memoryStorage({
+      [PERSIST_KEY]: JSON.stringify({ settings: { filter: { lowerFl: 100, upperFl: 600 } } }),
+    });
+
+    // Act
+    const { filter } = loadPersisted(
+      storage,
+      DEFAULT_SETTINGS,
+      DEFAULT_PANELS,
+      DEFAULT_SORT,
+    ).settings;
+
+    // Assert
+    expect(filter.lowerFl).toBe(100);
+    expect(filter.upperFl).toBe(FL_MAX);
   });
 });
