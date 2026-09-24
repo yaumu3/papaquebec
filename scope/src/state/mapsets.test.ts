@@ -103,8 +103,7 @@ describe('createMapSets', () => {
     sets.importMapSet(JSON.stringify(more), 'b');
 
     // Act
-    sets.toggleMapSet('a');
-    sets.toggleMapSet(BUILTIN_ID);
+    for (const id of ['a', BUILTIN_ID]) sets.toggleMapSet(id);
 
     // Assert
     expect(sets.aero().waypoints).toEqual([]);
@@ -125,8 +124,7 @@ describe('createMapSets', () => {
     sets.importMapSet(JSON.stringify(fixes), 'a');
 
     // Act
-    sets.removeMapSet('a');
-    sets.removeMapSet(BUILTIN_ID);
+    for (const id of ['a', BUILTIN_ID]) sets.removeMapSet(id);
 
     // Assert
     expect(sets.mapSets().map((s) => s.id)).toEqual([BUILTIN_ID]);
