@@ -33,10 +33,11 @@ const COLUMNS: [SortKey, string][] = [
   ['source', 'SRC'],
 ];
 
-/** Row tone: emergency over stale over climb state, matching the scope's colors. */
+/** Row tone: emergency over stale over ground over climb state, matching the scope's colors. */
 function rowTone(t: Track): string | undefined {
   if (isEmergency(t)) return s.emergency;
   if (isStale(t)) return s.stale;
+  if (t.alt === 'ground') return s.ground;
   const c = climbState(t.baroRate);
   return c === 'climbing' ? s.climbing : c === 'descending' ? s.descending : undefined;
 }

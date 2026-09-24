@@ -65,12 +65,13 @@ describe('isStale', () => {
 });
 
 describe('trackColor', () => {
-  it('ranks emergency over selected over stale over climb state', () => {
+  it('ranks emergency over selected over stale over ground over climb state', () => {
     // Arrange
     const cases: [Track, string | null][] = [
       [track({ squawk: '7700' }), '867a01'],
       [track(), '867a01'],
       [track({ seenPos: 60 }), null],
+      [track({ alt: 'ground', baroRate: 1500 }), null],
       [track({ baroRate: 1500 }), null],
       [track({ baroRate: -1500 }), null],
       [track(), null],
@@ -84,6 +85,7 @@ describe('trackColor', () => {
       THEME.emergency,
       THEME.selected,
       THEME.stale,
+      THEME.ground,
       THEME.climb,
       THEME.descend,
       THEME.level,
