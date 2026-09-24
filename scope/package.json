@@ -17,7 +17,8 @@
     "format:check": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt --check"
   },
   "dependencies": {
-    "solid-js": "^1.9.15"
+    "solid-js": "^1.9.15",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/bun": "latest",
