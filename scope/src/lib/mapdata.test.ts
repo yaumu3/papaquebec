@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { parseAero, parseCoast, UNTITLED_AERO } from './mapdata';
+import { EMPTY_AERO, parseAero, parseCoast, UNTITLED_AERO, validateAero } from './mapdata';
 
 describe('parseCoast', () => {
   it('keeps well-formed lines and drops the rest', () => {
@@ -117,5 +117,59 @@ describe('parseAero title', () => {
     expect(out[0]?.note).toBe('CC BY-NC-SA 4.0');
     expect(out[1]?.title).toBe(UNTITLED_AERO);
     expect(out[1]).not.toHaveProperty('note');
+  });
+});
+
+describe('validateAero', () => {
+  it('accepts a titled file, filling missing lists and dropping unknown keys', () => {
+    // Arrange
+    const raw = {
+      $schema: './aero.schema.json',
+      title: 'My fixes',
+      waypoints: [{ id: 'ORAMO', lat: 33.8, lon: 130.7 }], // north-east of RJFF
+    };
+
+    // Act
+    const out = validateAero(raw);
+
+    // Assert
+    expect(out).toEqual({
+      ok: true,
+      data: {
+        ...EMPTY_AERO,
+        title: 'My fixes',
+        waypoints: [{ id: 'ORAMO', lat: 33.8, lon: 130.7 }],
+      },
+    });
+  });
+
+  it('rejects a malformed file with the offending paths', () => {
+    // Arrange
+    const raw = {
+      waypoints: [
+        { id: 'ORAMO', lat: 33.8, lon: 130.7 },
+        { id: 'BAD', lat: 'x', lon: 130 },
+      ],
+    };
+
+    // Act
+    const out = validateAero(raw);
+
+    // Assert
+    expect(out.ok).toBe(false);
+    if (out.ok) return;
+    expect(out.message).toContain('title');
+    expect(out.message).toContain('waypoints[1].lat');
+  });
+
+  it('rejects anything that is not an object', () => {
+    // Arrange
+    const raw = [1, 2, 3];
+
+    // Act
+    const out = validateAero(raw);
+
+    // Assert
+    expect(out.ok).toBe(false);
   });
 });
