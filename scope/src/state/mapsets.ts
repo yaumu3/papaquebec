@@ -133,3 +133,11 @@ export function importNote(result: ImportResult): string | null {
   if (!result.ok) return result.message;
   return result.kept ? null : 'imported for this session only: browser storage is full';
 }
+
+/** Removing takes two clicks on the same control: the first arms it, the second acts. */
+export function armRemoval(
+  armed: string | null,
+  clicked: string,
+): { armed: string | null; remove: string | null } {
+  return armed === clicked ? { armed: null, remove: clicked } : { armed: clicked, remove: null };
+}

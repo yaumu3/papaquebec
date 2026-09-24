@@ -1,6 +1,14 @@
 import { createSignal, For, Show } from 'solid-js';
 
-import { importMapSet, importNote, mapSets, removeMapSet, toggleMapSet } from '../state/mapsets';
+import { cx } from '../design/cx';
+import {
+  armRemoval,
+  importMapSet,
+  importNote,
+  mapSets,
+  removeMapSet,
+  toggleMapSet,
+} from '../state/mapsets';
 import {
   activePreset,
   applyPreset,
@@ -68,6 +76,13 @@ function MapSetImport() {
 }
 
 export function MapsPanel() {
+  // The set whose remove control was clicked once; the next click on it removes, CANCEL or Escape disarms.
+  const [armed, setArmed] = createSignal<string | null>(null);
+  const clickRemove = (id: string) => {
+    const next = armRemoval(armed(), id);
+    setArmed(next.armed);
+    if (next.remove) removeMapSet(next.remove);
+  };
   return (
     <Window id="maps" title="Maps" class={s.panel}>
       <SectionTitle>PRESET</SectionTitle>
@@ -104,12 +119,18 @@ export function MapsPanel() {
               <Show when={!set.builtin}>
                 <button
                   type="button"
-                  class={s.remove}
+                  class={cx(s.remove, armed() === set.id && s.armed)}
                   title="Remove"
-                  onClick={() => removeMapSet(set.id)}
+                  onClick={() => clickRemove(set.id)}
+                  onKeyDown={(e) => e.key === 'Escape' && setArmed(null)}
                 >
-                  ×
+                  {armed() === set.id ? 'REMOVE' : '×'}
                 </button>
+                <Show when={armed() === set.id}>
+                  <button type="button" class={s.cancel} onClick={() => setArmed(null)}>
+                    CANCEL
+                  </button>
+                </Show>
               </Show>
             </div>
           )}

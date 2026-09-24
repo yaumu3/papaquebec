@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { EMPTY_AERO } from '../lib/mapdata';
-import { BUILTIN_ID, createMapSets, freshId, importNote } from './mapsets';
+import { armRemoval, BUILTIN_ID, createMapSets, freshId, importNote } from './mapsets';
 import { loadMapSets } from './mapsetsPersist';
 import { fullStorage, memoryStorage } from './memoryStorage';
 
@@ -151,6 +151,27 @@ describe('importNote', () => {
       'title: expected string',
       'imported for this session only: browser storage is full',
       null,
+    ]);
+  });
+});
+
+describe('armRemoval', () => {
+  it('arms on the first click, removes on the second, and re-arms when another set is clicked', () => {
+    // Arrange
+    const clicks: [string | null, string][] = [
+      [null, 'a'],
+      ['a', 'a'],
+      ['a', 'b'],
+    ];
+
+    // Act
+    const out = clicks.map(([armed, clicked]) => armRemoval(armed, clicked));
+
+    // Assert
+    expect(out).toEqual([
+      { armed: 'a', remove: null },
+      { armed: null, remove: 'a' },
+      { armed: 'b', remove: null },
     ]);
   });
 });
