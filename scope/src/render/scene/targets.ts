@@ -77,7 +77,7 @@ function drawables(input: TargetInput): Drawable[] {
       cx,
       cy,
       // Selecting a filtered target is the operator asking to see it in full.
-      visibility: t.hex === input.selected ? 'shown' : classify(t, input.filter),
+      visibility: t.hex === input.selected ? 'shown' : classify(t, input.filter, input.altimeter),
       color: trackColor(t, input.selected),
     });
   }

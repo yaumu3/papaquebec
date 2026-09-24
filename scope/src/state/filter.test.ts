@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { STANDARD_ALTIMETER } from '../lib/altitude';
 import { classify, type Filter } from './filter';
 
 const base: Filter = { ground: true, lowerFl: 0, upperFl: 600, squawk: 'all' };
@@ -10,8 +11,8 @@ describe('classify', () => {
     const t = { alt: undefined, squawk: '2000', emergency: undefined };
 
     // Act
-    const full = classify(t, base);
-    const banded = classify(t, { ...base, upperFl: 200 });
+    const full = classify(t, base, STANDARD_ALTIMETER);
+    const banded = classify(t, { ...base, upperFl: 200 }, STANDARD_ALTIMETER);
 
     // Assert
     expect(full).toBe('shown');
@@ -25,7 +26,7 @@ describe('classify', () => {
 
     // Act
     const results = alts.map((alt) =>
-      classify({ alt, squawk: '2000', emergency: undefined }, filter),
+      classify({ alt, squawk: '2000', emergency: undefined }, filter, STANDARD_ALTIMETER),
     );
 
     // Assert
@@ -42,7 +43,7 @@ describe('classify', () => {
     ];
 
     // Act
-    const results = filters.map((f) => classify(t, f));
+    const results = filters.map((f) => classify(t, f, STANDARD_ALTIMETER));
 
     // Assert
     expect(results).toEqual(['shown', 'filtered', 'filtered']);
@@ -55,7 +56,7 @@ describe('classify', () => {
 
     // Act
     const results = alts.map((alt) =>
-      classify({ alt, squawk: '2000', emergency: undefined }, filter),
+      classify({ alt, squawk: '2000', emergency: undefined }, filter, STANDARD_ALTIMETER),
     );
 
     // Assert
@@ -71,8 +72,12 @@ describe('classify', () => {
     ];
 
     // Act
-    const nonVfr = targets.map((t) => classify(t, { ...base, squawk: 'nonvfr' }));
-    const emerg = targets.map((t) => classify(t, { ...base, squawk: 'emergency' }));
+    const nonVfr = targets.map((t) =>
+      classify(t, { ...base, squawk: 'nonvfr' }, STANDARD_ALTIMETER),
+    );
+    const emerg = targets.map((t) =>
+      classify(t, { ...base, squawk: 'emergency' }, STANDARD_ALTIMETER),
+    );
 
     // Assert
     expect(nonVfr).toEqual(['filtered', 'shown', 'shown']);
@@ -84,9 +89,30 @@ describe('classify', () => {
     const filter: Filter = { ground: false, lowerFl: 100, upperFl: 200, squawk: 'nonvfr' };
 
     // Act
-    const r = classify({ alt: 500, squawk: '1200', emergency: 'general' }, filter);
+    const r = classify(
+      { alt: 500, squawk: '1200', emergency: 'general' },
+      filter,
+      STANDARD_ALTIMETER,
+    );
 
     // Assert
     expect(r).toBe('shown');
+  });
+});
+
+describe('classify with a local altimeter', () => {
+  it('bands on the altitude the data block shows, not raw pressure altitude', () => {
+    // Arrange
+    const filter: Filter = { ...base, lowerFl: 50, upperFl: 240 };
+    const high = { transitionAltFt: 14000, qnhInHg: 30.92 }; // about +920 ft on the block
+    const alts = [4600, 4000, 24500]; // blocks read 055, 049, FL245
+
+    // Act
+    const results = alts.map((alt) =>
+      classify({ alt, squawk: '2000', emergency: undefined }, filter, high),
+    );
+
+    // Assert
+    expect(results).toEqual(['shown', 'filtered', 'filtered']);
   });
 });

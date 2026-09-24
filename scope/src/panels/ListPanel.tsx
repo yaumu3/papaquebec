@@ -50,8 +50,10 @@ export function ListPanel() {
   const rows = createMemo(() => {
     snapshotVersion();
     const { ground, lowerFl, upperFl, squawk } = settings.filter;
+    const { transitionAltFt, qnhInHg } = settings.altimeter;
     const shown = [...trackStore.tracks.values()].filter(
-      (t) => classify(t, { ground, lowerFl, upperFl, squawk }) === 'shown',
+      (t) =>
+        classify(t, { ground, lowerFl, upperFl, squawk }, { transitionAltFt, qnhInHg }) === 'shown',
     );
     return sortTracks(shown, listSort());
   });

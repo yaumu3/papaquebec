@@ -1,3 +1,4 @@
+import { type Altimeter, displayAltitude } from '../lib/altitude';
 import { emergencyCode } from '../lib/format';
 
 export type SquawkFilter = 'all' | 'nonvfr' | 'emergency';
@@ -29,16 +30,19 @@ const bandActive = (f: Filter) => f.lowerFl > FL_MIN || f.upperFl < FL_MAX;
 /**
  * Emergency is additive: a filter never hides one. With a band set, a target
  * whose altitude is unknown cannot be shown to be inside it, so it is filtered.
+ * The band is read against the value the data block shows, so a target
+ * labelled 055 is inside a band starting at 050 whatever the QNH.
  */
-export function classify(t: Filterable, filter: Filter): Visibility {
+export function classify(t: Filterable, filter: Filter, altimeter: Altimeter): Visibility {
   if (emergencyCode(t.squawk, t.emergency)) return 'shown';
-  if (t.alt === 'ground') {
+  const d = displayAltitude(t.alt, altimeter);
+  if (d.kind === 'ground') {
     if (!filter.ground) return 'filtered';
-  } else if (t.alt === undefined) {
+  } else if (d.kind === 'unknown') {
     if (bandActive(filter)) return 'filtered';
   } else {
-    const fl = t.alt / 100;
-    if (fl < filter.lowerFl || fl > filter.upperFl) return 'filtered';
+    const hundreds = Math.round(d.feet / 100);
+    if (hundreds < filter.lowerFl || hundreds > filter.upperFl) return 'filtered';
   }
   if (filter.squawk === 'nonvfr' && t.squawk !== undefined && VFR_SQUAWKS.has(t.squawk)) {
     return 'filtered';

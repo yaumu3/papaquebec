@@ -47,7 +47,11 @@ export interface BlockHit {
 export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
   for (const t of trackStore.tracks.values()) {
     const s = targetScreen(view, t.hex);
-    if (!s || (t.hex !== selected() && classify(t, settings.filter) === 'filtered')) continue;
+    if (
+      !s ||
+      (t.hex !== selected() && classify(t, settings.filter, settings.altimeter) === 'filtered')
+    )
+      continue;
     const corner = t.ops.pinnedCorner ?? t.ops.autoCorner;
     const r = labelRect(s.cx, s.cy, corner, isEmergency(t));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)
