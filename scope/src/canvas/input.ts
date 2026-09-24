@@ -3,7 +3,6 @@ import type { View } from '../render/protocol';
 import { toWorld } from '../render/scene/view';
 import {
   bumpSnapshot,
-  nextRblTag,
   pan,
   rblPending,
   rbls,
@@ -33,6 +32,7 @@ import { trackStore } from '../state/tracks';
 import { pinchZoom, zoomAbout } from './gestures';
 import { blockAt, fixAt, rblAt, targetAt, targetScreen } from './hit';
 import { rblMenu, scopeMenu, targetMenu } from './menus';
+import { anchorFor, appendRbl } from './rbl';
 
 const DRAG_THRESHOLD_PX = 5;
 /** Wheel sensitivity: one 100 px notch scales the range by about 1.2. */
@@ -41,10 +41,17 @@ const ZOOM_PER_PX = 0.0018;
 const LONG_PRESS_MS = 450;
 /** Fingers are less precise than a cursor. */
 const TOUCH_REACH_PX = 24;
+/** An RBL end this close to a target snaps onto it, as the pending line already draws it. */
+const RBL_SNAP_PX = 15;
 
 interface Point {
   x: number;
   y: number;
+}
+
+/** The RBL anchor under a screen point: a target within `reach`, else the point itself. */
+function anchorAt(v: View, cx: number, cy: number, reach: number) {
+  return anchorFor(targetAt(v, cx, cy, reach), toWorld(v, cx, cy));
 }
 
 function onKey(e: KeyboardEvent) {
@@ -123,6 +130,8 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     sy: number;
     moved: boolean;
   } | null = null;
+  /** A drag that began on a target; once it moves it is a pending RBL anchored there. */
+  let rblDrag: { hex: string; sx: number; sy: number; moved: boolean } | null = null;
   /** Fingers on the canvas by pointer id, and the pinch they started when there are two. */
   const fingers = new Map<number, Point>();
   let pinch: { view: View; rangeNm: number; start: [Point, Point]; ids: [number, number] } | null =
@@ -141,6 +150,11 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
   const endDrags = () => {
     panDrag = null;
     blockDrag = null;
+    if (rblDrag?.moved) {
+      setRblPending(null);
+      setModeText(null);
+    }
+    rblDrag = null;
     setLabelDrag(null);
     canvas.style.cursor = 'crosshair';
   };
@@ -152,11 +166,15 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     setMenu({ x, y, items: t ? targetMenu(t) : r ? rblMenu(r) : scopeMenu(toWorld(v, x, y)) });
   };
 
-  /** Left button or first finger: grab a data block, else start panning. */
+  /** Left button or first finger: drag an RBL off a target, grab a data block, else start panning. */
   const startPrimary = (e: PointerEvent) => {
     const v = view();
     const reach = e.pointerType === 'touch' ? TOUCH_REACH_PX : undefined;
-    if (targetAt(v, e.clientX, e.clientY, reach)) return;
+    const t = targetAt(v, e.clientX, e.clientY, reach);
+    if (t) {
+      rblDrag = { hex: t.hex, sx: e.clientX, sy: e.clientY, moved: false };
+      return;
+    }
     const hit = blockAt(v, e.clientX, e.clientY);
     const s = hit ? targetScreen(v, hit.hex) : null;
     if (hit && s) {
@@ -176,6 +194,8 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
 
   const onDown = (e: PointerEvent) => {
     lastPointerType = e.pointerType;
+    // A finger drag never ends in a click, so a suppression left over from one must not eat this tap.
+    suppressClick = false;
     if (e.pointerType === 'mouse') {
       if (e.button === 2) {
         const v = view();
@@ -245,6 +265,18 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
         setRangeCursor(rightDrag.origin);
       }
     }
+    if (rblDrag) {
+      if (
+        !rblDrag.moved &&
+        Math.hypot(e.clientX - rblDrag.sx, e.clientY - rblDrag.sy) > DRAG_THRESHOLD_PX
+      ) {
+        rblDrag.moved = true;
+        cancelLongPress();
+        setRblPending({ a: { kind: 'target', hex: rblDrag.hex } });
+        setModeText('RBL · RELEASE ON ANCHOR B');
+      }
+      if (rblDrag.moved) setMouse({ cx: e.clientX, cy: e.clientY });
+    }
     if (blockDrag) {
       if (
         !blockDrag.moved &&
@@ -309,6 +341,22 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
       panDrag = null;
       canvas.style.cursor = 'crosshair';
     }
+    if (rblDrag) {
+      const drag = rblDrag;
+      rblDrag = null;
+      if (drag.moved) {
+        suppressClick = true;
+        // Escape mid-drag clears the pending anchor, and with it the line.
+        const a = rblPending()?.a;
+        if (a) {
+          const reach = e.pointerType === 'touch' ? TOUCH_REACH_PX : RBL_SNAP_PX;
+          setRbls(appendRbl(rbls(), a, anchorAt(view(), e.clientX, e.clientY, reach)));
+        }
+        setRblPending(null);
+        setModeText(null);
+        if (e.pointerType !== 'mouse') setMouse(null);
+      }
+    }
     if (blockDrag) {
       const drag = blockDrag;
       blockDrag = null;
@@ -351,15 +399,12 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     const reach = lastPointerType === 'touch' ? TOUCH_REACH_PX : undefined;
     const pending = rblPending();
     if (pending) {
-      const t = targetAt(v, e.clientX, e.clientY, reach ?? 15);
-      const anchor = t
-        ? { kind: 'target' as const, hex: t.hex }
-        : { kind: 'free' as const, ...toWorld(v, e.clientX, e.clientY) };
+      const anchor = anchorAt(v, e.clientX, e.clientY, reach ?? RBL_SNAP_PX);
       if (!pending.a) {
         setRblPending({ a: anchor });
         setModeText('RBL · SELECT ANCHOR B');
       } else {
-        setRbls([...rbls(), { a: pending.a, b: anchor, tag: nextRblTag(rbls()) }]);
+        setRbls(appendRbl(rbls(), pending.a, anchor));
         setRblPending(null);
         setModeText(null);
       }

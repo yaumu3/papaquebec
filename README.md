@@ -140,8 +140,9 @@ Layout:
 - **Phone** (below 720 px): the columns become one bottom sheet with a tab bar, and the top bar
   keeps clock, QNH and feed state.
 - **Touch**: one finger pans, two pinch-zoom around the fingers, a tap selects, a long press opens
-  the menu.
-- **Mouse and keyboard**: hover, right-drag range cursor, wheel zoom and the shortcuts `?` lists.
+  the menu, a drag off a target draws an RBL.
+- **Mouse and keyboard**: hover, right-drag range cursor, drag off a target for an RBL, wheel zoom
+  and the shortcuts `?` lists.
 
 ## Architecture
 
