@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { parseAero, parseCoast } from './mapdata';
+import { parseAero, parseCoast, UNTITLED_AERO } from './mapdata';
 
 describe('parseCoast', () => {
   it('keeps well-formed lines and drops the rest', () => {
@@ -100,5 +100,22 @@ describe('parseAero fetched', () => {
     // Assert
     expect(out[0]?.fetched).toBe('2026-09-22');
     expect(out[1]).not.toHaveProperty('fetched');
+  });
+});
+
+describe('parseAero title', () => {
+  it('keeps the title and note, and names an untitled file after itself', () => {
+    // Arrange
+    const titled = { title: 'openAIP JP', note: 'CC BY-NC-SA 4.0' };
+    const untitled = { title: 7 };
+
+    // Act
+    const out = [parseAero(titled), parseAero(untitled)];
+
+    // Assert
+    expect(out[0]?.title).toBe('openAIP JP');
+    expect(out[0]?.note).toBe('CC BY-NC-SA 4.0');
+    expect(out[1]?.title).toBe(UNTITLED_AERO);
+    expect(out[1]).not.toHaveProperty('note');
   });
 });

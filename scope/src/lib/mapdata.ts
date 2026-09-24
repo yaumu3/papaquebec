@@ -47,15 +47,26 @@ const LISTS = {
   airports: AirportSchema,
 };
 
-export const AeroSchema = z.object({
-  /** ISO date the data was fetched from its source, when known. */
-  fetched: z.optional(z.string()),
+/** The title a lenient parse gives a file that names none. */
+export const UNTITLED_AERO = 'aero.json';
+
+/** The drawn lists alone; what several map sets merge into. */
+export const AeroLayersSchema = z.object({
   waypoints: orDefault(z.array(LISTS.waypoints), []),
   navaids: orDefault(z.array(LISTS.navaids), []),
   airways: orDefault(z.array(LISTS.airways), []),
   airspace: orDefault(z.array(LISTS.airspace), []),
   sectors: orDefault(z.array(LISTS.sectors), []),
   airports: orDefault(z.array(LISTS.airports), []),
+});
+
+export const AeroSchema = z.extend(AeroLayersSchema, {
+  /** Names the map set on the Maps panel. */
+  title: z.string().check(z.minLength(1)),
+  /** Attribution, license or provenance, free text. */
+  note: z.optional(z.string()),
+  /** ISO date the data was fetched from its source, when known. */
+  fetched: z.optional(z.string()),
 });
 
 export type Waypoint = z.infer<typeof Fix>;
@@ -65,9 +76,11 @@ export type AirspaceCircle = z.infer<typeof CircleSchema>;
 export type AirspacePolygon = z.infer<typeof PolygonSchema>;
 export type Airspace = z.infer<typeof AirspaceSchema>;
 export type Airport = z.infer<typeof AirportSchema>;
+export type AeroLayers = z.infer<typeof AeroLayersSchema>;
 export type AeroData = z.infer<typeof AeroSchema>;
 
 export const EMPTY_AERO: AeroData = {
+  title: UNTITLED_AERO,
   waypoints: [],
   navaids: [],
   airways: [],
@@ -100,6 +113,8 @@ export function parseCoast(raw: unknown): CoastData {
 export function parseAero(raw: unknown): AeroData {
   if (!isRecord(raw)) throw new Error('aero.json: unexpected shape');
   return {
+    title: typeof raw.title === 'string' && raw.title ? raw.title : UNTITLED_AERO,
+    ...(typeof raw.note === 'string' ? { note: raw.note } : {}),
     ...(typeof raw.fetched === 'string' ? { fetched: raw.fetched } : {}),
     waypoints: list(raw.waypoints, LISTS.waypoints),
     navaids: list(raw.navaids, LISTS.navaids),
