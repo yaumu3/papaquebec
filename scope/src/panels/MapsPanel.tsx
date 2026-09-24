@@ -101,7 +101,6 @@ export function MapsPanel() {
                 on={set.enabled}
                 onToggle={() => toggleMapSet(set.id)}
               />
-              <span class={s.fetched}>{set.data.fetched ?? ''}</span>
               <Show when={!set.builtin}>
                 <button
                   type="button"

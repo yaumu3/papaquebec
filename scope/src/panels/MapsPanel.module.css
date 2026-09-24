@@ -23,10 +23,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.fetched {
-  color: var(--text-dim);
-  font-size: var(--text-xs);
-}
 .remove {
   padding: 0 var(--space-2);
   color: var(--text-dim);

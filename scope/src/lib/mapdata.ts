@@ -64,13 +64,10 @@ export const AeroLayersSchema = z.object({
 
 export const AeroSchema = z.extend(AeroLayersSchema, {
   title: z.string().check(z.minLength(1)).register(z.globalRegistry, {
-    description: 'Names the map set on the Maps panel.',
+    description: 'Names the map set on the Maps panel; say where and when it is from.',
   }),
   note: z.optional(z.string()).register(z.globalRegistry, {
     description: 'Attribution, license or provenance, free text.',
-  }),
-  fetched: z.optional(z.string()).register(z.globalRegistry, {
-    description: 'ISO date the data was fetched from its source, when known.',
   }),
 });
 
@@ -132,7 +129,6 @@ export function parseAero(raw: unknown): AeroData {
   return {
     title: typeof raw.title === 'string' && raw.title ? raw.title : UNTITLED_AERO,
     ...(typeof raw.note === 'string' ? { note: raw.note } : {}),
-    ...(typeof raw.fetched === 'string' ? { fetched: raw.fetched } : {}),
     waypoints: list(raw.waypoints, LISTS.waypoints),
     navaids: list(raw.navaids, LISTS.navaids),
     airways: list(raw.airways, LISTS.airways),

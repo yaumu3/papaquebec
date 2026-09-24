@@ -15,8 +15,9 @@ describe('aeroJsonSchema', () => {
     expect(schema.title).toBe('papaquebec aero.json');
     expect(schema.required).toEqual(['title']);
     expect(Object.keys(schema.properties)).toEqual(
-      expect.arrayContaining([...lists, 'title', 'note', 'fetched']),
+      expect.arrayContaining([...lists, 'title', 'note']),
     );
+    expect(schema.properties).not.toHaveProperty('fetched');
     expect(schema.properties.title).toMatchObject({
       description: expect.stringMatching(/Maps panel/),
     });

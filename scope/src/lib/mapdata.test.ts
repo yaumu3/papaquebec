@@ -95,33 +95,23 @@ describe('parseAero', () => {
   });
 });
 
-describe('parseAero fetched', () => {
-  it('keeps the fetch date when it is a string and omits it otherwise', () => {
-    // Arrange
-    const dated = { fetched: '2026-09-22' };
-    const undated = { fetched: 42 };
-
-    // Act
-    const out = [parseAero(dated), parseAero(undated)];
-
-    // Assert
-    expect(out[0]?.fetched).toBe('2026-09-22');
-    expect(out[1]).not.toHaveProperty('fetched');
-  });
-});
-
 describe('parseAero title', () => {
-  it('keeps the title and note, and names an untitled file after itself', () => {
+  it('keeps the title and note only, and names an untitled file after itself', () => {
     // Arrange
-    const titled = { title: 'openAIP JP', note: 'CC BY-NC-SA 4.0' };
+    const titled = {
+      title: 'openAIP JP 2026-09-24',
+      note: 'CC BY-NC-SA 4.0',
+      fetched: '2026-09-24',
+    };
     const untitled = { title: 7 };
 
     // Act
     const out = [parseAero(titled), parseAero(untitled)];
 
     // Assert
-    expect(out[0]?.title).toBe('openAIP JP');
+    expect(out[0]?.title).toBe('openAIP JP 2026-09-24');
     expect(out[0]?.note).toBe('CC BY-NC-SA 4.0');
+    expect(out[0]).not.toHaveProperty('fetched');
     expect(out[1]?.title).toBe(UNTITLED_AERO);
     expect(out[1]).not.toHaveProperty('note');
   });
