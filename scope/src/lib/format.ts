@@ -102,3 +102,9 @@ export function formatTemp(c: number | undefined): string {
   const r = Math.round(c);
   return `${r > 0 ? '+' : ''}${r}°C`;
 }
+
+/** The list's head count, naming what the filter hides only while it hides something. */
+export function formatListCount(shown: number, total: number): string {
+  const hidden = total - shown;
+  return hidden > 0 ? `${shown} · ${hidden} hidden` : String(shown);
+}

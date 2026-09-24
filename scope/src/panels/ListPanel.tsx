@@ -3,7 +3,7 @@ import { createMemo, For } from 'solid-js';
 import { targetMenu } from '../canvas/menus';
 import { cx } from '../design/cx';
 import { formatAltitude } from '../lib/altitude';
-import { climbArrow, climbState, formatGsWake, padTrack } from '../lib/format';
+import { climbArrow, climbState, formatGsWake, formatListCount, padTrack } from '../lib/format';
 import { isEmergency, isStale, trackLabel } from '../render/scene/rules';
 import { classify } from '../state/filter';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
@@ -59,7 +59,12 @@ export function ListPanel() {
     return sortTracks(shown, listSort());
   });
   return (
-    <Window id="list" title={<>Aircraft ({rows().length})</>} class={s.panel} bodyClass={s.body}>
+    <Window
+      id="list"
+      title={<>Aircraft ({formatListCount(rows().length, trackStore.tracks.size)})</>}
+      class={s.panel}
+      bodyClass={s.body}
+    >
       <div class={s.header}>
         <For each={COLUMNS}>
           {([key, label]) => (
