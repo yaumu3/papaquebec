@@ -4,6 +4,8 @@ import { cx } from '../design/cx';
 import {
   altitudeProfile,
   axisTicks,
+  binIndex,
+  displayLevel,
   edgeSpread,
   groundCount,
   scaleLabels,
@@ -19,7 +21,7 @@ import {
   withUpper,
 } from '../state/band';
 import { BAND_LIMITS } from '../state/filter';
-import { snapshotVersion } from '../state/scope';
+import { selected, snapshotVersion } from '../state/scope';
 import { setSettings, settings } from '../state/settings';
 import { trackStore } from '../state/tracks';
 import { BandSlider, thumbPosition } from '../ui/BandSlider';
@@ -44,11 +46,12 @@ const band = () => ({ lower: settings.filter.lowerFl, upper: settings.filter.upp
 const setBand = (b: Band) => setSettings('filter', { lowerFl: b.lower, upperFl: b.upper });
 const at = (v: number) => thumbPosition(fraction(v, BAND_LIMITS));
 
-/** Airborne targets per bin and those on the ground, on one scale. */
+/** Airborne targets per bin and those on the ground, on one scale, plus the selected target's bin. */
 interface Traffic {
   profile: number[];
   ground: number;
   peak: number;
+  picked: number | 'ground' | null;
 }
 
 /** A typed edge moves like a dragged thumb; unreadable input is put back as it was. */
@@ -89,7 +92,7 @@ function Profile(props: { traffic: Accessor<Traffic> }) {
       <For each={props.traffic().profile}>
         {(n, i) => (
           <div
-            class={cx(s.bar, inBand(i()) && s.lit)}
+            class={cx(s.bar, inBand(i()) && s.lit, props.traffic().picked === i() && s.picked)}
             style={{
               bottom: at(BAND_LIMITS.min + i() * BIN),
               height: `${BIN_PX}px`,
@@ -119,7 +122,12 @@ function GroundRow(props: { traffic: Accessor<Traffic> }) {
       </button>
       <div class={s.side}>
         <div
-          class={cx(s.bar, s.gndBar, groundOn() && s.gndLit)}
+          class={cx(
+            s.bar,
+            s.gndBar,
+            groundOn() && s.gndLit,
+            props.traffic().picked === 'ground' && s.picked,
+          )}
           style={{
             width: `${(props.traffic().ground / props.traffic().peak) * 100}%`,
             height: `${BIN_PX}px`,
@@ -128,6 +136,16 @@ function GroundRow(props: { traffic: Accessor<Traffic> }) {
       </div>
     </div>
   );
+}
+
+/** The bin holding the selected target, so the eye can tell whether a thumb would cut it. */
+function pickedBin(): number | 'ground' | null {
+  const hex = selected();
+  const t = hex === null ? undefined : trackStore.tracks.get(hex);
+  if (t === undefined) return null;
+  if (t.alt === 'ground') return 'ground';
+  const level = displayLevel(t.alt, settings.altimeter);
+  return level === null ? null : binIndex(level, BAND_LIMITS, BIN);
 }
 
 function Axis(props: { traffic: Accessor<Traffic> }) {
@@ -170,7 +188,7 @@ export function AltitudeAxis() {
     const tracks = [...trackStore.tracks.values()];
     const profile = altitudeProfile(tracks, settings.altimeter, BAND_LIMITS, BIN);
     const ground = groundCount(tracks);
-    return { profile, ground, peak: Math.max(1, ground, ...profile) };
+    return { profile, ground, peak: Math.max(1, ground, ...profile), picked: pickedBin() };
   });
   return (
     <div class={s.altitude} style={{ '--thumb': `${THUMB_PX}px` }}>

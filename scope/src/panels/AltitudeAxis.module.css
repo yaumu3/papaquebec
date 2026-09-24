@@ -133,3 +133,7 @@
 .gndLit {
   background: var(--color-ground);
 }
+/* Last so it wins over the band and GND tones. */
+.picked {
+  background: var(--color-selected);
+}
