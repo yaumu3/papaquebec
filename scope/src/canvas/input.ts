@@ -3,7 +3,6 @@ import type { View } from '../render/protocol';
 import { toWorld } from '../render/scene/view';
 import {
   bumpSnapshot,
-  nextRblTag,
   pan,
   rblPending,
   rbls,
@@ -33,6 +32,7 @@ import { trackStore } from '../state/tracks';
 import { pinchZoom, zoomAbout } from './gestures';
 import { blockAt, fixAt, rblAt, targetAt, targetScreen } from './hit';
 import { rblMenu, scopeMenu, targetMenu } from './menus';
+import { anchorFor, appendRbl } from './rbl';
 
 const DRAG_THRESHOLD_PX = 5;
 /** Wheel sensitivity: one 100 px notch scales the range by about 1.2. */
@@ -41,10 +41,17 @@ const ZOOM_PER_PX = 0.0018;
 const LONG_PRESS_MS = 450;
 /** Fingers are less precise than a cursor. */
 const TOUCH_REACH_PX = 24;
+/** An RBL end this close to a target snaps onto it, as the pending line already draws it. */
+const RBL_SNAP_PX = 15;
 
 interface Point {
   x: number;
   y: number;
+}
+
+/** The RBL anchor under a screen point: a target within `reach`, else the point itself. */
+function anchorAt(v: View, cx: number, cy: number, reach: number) {
+  return anchorFor(targetAt(v, cx, cy, reach), toWorld(v, cx, cy));
 }
 
 function onKey(e: KeyboardEvent) {
@@ -351,15 +358,12 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     const reach = lastPointerType === 'touch' ? TOUCH_REACH_PX : undefined;
     const pending = rblPending();
     if (pending) {
-      const t = targetAt(v, e.clientX, e.clientY, reach ?? 15);
-      const anchor = t
-        ? { kind: 'target' as const, hex: t.hex }
-        : { kind: 'free' as const, ...toWorld(v, e.clientX, e.clientY) };
+      const anchor = anchorAt(v, e.clientX, e.clientY, reach ?? RBL_SNAP_PX);
       if (!pending.a) {
         setRblPending({ a: anchor });
         setModeText('RBL · SELECT ANCHOR B');
       } else {
-        setRbls([...rbls(), { a: pending.a, b: anchor, tag: nextRblTag(rbls()) }]);
+        setRbls(appendRbl(rbls(), pending.a, anchor));
         setRblPending(null);
         setModeText(null);
       }

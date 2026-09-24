@@ -7,7 +7,7 @@ export function anchorFor(t: { hex: string } | null, world: Vec2): RblAnchor {
 }
 
 /** The list with a line from `a` to `b` added, unless both ends are the same target. */
-export function appendRbl(existing: readonly Rbl[], a: RblAnchor, b: RblAnchor): readonly Rbl[] {
+export function appendRbl(existing: Rbl[], a: RblAnchor, b: RblAnchor): Rbl[] {
   if (a.kind === 'target' && b.kind === 'target' && a.hex === b.hex) return existing;
   return [...existing, { a, b, tag: nextRblTag(existing) }];
 }
