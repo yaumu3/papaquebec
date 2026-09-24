@@ -32,13 +32,13 @@ export function formatEdge(v: number, l: BandLimits): string {
   return v >= l.max ? UNLIMITED : String(v).padStart(3, '0');
 }
 
-/** Up to three digits within the limits, or UNL; anything else is null. */
+/** Up to three digits or UNL; past the top stop reads as UNL, anything else is null. */
 export function parseEdge(text: string, l: BandLimits): number | null {
   const t = text.trim().toUpperCase();
   if (t === UNLIMITED) return l.max;
   if (!/^\d{1,3}$/.test(t)) return null;
   const v = Number(t);
-  return v >= l.min && v <= l.max ? v : null;
+  return v >= l.min ? Math.min(v, l.max) : null;
 }
 
 /** Where a value sits between the stops, 0 at min and 1 at max. */

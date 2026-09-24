@@ -55,14 +55,14 @@ describe('formatEdge', () => {
 });
 
 describe('parseEdge', () => {
-  it('reads up to three digits or UNL and rejects anything else', () => {
+  it('reads up to three digits or UNL, treats anything past the top stop as UNL, and rejects the rest', () => {
     // Arrange
-    const texts = ['050', '5', ' 245 ', 'unl', '600', '601', '', 'FL050', '-5'];
+    const texts = ['050', '5', ' 245 ', 'unl', '600', '601', '999', '', 'FL050', '-5'];
 
     // Act
     const out = texts.map((t) => parseEdge(t, limits));
 
     // Assert
-    expect(out).toEqual([50, 5, 245, 600, 600, null, null, null, null]);
+    expect(out).toEqual([50, 5, 245, 600, 600, 600, 600, null, null, null]);
   });
 });
