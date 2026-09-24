@@ -143,7 +143,7 @@ function MapSetList() {
 
 export function MapsPanel() {
   return (
-    <Window id="maps" title="Maps" class={s.panel}>
+    <Window id="maps" title="Maps">
       <SectionTitle>PRESET</SectionTitle>
       <Pills
         small

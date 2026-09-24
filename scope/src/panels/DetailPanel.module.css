@@ -1,6 +1,3 @@
-.panel {
-  flex-shrink: 0;
-}
 .empty {
   color: var(--text-dim);
   font-size: var(--text-sm);

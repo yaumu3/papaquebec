@@ -17,6 +17,27 @@ function phoneSignal(): () => boolean {
 /** True on a phone-sized viewport; the panel columns then collapse into a sheet. */
 export const isPhone = phoneSignal();
 
+interface ScrollHost {
+  scrollX: number;
+  scrollY: number;
+  scrollTo(x: number, y: number): void;
+  addEventListener(type: 'resize', listener: () => void): void;
+  removeEventListener(type: 'resize', listener: () => void): void;
+}
+
+/**
+ * Nothing here scrolls, yet an iOS home-screen web app comes back from landscape scrolled by
+ * the notch inset, which puts every fixed element's hit region above where it is painted.
+ * A resize that finds the window offset puts it back. Returns a disposer.
+ */
+export function keepUnscrolled(win: ScrollHost): () => void {
+  const onResize = () => {
+    if (win.scrollX !== 0 || win.scrollY !== 0) win.scrollTo(0, 0);
+  };
+  win.addEventListener('resize', onResize);
+  return () => win.removeEventListener('resize', onResize);
+}
+
 /** The one panel shown in the phone sheet; null when the sheet is closed. Not persisted. */
 export const [activeSheet, setActiveSheet] = createSignal<PanelId | null>(null);
 

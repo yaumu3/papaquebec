@@ -75,7 +75,7 @@ export function DetailPanel() {
     return t ? trackLabel(t) : (selected()?.toUpperCase() ?? 'Target Detail');
   };
   return (
-    <Window id="detail" title={title()} class={s.panel}>
+    <Window id="detail" title={title()}>
       <Show
         when={track()}
         fallback={<div class={s.empty}>{selected() ? 'NOT IN FEED' : 'NO TARGET SELECTED'}</div>}
