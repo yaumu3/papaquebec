@@ -16,8 +16,9 @@ import s from './Overlays.module.css';
 const HINT = `[ ]  RANGE         R  RBL          ?  HINT
 T    TRAIL CYCLE   V  VECTOR CYCLE  L  LIST
 RIGHT-DRAG  RANGE CURSOR       DRAG  PAN
-HOME RESET PAN     WHEEL   ZOOM   ESC CANCEL
-DEL  LAST RBL      SHIFT-DEL  ALL RBL`;
+DRAG TARGET  RBL   WHEEL   ZOOM   ESC CANCEL
+DEL  LAST RBL      SHIFT-DEL  ALL RBL
+HOME RESET PAN`;
 
 const banner = () => bannerText(renderError(), feedStatus(), site(), receiverAnswered());
 
