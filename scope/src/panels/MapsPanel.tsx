@@ -96,6 +96,11 @@ function MapSetRow(props: {
           type="button"
           class={cx(s.remove, props.armed && s.armed)}
           title="Remove"
+          aria-label={
+            props.armed
+              ? `Confirm removing ${props.set.data.title}`
+              : `Remove ${props.set.data.title}`
+          }
           onClick={() => props.onRemoveClick()}
           onKeyDown={(e) => e.key === 'Escape' && props.onDisarm()}
         >
