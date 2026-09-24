@@ -27,3 +27,32 @@
   color: var(--text-dim);
   font-size: var(--text-xs);
 }
+.remove {
+  padding: 0 var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+.remove:hover {
+  color: var(--color-emergency);
+}
+.import {
+  padding: 3px var(--space-3);
+  border: 1px dashed var(--panel-border);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+.import:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+.file {
+  display: none;
+}
+.note {
+  color: var(--color-descend);
+  font-size: var(--text-xs);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

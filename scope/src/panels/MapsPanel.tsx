@@ -1,6 +1,6 @@
-import { For } from 'solid-js';
+import { createSignal, For, Show } from 'solid-js';
 
-import { mapSets, toggleMapSet } from '../state/mapsets';
+import { importMapSet, importNote, mapSets, removeMapSet, toggleMapSet } from '../state/mapsets';
 import {
   activePreset,
   applyPreset,
@@ -28,6 +28,44 @@ const LAYERS: [LayerKey, string][] = [
   ['sector', 'Sector'],
   ['airports', 'Airports'],
 ];
+
+/** The chosen file goes through the strict schema; the note reports the outcome. */
+function MapSetImport() {
+  const [note, setNote] = createSignal<string | null>(null);
+  let input: HTMLInputElement | undefined;
+  const onFile = async (e: Event & { currentTarget: HTMLInputElement }) => {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setNote('could not read the file');
+      return;
+    }
+    setNote(importNote(importMapSet(text)));
+  };
+  return (
+    <>
+      <button type="button" class={s.import} onClick={() => input?.click()}>
+        IMPORT JSON…
+      </button>
+      <input
+        ref={(node) => {
+          input = node;
+        }}
+        type="file"
+        accept=".json,application/json"
+        class={s.file}
+        onChange={(e) => void onFile(e)}
+      />
+      <Show when={note()}>
+        <div class={s.note}>{note()}</div>
+      </Show>
+    </>
+  );
+}
 
 export function MapsPanel() {
   return (
@@ -64,9 +102,20 @@ export function MapsPanel() {
                 onToggle={() => toggleMapSet(set.id)}
               />
               <span class={s.fetched}>{set.data.fetched ?? ''}</span>
+              <Show when={!set.builtin}>
+                <button
+                  type="button"
+                  class={s.remove}
+                  title="Remove"
+                  onClick={() => removeMapSet(set.id)}
+                >
+                  ×
+                </button>
+              </Show>
             </div>
           )}
         </For>
+        <MapSetImport />
       </div>
       <Divider />
       <SectionTitle>LABEL DENSITY</SectionTitle>

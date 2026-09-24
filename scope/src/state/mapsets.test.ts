@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { EMPTY_AERO } from '../lib/mapdata';
-import { BUILTIN_ID, createMapSets, freshId } from './mapsets';
+import { BUILTIN_ID, createMapSets, freshId, importNote } from './mapsets';
 import { loadMapSets } from './mapsetsPersist';
 import { fullStorage, memoryStorage } from './memoryStorage';
 
@@ -131,6 +131,27 @@ describe('createMapSets', () => {
     // Assert
     expect(sets.mapSets().map((s) => s.id)).toEqual([BUILTIN_ID]);
     expect(loadMapSets(storage).imported).toEqual([]);
+  });
+});
+
+describe('importNote', () => {
+  it('reports a failure or an unsaved import, and nothing for a clean one', () => {
+    // Arrange
+    const results = [
+      { ok: false as const, message: 'title: expected string' },
+      { ok: true as const, kept: false },
+      { ok: true as const, kept: true },
+    ];
+
+    // Act
+    const notes = results.map(importNote);
+
+    // Assert
+    expect(notes).toEqual([
+      'title: expected string',
+      'imported for this session only: browser storage is full',
+      null,
+    ]);
   });
 });
 

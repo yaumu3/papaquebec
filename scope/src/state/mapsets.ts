@@ -127,3 +127,9 @@ export function createMapSets(storage: Storage | null): MapSets {
 
 const sets = createMapSets(typeof localStorage === 'undefined' ? null : localStorage);
 export const { mapSets, aero, setBuiltinAero, importMapSet, toggleMapSet, removeMapSet } = sets;
+
+/** What the Maps panel says after an import; null when there is nothing to say. */
+export function importNote(result: ImportResult): string | null {
+  if (!result.ok) return result.message;
+  return result.kept ? null : 'imported for this session only: browser storage is full';
+}
