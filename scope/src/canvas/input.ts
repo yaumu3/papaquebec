@@ -194,6 +194,8 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
 
   const onDown = (e: PointerEvent) => {
     lastPointerType = e.pointerType;
+    // A finger drag never ends in a click, so a suppression left over from one must not eat this tap.
+    suppressClick = false;
     if (e.pointerType === 'mouse') {
       if (e.button === 2) {
         const v = view();
