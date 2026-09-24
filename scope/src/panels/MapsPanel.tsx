@@ -86,6 +86,7 @@ function MapSetRow(props: {
   return (
     <div class={s.set}>
       <Toggle
+        class={s.setToggle}
         label={props.set.data.title}
         on={props.set.enabled}
         onToggle={() => toggleMapSet(props.set.id)}

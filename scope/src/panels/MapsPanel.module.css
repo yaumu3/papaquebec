@@ -16,7 +16,7 @@
   align-items: stretch;
   gap: var(--space-2);
 }
-.set > button:first-child {
+.setToggle {
   flex: 1;
   min-width: 0;
   overflow: hidden;
