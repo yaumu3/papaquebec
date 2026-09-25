@@ -20,6 +20,13 @@
 .left > * {
   width: var(--panel-width);
 }
+/* Not enough room beside the right dock for a second column: back to one, overflow and all. */
+@media (max-width: 860px) {
+  .left {
+    width: var(--panel-width);
+    flex-wrap: nowrap;
+  }
+}
 .right {
   right: var(--edge);
   width: 370px;
