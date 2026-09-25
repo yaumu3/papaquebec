@@ -76,7 +76,6 @@ export function DisplayPanel() {
       <Divider />
       <SectionTitle>ALTITUDE</SectionTitle>
       <AltitudeAxis />
-      <SectionTitle>ALTIMETER</SectionTitle>
       <FieldRow>
         <Field label="TA ft">
           <input
