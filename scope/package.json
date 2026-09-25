@@ -12,7 +12,7 @@
     "build": "bun run schema && bun run icons && bunx --bun tsc --noEmit && bunx --bun vite build",
     "preview": "bunx --bun vite preview",
     "sim": "bun scripts/sim.ts",
-    "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select JAL317 --scale 1 --out ../docs/screenshot.png",
+    "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select JAL317 --hint --scale 1 --out ../docs/screenshot.png",
     "test": "bun test",
     "lint": "bunx --bun oxlint --type-aware",
     "format": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt",
