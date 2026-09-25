@@ -10,6 +10,21 @@
 .lit {
   color: var(--text);
 }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.row + .row {
+  margin-top: var(--space-2);
+}
+.rowLabel {
+  flex-shrink: 0;
+  width: 42px;
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking);
+}
 .divider {
   margin: var(--space-4) 0;
   border-top: 1px solid var(--panel-border);
