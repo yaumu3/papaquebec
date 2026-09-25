@@ -70,12 +70,8 @@ export function DetailPanel() {
     const hex = selected();
     return hex ? (trackStore.tracks.get(hex) ?? null) : null;
   });
-  const title = () => {
-    const t = track();
-    return t ? trackLabel(t) : (selected()?.toUpperCase() ?? 'Target Detail');
-  };
   return (
-    <Window id="detail" title={title()}>
+    <Window id="detail" title="Target Detail">
       <Show
         when={track()}
         fallback={<div class={s.empty}>{selected() ? 'NOT IN FEED' : 'NO TARGET SELECTED'}</div>}
