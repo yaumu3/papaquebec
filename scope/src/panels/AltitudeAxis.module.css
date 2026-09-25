@@ -119,7 +119,8 @@
   background: var(--control-bg);
   border: 1px solid var(--panel-border);
 }
-.gnd:hover .swatch {
+/* Off state only: a touch leaves :hover behind, which must not hide the ground fill. */
+.gnd:not(.gndOn):hover .swatch {
   background: var(--control-hover);
 }
 .gndOn .swatch {
