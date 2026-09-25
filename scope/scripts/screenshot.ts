@@ -4,7 +4,9 @@
  * answers the data paths from the synthetic fleet at that speed instead of a receiver.
  *
  *   bun scripts/screenshot.ts --out shot.png [--url http://localhost:4173/] [--preview]
- *     [--sim 10] [--site lat,lon] [--wait 6000] [--select JAL317] [--scale 2]
+ *     [--sim 10] [--site lat,lon] [--wait 6000] [--select JAL317] [--hint] [--scale 2]
+ *
+ * `--hint` opens the keyboard and mouse hint pane, as the `?` key does.
  *
  * Chromium is launched on Metal; change `--use-angle` below on other platforms.
  */
@@ -24,6 +26,7 @@ const { values: opt } = parseArgs({
     site: { type: 'string', default: '35.5533,139.7811' }, // RJTT
     wait: { type: 'string', default: '6000' },
     select: { type: 'string' },
+    hint: { type: 'boolean', default: false },
     scale: { type: 'string', default: '2' },
   },
 });
@@ -89,6 +92,10 @@ await page.waitForTimeout(Number(opt.wait));
 if (opt.select) {
   await page.getByText(opt.select, { exact: true }).first().click();
   await page.waitForTimeout(1500);
+}
+if (opt.hint) {
+  await page.keyboard.press('?');
+  await page.waitForTimeout(500);
 }
 const status = await page.evaluate(() => document.querySelector('#top-bar')?.textContent ?? '');
 await page.screenshot({ path: opt.out });
