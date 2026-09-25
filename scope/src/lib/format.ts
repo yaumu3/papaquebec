@@ -96,13 +96,6 @@ export function formatWind(dir: number | undefined, speed: number | undefined): 
     : `${padBearing(dir)}° / ${Math.round(speed)}`;
 }
 
-/** Celsius with an explicit sign above zero. */
-export function formatTemp(c: number | undefined): string {
-  if (c === undefined) return '---';
-  const r = Math.round(c);
-  return `${r > 0 ? '+' : ''}${r}°C`;
-}
-
 /** The list's head count, naming what the filter hides only while it hides something. */
 export function formatListCount(shown: number, total: number): string {
   const hidden = total - shown;

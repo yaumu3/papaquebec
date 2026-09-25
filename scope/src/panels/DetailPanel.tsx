@@ -6,7 +6,6 @@ import {
   climbArrow,
   emergencyCode,
   formatMach,
-  formatTemp,
   formatWind,
   padTrack,
   wakeLetter,
@@ -16,50 +15,100 @@ import { selected, snapshotVersion } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Position } from '../state/track';
 import { trackStore } from '../state/tracks';
-import { SectionTitle } from '../ui/Section';
+import { Divider, SectionTitle } from '../ui/Section';
 import { Window } from '../ui/Window';
 
 import s from './DetailPanel.module.css';
 
-function positionText(p: Position): string {
+/** A value with its unit kept apart so the unit can be set quieter than the number. */
+interface Reading {
+  v: string;
+  unit?: string;
+  /** A lit marker after the unit, such as the climb arrow. */
+  tail?: string;
+  /** A second value after a dot, in the plain text tone whatever the cell's own. */
+  also?: string;
+}
+
+const NONE: Reading = { v: '---' };
+
+/** Latitude and longitude as two readings; a fix that is not live carries its caveat on LON. */
+function positionReadings(p: Position): [Reading, Reading] {
+  if (p.kind === 'none') return [NONE, NONE];
+  const lat = { v: p.lat.toFixed(5) };
+  const lon = p.lon.toFixed(5);
   switch (p.kind) {
-    case 'live':
-      return `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
     case 'last':
-      return `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · LAST KNOWN`;
+      return [lat, { v: lon, unit: 'LAST KNOWN' }];
     case 'rr':
-      return `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)} · ROUGH (rr)`;
+      return [lat, { v: lon, unit: 'ROUGH' }];
     default:
-      return 'NO POSITION';
+      return [lat, { v: lon }];
   }
 }
 
-function altitudeText(alt: number | 'ground' | undefined): string {
+function altitudeReading(
+  alt: number | 'ground' | undefined,
+  baroRate: number | undefined,
+): Reading {
   const d = displayAltitude(alt, settings.altimeter);
+  const tail = climbArrow(baroRate).trim();
   switch (d.kind) {
     case 'altitude':
-      return `${d.feet} ft`;
+      return { v: String(d.feet), unit: 'ft', tail };
     case 'level':
-      return `FL${String(Math.round(d.feet / 100)).padStart(3, '0')}`;
+      return { v: `FL${String(Math.round(d.feet / 100)).padStart(3, '0')}`, tail };
     case 'ground':
-      return 'GND';
+      return { v: 'GND' };
     default:
-      return '---';
+      return NONE;
   }
 }
 
-const num = (v: number | undefined, digits = 0, unit = '') =>
-  v === undefined ? '---' : `${v.toFixed(digits)}${unit}`;
+/** Type with its wake letter in the flight-plan form, e.g. B738/M, then the raw category. */
+function typeReading(type: string | undefined, category: string | undefined): Reading {
+  const v = `${type ?? '----'}/${wakeLetter(category)}`;
+  return category === undefined ? { v } : { v, also: category };
+}
 
-const signed = (v: number | undefined, unit: string) =>
-  v === undefined ? '---' : `${v > 0 ? '+' : ''}${Math.round(v)}${unit}`;
+const num = (v: number | undefined, unit: string, digits = 0): Reading =>
+  v === undefined ? NONE : { v: v.toFixed(digits), unit };
 
-/** One labeled value in the detail grid. */
-function Cell(props: { k: string; v: string; dim?: boolean }) {
+const signed = (v: number | undefined, unit: string): Reading =>
+  v === undefined ? NONE : { v: `${v > 0 ? '+' : ''}${Math.round(v)}`, unit };
+
+const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
+
+/** One labeled reading in the detail grid. */
+function Cell(props: {
+  k: string;
+  r: Reading;
+  dim?: boolean;
+  tone?: 'enriched' | 'alert' | undefined;
+}) {
   return (
-    <div class={cx((props.dim ?? props.v === '---') && s.dim)}>
+    <div
+      class={cx(
+        s.cell,
+        props.tone === 'enriched' && s.enriched,
+        props.tone === 'alert' && s.alert,
+        (props.dim ?? props.r.v === '---') && s.dim,
+      )}
+    >
       <div class={s.k}>{props.k}</div>
-      <div class={s.v}>{props.v}</div>
+      <div class={s.v}>
+        {props.r.v}
+        <Show when={props.r.unit}>
+          <span class={s.unit}>{props.r.unit}</span>
+        </Show>
+        <Show when={props.r.tail}>
+          <span class={s.tail}>{props.r.tail}</span>
+        </Show>
+        <Show when={props.r.also}>
+          <span class={s.sep}>·</span>
+          <span class={s.also}>{props.r.also}</span>
+        </Show>
+      </div>
     </div>
   );
 }
@@ -70,12 +119,8 @@ export function DetailPanel() {
     const hex = selected();
     return hex ? (trackStore.tracks.get(hex) ?? null) : null;
   });
-  const title = () => {
-    const t = track();
-    return t ? trackLabel(t) : (selected()?.toUpperCase() ?? 'Target Detail');
-  };
   return (
-    <Window id="detail" title={title()}>
+    <Window id="detail" title="Target Detail">
       <Show
         when={track()}
         fallback={<div class={s.empty}>{selected() ? 'NOT IN FEED' : 'NO TARGET SELECTED'}</div>}
@@ -90,46 +135,72 @@ export function DetailPanel() {
                   <span class={s.badge}>{ecode()}</span>
                 </Show>
               </div>
-              <div class={s.meta}>
-                {t().hex.toUpperCase()} · {t().category ?? '--'} · {t().source.toUpperCase()}
-                <Show when={t().type}>
-                  {' · '}
-                  <span class={s.enriched}>{t().type}</span>
-                </Show>
-                <Show when={t().registration}>
-                  {' · '}
-                  <span class={s.enriched}>{t().registration}</span>
-                </Show>
-              </div>
               <Show when={t().description}>
-                <div class={cx(s.meta, s.enriched)}>{t().description}</div>
+                <div class={s.description}>{t().description}</div>
               </Show>
+              <div class={cx(s.grid, s.identity)}>
+                <Cell k="HEX" r={{ v: t().hex.toUpperCase() }} />
+                <Cell k="SQUAWK" r={plain(t().squawk)} tone={ecode() ? 'alert' : undefined} />
+                <Cell
+                  k="TYPE"
+                  r={typeReading(t().type, t().category)}
+                  tone={t().type === undefined ? undefined : 'enriched'}
+                  dim={t().type === undefined}
+                />
+                <Cell k="REG" r={plain(t().registration)} tone="enriched" />
+              </div>
+              <Divider />
               <SectionTitle>FLIGHT</SectionTitle>
-              <div class={cx(s.grid, s.cols4)}>
-                <Cell k="ALT" v={`${altitudeText(t().alt)} ${climbArrow(t().baroRate)}`.trim()} />
-                <Cell k="VS" v={signed(t().baroRate, ' fpm')} />
-                <Cell k="GSW" v={`${num(t().gs, 0, ' kt')} ${wakeLetter(t().category)}`.trim()} />
-                <Cell k="TRK" v={`${padTrack(t().track)}°`} />
+              <div class={s.grid}>
+                <Cell k="ALT" r={altitudeReading(t().alt, t().baroRate)} />
+                <Cell k="VS" r={signed(t().baroRate, 'fpm')} />
+                <Cell k="GS" r={num(t().gs, 'kt')} />
+                <Cell
+                  k="TRK"
+                  r={t().track === undefined ? NONE : { v: `${padTrack(t().track)}°` }}
+                />
+                <Cell
+                  k="LAT"
+                  r={positionReadings(t().position)[0]}
+                  dim={t().position.kind !== 'live'}
+                />
+                <Cell
+                  k="LON"
+                  r={positionReadings(t().position)[1]}
+                  dim={t().position.kind !== 'live'}
+                />
               </div>
+              <Divider />
               <SectionTitle>AIR DATA</SectionTitle>
-              <div class={cx(s.grid, s.cols3)}>
-                <Cell k="TAS" v={num(t().tas, 0, ' kt')} />
-                <Cell k="IAS" v={num(t().ias, 0, ' kt')} />
-                <Cell k="MACH" v={formatMach(t().mach)} />
-                <Cell k="WIND" v={formatWind(t().windDir, t().windSpeed)} />
-                <Cell k="OAT" v={formatTemp(t().oat)} />
-                <Cell k="TAT" v={formatTemp(t().tat)} />
+              <div class={s.grid}>
+                <Cell k="TAS" r={num(t().tas, 'kt')} />
+                <Cell k="IAS" r={num(t().ias, 'kt')} />
+                <Cell
+                  k="MACH"
+                  r={plain(t().mach === undefined ? undefined : formatMach(t().mach))}
+                />
+                <Cell
+                  k="WIND"
+                  r={
+                    t().windDir === undefined || t().windSpeed === undefined
+                      ? NONE
+                      : { v: formatWind(t().windDir, t().windSpeed), unit: 'kt' }
+                  }
+                />
+                <Cell k="OAT" r={signed(t().oat, '°C')} />
+                <Cell k="TAT" r={signed(t().tat, '°C')} />
               </div>
+              <Divider />
               <SectionTitle>SIGNAL</SectionTitle>
-              <div class={cx(s.grid, s.cols3)}>
-                <Cell k="SQUAWK" v={t().squawk ?? '---'} />
-                <Cell k="NIC / NACP" v={`${t().nic ?? '-'} / ${t().nacP ?? '-'}`} />
-                <Cell k="MSGS" v={num(t().messages)} />
-                <Cell k="RSSI" v={num(t().rssi, 1, ' dB')} />
-                <Cell k="SEEN" v={num(t().seen, 1, ' s')} />
-                <Cell k="POS" v={num(t().seenPos, 1, ' s')} dim={isStale(t())} />
+              <div class={s.grid}>
+                <Cell k="NIC" r={num(t().nic, '')} />
+                <Cell k="NACP" r={num(t().nacP, '')} />
+                <Cell k="MSGS" r={num(t().messages, '')} />
+                <Cell k="RSSI" r={num(t().rssi, 'dB', 1)} />
+                <Cell k="SEEN" r={num(t().seen, 's', 1)} />
+                <Cell k="POS" r={num(t().seenPos, 's', 1)} dim={isStale(t())} />
+                <Cell k="SRC" r={{ v: t().source.toUpperCase() }} />
               </div>
-              <div class={s.pos}>{positionText(t().position)}</div>
             </>
           );
         }}

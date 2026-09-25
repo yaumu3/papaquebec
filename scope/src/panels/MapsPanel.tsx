@@ -146,10 +146,9 @@ export function MapsPanel() {
     <Window id="maps" title="Maps">
       <SectionTitle>PRESET</SectionTitle>
       <Pills
-        small
         options={[
-          { value: 'approach', label: 'APPROACH' },
-          { value: 'enroute', label: 'EN ROUTE' },
+          { value: 'approach', label: 'APP' },
+          { value: 'enroute', label: 'ENR' },
           { value: 'minimal', label: 'MIN' },
           { value: 'all', label: 'ALL' },
         ]}

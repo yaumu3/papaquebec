@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type Band, type BandLimits, formatEdge, parseEdge, withLower, withUpper } from './band';
+import {
+  type Band,
+  type BandLimits,
+  draggedEdge,
+  formatEdge,
+  parseEdge,
+  withLower,
+  withUpper,
+} from './band';
 
 const limits: BandLimits = { min: 0, max: 600, gap: 10 };
 const band: Band = { lower: 50, upper: 200 };
@@ -64,5 +72,26 @@ describe('parseEdge', () => {
 
     // Assert
     expect(out).toEqual([50, 5, 245, 600, 600, 600, 600, null, null, null]);
+  });
+});
+
+describe('draggedEdge', () => {
+  it('turns pointer travel up the axis into a stepped value from where the drag began', () => {
+    // Arrange
+    const trackPx = 300; // 0.5 px per unit over 600 units
+    const drags = [
+      { start: 100, dyPx: -50 }, // up 100 units
+      { start: 100, dyPx: 50 }, // down 100 units
+      { start: 100, dyPx: -7 }, // 14 units, rounds to the nearest step
+      { start: 100, dyPx: 2 }, // under half a step: unchanged
+      { start: 590, dyPx: -200 }, // past the top stop
+      { start: 20, dyPx: 200 }, // past the bottom stop
+    ];
+
+    // Act
+    const out = drags.map((d) => draggedEdge(d.start, d.dyPx, trackPx, limits, 10));
+
+    // Assert
+    expect(out).toEqual([200, 0, 110, 100, 600, 0]);
   });
 });

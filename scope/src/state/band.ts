@@ -45,3 +45,18 @@ export function parseEdge(text: string, l: BandLimits): number | null {
 export function fraction(v: number, l: BandLimits): number {
   return Math.min(1, Math.max(0, (v - l.min) / (l.max - l.min)));
 }
+
+/**
+ * Where an edge lands after a pointer drag: `dyPx` is the travel down the screen from where the
+ * drag began at `start`, and `trackPx` spans the whole range. The result snaps to `step`.
+ */
+export function draggedEdge(
+  start: number,
+  dyPx: number,
+  trackPx: number,
+  l: BandLimits,
+  step: number,
+): number {
+  const raw = start - (dyPx / trackPx) * (l.max - l.min);
+  return clamp(Math.round(raw / step) * step, l.min, l.max);
+}

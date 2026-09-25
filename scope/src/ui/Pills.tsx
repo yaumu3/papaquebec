@@ -13,7 +13,6 @@ export function Pills<T extends string | number>(props: {
   options: readonly PillOption<T>[];
   value: T | null;
   onChange: (v: T) => void;
-  small?: boolean;
 }) {
   return (
     <div class={s.pills}>
@@ -21,7 +20,7 @@ export function Pills<T extends string | number>(props: {
         {(o) => (
           <button
             type="button"
-            class={cx(s.pill, props.small && s.small, o.value === props.value && s.active)}
+            class={cx(s.pill, o.value === props.value && s.active)}
             onClick={() => props.onChange(o.value)}
           >
             {o.label}

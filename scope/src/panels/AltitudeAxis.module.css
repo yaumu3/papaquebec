@@ -1,6 +1,6 @@
 /* Column widths and the readout lane, shared by the axis and the GND row below it. */
 .altitude {
-  --scale: 26px;
+  --scale: 18px;
   --slider: 22px; /* BandSlider's vertical width */
   --readout: 42px;
   --lane: calc(var(--readout) + var(--space-4));
@@ -65,6 +65,8 @@
   display: flex;
   align-items: center;
   transform: translateY(50%);
+  cursor: ns-resize;
+  touch-action: none;
 }
 .lead {
   flex: 1;
@@ -90,7 +92,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: calc(-1 * var(--space-2)) 0 var(--space-1);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   font-size: var(--text-sm);
 }
 .foot .side {
@@ -119,7 +121,8 @@
   background: var(--control-bg);
   border: 1px solid var(--panel-border);
 }
-.gnd:hover .swatch {
+/* Off state only: a touch leaves :hover behind, which must not hide the ground fill. */
+.gnd:not(.gndOn):hover .swatch {
   background: var(--control-hover);
 }
 .gndOn .swatch {

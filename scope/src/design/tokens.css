@@ -51,6 +51,7 @@
   --space-6: 12px;
 
   /* Layout */
+  --control-height: 20px;
   --topbar-height: 28px;
   --tabbar-height: 44px;
   /* Phone breakpoint: 720px, repeated in each module's media query (custom properties cannot be). */

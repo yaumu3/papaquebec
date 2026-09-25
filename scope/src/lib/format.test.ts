@@ -8,7 +8,6 @@ import {
   formatGsWake,
   formatMmSs,
   formatMach,
-  formatTemp,
   formatWind,
   padBearing,
   wakeLetter,
@@ -100,8 +99,8 @@ describe('formatMmSs / padBearing', () => {
   });
 });
 
-describe('formatWind / formatTemp', () => {
-  it('renders wind as direction over speed and temperatures with a sign', () => {
+describe('formatWind', () => {
+  it('renders wind as direction over speed', () => {
     // Arrange
     const winds: [number | undefined, number | undefined][] = [
       [255, 14],
@@ -109,15 +108,12 @@ describe('formatWind / formatTemp', () => {
       [undefined, 5],
       [180, undefined],
     ];
-    const temps = [13, -40, 0, undefined];
 
     // Act
     const w = winds.map(([dir, speed]) => formatWind(dir, speed));
-    const t = temps.map(formatTemp);
 
     // Assert
     expect(w).toEqual(['255° / 14', '360° / 3', '---', '---']);
-    expect(t).toEqual(['+13°C', '-40°C', '0°C', '---']);
   });
 });
 

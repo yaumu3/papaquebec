@@ -10,7 +10,7 @@ import {
 } from '../state/settings';
 import { Field, FieldRow, FieldSlot } from '../ui/Field';
 import { Pills } from '../ui/Pills';
-import { Divider, SectionTitle } from '../ui/Section';
+import { Divider, LabeledRow, SectionTitle } from '../ui/Section';
 import { Toggle } from '../ui/Toggle';
 import { Window } from '../ui/Window';
 import { AltitudeAxis } from './AltitudeAxis';
@@ -41,32 +41,44 @@ function setStation(input: string): void {
 export function DisplayPanel() {
   return (
     <Window id="display" title="Display">
-      <SectionTitle>VECTOR</SectionTitle>
-      <Pills
-        options={[
-          { value: 0, label: 'OFF' },
-          { value: 0.5, label: '30s' },
-          { value: 1, label: '1m' },
-          { value: 2, label: '2m' },
-        ]}
-        value={settings.vectorMin}
-        onChange={(v) => setSettings('vectorMin', v)}
-      />
-      <SectionTitle>TRAIL</SectionTitle>
-      <Pills
-        options={[
-          { value: 0, label: 'OFF' },
-          { value: 30, label: '30s' },
-          { value: 60, label: '1m' },
-          { value: 120, label: '2m' },
-        ]}
-        value={settings.trailSec}
-        onChange={(v) => setSettings('trailSec', v)}
-      />
+      <LabeledRow label="VECTOR">
+        <Pills
+          options={[
+            { value: 0, label: 'OFF' },
+            { value: 0.5, label: '30s' },
+            { value: 1, label: '1m' },
+            { value: 2, label: '2m' },
+          ]}
+          value={settings.vectorMin}
+          onChange={(v) => setSettings('vectorMin', v)}
+        />
+      </LabeledRow>
+      <LabeledRow label="TRAIL">
+        <Pills
+          options={[
+            { value: 0, label: 'OFF' },
+            { value: 30, label: '30s' },
+            { value: 60, label: '1m' },
+            { value: 120, label: '2m' },
+          ]}
+          value={settings.trailSec}
+          onChange={(v) => setSettings('trailSec', v)}
+        />
+      </LabeledRow>
+      <LabeledRow label="SQUAWK">
+        <Pills
+          options={[
+            { value: 'all', label: 'ALL' },
+            { value: 'nonvfr', label: 'NON-VFR' },
+            { value: 'emergency', label: 'EMERG' },
+          ]}
+          value={settings.filter.squawk}
+          onChange={(v: SquawkFilter) => setSettings('filter', 'squawk', v)}
+        />
+      </LabeledRow>
       <Divider />
       <SectionTitle>ALTITUDE</SectionTitle>
       <AltitudeAxis />
-      <SectionTitle>ALTIMETER</SectionTitle>
       <FieldRow>
         <Field label="TA ft">
           <input
@@ -108,16 +120,6 @@ export function DisplayPanel() {
           />
         </FieldSlot>
       </FieldRow>
-      <SectionTitle>SQUAWK</SectionTitle>
-      <Pills
-        options={[
-          { value: 'all', label: 'ALL' },
-          { value: 'nonvfr', label: 'NON-VFR' },
-          { value: 'emergency', label: 'EMERG' },
-        ]}
-        value={settings.filter.squawk}
-        onChange={(v: SquawkFilter) => setSettings('filter', 'squawk', v)}
-      />
     </Window>
   );
 }
