@@ -1,61 +1,44 @@
-type Binding = readonly [key: string, action: string];
-type Column = readonly Binding[];
-/** Columns laid side by side; blocks stack with a blank line between. */
-type Block = readonly Column[];
+/** Caps pressed together, joined by `sep` (a chord by default), and what they do. */
+export interface Binding {
+  keys: readonly string[];
+  action: string;
+  sep?: string;
+}
+export type Column = readonly Binding[];
 
-const KEYBOARD: Block = [
-  [
-    ['[ ]', 'RANGE'],
-    ['T', 'TRAIL CYCLE'],
-    ['V', 'VECTOR CYCLE'],
-    ['L', 'LIST'],
-    ['?', 'HINT'],
-  ],
-  [
-    ['R', 'RBL'],
-    ['DEL', 'LAST RBL'],
-    ['SHIFT-DEL', 'ALL RBL'],
-    ['HOME', 'RESET PAN'],
-    ['ESC', 'CANCEL'],
-  ],
-];
-
-const MOUSE: Block = [
-  [
-    ['DRAG', 'PAN'],
-    ['DRAG TARGET', 'RBL'],
-  ],
-  [
-    ['RIGHT-DRAG', 'RANGE CURSOR'],
-    ['WHEEL', 'ZOOM'],
-  ],
-];
-
-const KEY_GAP = 2;
-const COLUMN_GAP = 4;
-
-const widest = (blocks: readonly Block[], column: number, part: 0 | 1) =>
-  Math.max(0, ...blocks.flatMap((b) => (b[column] ?? []).map((binding) => binding[part].length)));
-
-/** Keys and actions align down each column across every block. */
-function layout(blocks: readonly Block[]): string {
-  const columns = Math.max(...blocks.map((b) => b.length));
-  const width = Array.from({ length: columns }, (_, i) => ({
-    key: widest(blocks, i, 0) + KEY_GAP,
-    action: widest(blocks, i, 1),
-  }));
-  const cell = (b: Binding | undefined, i: number) => {
-    const w = width[i] ?? { key: 0, action: 0 };
-    return (b ? b[0].padEnd(w.key) + b[1] : '').padEnd(w.key + w.action);
-  };
-  const block = (b: Block) =>
-    Array.from({ length: Math.max(...b.map((c) => c.length)) }, (_, row) =>
-      b
-        .map((c, i) => cell(c[row], i))
-        .join(' '.repeat(COLUMN_GAP))
-        .trimEnd(),
-    ).join('\n');
-  return blocks.map(block).join('\n\n');
+/** One titled group of bindings, its columns laid side by side. */
+export interface HintBlock {
+  title: string;
+  columns: readonly Column[];
 }
 
-export const HINT = layout([KEYBOARD, MOUSE]);
+const key = (k: string, action: string): Binding => ({ keys: [k], action });
+
+export const HINT: readonly HintBlock[] = [
+  {
+    title: 'KEYBOARD',
+    columns: [
+      [
+        { keys: ['[', ']'], action: 'RANGE', sep: '' },
+        key('T', 'TRAIL CYCLE'),
+        key('V', 'VECTOR CYCLE'),
+        key('L', 'LIST'),
+        key('?', 'HINT'),
+      ],
+      [
+        key('R', 'RBL'),
+        key('DEL', 'LAST RBL'),
+        { keys: ['SHIFT', 'DEL'], action: 'ALL RBL' },
+        key('HOME', 'RESET PAN'),
+        key('ESC', 'CANCEL'),
+      ],
+    ],
+  },
+  {
+    title: 'MOUSE',
+    columns: [
+      [key('DRAG', 'PAN'), key('DRAG TARGET', 'RBL')],
+      [key('RIGHT-DRAG', 'RANGE CURSOR'), key('WHEEL', 'ZOOM')],
+    ],
+  },
+];
