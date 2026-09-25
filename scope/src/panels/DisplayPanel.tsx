@@ -63,6 +63,16 @@ export function DisplayPanel() {
         value={settings.trailSec}
         onChange={(v) => setSettings('trailSec', v)}
       />
+      <SectionTitle>SQUAWK</SectionTitle>
+      <Pills
+        options={[
+          { value: 'all', label: 'ALL' },
+          { value: 'nonvfr', label: 'NON-VFR' },
+          { value: 'emergency', label: 'EMERG' },
+        ]}
+        value={settings.filter.squawk}
+        onChange={(v: SquawkFilter) => setSettings('filter', 'squawk', v)}
+      />
       <Divider />
       <SectionTitle>ALTITUDE</SectionTitle>
       <AltitudeAxis />
@@ -108,16 +118,6 @@ export function DisplayPanel() {
           />
         </FieldSlot>
       </FieldRow>
-      <SectionTitle>SQUAWK</SectionTitle>
-      <Pills
-        options={[
-          { value: 'all', label: 'ALL' },
-          { value: 'nonvfr', label: 'NON-VFR' },
-          { value: 'emergency', label: 'EMERG' },
-        ]}
-        value={settings.filter.squawk}
-        onChange={(v: SquawkFilter) => setSettings('filter', 'squawk', v)}
-      />
     </Window>
   );
 }
