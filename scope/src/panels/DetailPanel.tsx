@@ -6,7 +6,6 @@ import {
   climbArrow,
   emergencyCode,
   formatMach,
-  formatTemp,
   formatWind,
   padTrack,
   wakeLetter,
@@ -188,8 +187,8 @@ export function DetailPanel() {
                       : { v: formatWind(t().windDir, t().windSpeed), unit: 'kt' }
                   }
                 />
-                <Cell k="OAT" r={plain(t().oat === undefined ? undefined : formatTemp(t().oat))} />
-                <Cell k="TAT" r={plain(t().tat === undefined ? undefined : formatTemp(t().tat))} />
+                <Cell k="OAT" r={signed(t().oat, '°C')} />
+                <Cell k="TAT" r={signed(t().tat, '°C')} />
               </div>
               <Divider />
               <SectionTitle>SIGNAL</SectionTitle>
