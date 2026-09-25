@@ -14,6 +14,7 @@ import {
 import {
   type Band,
   type BandLimits,
+  draggedEdge,
   formatEdge,
   fraction,
   parseEdge,
@@ -54,7 +55,13 @@ interface Traffic {
   picked: number | 'ground' | null;
 }
 
-/** A typed edge moves like a dragged thumb; unreadable input is put back as it was. */
+/** Pointer travel under this many pixels is a tap on the readout, not a drag. */
+const DRAG_SLOP_PX = 3;
+
+/**
+ * A typed edge moves like a dragged thumb; unreadable input is put back as it was. The whole
+ * row, leader and readout, also drags the edge: a bigger handle than the thumb for a finger.
+ */
 function BandEdge(props: {
   label: string;
   value: number;
@@ -62,10 +69,44 @@ function BandEdge(props: {
   move: (b: Band, v: number, l: BandLimits) => Band;
 }) {
   const nudge = () => edgeSpread(band(), BAND_LIMITS, GEOMETRY) * (props.side === 'above' ? 1 : -1);
+  let drag: { y: number; start: number; moved: boolean } | null = null;
+  let input: HTMLInputElement | undefined;
+  const onDown = (e: PointerEvent & { currentTarget: HTMLDivElement }) => {
+    if (e.button !== 0) return;
+    drag = { y: e.clientY, start: props.value, moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onMove = (e: PointerEvent) => {
+    if (!drag) return;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved && Math.abs(dy) < DRAG_SLOP_PX) return;
+    drag.moved = true;
+    input?.blur();
+    setBand(
+      props.move(
+        band(),
+        draggedEdge(drag.start, dy, GEOMETRY.track, BAND_LIMITS, DRAG_STEP),
+        BAND_LIMITS,
+      ),
+    );
+  };
+  const onUp = () => {
+    drag = null;
+  };
   return (
-    <div class={s.edge} style={{ bottom: `calc(${at(props.value)} + ${nudge()}px)` }}>
+    <div
+      class={s.edge}
+      style={{ bottom: `calc(${at(props.value)} + ${nudge()}px)` }}
+      onPointerDown={onDown}
+      onPointerMove={onMove}
+      onPointerUp={onUp}
+      onPointerCancel={onUp}
+    >
       <span class={s.lead} />
       <input
+        ref={(node) => {
+          input = node;
+        }}
         type="text"
         maxlength={3}
         spellcheck={false}

@@ -65,6 +65,8 @@
   display: flex;
   align-items: center;
   transform: translateY(50%);
+  cursor: ns-resize;
+  touch-action: none;
 }
 .lead {
   flex: 1;
