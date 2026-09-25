@@ -1,6 +1,6 @@
 /* Column widths and the readout lane, shared by the axis and the GND row below it. */
 .altitude {
-  --scale: 26px;
+  --scale: 18px;
   --slider: 22px; /* BandSlider's vertical width */
   --readout: 42px;
   --lane: calc(var(--readout) + var(--space-4));
@@ -90,7 +90,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin: calc(-1 * var(--space-2)) 0 var(--space-1);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-4);
   font-size: var(--text-sm);
 }
 .foot .side {
