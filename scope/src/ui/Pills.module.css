@@ -1,5 +1,6 @@
 .pills {
   display: flex;
+  flex: 1;
   gap: var(--space-1);
 }
 .pill {
@@ -10,9 +11,6 @@
   border: 1px solid var(--panel-border);
   font-size: var(--text-sm);
   text-align: center;
-}
-.small {
-  font-size: var(--text-xs);
 }
 .pill:hover {
   background: var(--control-hover);
