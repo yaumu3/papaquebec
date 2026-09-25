@@ -17,39 +17,56 @@
   font-size: var(--text-sm);
   vertical-align: 2px;
 }
-.meta {
+.description {
   margin-top: var(--space-1);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-}
-.enriched {
   color: var(--color-enriched);
+  font-size: var(--text-sm);
 }
 .grid {
   display: grid;
-  gap: var(--space-2) var(--space-4);
-}
-.cols3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-.cols4 {
   grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-3) var(--space-4);
+}
+.identity {
+  margin-top: var(--space-3);
+}
+.cell {
+  min-width: 0;
 }
 .k {
   color: var(--text-dim);
   font-size: var(--text-xs);
-  letter-spacing: var(--tracking);
+  letter-spacing: var(--tracking-wide);
 }
 .v {
   font-size: var(--text-md);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+.unit {
+  margin-left: var(--space-2);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: var(--tracking);
+}
+.tail {
+  margin-left: var(--space-2);
+}
+.sep {
+  margin: 0 var(--space-2);
+  color: var(--text-muted);
+}
+.also {
+  color: var(--text);
+}
+.enriched .v {
+  color: var(--color-enriched);
+}
+.alert .v {
+  color: var(--color-emergency);
+}
+/* Last so a missing value reads dim whatever its tone. */
 .dim .v {
   color: var(--text-dim);
-}
-.pos {
-  margin-top: var(--space-4);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
 }
