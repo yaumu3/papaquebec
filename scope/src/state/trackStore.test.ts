@@ -80,6 +80,18 @@ describe('createTrackStore', () => {
     ]);
   });
 
+  it('retains an hour of history', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [live('a', 33.5, 130.5)])); // south of RJFF
+
+    // Act
+    store.ingest(snapshot(1000 + 3600, [live('a', 33.6, 130.5)])); // RJFF
+
+    // Assert
+    expect(store.tracks.get('a')?.history.map((f) => f.t)).toEqual([1000, 1000 + 3600]);
+  });
+
   it('preserves operator state across snapshots', () => {
     // Arrange
     const store = createTrackStore(project);
