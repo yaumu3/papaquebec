@@ -1,5 +1,19 @@
+import { RBL_SNAP_PX, TARGET_PX } from '../../hit';
+import type { Precision } from '../actions';
 import { DRAG_THRESHOLD_PX, type Point } from '../geometry';
 import { dragZoomFactor, isDoubleTap, type Pair, pinchOf, type Tap } from './touchGestures';
+
+/** Fingers are less precise than a cursor. */
+const FINGER_REACH_PX = 24;
+/** A finger lands loosely; neither it nor a pen shows where it is between presses. */
+export const FINGER: Precision = { reach: FINGER_REACH_PX, snap: FINGER_REACH_PX, hovers: false };
+/** A pen lands as exactly as a cursor. */
+export const PEN: Precision = { reach: TARGET_PX, snap: RBL_SNAP_PX, hovers: false };
+
+/** The precision of a non-mouse `pointerType`: a touch is a finger, anything else a pen. */
+export function precisionOf(pointerType: string): Precision {
+  return pointerType === 'touch' ? FINGER : PEN;
+}
 
 /** The parts of a `PointerEvent` the recognizer reads. */
 export interface FingerEvent {

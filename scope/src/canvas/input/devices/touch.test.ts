@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type FingerEvent, type TouchHandlers, trackTouches } from './touch';
+import {
+  FINGER,
+  type FingerEvent,
+  PEN,
+  precisionOf,
+  type TouchHandlers,
+  trackTouches,
+} from './touch';
 
 const LONG_PRESS_MS = 20;
 
@@ -255,5 +262,18 @@ describe('trackTouches', () => {
 
     // Assert
     expect(zooming).toEqual([false, false, true, false]);
+  });
+});
+
+describe('precisionOf', () => {
+  it('takes a touch for a finger and anything else for a pen', () => {
+    // Arrange
+    const types = ['touch', 'pen', 'something new'];
+
+    // Act
+    const out = types.map(precisionOf);
+
+    // Assert
+    expect(out).toEqual([FINGER, PEN, PEN]);
   });
 });
