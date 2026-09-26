@@ -2,7 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
-import { buildTargets, INTENT_TONE, type TargetInput } from './targets';
+import { INTENT_TONE } from './datablock';
+import { buildTargets, type TargetInput } from './targets';
 import { makeTrack } from './trackFixture';
 
 const atlas: AtlasInfo = {

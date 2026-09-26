@@ -2,10 +2,10 @@ import type { Altimeter } from '../../lib/altitude';
 import { velocityNm } from '../../lib/geo';
 import { classify, type Filter, type Visibility } from '../../state/filter';
 import type { Corner, Fix, Track } from '../../state/track';
-import { DB_LINE, labelOffset, type LabelSubject, placeLabels } from '../layout/labels';
+import { labelOffset, type LabelSubject, placeLabels } from '../layout/labels';
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
-import { dataBlock, extraLines, type Run } from './datablock';
+import { dataBlock, drawDataBlock, extraLines } from './datablock';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { targetShape, THEME, trackColor } from './rules';
 import { toScreen } from './view';
@@ -40,22 +40,10 @@ export interface TargetScene {
   corners: Map<string, Corner>;
 }
 
-const FONT_PX = 11;
 const GLYPH_PX = 6;
 /** Fixed 45° slash, half-length in CSS px. */
 const SLASH = 2.1;
 const HISTORY_DOT_PX = 2.5;
-/** Brightness of downlinked intent against the block's own color. */
-export const INTENT_TONE = 0.65;
-
-function dim(hex: string, f: number): string {
-  const n = Number.parseInt(hex.slice(1, 7), 16);
-  const c = (v: number) =>
-    Math.round(v * f)
-      .toString(16)
-      .padStart(2, '0');
-  return `#${c((n >>> 16) & 255)}${c((n >>> 8) & 255)}${c(n & 255)}`;
-}
 
 interface Drawable {
   t: Track;
@@ -132,59 +120,6 @@ function drawSelection(lines: LineBatch, d: Drawable): void {
   }
 }
 
-/** One line of runs, laid out as a single string would be under `align`. */
-function drawRuns(
-  text: TextBatch,
-  runs: Run[],
-  at: Anchor,
-  align: 'left' | 'right',
-  colors: { plain: string; intent: string },
-): void {
-  const width = text.measure(runs.map((r) => r.text).join(''), FONT_PX);
-  let px = (at.px ?? 0) - (align === 'right' ? width : 0);
-  for (const r of runs) {
-    text.text(r.text, { ...at, px }, FONT_PX, r.intent ? colors.intent : colors.plain);
-    px += text.measure(r.text, FONT_PX);
-  }
-}
-
-function drawDataBlock(
-  lines: LineBatch,
-  text: TextBatch,
-  d: Drawable,
-  { dx, dy }: { dx: number; dy: number },
-  input: TargetInput,
-): void {
-  const right = dx > 0;
-  const above = dy < 0;
-  const block = dataBlock(d.t, input.now, input.altimeter);
-  const extra = above ? extraLines(d.t) * DB_LINE : 0;
-  const blockY = dy - extra;
-  const align = right ? 'left' : 'right';
-  const emphasised = d.t.hex === input.selected || d.t.hex === input.hovered;
-  const at: Anchor = { x: d.x, y: d.y };
-  // Leader from the glyph edge to the block edge that faces the target.
-  lines.segment(
-    { ...at, px: right ? 3 : -3, py: above ? -3 : 3 },
-    { ...at, px: right ? dx - 3 : dx + 3, py: above ? dy + 13 : blockY - 3 },
-    emphasised ? d.color : dim(d.color, 0.5),
-  );
-  let lineY = blockY;
-  if (block.prefix) {
-    text.text(block.prefix, { ...at, px: dx, py: lineY }, FONT_PX, THEME.emergency, { align });
-    lineY += DB_LINE;
-  }
-  const intent = dim(d.color, INTENT_TONE);
-  text.text(block.line1, { ...at, px: dx, py: lineY }, FONT_PX, d.color, { align });
-  drawRuns(text, block.line2, { ...at, px: dx, py: lineY + DB_LINE }, align, {
-    plain: d.color,
-    intent,
-  });
-  if (block.line3) {
-    text.text(block.line3, { ...at, px: dx, py: lineY + 2 * DB_LINE }, FONT_PX, intent, { align });
-  }
-}
-
 export function buildTargets(input: TargetInput): TargetScene {
   const lines = new LineBatch();
   const markers = new MarkerBatch();
@@ -217,7 +152,13 @@ export function buildTargets(input: TargetInput): TargetScene {
     else if (d.t.hex === input.hovered) markers.marker(at, Shape.HollowSquare, 14, THEME.hover);
     const drag = input.labelDrag;
     const offset = drag && drag.hex === d.t.hex ? drag : labelOffset(corners.get(d.t.hex) ?? 'ne');
-    drawDataBlock(lines, text, d, offset, input);
+    drawDataBlock(lines, text, dataBlock(d.t, input.now, input.altimeter), {
+      at,
+      ...offset,
+      extra: extraLines(d.t),
+      color: d.color,
+      emphasised: d.t.hex === input.selected || d.t.hex === input.hovered,
+    });
   }
 
   return { batches: [lines.finish(), markers.finish(), text.finish()], corners };
