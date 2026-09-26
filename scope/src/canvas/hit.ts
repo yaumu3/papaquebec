@@ -1,7 +1,7 @@
 import { distanceToSegment } from '../lib/geo';
 import { labelOffset, labelRect } from '../render/layout/labels';
 import type { View } from '../render/protocol';
-import { extraLines } from '../render/scene/rules';
+import { extraLines } from '../render/scene/datablock';
 import { toScreen, toWorld } from '../render/scene/view';
 import { classify } from '../state/filter';
 import { aero, type Rbl, type RblAnchor, rbls, selected } from '../state/scope';

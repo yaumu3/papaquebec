@@ -5,8 +5,9 @@ import type { Corner, Fix, Track } from '../../state/track';
 import { DB_LINE, labelOffset, type LabelSubject, placeLabels } from '../layout/labels';
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
+import { dataBlock, extraLines, type Run } from './datablock';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
-import { dataBlock, extraLines, type Run, targetShape, THEME, trackColor } from './rules';
+import { targetShape, THEME, trackColor } from './rules';
 import { toScreen } from './view';
 
 export interface TargetInput {
