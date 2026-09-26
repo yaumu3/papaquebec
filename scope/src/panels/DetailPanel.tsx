@@ -1,15 +1,17 @@
 import { createMemo, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { type DisplayAltitude, displayAltitude } from '../lib/altitude';
+import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
 import {
   climbArrow,
   emergencyCode,
   formatMach,
+  formatModes,
   formatWind,
   padBearing,
   wakeLetter,
 } from '../lib/format';
+import { hpaToInHg } from '../lib/metar';
 import { isStale, trackLabel } from '../render/scene/rules';
 import { selected, snapshotVersion } from '../state/scope';
 import { settings } from '../state/settings';
@@ -54,6 +56,9 @@ function altitudeReading(
   return levelReading(displayAltitude(alt, settings.altimeter), climbArrow(baroRate).trim());
 }
 
+const selectedReading = (ft: number | undefined): Reading =>
+  levelReading(displayAltitude(ft, uncorrected(settings.altimeter)));
+
 function levelReading(d: DisplayAltitude, tail = ''): Reading {
   switch (d.kind) {
     case 'altitude':
@@ -79,6 +84,8 @@ const num = (v: number | undefined, unit: string, digits = 0): Reading =>
 const bearing = (deg: number | undefined): Reading =>
   deg === undefined ? NONE : { v: `${padBearing(deg)}°` };
 
+const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
+
 const signed = (v: number | undefined, unit: string): Reading =>
   v === undefined ? NONE : { v: `${v > 0 ? '+' : ''}${Math.round(v)}`, unit };
 
@@ -90,11 +97,14 @@ function Cell(props: {
   r: Reading;
   dim?: boolean;
   tone?: 'enriched' | 'alert' | undefined;
+  /** Spans the whole row, for a value too long for one column. */
+  wide?: boolean;
 }) {
   return (
     <div
       class={cx(
         s.cell,
+        props.wide && s.wide,
         props.tone === 'enriched' && s.enriched,
         props.tone === 'alert' && s.alert,
         (props.dim ?? props.r.v === '---') && s.dim,
@@ -191,6 +201,15 @@ export function DetailPanel() {
                 />
                 <Cell k="OAT" r={signed(t().oat, '°C')} />
                 <Cell k="TAT" r={signed(t().tat, '°C')} />
+              </div>
+              <Divider />
+              <SectionTitle>NAV</SectionTitle>
+              <div class={s.grid}>
+                <Cell k="SEL ALT" r={selectedReading(t().selAlt)} />
+                <Cell k="FMS ALT" r={selectedReading(t().fmsAlt)} />
+                <Cell k="SEL HDG" r={bearing(t().selHeading)} />
+                <Cell k="QNH" r={num(inHg(t().navQnh), 'inHg', 2)} />
+                <Cell k="MODES" r={plain(formatModes(t().navModes))} wide />
               </div>
               <Divider />
               <SectionTitle>SIGNAL</SectionTitle>

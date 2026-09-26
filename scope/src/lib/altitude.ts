@@ -32,6 +32,9 @@ export function displayAltitude(alt: number | 'ground' | undefined, a: Altimeter
     : { kind: 'level', feet: alt };
 }
 
+/** The same regimes without the QNH correction, for altitudes the crew set on their own altimeter. */
+export const uncorrected = (a: Altimeter): Altimeter => ({ ...a, qnhInHg: STANDARD_QNH_INHG });
+
 /** The hundreds of feet a data block prints for `alt`; ground and unknown pass through. */
 export function displayLevel(
   alt: number | 'ground' | undefined,
