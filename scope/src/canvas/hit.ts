@@ -10,6 +10,8 @@ import type { Track } from '../state/track';
 import { projectNm, trackStore } from '../state/tracks';
 
 const TARGET_PX = 14;
+/** An RBL end this close to a target snaps onto it, as the pending line draws it. */
+export const RBL_SNAP_PX = 15;
 const FIX_PX = 10;
 
 /** Nearest drawn target within reach of a screen point; filtered diamonds count too. */

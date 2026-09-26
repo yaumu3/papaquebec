@@ -30,7 +30,7 @@ import {
 } from '../state/settings';
 import { trackStore } from '../state/tracks';
 import { dragZoom, pinchZoom, type Zoomed, zoomAbout } from './gestures';
-import { blockAt, fixAt, rblAt, targetAt, targetScreen } from './hit';
+import { blockAt, fixAt, RBL_SNAP_PX, rblAt, targetAt, targetScreen } from './hit';
 import { rblMenu, scopeMenu, targetMenu } from './menus';
 import { anchorFor, appendRbl } from './rbl';
 import { DRAG_THRESHOLD_PX, type Point, trackTouches } from './touch';
@@ -39,8 +39,6 @@ import { DRAG_THRESHOLD_PX, type Point, trackTouches } from './touch';
 const ZOOM_PER_PX = 0.0018;
 /** Fingers are less precise than a cursor. */
 const TOUCH_REACH_PX = 24;
-/** An RBL end this close to a target snaps onto it, as the pending line already draws it. */
-const RBL_SNAP_PX = 15;
 
 /** The RBL anchor under a screen point: a target within `reach`, else the point itself. */
 function anchorAt(v: View, cx: number, cy: number, reach: number) {
