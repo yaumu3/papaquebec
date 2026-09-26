@@ -83,9 +83,6 @@
   background: var(--row-selected);
   color: var(--color-selected);
 }
-.dim {
-  color: var(--text-dim);
-}
 .hex {
   color: var(--text-dim);
   font-size: var(--text-xs);

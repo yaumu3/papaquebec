@@ -9,6 +9,7 @@ import { type PanelId, persisted } from './settings';
 export type { PanelId };
 /** The enabled map sets merged; see `mapsets`. */
 export { aero };
+export { declination, magneticTrack, setDeclination } from './magnetic';
 import type { Fix } from './track';
 
 /** Feed liveness, as readsb reports it; the scope keeps no timer of its own beyond "when did we last hear". */
@@ -41,7 +42,6 @@ export type RangeCursorOrigin =
 export const [site, setSite] = createSignal<Site | null>(null);
 /** True once receiver.json has been read, whether or not it carried a position. */
 export const [receiverAnswered, setReceiverAnswered] = createSignal(false);
-export const [declination, setDeclination] = createSignal(0);
 /** Bumped whenever the projection is (re)configured; projected geometry must be rebuilt. */
 const [projectionVersionSignal, setProjectionVersion] = createSignal(0);
 export const projectionVersion = projectionVersionSignal;

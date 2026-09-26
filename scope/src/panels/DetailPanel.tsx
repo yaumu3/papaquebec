@@ -13,9 +13,9 @@ import {
 } from '../lib/format';
 import { hpaToInHg } from '../lib/metar';
 import { isStale, trackLabel } from '../render/scene/rules';
-import { selected, snapshotVersion } from '../state/scope';
+import { magneticTrack, selected, snapshotVersion } from '../state/scope';
 import { settings } from '../state/settings';
-import type { Position } from '../state/track';
+import type { Position, Track } from '../state/track';
 import { trackStore } from '../state/tracks';
 import { Divider, SectionTitle } from '../ui/Section';
 import { Window } from '../ui/Window';
@@ -30,6 +30,8 @@ interface Reading {
   tail?: string;
   /** A second value after a dot, in the plain text tone whatever the cell's own. */
   also?: string;
+  /** Tones the second value as the scope's own, not the transponder's. */
+  alsoEnriched?: boolean;
 }
 
 const NONE: Reading = { v: '---' };
@@ -84,6 +86,18 @@ const num = (v: number | undefined, unit: string, digits = 0): Reading =>
 const bearing = (deg: number | undefined): Reading =>
   deg === undefined ? NONE : { v: `${padBearing(deg)}°` };
 
+/** Transmitted true track, then the magnetic one the scope derives. */
+function trackReading(t: Track): Reading {
+  const mag = magneticTrack(t);
+  if (t.track === undefined || mag === undefined) return NONE;
+  return {
+    v: `${padBearing(t.track)}°`,
+    unit: 'T',
+    also: `${padBearing(mag)}°`,
+    alsoEnriched: true,
+  };
+}
+
 const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
 
 const signed = (v: number | undefined, unit: string): Reading =>
@@ -121,7 +135,7 @@ function Cell(props: {
         </Show>
         <Show when={props.r.also}>
           <span class={s.sep}>·</span>
-          <span class={s.also}>{props.r.also}</span>
+          <span class={cx(s.also, props.r.alsoEnriched && s.alsoEnriched)}>{props.r.also}</span>
         </Show>
       </div>
     </div>
@@ -170,7 +184,7 @@ export function DetailPanel() {
                 <Cell k="ALT" r={altitudeReading(t().alt, t().baroRate)} />
                 <Cell k="VS" r={signed(t().baroRate, 'fpm')} />
                 <Cell k="GS" r={num(t().gs, 'kt')} />
-                <Cell k="TRK" r={bearing(t().track)} />
+                <Cell k="TRK" r={trackReading(t())} />
                 <Cell
                   k="LAT"
                   r={positionReadings(t().position)[0]}
