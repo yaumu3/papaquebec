@@ -2,7 +2,7 @@ import type { AtlasInfo } from '../protocol';
 import { edt, INF } from './edt';
 
 /** Printable ASCII plus the few symbols the scope draws. */
-const ATLAS_CHARS = `${Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('')}↑↓°·×–—`;
+const ATLAS_CHARS = `${Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).join('')}↑↓°·×–—✓`;
 
 const COLUMNS = 16;
 const RADIUS_FRACTION = 1 / 6;

@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  type Altimeter,
   displayAltitude,
   displayLevel,
   formatAltitude,
+  holdsSelected,
   qnhAltitudeFt,
+  type Selection,
   STANDARD_ALTIMETER,
 } from './altitude';
 
@@ -82,5 +85,29 @@ describe('displayLevel', () => {
 
     // Assert
     expect(out).toEqual([47, 330, 'ground', undefined]);
+  });
+});
+
+describe('holdsSelected', () => {
+  it('holds within 200 ft of the selected altitude, read on the crew altimeter', () => {
+    // Arrange
+    const standard = { transitionAltFt: 14000, qnhInHg: 29.92 };
+    const low = { transitionAltFt: 14000, qnhInHg: 29.62 };
+    const cases: [Selection, Altimeter][] = [
+      [{ alt: 35150, selAlt: 35000, navQnh: 1013.2 }, standard],
+      [{ alt: 34700, selAlt: 35000, navQnh: 1013.2 }, standard],
+      [{ alt: 4750, selAlt: 5000, navQnh: 1023.2 }, standard], // reads 5022 on the crew's 1023
+      [{ alt: 4750, selAlt: 5000, navQnh: undefined }, standard], // reads 4750 on the operator's
+      [{ alt: 35000, selAlt: 35000, navQnh: undefined }, low], // flight levels stay on standard
+      [{ alt: 35000, selAlt: undefined, navQnh: 1013.2 }, standard],
+      [{ alt: 'ground', selAlt: 0, navQnh: 1013.2 }, standard],
+      [{ alt: undefined, selAlt: 5000, navQnh: undefined }, standard],
+    ];
+
+    // Act
+    const out = cases.map(([selection, altimeter]) => holdsSelected(selection, altimeter));
+
+    // Assert
+    expect(out).toEqual([true, false, true, false, true, false, false, false]);
   });
 });

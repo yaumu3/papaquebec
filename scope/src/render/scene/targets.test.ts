@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
-import { buildTargets, type TargetInput } from './targets';
+import { buildTargets, INTENT_TONE, type TargetInput } from './targets';
 import { makeTrack } from './trackFixture';
 
 const atlas: AtlasInfo = {
@@ -53,6 +53,16 @@ function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
 const byKind = (batches: Batch[], kind: Batch['kind']) => batches.filter((b) => b.kind === kind);
 const count = (batches: Batch[], kind: Batch['kind']) =>
   byKind(batches, kind).reduce((n, b) => n + b.count, 0);
+/** Each text glyph's horizontal offset from its anchor and its color, in draw order. */
+const glyphs = (batches: Batch[]) =>
+  byKind(batches, 'text').flatMap((b) =>
+    Array.from({ length: b.count }, (_, i) => ({
+      px: b.data[i * 16 + 2] ?? 0,
+      rgb: [10, 11, 12].map((k) => b.data[i * 16 + k] ?? 0),
+    })),
+  );
+/** Two colors alike within the rounding of an 8-bit channel. */
+const near = (x: number[], y: number[]) => x.every((v, k) => Math.abs(v - (y[k] ?? 0)) < 0.01);
 const shapes = (batches: Batch[]) =>
   byKind(batches, 'markers').flatMap((b) =>
     Array.from({ length: b.count }, (_, i) => b.data[i * 12 + 5]),
@@ -180,5 +190,41 @@ describe('buildTargets', () => {
 
     // Assert
     expect(corners.get('867a01')).toBe('ne');
+  });
+
+  it('sets the selected level in the dimmed intent tone', () => {
+    // Arrange
+    const t = track({ baroRate: 1500, selAlt: 16000 });
+
+    // Act
+    const { batches } = buildTargets(input([t]));
+
+    // Assert
+    const g = glyphs(batches);
+    const plain = g[0]?.rgb ?? [];
+    const intent = plain.map((v) => v * INTENT_TONE);
+    const tones = g.map(({ rgb }) => (near(rgb, plain) ? 'p' : near(rgb, intent) ? 'i' : '?'));
+    // ANA241 / 110↑ 160 B789, spaces drawing nothing
+    expect(tones.join('')).toBe(['pppppp', 'pppp', 'iii', 'pppp'].join(''));
+  });
+
+  it('keeps the runs of a right-aligned line contiguous', () => {
+    // Arrange
+    const t = track({
+      baroRate: 1500,
+      selAlt: 16000,
+      ops: { hideTrail: false, pinnedCorner: 'nw', autoCorner: 'nw' },
+    });
+    const advance = (atlas.advance * 11) / atlas.fontSize;
+
+    // Act
+    const { batches } = buildTargets(input([t]));
+
+    // Assert
+    const line2 = glyphs(batches)
+      .slice(6)
+      .map((x) => x.px);
+    const columns = line2.map((px) => Math.round((px - (line2[0] ?? 0)) / advance));
+    expect(columns).toEqual([0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11]); // 110↑160 B789
   });
 });

@@ -1,7 +1,7 @@
 import type { Corner } from '../../state/track';
 
-/** Data block footprint in CSS pixels: two lines of 11 px mono, a little generous. */
-const DB_WIDTH = 64;
+/** Data block footprint in CSS pixels: two lines of 11 px mono, twelve glyphs wide. */
+const DB_WIDTH = 80;
 export const DB_HEIGHT = 26;
 export const DB_LINE = 12;
 /** Half the glyph box; blocks must clear other targets' glyphs. */
