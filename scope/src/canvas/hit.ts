@@ -3,7 +3,7 @@ import { labelOffset, labelRect } from '../render/layout/labels';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { toScreen, toWorld } from '../render/scene/view';
-import { classify } from '../state/filter';
+import { visibility } from '../state/filter';
 import { aero, type Rbl, type RblAnchor, rbls, selected } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
@@ -53,7 +53,7 @@ export interface BlockHit {
 
 /** A filtered target draws no block, unless it is the selected one. */
 const hidden = (t: Track) =>
-  t.hex !== selected() && classify(t, settings.filter, settings.altimeter) === 'filtered';
+  visibility(t, selected(), settings.filter, settings.altimeter) === 'filtered';
 
 /** The data block under a screen point, if any; the selected target's block counts even when filtered, as it is drawn. */
 export function blockAt(view: View, cx: number, cy: number): BlockHit | null {

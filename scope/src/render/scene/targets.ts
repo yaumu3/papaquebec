@@ -1,6 +1,6 @@
 import type { Altimeter } from '../../lib/altitude';
 import { velocityNm } from '../../lib/geo';
-import { classify, type Filter, type Visibility } from '../../state/filter';
+import { type Filter, visibility, type Visibility } from '../../state/filter';
 import type { Corner, Fix, Track } from '../../state/track';
 import { labelOffset, type LabelSubject, placeLabels } from '../layout/labels';
 import { decimateTrail } from '../layout/trails';
@@ -67,8 +67,7 @@ function drawables(input: TargetInput): Drawable[] {
       y: p.y,
       cx,
       cy,
-      // Selecting a filtered target is the operator asking to see it in full.
-      visibility: t.hex === input.selected ? 'shown' : classify(t, input.filter, input.altimeter),
+      visibility: visibility(t, input.selected, input.filter, input.altimeter),
       color: trackColor(t, input.selected),
     });
   }
