@@ -246,11 +246,11 @@ describe('createTrackStore', () => {
   });
 });
 
-describe('createTrackStore air data', () => {
-  it('carries the air data speeds, wind and temperatures when readsb reports them', () => {
+describe('createTrackStore readouts', () => {
+  it('carries air data and autopilot intent when readsb reports them', () => {
     // Arrange
     const store = createTrackStore(project);
-    const withAir: AircraftJson = {
+    const reported: AircraftJson = {
       ...live('a'),
       ws: 14,
       wd: 255,
@@ -259,21 +259,25 @@ describe('createTrackStore air data', () => {
       tas: 282,
       ias: 229,
       mach: 0.428,
+      nav_altitude_mcp: 35008,
+      nav_altitude_fms: 35000,
+      nav_heading: 270.7,
+      nav_qnh: 1013.6,
+      nav_modes: ['autopilot', 'vnav', 'lnav'],
     };
 
     // Act
-    store.ingest(snapshot(1000, [withAir, live('b')]));
+    store.ingest(snapshot(1000, [reported, live('b')]));
 
     // Assert
     const a = store.tracks.get('a');
     const b = store.tracks.get('b');
     expect([a?.windSpeed, a?.windDir, a?.oat, a?.tat]).toEqual([14, 255, 13, 23]);
     expect([a?.tas, a?.ias, a?.mach]).toEqual([282, 229, 0.428]);
-    expect([b?.windSpeed, b?.windDir, b?.oat, b?.tat]).toEqual([
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-    ]);
+    expect([a?.selAlt, a?.fmsAlt, a?.selHeading, a?.navQnh]).toEqual([35008, 35000, 270.7, 1013.6]);
+    expect(a?.navModes).toEqual(['autopilot', 'vnav', 'lnav']);
+    expect([b?.windSpeed, b?.tas, b?.selAlt, b?.selHeading, b?.navModes]).toEqual(
+      Array(5).fill(undefined),
+    );
   });
 });
