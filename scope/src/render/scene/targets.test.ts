@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
+import { DB_FONT_PX } from '../layout/labels';
 import { type Batch, Shape, type View } from '../protocol';
 import { atlas } from './atlasFixture';
 import { INTENT_TONE } from './datablock';
@@ -204,7 +205,7 @@ describe('buildTargets', () => {
       selAlt: 16000,
       ops: { hideTrail: false, pinnedCorner: 'nw', autoCorner: 'nw' },
     });
-    const advance = (atlas.advance * 11) / atlas.fontSize;
+    const advance = (atlas.advance * DB_FONT_PX) / atlas.fontSize;
 
     // Act
     const { batches } = buildTargets(input([t]));

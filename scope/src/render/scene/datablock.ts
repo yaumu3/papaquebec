@@ -8,7 +8,7 @@ import {
 import { steeringHeading } from '../../lib/autopilot';
 import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
 import type { Track } from '../../state/track';
-import { DB_LINE } from '../layout/labels';
+import { DB_FONT_PX, DB_LINE } from '../layout/labels';
 import type { Anchor, LineBatch, TextBatch } from './pack';
 import { isEmergency, THEME, trackLabel } from './rules';
 
@@ -77,7 +77,6 @@ export function dataBlock(
   };
 }
 
-const FONT_PX = 11;
 /** Brightness of downlinked intent against the block's own color. */
 export const INTENT_TONE = 0.65;
 
@@ -110,11 +109,11 @@ function drawRuns(
   align: 'left' | 'right',
   colors: { plain: string; intent: string },
 ): void {
-  const width = text.measure(runs.map((r) => r.text).join(''), FONT_PX);
+  const width = text.measure(runs.map((r) => r.text).join(''), DB_FONT_PX);
   let px = (at.px ?? 0) - (align === 'right' ? width : 0);
   for (const r of runs) {
-    text.text(r.text, { ...at, px }, FONT_PX, r.intent ? colors.intent : colors.plain);
-    px += text.measure(r.text, FONT_PX);
+    text.text(r.text, { ...at, px }, DB_FONT_PX, r.intent ? colors.intent : colors.plain);
+    px += text.measure(r.text, DB_FONT_PX);
   }
 }
 
@@ -136,17 +135,17 @@ export function drawDataBlock(
   );
   let lineY = blockY;
   if (block.prefix) {
-    text.text(block.prefix, { ...at, px: dx, py: lineY }, FONT_PX, THEME.emergency, { align });
+    text.text(block.prefix, { ...at, px: dx, py: lineY }, DB_FONT_PX, THEME.emergency, { align });
     lineY += DB_LINE;
   }
   const intentColor = dim(color, INTENT_TONE);
-  text.text(block.line1, { ...at, px: dx, py: lineY }, FONT_PX, color, { align });
+  text.text(block.line1, { ...at, px: dx, py: lineY }, DB_FONT_PX, color, { align });
   drawRuns(text, block.line2, { ...at, px: dx, py: lineY + DB_LINE }, align, {
     plain: color,
     intent: intentColor,
   });
   if (block.line3) {
-    text.text(block.line3, { ...at, px: dx, py: lineY + 2 * DB_LINE }, FONT_PX, intentColor, {
+    text.text(block.line3, { ...at, px: dx, py: lineY + 2 * DB_LINE }, DB_FONT_PX, intentColor, {
       align,
     });
   }
