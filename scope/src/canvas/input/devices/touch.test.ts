@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
+import { recordActions } from '../recordActions';
 import {
   FINGER,
   type FingerEvent,
   PEN,
   precisionOf,
   type TouchHandlers,
+  touchBindings,
   trackTouches,
 } from './touch';
 
@@ -29,6 +31,7 @@ function recorder() {
   const h: TouchHandlers = {
     press: (e) => calls.push(['press', e.pointerId]),
     longPress: (at) => calls.push(['longPress', at]),
+    tap: (at) => calls.push(['tap', at]),
     zoomStart: () => calls.push(['zoomStart']),
     zoom: (anchor, factor, to) => calls.push(['zoom', anchor, factor, to]),
     zoomEnd: () => calls.push(['zoomEnd']),
@@ -141,7 +144,7 @@ describe('trackTouches', () => {
     t.move(finger(2, 105, 135, 220));
 
     // Assert
-    expect(calls.slice(1)).toEqual([
+    expect(calls.slice(2)).toEqual([
       ['zoomStart'],
       ['zoom', { x: 105, y: 195 }, 2 ** (-60 / 150), { x: 105, y: 195 }],
     ]);
@@ -173,7 +176,10 @@ describe('trackTouches', () => {
     t.up(finger(2, 100, 200, 240));
 
     // Assert
-    expect(calls).toEqual([['press', 1]]);
+    expect(calls).toEqual([
+      ['press', 1],
+      ['tap', { x: 100, y: 200 }],
+    ]);
   });
 
   it('does not drag-zoom after a slow second touch or a first touch that moved', () => {
@@ -262,6 +268,111 @@ describe('trackTouches', () => {
 
     // Assert
     expect(zooming).toEqual([false, false, true, false]);
+  });
+
+  it('taps where a lone finger lifts, unless it dragged first', () => {
+    // Arrange
+    const lifts = [
+      [102, 200],
+      [130, 200],
+    ];
+    const runs = lifts.map(() => recorder());
+    runs.forEach((r, i) => {
+      r.t.down(finger(1, 100, 200, 0));
+      r.t.move(finger(1, lifts[i]?.[0] ?? 0, lifts[i]?.[1] ?? 0, 10));
+    });
+
+    // Act
+    runs.forEach((r, i) => r.t.up(finger(1, lifts[i]?.[0] ?? 0, lifts[i]?.[1] ?? 0, 20)));
+
+    // Assert
+    expect(runs.map((r) => r.calls.filter(([name]) => name === 'tap'))).toEqual([
+      [['tap', { x: 102, y: 200 }]],
+      [],
+    ]);
+  });
+
+  it('does not tap when the finger lifts after a long press', async () => {
+    // Arrange
+    const { calls, t } = recorder();
+    t.down(finger(1, 100, 200, 0));
+    await Bun.sleep(LONG_PRESS_MS * 2);
+
+    // Act
+    t.up(finger(1, 100, 200, 60));
+
+    // Assert
+    expect(calls.some(([name]) => name === 'tap')).toBe(false);
+  });
+
+  it('does not tap when a pinch ends', () => {
+    // Arrange
+    const { calls, t } = recorder();
+    t.down(finger(1, 100, 100));
+    t.down(finger(2, 200, 100));
+    t.up(finger(2, 200, 100));
+
+    // Act
+    t.up(finger(1, 100, 100));
+
+    // Assert
+    expect(calls.some(([name]) => name === 'tap')).toBe(false);
+  });
+
+  it('does not tap when the browser cancels a lone finger', () => {
+    // Arrange
+    const { calls, t } = recorder();
+    t.down(finger(1, 100, 200, 0));
+
+    // Act
+    t.up(finger(1, 100, 200, 60), true);
+
+    // Assert
+    expect(calls).toEqual([['press', 1]]);
+  });
+});
+
+describe('touchBindings', () => {
+  const p = { x: 10, y: 20 };
+
+  it('grabs on a press and taps on a tap, at the precision of what pressed', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const b = touchBindings(actions, () => PEN);
+
+    // Act
+    for (const step of [() => b.press(finger(1, p.x, p.y)), () => b.tap(p)]) step();
+
+    // Assert
+    expect(calls).toEqual([
+      ['grab', p, PEN],
+      ['tap', p, PEN],
+    ]);
+  });
+
+  it('lets go of the grab before a long-press menu or a zoom', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const b = touchBindings(actions, () => FINGER);
+    const steps = [
+      () => b.longPress(p),
+      () => b.zoomStart(),
+      () => b.zoom(p, 0.5, p),
+      () => b.zoomEnd(),
+    ];
+
+    // Act
+    for (const step of steps) step();
+
+    // Assert
+    expect(calls).toEqual([
+      ['dropGrab'],
+      ['menu', p, FINGER],
+      ['dropGrab'],
+      ['zoomStart'],
+      ['zoomTo', p, 0.5, p],
+      ['zoomEnd'],
+    ]);
   });
 });
 

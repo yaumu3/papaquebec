@@ -1,5 +1,6 @@
 import { RBL_SNAP_PX, TARGET_PX } from '../../hit';
-import type { Precision } from '../actions';
+import type { Precision, ScopeActions } from '../actions';
+import { at, listen, offAll } from '../dom';
 import { DRAG_THRESHOLD_PX, type Point } from '../geometry';
 import { dragZoomFactor, isDoubleTap, type Pair, pinchOf, type Tap } from './touchGestures';
 
@@ -29,6 +30,8 @@ export interface TouchHandlers {
   press(e: FingerEvent): void;
   /** The first finger stayed down, unmoved, for the long-press delay. */
   longPress(at: Point): void;
+  /** A lone finger lifted at `at` without dragging, long-pressing or starting a zoom. */
+  tap(at: Point): void;
   /** A second finger landed, or a finger that landed just after a tap began sliding. */
   zoomStart(): void;
   /** Scale the range from the zoom's start by `factor` about `anchor`, which moves to `to`. */
@@ -64,23 +67,23 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
   };
 
   const down = (e: FingerEvent) => {
-    const at = { x: e.clientX, y: e.clientY };
-    fingers.set(e.pointerId, at);
+    const p = at(e);
+    fingers.set(e.pointerId, p);
     if (fingers.size === 1) {
-      const second = isDoubleTap(lastTap, { ...at, t: e.timeStamp });
+      const second = isDoubleTap(lastTap, { ...p, t: e.timeStamp });
       // Any other touch between two taps breaks the pair, so only the tap just before counts.
       lastTap = null;
       if (second) {
-        zoom = { id: e.pointerId, anchor: at, started: false };
+        zoom = { id: e.pointerId, anchor: p, started: false };
         return;
       }
-      tapping = { id: e.pointerId, at };
+      tapping = { id: e.pointerId, at: p };
       h.press(e);
       cancelLongPress();
       longPress = setTimeout(() => {
         longPress = null;
         tapping = null;
-        h.longPress(at);
+        h.longPress(p);
       }, longPressMs);
     } else if (fingers.size === 2) {
       cancelLongPress();
@@ -95,7 +98,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
   };
 
   const move = (e: FingerEvent): boolean => {
-    if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.has(e.pointerId)) fingers.set(e.pointerId, at(e));
     if (pinch) {
       const a = fingers.get(pinch.ids[0]);
       const b = fingers.get(pinch.ids[1]);
@@ -124,7 +127,8 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     return false;
   };
 
-  const up = (e: FingerEvent): boolean => {
+  /** A finger lifted, or the browser `cancelled` it, which is never a tap. */
+  const up = (e: FingerEvent, cancelled = false): boolean => {
     if (!fingers.delete(e.pointerId)) return false;
     cancelLongPress();
     if (pinch) {
@@ -138,7 +142,12 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
       endZoom();
       return true;
     }
-    lastTap = tapping?.id === e.pointerId ? { ...tapping.at, t: e.timeStamp } : null;
+    if (tapping?.id === e.pointerId && !cancelled) {
+      lastTap = { ...tapping.at, t: e.timeStamp };
+      h.tap(at(e));
+    } else {
+      lastTap = null;
+    }
     tapping = null;
     return false;
   };
@@ -147,4 +156,60 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
   const zooming = () => zoom !== null;
 
   return { down, move, up, zooming };
+}
+
+/**
+ * What a finger or pen can ask of the scope: grab and drag, tap, open the menu with a long press,
+ * and zoom with a pinch or a double-tap drag. `precision` is that of whatever pressed last.
+ */
+export function touchBindings(a: ScopeActions, precision: () => Precision): TouchHandlers {
+  return {
+    press: (e) => a.grab(at(e), precision()),
+    longPress: (p) => {
+      a.dropGrab();
+      a.menu(p, precision());
+    },
+    tap: (p) => a.tap(p, precision()),
+    zoomStart: () => {
+      a.dropGrab();
+      a.zoomStart();
+    },
+    zoom: (anchor, factor, to) => a.zoomTo(anchor, factor, to),
+    zoomEnd: () => a.zoomEnd(),
+  };
+}
+
+const isTouch = (e: PointerEvent) => e.pointerType !== 'mouse';
+
+/** Attaches fingers and pens to the canvas. Returns a disposer. */
+export function attachTouch(canvas: HTMLCanvasElement, a: ScopeActions): () => void {
+  let precision = FINGER;
+  const touch = trackTouches(touchBindings(a, () => precision));
+  const lift = (e: PointerEvent, cancelled: boolean) => {
+    if (isTouch(e) && !touch.up(e, cancelled)) a.release(at(e));
+  };
+  return offAll([
+    listen(canvas, 'pointerdown', (e) => {
+      if (!isTouch(e)) return;
+      precision = precisionOf(e.pointerType);
+      canvas.setPointerCapture(e.pointerId);
+      touch.down(e);
+    }),
+    listen(window, 'pointermove', (e) => {
+      if (isTouch(e) && !touch.move(e)) a.dragTo(at(e));
+    }),
+    listen(window, 'pointerup', (e) => lift(e, false)),
+    listen(window, 'pointercancel', (e) => lift(e, true)),
+    // iOS shows its text magnifier when a double tap is held; a drag zoom is not a text gesture.
+    listen(
+      canvas,
+      'touchstart',
+      (e) => {
+        if (touch.zooming()) e.preventDefault();
+      },
+      { passive: false },
+    ),
+    // A finger asks for the menu by long press, never by the browser's own.
+    listen(canvas, 'contextmenu', (e) => e.preventDefault()),
+  ]);
 }
