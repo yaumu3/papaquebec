@@ -211,6 +211,23 @@ describe('trackTouches', () => {
     ]);
   });
 
+  it('does not drag-zoom when another touch came between the tap and the second touch', () => {
+    // Arrange
+    const { calls, t } = recorder();
+    t.down(finger(1, 100, 200, 0));
+    t.up(finger(1, 100, 200, 60));
+    t.down(finger(2, 300, 400, 100));
+    t.move(finger(2, 340, 400, 120));
+    t.up(finger(2, 340, 400, 140));
+    t.down(finger(3, 100, 200, 200));
+
+    // Act
+    t.move(finger(3, 100, 140, 240));
+
+    // Assert
+    expect(calls.some(([name]) => name === 'zoomDragStart')).toBe(false);
+  });
+
   it('does not drag-zoom after a long press', async () => {
     // Arrange
     const { calls, t } = recorder();

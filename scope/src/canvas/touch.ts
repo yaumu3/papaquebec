@@ -65,8 +65,10 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     const at = { x: e.clientX, y: e.clientY };
     fingers.set(e.pointerId, at);
     if (fingers.size === 1) {
-      if (isDoubleTap(lastTap, { ...at, t: e.timeStamp })) {
-        lastTap = null;
+      const second = isDoubleTap(lastTap, { ...at, t: e.timeStamp });
+      // Any other touch between two taps breaks the pair, so only the tap just before counts.
+      lastTap = null;
+      if (second) {
         zoom = { id: e.pointerId, anchor: at, started: false };
         return;
       }
@@ -130,7 +132,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
       endZoom();
       return true;
     }
-    if (tapping?.id === e.pointerId) lastTap = { ...tapping.at, t: e.timeStamp };
+    lastTap = tapping?.id === e.pointerId ? { ...tapping.at, t: e.timeStamp } : null;
     tapping = null;
     return false;
   };
