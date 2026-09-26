@@ -59,12 +59,13 @@ describe('trackTouches', () => {
     ]);
   });
 
-  it('does not long-press after a lift, a cancel or a second finger', async () => {
+  it('long-presses through a wobble, but not a lift, a drag or a second finger', async () => {
     // Arrange
     const interrupts = [
       (t: ReturnType<typeof trackTouches>) => t.up(finger(1, 10, 20)),
-      (t: ReturnType<typeof trackTouches>) => t.cancelLongPress(),
+      (t: ReturnType<typeof trackTouches>) => t.move(finger(1, 30, 20)),
       (t: ReturnType<typeof trackTouches>) => t.down(finger(2, 50, 50)),
+      (t: ReturnType<typeof trackTouches>) => t.move(finger(1, 13, 20)),
     ];
     const runs = interrupts.map(() => recorder());
     for (const r of runs) r.t.down(finger(1, 10, 20));
@@ -78,6 +79,7 @@ describe('trackTouches', () => {
       false,
       false,
       false,
+      true,
     ]);
   });
 

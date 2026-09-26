@@ -257,7 +257,6 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
         Math.hypot(e.clientX - rblDrag.sx, e.clientY - rblDrag.sy) > DRAG_THRESHOLD_PX
       ) {
         rblDrag.moved = true;
-        touch.cancelLongPress();
         setRblPending({ a: { kind: 'target', hex: rblDrag.hex } });
         setModeText('RBL · RELEASE ON ANCHOR B');
       }
@@ -269,7 +268,6 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
         Math.hypot(e.clientX - blockDrag.sx, e.clientY - blockDrag.sy) > DRAG_THRESHOLD_PX
       ) {
         blockDrag.moved = true;
-        touch.cancelLongPress();
         canvas.style.cursor = 'grabbing';
       }
       const s = blockDrag.moved ? targetScreen(view(), blockDrag.hex) : null;
@@ -287,7 +285,6 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
         Math.hypot(e.clientX - panDrag.sx, e.clientY - panDrag.sy) > DRAG_THRESHOLD_PX
       ) {
         panDrag.moved = true;
-        touch.cancelLongPress();
         canvas.style.cursor = 'move';
       }
       if (!panDrag.moved) return;

@@ -114,6 +114,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
       Math.hypot(e.clientX - tapping.at.x, e.clientY - tapping.at.y) > DRAG_THRESHOLD_PX
     ) {
       tapping = null;
+      cancelLongPress();
     }
     return false;
   };
@@ -140,5 +141,5 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
   /** Whether a double-tap drag zoom owns the current touch. */
   const zooming = () => zoom !== null;
 
-  return { down, move, up, cancelLongPress, zooming };
+  return { down, move, up, zooming };
 }
