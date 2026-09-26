@@ -1,15 +1,17 @@
 import { createMemo, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { displayAltitude } from '../lib/altitude';
+import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
 import {
   climbArrow,
   emergencyCode,
   formatMach,
+  formatModes,
   formatWind,
-  padTrack,
+  padBearing,
   wakeLetter,
 } from '../lib/format';
+import { hpaToInHg } from '../lib/metar';
 import { isStale, trackLabel } from '../render/scene/rules';
 import { selected, snapshotVersion } from '../state/scope';
 import { settings } from '../state/settings';
@@ -51,8 +53,13 @@ function altitudeReading(
   alt: number | 'ground' | undefined,
   baroRate: number | undefined,
 ): Reading {
-  const d = displayAltitude(alt, settings.altimeter);
-  const tail = climbArrow(baroRate).trim();
+  return levelReading(displayAltitude(alt, settings.altimeter), climbArrow(baroRate).trim());
+}
+
+const selectedReading = (ft: number | undefined): Reading =>
+  levelReading(displayAltitude(ft, uncorrected(settings.altimeter)));
+
+function levelReading(d: DisplayAltitude, tail = ''): Reading {
   switch (d.kind) {
     case 'altitude':
       return { v: String(d.feet), unit: 'ft', tail };
@@ -74,6 +81,11 @@ function typeReading(type: string | undefined, category: string | undefined): Re
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>
   v === undefined ? NONE : { v: v.toFixed(digits), unit };
 
+const bearing = (deg: number | undefined): Reading =>
+  deg === undefined ? NONE : { v: `${padBearing(deg)}°` };
+
+const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
+
 const signed = (v: number | undefined, unit: string): Reading =>
   v === undefined ? NONE : { v: `${v > 0 ? '+' : ''}${Math.round(v)}`, unit };
 
@@ -85,11 +97,14 @@ function Cell(props: {
   r: Reading;
   dim?: boolean;
   tone?: 'enriched' | 'alert' | undefined;
+  /** Spans the whole row, for a value too long for one column. */
+  wide?: boolean;
 }) {
   return (
     <div
       class={cx(
         s.cell,
+        props.wide && s.wide,
         props.tone === 'enriched' && s.enriched,
         props.tone === 'alert' && s.alert,
         (props.dim ?? props.r.v === '---') && s.dim,
@@ -155,10 +170,7 @@ export function DetailPanel() {
                 <Cell k="ALT" r={altitudeReading(t().alt, t().baroRate)} />
                 <Cell k="VS" r={signed(t().baroRate, 'fpm')} />
                 <Cell k="GS" r={num(t().gs, 'kt')} />
-                <Cell
-                  k="TRK"
-                  r={t().track === undefined ? NONE : { v: `${padTrack(t().track)}°` }}
-                />
+                <Cell k="TRK" r={bearing(t().track)} />
                 <Cell
                   k="LAT"
                   r={positionReadings(t().position)[0]}
@@ -189,6 +201,15 @@ export function DetailPanel() {
                 />
                 <Cell k="OAT" r={signed(t().oat, '°C')} />
                 <Cell k="TAT" r={signed(t().tat, '°C')} />
+              </div>
+              <Divider />
+              <SectionTitle>NAV</SectionTitle>
+              <div class={s.grid}>
+                <Cell k="SEL ALT" r={selectedReading(t().selAlt)} />
+                <Cell k="FMS ALT" r={selectedReading(t().fmsAlt)} />
+                <Cell k="SEL HDG" r={bearing(t().selHeading)} />
+                <Cell k="QNH" r={num(inHg(t().navQnh), 'inHg', 2)} />
+                <Cell k="MODES" r={plain(formatModes(t().navModes))} wide />
               </div>
               <Divider />
               <SectionTitle>SIGNAL</SectionTitle>

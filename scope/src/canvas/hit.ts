@@ -1,7 +1,7 @@
 import { distanceToSegment } from '../lib/geo';
 import { labelOffset, labelRect } from '../render/layout/labels';
 import type { View } from '../render/protocol';
-import { isEmergency } from '../render/scene/rules';
+import { extraLines } from '../render/scene/rules';
 import { toScreen, toWorld } from '../render/scene/view';
 import { classify } from '../state/filter';
 import { aero, type Rbl, type RblAnchor, rbls, selected } from '../state/scope';
@@ -53,7 +53,7 @@ export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
     const s = targetScreen(view, t.hex);
     if (!s || hidden(t)) continue;
     const corner = t.ops.pinnedCorner ?? t.ops.autoCorner;
-    const r = labelRect(s.cx, s.cy, corner, isEmergency(t));
+    const r = labelRect(s.cx, s.cy, corner, extraLines(t));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)
       return { hex: t.hex, ...labelOffset(corner) };
   }

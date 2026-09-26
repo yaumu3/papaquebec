@@ -96,3 +96,41 @@ describe('createSimSource ground traffic', () => {
     expect(ground.every((a) => a.baro_rate === 0)).toBe(true);
   });
 });
+
+describe('createSimSource autopilot intent', () => {
+  it('pauses on a newly set level before starting toward it', () => {
+    // Arrange
+    let t = 1000;
+    const source = createSimSource(site, () => t);
+    source.poll();
+    t += 30;
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    const nca125 = snap.aircraft.find((a) => a.flight?.trim() === 'NCA125');
+    expect([nca125?.alt_baro, nca125?.nav_altitude_mcp, nca125?.baro_rate]).toEqual([
+      17000, 21000, 1000,
+    ]);
+  });
+
+  it('sets the level it came from once it has held the selected one', () => {
+    // Arrange
+    let t = 1000;
+    const source = createSimSource(site, () => t);
+    source.poll();
+    t += 200;
+    source.poll();
+    t += 100;
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    const jal318 = snap.aircraft.find((a) => a.flight?.trim() === 'JAL318');
+    expect([jal318?.alt_baro, jal318?.nav_altitude_mcp, jal318?.baro_rate]).toEqual([
+      7000, 5000, 0,
+    ]);
+  });
+});

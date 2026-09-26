@@ -8,6 +8,7 @@ import {
   formatGsWake,
   formatMmSs,
   formatMach,
+  formatModes,
   formatWind,
   padBearing,
   wakeLetter,
@@ -127,6 +128,24 @@ describe('formatMach', () => {
 
     // Assert
     expect(out).toEqual(['M0.43', 'M0.85', 'M1.02', '---']);
+  });
+});
+
+describe('formatModes', () => {
+  it('abbreviates the engaged modes in readsb order and drops an empty list', () => {
+    // Arrange
+    const cases = [
+      ['autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'],
+      ['autopilot', 'glideslope'],
+      [],
+      undefined,
+    ];
+
+    // Act
+    const out = cases.map(formatModes);
+
+    // Assert
+    expect(out).toEqual(['AP VNAV ALT APP LNAV TCAS', 'AP GLIDESLOPE', undefined, undefined]);
   });
 });
 

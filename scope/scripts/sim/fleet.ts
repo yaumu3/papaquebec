@@ -14,6 +14,10 @@ export interface SimAircraft {
   /** Reports "ground" instead of an altitude; `gs` is then taxi speed. */
   ground?: boolean;
   mlat?: boolean;
+  /** Autopilot intent it downlinks; it levels off on reaching `selAlt`. */
+  selAlt?: number;
+  selHeading?: number;
+  modes?: string[];
   type: string;
   reg: string;
 }
@@ -33,6 +37,8 @@ export const FLEET: SimAircraft[] = [
     baroRate: -1200,
     type: 'B789',
     reg: 'JA893A',
+    selAlt: 6000,
+    modes: ['autopilot', 'vnav', 'lnav'],
   },
   {
     hex: '867a02',
@@ -47,6 +53,9 @@ export const FLEET: SimAircraft[] = [
     baroRate: -1000,
     type: 'B738',
     reg: 'JA348J',
+    selAlt: 4000,
+    selHeading: 210,
+    modes: ['autopilot'],
   },
   {
     hex: '867a03',
@@ -61,6 +70,8 @@ export const FLEET: SimAircraft[] = [
     baroRate: 1500,
     type: 'B738',
     reg: 'JA349J',
+    selAlt: 7000,
+    modes: ['autopilot', 'vnav', 'lnav'],
   },
   {
     hex: '867a04',
@@ -103,6 +114,8 @@ export const FLEET: SimAircraft[] = [
     baroRate: 0,
     type: 'A320',
     reg: 'JA25MC',
+    selAlt: 14000,
+    modes: ['autopilot', 'althold', 'lnav'],
   },
   {
     hex: '867a07',
@@ -117,6 +130,9 @@ export const FLEET: SimAircraft[] = [
     baroRate: 0,
     type: 'B74F',
     reg: 'JA12KZ',
+    selAlt: 21000,
+    selHeading: 260,
+    modes: ['autopilot', 'althold'],
   },
   {
     hex: '867a08',

@@ -85,6 +85,18 @@ export function padTrack(deg: number | undefined): string {
   return deg === undefined ? '---' : padBearing(deg);
 }
 
+const MODE_ABBREVIATIONS: Readonly<Record<string, string>> = {
+  autopilot: 'AP',
+  althold: 'ALT',
+  approach: 'APP',
+};
+
+/** readsb's engaged mode names, abbreviated as a panel shows them; undefined when none are engaged. */
+export function formatModes(modes: string[] | undefined): string | undefined {
+  if (!modes?.length) return undefined;
+  return modes.map((m) => MODE_ABBREVIATIONS[m] ?? m.toUpperCase()).join(' ');
+}
+
 export function formatMach(m: number | undefined): string {
   return m === undefined ? '---' : `M${m.toFixed(2)}`;
 }

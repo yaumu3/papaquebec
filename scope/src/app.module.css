@@ -40,6 +40,7 @@
     bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
     width: auto;
     max-height: 55vh;
+    max-height: 55dvh;
     gap: 0;
     flex-wrap: nowrap;
   }

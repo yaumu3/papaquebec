@@ -6,7 +6,7 @@ import { DB_LINE, labelOffset, type LabelSubject, placeLabels } from '../layout/
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
-import { dataBlock, isEmergency, targetShape, THEME, trackColor } from './rules';
+import { dataBlock, extraLines, type Run, targetShape, THEME, trackColor } from './rules';
 import { toScreen } from './view';
 
 export interface TargetInput {
@@ -44,6 +44,8 @@ const GLYPH_PX = 6;
 /** Fixed 45° slash, half-length in CSS px. */
 const SLASH = 2.1;
 const HISTORY_DOT_PX = 2.5;
+/** Brightness of downlinked intent against the block's own color. */
+export const INTENT_TONE = 0.65;
 
 function dim(hex: string, f: number): string {
   const n = Number.parseInt(hex.slice(1, 7), 16);
@@ -129,6 +131,22 @@ function drawSelection(lines: LineBatch, d: Drawable): void {
   }
 }
 
+/** One line of runs, laid out as a single string would be under `align`. */
+function drawRuns(
+  text: TextBatch,
+  runs: Run[],
+  at: Anchor,
+  align: 'left' | 'right',
+  colors: { plain: string; intent: string },
+): void {
+  const width = text.measure(runs.map((r) => r.text).join(''), FONT_PX);
+  let px = (at.px ?? 0) - (align === 'right' ? width : 0);
+  for (const r of runs) {
+    text.text(r.text, { ...at, px }, FONT_PX, r.intent ? colors.intent : colors.plain);
+    px += text.measure(r.text, FONT_PX);
+  }
+}
+
 function drawDataBlock(
   lines: LineBatch,
   text: TextBatch,
@@ -139,7 +157,7 @@ function drawDataBlock(
   const right = dx > 0;
   const above = dy < 0;
   const block = dataBlock(d.t, input.now, input.altimeter);
-  const extra = block.prefix && above ? DB_LINE : 0;
+  const extra = above ? extraLines(d.t) * DB_LINE : 0;
   const blockY = dy - extra;
   const align = right ? 'left' : 'right';
   const emphasised = d.t.hex === input.selected || d.t.hex === input.hovered;
@@ -155,8 +173,15 @@ function drawDataBlock(
     text.text(block.prefix, { ...at, px: dx, py: lineY }, FONT_PX, THEME.emergency, { align });
     lineY += DB_LINE;
   }
+  const intent = dim(d.color, INTENT_TONE);
   text.text(block.line1, { ...at, px: dx, py: lineY }, FONT_PX, d.color, { align });
-  text.text(block.line2, { ...at, px: dx, py: lineY + DB_LINE }, FONT_PX, d.color, { align });
+  drawRuns(text, block.line2, { ...at, px: dx, py: lineY + DB_LINE }, align, {
+    plain: d.color,
+    intent,
+  });
+  if (block.line3) {
+    text.text(block.line3, { ...at, px: dx, py: lineY + 2 * DB_LINE }, FONT_PX, intent, { align });
+  }
 }
 
 export function buildTargets(input: TargetInput): TargetScene {
@@ -171,7 +196,7 @@ export function buildTargets(input: TargetInput): TargetScene {
       hex: d.t.hex,
       cx: d.cx,
       cy: d.cy,
-      emergency: isEmergency(d.t),
+      extraLines: extraLines(d.t),
       pinnedCorner: d.t.ops.pinnedCorner,
       autoCorner: d.t.ops.autoCorner,
     }));

@@ -48,6 +48,16 @@ export interface AircraftJson {
   /** Outside and total air temperature, degrees Celsius. */
   oat?: number;
   tat?: number;
+  /** Altitude selected on the MCP/FCU, feet, as the crew set it. */
+  nav_altitude_mcp?: number;
+  /** Altitude the FMS is flying to, feet. */
+  nav_altitude_fms?: number;
+  /** Selected heading, degrees; DO-260B leaves true or magnetic undefined. */
+  nav_heading?: number;
+  /** Altimeter setting the crew has set, hPa. */
+  nav_qnh?: number;
+  /** Engaged modes: autopilot, vnav, althold, approach, lnav, tcas. */
+  nav_modes?: string[];
 }
 
 export interface AircraftSnapshot {

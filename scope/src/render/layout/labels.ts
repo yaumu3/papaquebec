@@ -1,7 +1,7 @@
 import type { Corner } from '../../state/track';
 
-/** Data block footprint in CSS pixels: two lines of 11 px mono, a little generous. */
-const DB_WIDTH = 64;
+/** Data block footprint in CSS pixels: two lines of 11 px mono, twelve glyphs wide. */
+const DB_WIDTH = 80;
 export const DB_HEIGHT = 26;
 export const DB_LINE = 12;
 /** Half the glyph box; blocks must clear other targets' glyphs. */
@@ -20,7 +20,8 @@ export interface LabelSubject {
   hex: string;
   cx: number;
   cy: number;
-  emergency: boolean;
+  /** Lines beyond the standard two, such as the emergency prefix. */
+  extraLines: number;
   pinnedCorner: Corner | null;
   autoCorner: Corner;
 }
@@ -43,13 +44,13 @@ export function nearestCorner(dx: number, dy: number): Corner {
 }
 
 /**
- * The rectangle a data block occupies. With the block above the target, an
- * emergency line is added on top so the two standard lines keep their distance.
+ * The rectangle a data block occupies. With the block above the target, extra
+ * lines grow it upward so the two standard lines keep their distance.
  */
-export function labelRect(cx: number, cy: number, corner: Corner, emergency: boolean): Rect {
+export function labelRect(cx: number, cy: number, corner: Corner, extraLines: number): Rect {
   const { dx, dy } = labelOffset(corner);
   const x0 = dx > 0 ? cx + dx : cx + dx - DB_WIDTH;
-  const extra = emergency ? DB_LINE : 0;
+  const extra = extraLines * DB_LINE;
   const y0 = cy + dy - (dy < 0 ? extra : 0);
   return { x0, y0, x1: x0 + DB_WIDTH, y1: y0 + DB_HEIGHT + extra };
 }
@@ -77,7 +78,7 @@ export function placeLabels(subjects: readonly LabelSubject[]): Map<string, Corn
   const auto: LabelSubject[] = [];
   for (const s of subjects) {
     if (s.pinnedCorner) {
-      claimed.push(labelRect(s.cx, s.cy, s.pinnedCorner, s.emergency));
+      claimed.push(labelRect(s.cx, s.cy, s.pinnedCorner, s.extraLines));
       result.set(s.hex, s.pinnedCorner);
     } else {
       auto.push(s);
@@ -87,10 +88,10 @@ export function placeLabels(subjects: readonly LabelSubject[]): Map<string, Corn
   for (const s of auto) {
     const order = [s.autoCorner, ...CORNERS.filter((c) => c !== s.autoCorner)];
     let best: Corner = s.autoCorner;
-    let bestRect = labelRect(s.cx, s.cy, best, s.emergency);
+    let bestRect = labelRect(s.cx, s.cy, best, s.extraLines);
     let bestCost = Number.POSITIVE_INFINITY;
     for (const corner of order) {
-      const r = labelRect(s.cx, s.cy, corner, s.emergency);
+      const r = labelRect(s.cx, s.cy, corner, s.extraLines);
       let cost = 0;
       for (const c of claimed) cost += overlap(r, c);
       if (cost < bestCost) {

@@ -9,7 +9,7 @@ function subject(
   cy: number,
   extra: Partial<LabelSubject> = {},
 ): LabelSubject {
-  return { hex, cx, cy, emergency: false, pinnedCorner: null, autoCorner: 'ne', ...extra };
+  return { hex, cx, cy, extraLines: 0, pinnedCorner: null, autoCorner: 'ne', ...extra };
 }
 
 describe('labelRect', () => {
@@ -18,7 +18,7 @@ describe('labelRect', () => {
     const corners: Corner[] = ['ne', 'nw', 'se', 'sw'];
 
     // Act
-    const rects = corners.map((c) => labelRect(100, 100, c, false));
+    const rects = corners.map((c) => labelRect(100, 100, c, 0));
 
     // Assert
     expect(rects[0]?.x0).toBeGreaterThan(100);
@@ -31,12 +31,12 @@ describe('labelRect', () => {
     expect(rects[3]?.y0).toBeGreaterThan(100);
   });
 
-  it('adds a line above the block for the emergency prefix', () => {
+  it('grows a block above the target upward by its extra lines', () => {
     // Arrange
-    const plain = labelRect(100, 100, 'ne', false);
+    const plain = labelRect(100, 100, 'ne', 0);
 
     // Act
-    const emerg = labelRect(100, 100, 'ne', true);
+    const emerg = labelRect(100, 100, 'ne', 1);
 
     // Assert
     expect(emerg.y1 - emerg.y0).toBeGreaterThan(DB_HEIGHT);

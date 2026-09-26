@@ -5,47 +5,17 @@ import { Shape } from '../protocol';
 import {
   airspaceColor,
   dataBlock,
+  extraLines,
+  type Run,
   isStale,
   targetShape,
   THEME,
   trackColor,
   trackLabel,
 } from './rules';
+import { makeTrack as track } from './trackFixture';
 
-function track(over: Partial<Track> = {}): Track {
-  return {
-    hex: '867a01',
-    flight: 'ANA241',
-    squawk: '2431',
-    category: 'A3',
-    alt: 11000,
-    gs: 290,
-    track: 235,
-    baroRate: 0,
-    nic: 8,
-    nacP: 9,
-    messages: 1,
-    rssi: -10,
-    type: 'B789',
-    registration: 'JA893A',
-    description: 'Boeing 787-9',
-    emergency: undefined,
-    tas: undefined,
-    ias: undefined,
-    mach: undefined,
-    windSpeed: undefined,
-    windDir: undefined,
-    oat: undefined,
-    tat: undefined,
-    source: 'adsb',
-    seen: 0.2,
-    seenPos: 0.2,
-    position: { kind: 'live', lat: 33.6, lon: 130.5, x: 1, y: 2 }, // RJFF
-    history: [],
-    ops: { hideTrail: false, pinnedCorner: null, autoCorner: 'ne' },
-    ...over,
-  };
-}
+const text = (runs: Run[]) => runs.map((r) => r.text).join('');
 
 describe('isStale', () => {
   it('is stale after 30 s without a position or when the position is a lastPosition', () => {
@@ -136,13 +106,12 @@ describe('dataBlock', () => {
     const phaseB = 8;
 
     // Act
-    const a = dataBlock(t, phaseA);
-    const b = dataBlock(t, phaseB);
+    const [a, b] = [phaseA, phaseB].map((now) => dataBlock(t, now));
 
     // Assert
-    expect(a.prefix).toBeNull();
-    expect(a.line1).toBe('ANA241');
-    expect([a.line2, b.line2].toSorted()).toEqual(['110↓ 29M', '110↓ B789']);
+    expect(a?.prefix).toBeNull();
+    expect(a?.line1).toBe('ANA241');
+    expect([a, b].map((x) => text(x?.line2 ?? [])).toSorted()).toEqual(['110↓ 29M', '110↓ B789']);
   });
 
   it('falls back to the hex and the bracketed category when enrichment is missing', () => {
@@ -160,7 +129,7 @@ describe('dataBlock', () => {
 
     // Assert
     expect(block.line1).toBe('867A01');
-    expect(['110  [A1]', '110  ---']).toContain(block.line2);
+    expect(['110  [A1]', '110  ---']).toContain(text(block.line2));
   });
 
   it('adds the emergency prefix', () => {
@@ -184,7 +153,82 @@ describe('dataBlock', () => {
     const [ba, bb] = [dataBlock(a, now), dataBlock(b, now)];
 
     // Assert
-    expect(ba.line2).toBe(bb.line2);
+    expect(ba.line2).toEqual(bb.line2);
+  });
+
+  it('follows the level and trend with the selected level as intent', () => {
+    // Arrange
+    const t = track({ baroRate: 1500, selAlt: 16000 });
+
+    // Act
+    const block = dataBlock(t, 0);
+
+    // Assert
+    expect(block.line2).toEqual([
+      { text: '110↑', intent: false },
+      { text: '160', intent: true },
+      { text: ' B789', intent: false },
+    ]);
+  });
+
+  it('marks an aircraft holding its selected level with a check instead', () => {
+    // Arrange
+    const t = track({ alt: 34860, selAlt: 35000, navQnh: 1013.2 });
+
+    // Act
+    const block = dataBlock(t, 0);
+
+    // Assert
+    expect(block.line2).toEqual([
+      { text: '349', intent: false },
+      { text: '✓', intent: true },
+      { text: ' B789', intent: false },
+    ]);
+  });
+
+  it('puts the heading that steers the aircraft on a third line', () => {
+    // Arrange
+    const cases = [
+      track({ selHeading: 95, navModes: ['autopilot'] }),
+      track({ selHeading: 95, navModes: ['approach'] }),
+      track(),
+    ];
+
+    // Act
+    const out = cases.map((t) => dataBlock(t, 0).line3);
+
+    // Assert
+    expect(out).toEqual(['095°', null, null]);
+  });
+
+  it('prints the selected level as the crew set it, without the QNH correction', () => {
+    // Arrange
+    const t = track({ alt: 5000, selAlt: 5000 });
+    const altimeter = { transitionAltFt: 14000, qnhInHg: 29.62 };
+
+    // Act
+    const block = dataBlock(t, 0, altimeter);
+
+    // Assert
+    expect(text(block.line2)).toBe('047 050 B789');
+  });
+});
+
+describe('extraLines', () => {
+  it('counts the emergency prefix and the selected heading line', () => {
+    // Arrange
+    const cases = [
+      track(),
+      track({ squawk: '7700' }),
+      track({ selHeading: 95 }),
+      track({ squawk: '7700', selHeading: 95 }),
+    ];
+
+    // Act
+    const out = cases.map(extraLines);
+
+    // Assert
+    expect(out).toEqual([0, 1, 1, 2]);
   });
 });
 

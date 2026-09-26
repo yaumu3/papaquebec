@@ -1,8 +1,7 @@
-/* Docked windows keep their height; the phone sheet shrinks them and scrolls the body instead. */
+/* A window shrinks and scrolls its body once its column runs out of height. */
 .win {
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
   min-height: 0;
   background: var(--panel-glass);
   border: 1px solid var(--panel-border);
@@ -27,13 +26,11 @@
 }
 .body {
   min-height: 0;
+  overflow-y: auto;
   padding: var(--space-4);
 }
 @media (max-width: 720px) {
   .win {
     flex: 1;
-  }
-  .body {
-    overflow-y: auto;
   }
 }

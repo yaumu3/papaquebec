@@ -55,6 +55,13 @@ export interface Track {
   /** Outside and total air temperature, degrees Celsius. */
   oat: number | undefined;
   tat: number | undefined;
+  /** Downlinked autopilot intent: MCP/FCU and FMS altitudes in feet, heading, crew QNH in hPa. */
+  selAlt: number | undefined;
+  fmsAlt: number | undefined;
+  selHeading: number | undefined;
+  navQnh: number | undefined;
+  /** Engaged modes as readsb names them, e.g. autopilot, vnav, lnav. */
+  navModes: string[] | undefined;
   source: Source;
   seen: number;
   seenPos: number | undefined;

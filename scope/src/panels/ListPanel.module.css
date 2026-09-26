@@ -1,5 +1,6 @@
+/* Gives way to Target Detail first, down to a few rows. */
 .panel {
-  flex: 0 1 auto;
+  flex: 0 1000 auto;
   min-height: 120px;
 }
 .body {
