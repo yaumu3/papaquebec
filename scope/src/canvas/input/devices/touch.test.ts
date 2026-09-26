@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type FingerEvent, type TouchHandlers, trackTouches } from './touch';
+import { recordActions } from '../recordActions';
+import {
+  FINGER,
+  type FingerEvent,
+  PEN,
+  precisionOf,
+  type TouchHandlers,
+  touchBindings,
+  trackTouches,
+} from './touch';
 
 const LONG_PRESS_MS = 20;
 
@@ -22,12 +31,10 @@ function recorder() {
   const h: TouchHandlers = {
     press: (e) => calls.push(['press', e.pointerId]),
     longPress: (at) => calls.push(['longPress', at]),
-    pinchStart: (start) => calls.push(['pinchStart', start]),
-    pinch: (start, now) => calls.push(['pinch', start, now]),
-    pinchEnd: () => calls.push(['pinchEnd']),
-    zoomDragStart: (anchor) => calls.push(['zoomDragStart', anchor]),
-    zoomDrag: (anchor, dy) => calls.push(['zoomDrag', anchor, dy]),
-    zoomDragEnd: () => calls.push(['zoomDragEnd']),
+    tap: (at) => calls.push(['tap', at]),
+    zoomStart: () => calls.push(['zoomStart']),
+    zoom: (anchor, factor, to) => calls.push(['zoom', anchor, factor, to]),
+    zoomEnd: () => calls.push(['zoomEnd']),
   };
   return { calls, t: trackTouches(h, LONG_PRESS_MS) };
 }
@@ -59,12 +66,13 @@ describe('trackTouches', () => {
     ]);
   });
 
-  it('does not long-press after a lift, a cancel or a second finger', async () => {
+  it('long-presses through a wobble, but not a lift, a drag or a second finger', async () => {
     // Arrange
     const interrupts = [
       (t: ReturnType<typeof trackTouches>) => t.up(finger(1, 10, 20)),
-      (t: ReturnType<typeof trackTouches>) => t.cancelLongPress(),
+      (t: ReturnType<typeof trackTouches>) => t.move(finger(1, 30, 20)),
       (t: ReturnType<typeof trackTouches>) => t.down(finger(2, 50, 50)),
+      (t: ReturnType<typeof trackTouches>) => t.move(finger(1, 13, 20)),
     ];
     const runs = interrupts.map(() => recorder());
     for (const r of runs) r.t.down(finger(1, 10, 20));
@@ -78,43 +86,28 @@ describe('trackTouches', () => {
       false,
       false,
       false,
+      true,
     ]);
   });
 
-  it('pinches from where two fingers landed to where they are now', () => {
+  it('zooms by the change in finger spread, following their midpoint', () => {
     // Arrange
     const { calls, t } = recorder();
-    t.down(finger(1, 10, 10));
-    t.down(finger(2, 50, 50));
+    t.down(finger(1, 100, 100));
+    t.down(finger(2, 200, 100));
 
     // Act
-    const consumed = t.move(finger(2, 70, 60));
+    const consumed = t.move(finger(2, 300, 100));
 
     // Assert
     expect(consumed).toBe(true);
     expect(calls.slice(1)).toEqual([
-      [
-        'pinchStart',
-        [
-          { x: 10, y: 10 },
-          { x: 50, y: 50 },
-        ],
-      ],
-      [
-        'pinch',
-        [
-          { x: 10, y: 10 },
-          { x: 50, y: 50 },
-        ],
-        [
-          { x: 10, y: 10 },
-          { x: 70, y: 60 },
-        ],
-      ],
+      ['zoomStart'],
+      ['zoom', { x: 150, y: 100 }, 0.5, { x: 200, y: 100 }],
     ]);
   });
 
-  it('ends the pinch, consuming the lift, when either finger lifts', () => {
+  it('ends the zoom, consuming the lift, when either finger lifts', () => {
     // Arrange
     const { calls, t } = recorder();
     t.down(finger(1, 10, 10));
@@ -125,7 +118,7 @@ describe('trackTouches', () => {
 
     // Assert
     expect(consumed).toBe(true);
-    expect(calls.at(-1)).toEqual(['pinchEnd']);
+    expect(calls.at(-1)).toEqual(['zoomEnd']);
   });
 
   it('leaves single-finger moves and lifts and foreign pointers to the caller', () => {
@@ -151,9 +144,9 @@ describe('trackTouches', () => {
     t.move(finger(2, 105, 135, 220));
 
     // Assert
-    expect(calls.slice(1)).toEqual([
-      ['zoomDragStart', { x: 105, y: 195 }],
-      ['zoomDrag', { x: 105, y: 195 }, -60],
+    expect(calls.slice(2)).toEqual([
+      ['zoomStart'],
+      ['zoom', { x: 105, y: 195 }, 2 ** (-60 / 150), { x: 105, y: 195 }],
     ]);
   });
 
@@ -169,7 +162,7 @@ describe('trackTouches', () => {
     t.up(finger(2, 100, 260, 260));
 
     // Assert
-    expect(calls.at(-1)).toEqual(['zoomDragEnd']);
+    expect(calls.at(-1)).toEqual(['zoomEnd']);
   });
 
   it('treats an unmoved second touch as neither a press nor a drag zoom', () => {
@@ -183,7 +176,10 @@ describe('trackTouches', () => {
     t.up(finger(2, 100, 200, 240));
 
     // Assert
-    expect(calls).toEqual([['press', 1]]);
+    expect(calls).toEqual([
+      ['press', 1],
+      ['tap', { x: 100, y: 200 }],
+    ]);
   });
 
   it('does not drag-zoom after a slow second touch or a first touch that moved', () => {
@@ -205,10 +201,7 @@ describe('trackTouches', () => {
     cases.forEach((c, i) => runs[i]?.t.move(finger(2, 100, 140, c.secondAt + 40)));
 
     // Assert
-    expect(runs.map((r) => r.calls.some(([name]) => name === 'zoomDragStart'))).toEqual([
-      false,
-      false,
-    ]);
+    expect(runs.map((r) => r.calls.some(([name]) => name === 'zoomStart'))).toEqual([false, false]);
   });
 
   it('does not drag-zoom when another touch came between the tap and the second touch', () => {
@@ -225,7 +218,7 @@ describe('trackTouches', () => {
     t.move(finger(3, 100, 140, 240));
 
     // Assert
-    expect(calls.some(([name]) => name === 'zoomDragStart')).toBe(false);
+    expect(calls.some(([name]) => name === 'zoomStart')).toBe(false);
   });
 
   it('does not drag-zoom after a long press', async () => {
@@ -240,7 +233,7 @@ describe('trackTouches', () => {
     t.move(finger(2, 100, 140, 220));
 
     // Assert
-    expect(calls.some(([name]) => name === 'zoomDragStart')).toBe(false);
+    expect(calls.some(([name]) => name === 'zoomStart')).toBe(false);
   });
 
   it('ends a drag zoom and pinches when a second finger lands', () => {
@@ -255,7 +248,7 @@ describe('trackTouches', () => {
     t.down(finger(3, 200, 200, 260));
 
     // Assert
-    expect(calls.slice(-2).map(([name]) => name)).toEqual(['zoomDragEnd', 'pinchStart']);
+    expect(calls.slice(-2).map(([name]) => name)).toEqual(['zoomEnd', 'zoomStart']);
   });
   it('is zooming from the second touch of a double tap until that finger lifts', () => {
     // Arrange
@@ -275,5 +268,123 @@ describe('trackTouches', () => {
 
     // Assert
     expect(zooming).toEqual([false, false, true, false]);
+  });
+
+  it('taps where a lone finger lifts, unless it dragged first', () => {
+    // Arrange
+    const lifts = [
+      [102, 200],
+      [130, 200],
+    ];
+    const runs = lifts.map(() => recorder());
+    runs.forEach((r, i) => {
+      r.t.down(finger(1, 100, 200, 0));
+      r.t.move(finger(1, lifts[i]?.[0] ?? 0, lifts[i]?.[1] ?? 0, 10));
+    });
+
+    // Act
+    runs.forEach((r, i) => r.t.up(finger(1, lifts[i]?.[0] ?? 0, lifts[i]?.[1] ?? 0, 20)));
+
+    // Assert
+    expect(runs.map((r) => r.calls.filter(([name]) => name === 'tap'))).toEqual([
+      [['tap', { x: 102, y: 200 }]],
+      [],
+    ]);
+  });
+
+  it('does not tap when the finger lifts after a long press', async () => {
+    // Arrange
+    const { calls, t } = recorder();
+    t.down(finger(1, 100, 200, 0));
+    await Bun.sleep(LONG_PRESS_MS * 2);
+
+    // Act
+    t.up(finger(1, 100, 200, 60));
+
+    // Assert
+    expect(calls.some(([name]) => name === 'tap')).toBe(false);
+  });
+
+  it('does not tap when a pinch ends', () => {
+    // Arrange
+    const { calls, t } = recorder();
+    t.down(finger(1, 100, 100));
+    t.down(finger(2, 200, 100));
+    t.up(finger(2, 200, 100));
+
+    // Act
+    t.up(finger(1, 100, 100));
+
+    // Assert
+    expect(calls.some(([name]) => name === 'tap')).toBe(false);
+  });
+
+  it('does not tap when the browser cancels a lone finger', () => {
+    // Arrange
+    const { calls, t } = recorder();
+    t.down(finger(1, 100, 200, 0));
+
+    // Act
+    t.up(finger(1, 100, 200, 60), true);
+
+    // Assert
+    expect(calls).toEqual([['press', 1]]);
+  });
+});
+
+describe('touchBindings', () => {
+  const p = { x: 10, y: 20 };
+
+  it('grabs on a press and taps on a tap, at the precision of what pressed', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const b = touchBindings(actions, () => PEN);
+
+    // Act
+    for (const step of [() => b.press(finger(1, p.x, p.y)), () => b.tap(p)]) step();
+
+    // Assert
+    expect(calls).toEqual([
+      ['grab', p, PEN],
+      ['tap', p, PEN],
+    ]);
+  });
+
+  it('lets go of the grab before a long-press menu or a zoom', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const b = touchBindings(actions, () => FINGER);
+    const steps = [
+      () => b.longPress(p),
+      () => b.zoomStart(),
+      () => b.zoom(p, 0.5, p),
+      () => b.zoomEnd(),
+    ];
+
+    // Act
+    for (const step of steps) step();
+
+    // Assert
+    expect(calls).toEqual([
+      ['dropGrab'],
+      ['menu', p, FINGER],
+      ['dropGrab'],
+      ['zoomStart'],
+      ['zoomTo', p, 0.5, p],
+      ['zoomEnd'],
+    ]);
+  });
+});
+
+describe('precisionOf', () => {
+  it('takes a touch for a finger and anything else for a pen', () => {
+    // Arrange
+    const types = ['touch', 'pen', 'something new'];
+
+    // Act
+    const out = types.map(precisionOf);
+
+    // Assert
+    expect(out).toEqual([FINGER, PEN, PEN]);
   });
 });

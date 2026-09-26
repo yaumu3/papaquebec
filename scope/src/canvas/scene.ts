@@ -12,7 +12,7 @@ import {
   declination,
   hovered,
   labelDrag,
-  mouse,
+  pointer,
   rangeCursor,
   rblPending,
   rbls,
@@ -25,7 +25,7 @@ import {
 } from '../state/scope';
 import { settings } from '../state/settings';
 import { projectNm, trackStore } from '../state/tracks';
-import { targetAt } from './hit';
+import { RBL_SNAP_PX, targetAt } from './hit';
 
 const ORDER = [...STATIC_ORDER, 'targets', 'overlays'];
 
@@ -107,7 +107,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         snapshotVersion,
         view,
         declination,
-        () => (rblPending() || rangeCursor() ? mouse() : null),
+        () => (rblPending() || rangeCursor() ? pointer() : null),
       ],
       () => {
         const a = atlas();
@@ -120,11 +120,11 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
             rbls: rbls(),
             rblPending: rblPending(),
             rangeCursor: rangeCursor(),
-            mouse: mouse(),
+            pointer: pointer(),
             declination: declination(),
             view: v,
             atlas: a,
-            snap: (cx, cy) => targetAt(v, cx, cy, 15),
+            snap: (cx, cy) => targetAt(v, cx, cy, RBL_SNAP_PX),
           }),
         );
         renderer.draw(ORDER);

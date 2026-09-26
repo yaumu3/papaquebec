@@ -8,8 +8,11 @@ import { aero, type Rbl, type RblAnchor, rbls, selected } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
 import { projectNm, trackStore } from '../state/tracks';
+import { anchorFor } from './rbl';
 
-const TARGET_PX = 14;
+export const TARGET_PX = 14;
+/** An RBL end this close to a target snaps onto it, as the pending line draws it. */
+export const RBL_SNAP_PX = 15;
 const FIX_PX = 10;
 
 /** Nearest drawn target within reach of a screen point; filtered diamonds count too. */
@@ -27,6 +30,11 @@ export function targetAt(view: View, cx: number, cy: number, reachPx = TARGET_PX
     }
   }
   return best;
+}
+
+/** The RBL anchor under a screen point: a target within `reach`, else the point itself. */
+export function anchorAt(v: View, cx: number, cy: number, reach: number): RblAnchor {
+  return anchorFor(targetAt(v, cx, cy, reach), toWorld(v, cx, cy));
 }
 
 /** Screen position of a track, or null when it has none. */
