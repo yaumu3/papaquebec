@@ -29,13 +29,12 @@ import {
   VECTOR_STEPS,
 } from '../state/settings';
 import { trackStore } from '../state/tracks';
-import { pinchZoom, zoomAbout } from './gestures';
+import { dragZoom, pinchZoom, type Zoomed, zoomAbout } from './gestures';
 import { blockAt, fixAt, rblAt, targetAt, targetScreen } from './hit';
 import { rblMenu, scopeMenu, targetMenu } from './menus';
 import { anchorFor, appendRbl } from './rbl';
-import { type Point, trackTouches } from './touch';
+import { DRAG_THRESHOLD_PX, type Point, trackTouches } from './touch';
 
-const DRAG_THRESHOLD_PX = 5;
 /** Wheel sensitivity: one 100 px notch scales the range by about 1.2. */
 const ZOOM_PER_PX = 0.0018;
 /** Fingers are less precise than a cursor. */
@@ -93,6 +92,11 @@ function onKey(e: KeyboardEvent) {
   }
 }
 
+function applyZoom(z: Zoomed) {
+  setRange(z.rangeNm);
+  setPan(z.pan);
+}
+
 function onLeave(e: PointerEvent) {
   if (e.pointerType !== 'mouse') return;
   setMouse(null);
@@ -106,7 +110,7 @@ function onWindowDown(e: PointerEvent) {
 /**
  * Wires pointer and keyboard interaction to the canvas. A mouse gets hover, left-drag pan,
  * block drag, right-drag range cursor, wheel zoom and the context menu; a finger gets drag pan,
- * block drag, pinch zoom, tap and long-press. Returns a disposer.
+ * block drag, pinch zoom, double-tap drag zoom, tap and long-press. Returns a disposer.
  */
 export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => void {
   let rightDrag: {
@@ -126,8 +130,8 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
   } | null = null;
   /** A drag that began on a target; once it moves it is a pending RBL anchored there. */
   let rblDrag: { hex: string; sx: number; sy: number; moved: boolean } | null = null;
-  /** The view and range a pinch started from. */
-  let pinchBase: { view: View; rangeNm: number } | null = null;
+  /** The view and range a pinch or drag zoom started from. */
+  let zoomBase: { view: View; rangeNm: number } | null = null;
   let suppressClick = false;
   let suppressMenu = false;
   let lastPointerType = 'mouse';
@@ -178,6 +182,14 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     panDrag = { sx: x, sy: y, x: p.x, y: p.y, moved: false };
   };
 
+  const startZoom = () => {
+    zoomBase = { view: view(), rangeNm: settings.rangeNm };
+  };
+  const endZoom = () => {
+    zoomBase = null;
+    suppressClick = true;
+  };
+
   const touch = trackTouches({
     press: (e) => startPrimary(e.clientX, e.clientY, TOUCH_REACH_PX),
     longPress: (at) => {
@@ -187,18 +199,17 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     },
     pinchStart: () => {
       endDrags();
-      pinchBase = { view: view(), rangeNm: settings.rangeNm };
+      startZoom();
     },
     pinch: (start, now) => {
-      if (!pinchBase) return;
-      const z = pinchZoom(pinchBase.view, pinchBase.rangeNm, start, now);
-      setRange(z.rangeNm);
-      setPan(z.pan);
+      if (zoomBase) applyZoom(pinchZoom(zoomBase.view, zoomBase.rangeNm, start, now));
     },
-    pinchEnd: () => {
-      pinchBase = null;
-      suppressClick = true;
+    pinchEnd: endZoom,
+    zoomDragStart: startZoom,
+    zoomDrag: (anchor, dy) => {
+      if (zoomBase) applyZoom(dragZoom(zoomBase.view, zoomBase.rangeNm, anchor, dy));
     },
+    zoomDragEnd: endZoom,
   });
 
   const onDown = (e: PointerEvent) => {
@@ -382,6 +393,11 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     setSelected(t ? t.hex : (blockAt(v, e.clientX, e.clientY)?.hex ?? null));
   };
 
+  /** iOS shows its text magnifier when a double tap is held; a drag zoom is not a text gesture. */
+  const onTouchStart = (e: TouchEvent) => {
+    if (touch.zooming()) e.preventDefault();
+  };
+
   const onContextMenu = (e: MouseEvent) => {
     e.preventDefault();
     if (suppressMenu || lastPointerType === 'touch') return;
@@ -398,6 +414,7 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
   canvas.addEventListener('wheel', onWheel, { passive: false });
   canvas.addEventListener('click', onClick);
   canvas.addEventListener('contextmenu', onContextMenu);
+  canvas.addEventListener('touchstart', onTouchStart, { passive: false });
   window.addEventListener('pointermove', onWindowMove);
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
@@ -410,6 +427,7 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     canvas.removeEventListener('wheel', onWheel);
     canvas.removeEventListener('click', onClick);
     canvas.removeEventListener('contextmenu', onContextMenu);
+    canvas.removeEventListener('touchstart', onTouchStart);
     window.removeEventListener('pointermove', onWindowMove);
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onUp);
