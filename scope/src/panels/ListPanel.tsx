@@ -89,7 +89,7 @@ export function ListPanel() {
               }}
             >
               <span class={cx(!t.flight && !t.registration && s.hex)}>{trackLabel(t)}</span>
-              <span class={s.dim}>{t.type ?? `[${t.category ?? '--'}]`}</span>
+              <span>{t.type ?? `[${t.category ?? '--'}]`}</span>
               <span>
                 {formatAltitude(t.alt, settings.altimeter)}
                 {climbArrow(t.baroRate)}
@@ -98,7 +98,7 @@ export function ListPanel() {
               <span>{padTrack(magneticTrack(t))}</span>
               <span>{t.squawk ?? '----'}</span>
               <span>{formatDistance(t)}</span>
-              <span class={s.dim}>{t.source.toUpperCase()}</span>
+              <span>{t.source.toUpperCase()}</span>
             </div>
           )}
         </For>
