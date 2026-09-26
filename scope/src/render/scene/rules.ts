@@ -57,6 +57,11 @@ export function isEmergency(t: Track): boolean {
   return emergencyCode(t.squawk, t.emergency) !== null;
 }
 
+/** Data block lines beyond the standard two. */
+export function extraLines(t: Track): number {
+  return isEmergency(t) ? 1 : 0;
+}
+
 /** Emergency over selected over stale over ground over climb state. */
 export function trackColor(t: Track, selected: string | null): string {
   if (isEmergency(t)) return THEME.emergency;

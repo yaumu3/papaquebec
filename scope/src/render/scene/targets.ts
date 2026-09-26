@@ -6,7 +6,7 @@ import { DB_LINE, labelOffset, type LabelSubject, placeLabels } from '../layout/
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
-import { dataBlock, isEmergency, targetShape, THEME, trackColor } from './rules';
+import { dataBlock, extraLines, targetShape, THEME, trackColor } from './rules';
 import { toScreen } from './view';
 
 export interface TargetInput {
@@ -139,7 +139,7 @@ function drawDataBlock(
   const right = dx > 0;
   const above = dy < 0;
   const block = dataBlock(d.t, input.now, input.altimeter);
-  const extra = block.prefix && above ? DB_LINE : 0;
+  const extra = above ? extraLines(d.t) * DB_LINE : 0;
   const blockY = dy - extra;
   const align = right ? 'left' : 'right';
   const emphasised = d.t.hex === input.selected || d.t.hex === input.hovered;
@@ -171,7 +171,7 @@ export function buildTargets(input: TargetInput): TargetScene {
       hex: d.t.hex,
       cx: d.cx,
       cy: d.cy,
-      emergency: isEmergency(d.t),
+      extraLines: extraLines(d.t),
       pinnedCorner: d.t.ops.pinnedCorner,
       autoCorner: d.t.ops.autoCorner,
     }));
