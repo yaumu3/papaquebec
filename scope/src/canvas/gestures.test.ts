@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { View } from '../render/protocol';
 import { toWorld } from '../render/scene/view';
-import { pinchZoom, zoomAbout } from './gestures';
+import { dragZoom, isDoubleTap, pinchZoom, zoomAbout } from './gestures';
 import { pxPerNmFor } from './view';
 
 const view = (rangeNm: number, cx = 0, cy = 0): View => ({
@@ -72,5 +72,59 @@ describe('pinchZoom', () => {
     );
     expect(after.x).toBeCloseTo(midBefore.x, 6);
     expect(after.y).toBeCloseTo(midBefore.y, 6);
+  });
+});
+
+describe('dragZoom', () => {
+  it('zooms in as the finger drags up and out as it drags down, about the anchor', () => {
+    // Arrange
+    const v = view(40);
+    const anchor = { x: 600, y: 200 };
+    const before = toWorld(v, anchor.x, anchor.y);
+
+    // Act
+    const out = [-150, 150].map((dy) => dragZoom(v, 40, anchor, dy));
+
+    // Assert
+    expect(out[0]?.rangeNm).toBeCloseTo(20, 6);
+    expect(out[1]?.rangeNm).toBeCloseTo(80, 6);
+    for (const o of out) {
+      const after = toWorld(
+        { ...v, centerX: o.pan.x, centerY: o.pan.y, pxPerNm: pxPerNmFor(800, 600, o.rangeNm) },
+        anchor.x,
+        anchor.y,
+      );
+      expect(after.x).toBeCloseTo(before.x, 6);
+      expect(after.y).toBeCloseTo(before.y, 6);
+    }
+  });
+});
+
+describe('isDoubleTap', () => {
+  it('pairs a touch-down with a tap only when it lands soon and nearby', () => {
+    // Arrange
+    const tap = { x: 100, y: 100, t: 1000 };
+    const cases = [
+      { down: { x: 110, y: 95, t: 1200 }, want: true },
+      { down: { x: 100, y: 100, t: 1400 }, want: false },
+      { down: { x: 160, y: 100, t: 1100 }, want: false },
+    ];
+
+    // Act
+    const got = cases.map((c) => isDoubleTap(tap, c.down));
+
+    // Assert
+    expect(got).toEqual(cases.map((c) => c.want));
+  });
+
+  it('is never a double tap without an earlier tap', () => {
+    // Arrange
+    const down = { x: 100, y: 100, t: 1000 };
+
+    // Act
+    const got = isDoubleTap(null, down);
+
+    // Assert
+    expect(got).toBe(false);
   });
 });
