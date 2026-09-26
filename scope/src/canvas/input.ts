@@ -11,7 +11,7 @@ import {
   setLabelDrag,
   setMenu,
   setModeText,
-  setMouse,
+  setPointer,
   setPan,
   setRangeCursor,
   setRblPending,
@@ -97,7 +97,7 @@ function applyZoom(z: Zoomed) {
 
 function onLeave(e: PointerEvent) {
   if (e.pointerType !== 'mouse') return;
-  setMouse(null);
+  setPointer(null);
   setHovered(null);
 }
 
@@ -238,7 +238,7 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
 
   const onHover = (e: PointerEvent) => {
     if (e.pointerType !== 'mouse') return;
-    setMouse({ cx: e.clientX, cy: e.clientY });
+    setPointer({ cx: e.clientX, cy: e.clientY });
     const t = targetAt(view(), e.clientX, e.clientY);
     setHovered(t ? t.hex : null);
   };
@@ -261,7 +261,7 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
         setRblPending({ a: { kind: 'target', hex: rblDrag.hex } });
         setModeText('RBL · RELEASE ON ANCHOR B');
       }
-      if (rblDrag.moved) setMouse({ cx: e.clientX, cy: e.clientY });
+      if (rblDrag.moved) setPointer({ cx: e.clientX, cy: e.clientY });
     }
     if (blockDrag) {
       if (
@@ -331,7 +331,7 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
         }
         setRblPending(null);
         setModeText(null);
-        if (e.pointerType !== 'mouse') setMouse(null);
+        if (e.pointerType !== 'mouse') setPointer(null);
       }
     }
     if (blockDrag) {

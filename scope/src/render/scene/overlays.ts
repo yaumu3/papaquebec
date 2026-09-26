@@ -19,7 +19,8 @@ export interface OverlayInput {
   rbls: readonly Rbl[];
   rblPending: RblPending | null;
   rangeCursor: RangeCursorOrigin | null;
-  mouse: { cx: number; cy: number } | null;
+  /** Where a hovering or dragging pointer is, in screen px. */
+  pointer: { cx: number; cy: number } | null;
   /** Magnetic declination at the site, degrees east. */
   declination: number;
   view: View;
@@ -50,10 +51,10 @@ function anchorPoint(a: RblAnchor, tracks: Map<string, Track>): Point | null {
 }
 
 function mousePoint(input: OverlayInput): Point | null {
-  if (!input.mouse) return null;
-  const snapped = input.snap(input.mouse.cx, input.mouse.cy);
+  if (!input.pointer) return null;
+  const snapped = input.snap(input.pointer.cx, input.pointer.cy);
   if (snapped) return trackPoint(snapped);
-  const w = toWorld(input.view, input.mouse.cx, input.mouse.cy);
+  const w = toWorld(input.view, input.pointer.cx, input.pointer.cy);
   return { pos: w, vel: null, label: '' };
 }
 
@@ -108,7 +109,7 @@ function drawRangeCursor(
   input: OverlayInput,
 ): void {
   const origin = input.rangeCursor;
-  if (!origin || !input.mouse) return;
+  if (!origin || !input.pointer) return;
   let o: Vec2;
   let label: string;
   if (origin.kind === 'target') {
@@ -121,7 +122,7 @@ function drawRangeCursor(
     o = { x: origin.x, y: origin.y };
     label = origin.kind === 'fix' ? origin.name : `${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`;
   }
-  const m = toWorld(input.view, input.mouse.cx, input.mouse.cy);
+  const m = toWorld(input.view, input.pointer.cx, input.pointer.cy);
   const dist = distanceNm(o, m);
   const brg = trueToMagnetic(bearingTrue(m.x - o.x, m.y - o.y), input.declination);
   lines.segment(o, m, THEME.cursor, { dash: [2, 3] });
@@ -160,8 +161,8 @@ export function buildOverlays(input: OverlayInput): Batch[] {
   if (pending) {
     const a = anchorPoint(pending, input.tracks);
     const b = mousePoint(input);
-    if (a && b && input.mouse) {
-      const w = toWorld(input.view, input.mouse.cx, input.mouse.cy);
+    if (a && b && input.pointer) {
+      const w = toWorld(input.view, input.pointer.cx, input.pointer.cy);
       drawRbl(
         lines,
         markers,

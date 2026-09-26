@@ -12,7 +12,7 @@ import {
   declination,
   hovered,
   labelDrag,
-  mouse,
+  pointer,
   rangeCursor,
   rblPending,
   rbls,
@@ -107,7 +107,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         snapshotVersion,
         view,
         declination,
-        () => (rblPending() || rangeCursor() ? mouse() : null),
+        () => (rblPending() || rangeCursor() ? pointer() : null),
       ],
       () => {
         const a = atlas();
@@ -120,7 +120,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
             rbls: rbls(),
             rblPending: rblPending(),
             rangeCursor: rangeCursor(),
-            mouse: mouse(),
+            pointer: pointer(),
             declination: declination(),
             view: v,
             atlas: a,

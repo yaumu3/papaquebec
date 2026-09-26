@@ -64,7 +64,8 @@ export const [hovered, setHovered] = createSignal<string | null>(null);
 /** Pan offset from the site, in NM. */
 export const [pan, setPan] = createSignal<Vec2>({ x: 0, y: 0 });
 export const [canvasSize, setCanvasSize] = createSignal({ width: 1, height: 1, dpr: 1 });
-export const [mouse, setMouse] = createSignal<{ cx: number; cy: number } | null>(null);
+/** Where a hovering or dragging pointer is on the canvas; null when none is. */
+export const [pointer, setPointer] = createSignal<{ cx: number; cy: number } | null>(null);
 export const [rbls, setRbls] = createSignal<Rbl[]>([]);
 export const [rblPending, setRblPending] = createSignal<RblPending | null>(null);
 export const [rangeCursor, setRangeCursor] = createSignal<RangeCursorOrigin | null>(null);
