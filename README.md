@@ -129,6 +129,10 @@ Conventions:
 - **Data blocks** are two lines: callsign; then altitude with climb arrow and, flipping every eight
   seconds in step across all blocks, type or ground speed with wake letter. Each sits in the first
   free of four corners and is left alone until it collides; dragging one pins it.
+- **Downlinked intent** is set in a dimmed tone of the block's color: the selected altitude
+  follows the altitude (`240↑350`), or a `✓` replaces the arrow while the aircraft holds it within
+  200 ft on its own altimeter, and a selected heading (`270°`) adds a third line while it steers the
+  aircraft, not LNAV or an approach.
 - **Trails** are NATS-style slashes decimated to eight-second slots.
 - **Bearings** shown to the operator are magnetic, 001 to 360.
 - **The top bar** carries only runtime state.
