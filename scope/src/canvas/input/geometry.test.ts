@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { View } from '../render/protocol';
-import { toWorld } from '../render/scene/view';
-import { dragZoom, isDoubleTap, pinchZoom, zoomAbout } from './gestures';
-import { pxPerNmFor } from './view';
+import type { View } from '../../render/protocol';
+import { toWorld } from '../../render/scene/view';
+import { pxPerNmFor } from '../view';
+import { dragZoom, isDoubleTap, pinchZoom, zoomAbout } from './geometry';
 
 const view = (rangeNm: number, cx = 0, cy = 0): View => ({
   centerX: cx,

@@ -1,4 +1,4 @@
-import { isDoubleTap, type Tap } from './gestures';
+import { isDoubleTap, type Tap } from '../geometry';
 
 export interface Point {
   x: number;

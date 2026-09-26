@@ -1,7 +1,7 @@
-import type { View } from '../render/protocol';
-import { toWorld } from '../render/scene/view';
-import { RANGE_MAX_NM, RANGE_MIN_NM } from '../state/settingsDefaults';
-import { pxPerNmFor } from './view';
+import type { View } from '../../render/protocol';
+import { toWorld } from '../../render/scene/view';
+import { RANGE_MAX_NM, RANGE_MIN_NM } from '../../state/settingsDefaults';
+import { pxPerNmFor } from '../view';
 
 export interface Zoomed {
   rangeNm: number;
