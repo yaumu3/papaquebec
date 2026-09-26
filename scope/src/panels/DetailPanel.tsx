@@ -1,7 +1,7 @@
 import { createMemo, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { displayAltitude } from '../lib/altitude';
+import { type DisplayAltitude, displayAltitude } from '../lib/altitude';
 import {
   climbArrow,
   emergencyCode,
@@ -51,8 +51,10 @@ function altitudeReading(
   alt: number | 'ground' | undefined,
   baroRate: number | undefined,
 ): Reading {
-  const d = displayAltitude(alt, settings.altimeter);
-  const tail = climbArrow(baroRate).trim();
+  return levelReading(displayAltitude(alt, settings.altimeter), climbArrow(baroRate).trim());
+}
+
+function levelReading(d: DisplayAltitude, tail = ''): Reading {
   switch (d.kind) {
     case 'altitude':
       return { v: String(d.feet), unit: 'ft', tail };
