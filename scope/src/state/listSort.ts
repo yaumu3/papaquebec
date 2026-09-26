@@ -1,4 +1,5 @@
 import { trackLabel } from '../render/scene/rules';
+import { magneticTrack } from './magnetic';
 import type { Track } from './track';
 
 export type SortKey = 'id' | 'type' | 'alt' | 'gs' | 'track' | 'squawk' | 'dist' | 'source';
@@ -34,7 +35,7 @@ const VALUE: Record<SortKey, (t: Track) => SortValue> = {
   type: (t) => t.type,
   alt: (t) => (t.alt === 'ground' ? -1 : t.alt),
   gs: (t) => t.gs,
-  track: (t) => t.track,
+  track: magneticTrack,
   squawk: (t) => t.squawk,
   dist: distanceFromSite,
   source: (t) => t.source,

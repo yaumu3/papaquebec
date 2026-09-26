@@ -9,7 +9,7 @@ import { type PanelId, persisted } from './settings';
 export type { PanelId };
 /** The enabled map sets merged; see `mapsets`. */
 export { aero };
-export { declination, setDeclination } from './magnetic';
+export { declination, magneticTrack, setDeclination } from './magnetic';
 import type { Fix } from './track';
 
 /** Feed liveness, as readsb reports it; the scope keeps no timer of its own beyond "when did we last hear". */

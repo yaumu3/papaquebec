@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { distanceFromSite, sortTracks } from './listSort';
+import { setDeclination } from './magnetic';
 import type { Track } from './track';
 
 function track(hex: string, over: Partial<Track> = {}): Track {
@@ -61,6 +62,8 @@ describe('distanceFromSite', () => {
 });
 
 describe('sortTracks', () => {
+  afterEach(() => setDeclination(0));
+
   it('sorts by identity label, registration counting as identity', () => {
     // Arrange
     const tracks = [
@@ -109,6 +112,18 @@ describe('sortTracks', () => {
 
     // Assert
     expect(out).toEqual(['near', 'far', 'none']);
+  });
+
+  it('sorts by magnetic track, as the column reads', () => {
+    // Arrange
+    setDeclination(-8);
+    const tracks = [track('east', { track: 10 }), track('north', { track: 355 })];
+
+    // Act
+    const out = sortTracks(tracks, { key: 'track', dir: 'asc' }).map((t) => t.hex);
+
+    // Assert
+    expect(out).toEqual(['north', 'east']);
   });
 
   it('does not mutate its input', () => {

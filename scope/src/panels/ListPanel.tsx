@@ -9,6 +9,7 @@ import { classify } from '../state/filter';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import {
   listSort,
+  magneticTrack,
   selected,
   setListSort,
   setMenu,
@@ -94,7 +95,7 @@ export function ListPanel() {
                 {climbArrow(t.baroRate)}
               </span>
               <span>{formatGsWake(t.gs, t.category)}</span>
-              <span>{padTrack(t.track)}</span>
+              <span>{padTrack(magneticTrack(t))}</span>
               <span>{t.squawk ?? '----'}</span>
               <span>{formatDistance(t)}</span>
               <span class={s.dim}>{t.source.toUpperCase()}</span>

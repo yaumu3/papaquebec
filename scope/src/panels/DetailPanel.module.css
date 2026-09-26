@@ -63,6 +63,9 @@
 .also {
   color: var(--text);
 }
+.alsoEnriched {
+  color: var(--color-enriched);
+}
 .enriched .v {
   color: var(--color-enriched);
 }
