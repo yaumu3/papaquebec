@@ -7,7 +7,7 @@ import {
   emergencyCode,
   formatMach,
   formatWind,
-  padTrack,
+  padBearing,
   wakeLetter,
 } from '../lib/format';
 import { isStale, trackLabel } from '../render/scene/rules';
@@ -75,6 +75,9 @@ function typeReading(type: string | undefined, category: string | undefined): Re
 
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>
   v === undefined ? NONE : { v: v.toFixed(digits), unit };
+
+const bearing = (deg: number | undefined): Reading =>
+  deg === undefined ? NONE : { v: `${padBearing(deg)}°` };
 
 const signed = (v: number | undefined, unit: string): Reading =>
   v === undefined ? NONE : { v: `${v > 0 ? '+' : ''}${Math.round(v)}`, unit };
@@ -157,10 +160,7 @@ export function DetailPanel() {
                 <Cell k="ALT" r={altitudeReading(t().alt, t().baroRate)} />
                 <Cell k="VS" r={signed(t().baroRate, 'fpm')} />
                 <Cell k="GS" r={num(t().gs, 'kt')} />
-                <Cell
-                  k="TRK"
-                  r={t().track === undefined ? NONE : { v: `${padTrack(t().track)}°` }}
-                />
+                <Cell k="TRK" r={bearing(t().track)} />
                 <Cell
                   k="LAT"
                   r={positionReadings(t().position)[0]}
