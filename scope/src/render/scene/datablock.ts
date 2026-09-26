@@ -36,6 +36,11 @@ export function extraLines(t: Track): number {
   return (isEmergency(t) ? 1 : 0) + (headingLine(t) === null ? 0 : 1);
 }
 
+/** Lines of a built block beyond the standard two; always `extraLines` of its track. */
+export function blockExtraLines(block: DataBlock): number {
+  return (block.prefix ? 1 : 0) + (block.line3 === null ? 0 : 1);
+}
+
 function headingLine(t: Track): string | null {
   const heading = steeringHeading(t);
   return heading === undefined ? null : `${padBearing(heading)}°`;
@@ -92,8 +97,6 @@ export interface BlockPlacement {
   /** Offset from the target to the block's near corner, CSS px. */
   dx: number;
   dy: number;
-  /** Lines beyond the standard two, as `extraLines` counts them. */
-  extra: number;
   color: string;
   /** Keeps the leader at full brightness, as for a selected or hovered target. */
   emphasised: boolean;
@@ -119,11 +122,11 @@ export function drawDataBlock(
   lines: LineBatch,
   text: TextBatch,
   block: DataBlock,
-  { at, dx, dy, extra, color, emphasised }: BlockPlacement,
+  { at, dx, dy, color, emphasised }: BlockPlacement,
 ): void {
   const right = dx > 0;
   const above = dy < 0;
-  const blockY = dy - (above ? extra * DB_LINE : 0);
+  const blockY = dy - (above ? blockExtraLines(block) * DB_LINE : 0);
   const align = right ? 'left' : 'right';
   // Leader from the glyph edge to the block edge that faces the target.
   lines.segment(

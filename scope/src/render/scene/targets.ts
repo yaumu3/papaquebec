@@ -154,7 +154,6 @@ export function buildTargets(input: TargetInput): TargetScene {
     drawDataBlock(lines, text, dataBlock(d.t, input.now, input.altimeter), {
       at,
       ...offset,
-      extra: extraLines(d.t),
       color: d.color,
       emphasised: d.t.hex === input.selected || d.t.hex === input.hovered,
     });

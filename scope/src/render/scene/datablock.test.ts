@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 
-import { dataBlock, extraLines, type Run } from './datablock';
+import type { Track } from '../../state/track';
+import { atlas } from './atlasFixture';
+import {
+  blockExtraLines,
+  type BlockPlacement,
+  dataBlock,
+  drawDataBlock,
+  extraLines,
+  type Run,
+} from './datablock';
+import { LineBatch, TextBatch } from './pack';
 import { makeTrack as track } from './trackFixture';
 
 const text = (runs: Run[]) => runs.map((r) => r.text).join('');
@@ -136,5 +146,58 @@ describe('extraLines', () => {
 
     // Assert
     expect(out).toEqual([0, 1, 1, 2]);
+  });
+});
+
+describe('blockExtraLines', () => {
+  it('agrees with extraLines on the lines a track would print', () => {
+    // Arrange
+    const cases = [
+      track(),
+      track({ squawk: '7700' }),
+      track({ selHeading: 95 }),
+      track({ squawk: '7700', selHeading: 95 }),
+    ];
+
+    // Act
+    const out = cases.map((t) => [blockExtraLines(dataBlock(t, 0)), extraLines(t)]);
+
+    // Assert
+    expect(out).toEqual([
+      [0, 0],
+      [1, 1],
+      [1, 1],
+      [2, 2],
+    ]);
+  });
+});
+
+describe('drawDataBlock', () => {
+  const place: BlockPlacement = {
+    at: { x: 0, y: 0 },
+    dx: 22,
+    dy: -18,
+    color: '#ffffff',
+    emphasised: false,
+  };
+  /** Vertical offset of each glyph from the target, in draw order. */
+  const rows = (t: Track) => {
+    const glyphs = new TextBatch(atlas);
+    drawDataBlock(new LineBatch(), glyphs, dataBlock(t, 0), place);
+    const b = glyphs.finish();
+    return Array.from({ length: b.count }, (_, i) => b.data[i * 16 + 3] ?? 0);
+  };
+
+  it('grows a block above its target upward, keeping the standard lines in place', () => {
+    // Arrange
+    const plain = track();
+    const emergency = track({ squawk: '7600' });
+
+    // Act
+    const [a, b] = [plain, emergency].map(rows);
+
+    // Assert
+    expect(b?.slice('RF'.length)).toEqual(a ?? []);
+    expect(b?.[0]).toBeLessThan(a?.[0] ?? 0);
   });
 });
