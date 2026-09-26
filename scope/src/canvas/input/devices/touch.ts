@@ -1,9 +1,5 @@
-import { isDoubleTap, type Tap } from '../geometry';
-
-export interface Point {
-  x: number;
-  y: number;
-}
+import { DRAG_THRESHOLD_PX, type Point } from '../geometry';
+import { isDoubleTap, type Pair, type Tap } from './touchGestures';
 
 /** The parts of a `PointerEvent` the recognizer reads. */
 export interface FingerEvent {
@@ -12,8 +8,6 @@ export interface FingerEvent {
   clientY: number;
   timeStamp: number;
 }
-
-export type Pair = [Point, Point];
 
 /** What the fingers on the canvas are doing, as the recognizer sees it. */
 export interface TouchHandlers {
@@ -35,8 +29,6 @@ export interface TouchHandlers {
 
 /** A finger held still this long opens the menu a right click would. */
 export const LONG_PRESS_MS = 450;
-/** A finger that moves farther than this is dragging, not tapping. */
-export const DRAG_THRESHOLD_PX = 5;
 
 /**
  * Tracks fingers by pointer id and turns them into press, long-press, pinch and double-tap drag

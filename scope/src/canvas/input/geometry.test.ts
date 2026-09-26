@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
 import { pxPerNmFor } from '../view';
-import { dragZoom, isDoubleTap, pinchZoom, zoomAbout } from './geometry';
+import { dragZoom, pinchZoom, zoomAbout } from './geometry';
 
 const view = (rangeNm: number, cx = 0, cy = 0): View => ({
   centerX: cx,
@@ -97,34 +97,5 @@ describe('dragZoom', () => {
       expect(after.x).toBeCloseTo(before.x, 6);
       expect(after.y).toBeCloseTo(before.y, 6);
     }
-  });
-});
-
-describe('isDoubleTap', () => {
-  it('pairs a touch-down with a tap only when it lands soon and nearby', () => {
-    // Arrange
-    const tap = { x: 100, y: 100, t: 1000 };
-    const cases = [
-      { down: { x: 110, y: 95, t: 1200 }, want: true },
-      { down: { x: 100, y: 100, t: 1400 }, want: false },
-      { down: { x: 160, y: 100, t: 1100 }, want: false },
-    ];
-
-    // Act
-    const got = cases.map((c) => isDoubleTap(tap, c.down));
-
-    // Assert
-    expect(got).toEqual(cases.map((c) => c.want));
-  });
-
-  it('is never a double tap without an earlier tap', () => {
-    // Arrange
-    const down = { x: 100, y: 100, t: 1000 };
-
-    // Act
-    const got = isDoubleTap(null, down);
-
-    // Assert
-    expect(got).toBe(false);
   });
 });

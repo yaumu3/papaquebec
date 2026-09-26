@@ -32,8 +32,15 @@ import { trackStore } from '../../state/tracks';
 import { blockAt, fixAt, RBL_SNAP_PX, rblAt, targetAt, targetScreen } from '../hit';
 import { rblMenu, scopeMenu, targetMenu } from '../menus';
 import { anchorFor, appendRbl } from '../rbl';
-import { DRAG_THRESHOLD_PX, type Point, trackTouches } from './devices/touch';
-import { dragZoom, pinchZoom, type Zoomed, zoomAbout } from './geometry';
+import { trackTouches } from './devices/touch';
+import {
+  DRAG_THRESHOLD_PX,
+  dragZoom,
+  pinchZoom,
+  type Point,
+  type Zoomed,
+  zoomAbout,
+} from './geometry';
 
 /** Wheel sensitivity: one 100 px notch scales the range by about 1.2. */
 const ZOOM_PER_PX = 0.0018;
