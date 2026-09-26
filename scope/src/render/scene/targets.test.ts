@@ -1,24 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
-import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
+import { type Batch, Shape, type View } from '../protocol';
+import { atlas } from './atlasFixture';
 import { INTENT_TONE } from './datablock';
 import { buildTargets, type TargetInput } from './targets';
 import { makeTrack } from './trackFixture';
 
-const atlas: AtlasInfo = {
-  width: 160,
-  height: 40,
-  cellW: 10,
-  cellH: 20,
-  columns: 16,
-  fontSize: 40,
-  buffer: 2,
-  baseline: 16,
-  advance: 6,
-  chars:
-    ' !"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~↑↓°·',
-};
 const view: View = { centerX: 0, centerY: 0, pxPerNm: 10, widthPx: 800, heightPx: 600, dpr: 1 };
 
 function track(over: Partial<Track> = {}): Track {
