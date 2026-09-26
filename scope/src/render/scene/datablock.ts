@@ -1,10 +1,4 @@
-import {
-  type Altimeter,
-  formatAltitude,
-  holdsSelected,
-  STANDARD_ALTIMETER,
-  uncorrected,
-} from '../../lib/altitude';
+import { type Altimeter, formatAltitude, holdsSelected, uncorrected } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
 import type { Track } from '../../state/track';
@@ -61,11 +55,7 @@ function levelRuns(t: Track, altimeter: Altimeter): Run[] {
  * ground speed with wake, alternating every 8 s on one shared clock so every
  * block reads the same field at the same time, then the selected heading.
  */
-export function dataBlock(
-  t: Track,
-  nowSec: number,
-  altimeter: Altimeter = STANDARD_ALTIMETER,
-): DataBlock {
+export function dataBlock(t: Track, nowSec: number, altimeter: Altimeter): DataBlock {
   const showType = Math.floor(nowSec / DATA_BLOCK_PERIOD_SEC) % 2 === 0;
   const typeLabel = t.type ?? `[${t.category ?? '--'}]`;
   const second = showType ? typeLabel : formatGsWake(t.gs, t.category);

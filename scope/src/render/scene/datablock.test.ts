@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { STANDARD_ALTIMETER } from '../../lib/altitude';
 import type { Track } from '../../state/track';
 import { DB_FONT_PX } from '../layout/labels';
 import { atlas } from './atlasFixture';
@@ -27,7 +28,7 @@ describe('dataBlock', () => {
     const phaseB = 8;
 
     // Act
-    const [a, b] = [phaseA, phaseB].map((now) => dataBlock(t, now));
+    const [a, b] = [phaseA, phaseB].map((now) => dataBlock(t, now, STANDARD_ALTIMETER));
 
     // Assert
     expect(a?.prefix).toBeNull();
@@ -46,7 +47,7 @@ describe('dataBlock', () => {
     });
 
     // Act
-    const block = dataBlock(t, 0);
+    const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
     expect(block.line1).toBe('867A01');
@@ -58,7 +59,7 @@ describe('dataBlock', () => {
     const t = track({ squawk: '7600' });
 
     // Act
-    const block = dataBlock(t, 0);
+    const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
     expect(block.prefix).toBe('RF');
@@ -71,7 +72,7 @@ describe('dataBlock', () => {
     const now = 4;
 
     // Act
-    const [ba, bb] = [dataBlock(a, now), dataBlock(b, now)];
+    const [ba, bb] = [dataBlock(a, now, STANDARD_ALTIMETER), dataBlock(b, now, STANDARD_ALTIMETER)];
 
     // Assert
     expect(ba.line2).toEqual(bb.line2);
@@ -82,7 +83,7 @@ describe('dataBlock', () => {
     const t = track({ baroRate: 1500, selAlt: 16000 });
 
     // Act
-    const block = dataBlock(t, 0);
+    const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
     expect(block.line2).toEqual([
@@ -97,7 +98,7 @@ describe('dataBlock', () => {
     const t = track({ alt: 34860, selAlt: 35000, navQnh: 1013.2 });
 
     // Act
-    const block = dataBlock(t, 0);
+    const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
     expect(block.line2).toEqual([
@@ -116,7 +117,7 @@ describe('dataBlock', () => {
     ];
 
     // Act
-    const out = cases.map((t) => dataBlock(t, 0).line3);
+    const out = cases.map((t) => dataBlock(t, 0, STANDARD_ALTIMETER).line3);
 
     // Assert
     expect(out).toEqual(['095°', null, null]);
@@ -164,7 +165,10 @@ describe('blockExtraLines', () => {
     ];
 
     // Act
-    const out = cases.map((t) => [blockExtraLines(dataBlock(t, 0)), extraLines(t)]);
+    const out = cases.map((t) => [
+      blockExtraLines(dataBlock(t, 0, STANDARD_ALTIMETER)),
+      extraLines(t),
+    ]);
 
     // Assert
     expect(out).toEqual([
@@ -187,7 +191,7 @@ describe('drawDataBlock', () => {
   /** Each glyph's offset from the target and its color, in draw order. */
   const glyphs = (t: Track, place = ne) => {
     const batch = new TextBatch(atlas);
-    drawDataBlock(new LineBatch(), batch, dataBlock(t, 0), place);
+    drawDataBlock(new LineBatch(), batch, dataBlock(t, 0, STANDARD_ALTIMETER), place);
     const b = batch.finish();
     return Array.from({ length: b.count }, (_, i) => ({
       px: b.data[i * 16 + 2] ?? 0,
