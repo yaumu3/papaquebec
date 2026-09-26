@@ -1,61 +1,16 @@
 import type { View } from '../../render/protocol';
 import type { RangeCursorOrigin } from '../../state/scope';
 import { RBL_SNAP_PX, TARGET_PX } from '../hit';
-import { createActions, type Precision, type ScopeActions } from './actions';
+import { createActions, type Precision } from './actions';
+import { attachKeyboard } from './devices/keyboard';
 import { FINGER, precisionOf, trackTouches } from './devices/touch';
+import { at } from './dom';
 import { DRAG_THRESHOLD_PX, type Point } from './geometry';
 
 /** Wheel sensitivity: one 100 px notch scales the range by about 1.2. */
 const ZOOM_PER_PX = 0.0018;
 /** A mouse cursor lands exactly and shows where it is between presses. */
 const CURSOR: Precision = { reach: TARGET_PX, snap: RBL_SNAP_PX, hovers: true };
-
-const at = (e: { clientX: number; clientY: number }): Point => ({ x: e.clientX, y: e.clientY });
-
-/** Canvas shortcuts; keys typed into an input are left alone. */
-function keyHandler(a: ScopeActions) {
-  return (e: KeyboardEvent) => {
-    if (e.target instanceof HTMLInputElement) return;
-    switch (e.key) {
-      case 'Escape':
-        a.cancel();
-        break;
-      case '?':
-        a.toggleHint();
-        break;
-      case '[':
-        a.stepRange(-1);
-        break;
-      case ']':
-        a.stepRange(1);
-        break;
-      case 't':
-      case 'T':
-        a.cycleTrails();
-        break;
-      case 'v':
-      case 'V':
-        a.cycleVectors();
-        break;
-      case 'l':
-      case 'L':
-        a.toggleList();
-        break;
-      case 'r':
-      case 'R':
-        a.startRbl();
-        break;
-      case 'Home':
-        a.recenter();
-        break;
-      case 'Delete':
-      case 'Backspace':
-        if (e.shiftKey) a.clearRbls();
-        else a.deleteLastRbl();
-        break;
-    }
-  };
-}
 
 /**
  * Wires pointer and keyboard interaction to the canvas: it recognizes each device's gestures and
@@ -68,7 +23,7 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
       canvas.style.cursor = c;
     },
   });
-  const onKey = keyHandler(actions);
+  const detachKeyboard = attachKeyboard(actions);
   let rightDrag: { sx: number; sy: number; started: boolean; origin: RangeCursorOrigin } | null =
     null;
   let suppressClick = false;
@@ -200,7 +155,6 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
   window.addEventListener('pointerup', onUp);
   window.addEventListener('pointercancel', onUp);
   window.addEventListener('pointerdown', onWindowDown);
-  window.addEventListener('keydown', onKey);
   return () => {
     canvas.removeEventListener('pointermove', onHover);
     canvas.removeEventListener('pointerleave', onLeave);
@@ -213,6 +167,6 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onUp);
     window.removeEventListener('pointerdown', onWindowDown);
-    window.removeEventListener('keydown', onKey);
+    detachKeyboard();
   };
 }
