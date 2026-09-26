@@ -53,3 +53,31 @@ export function pinchZoom(
     pan: { x: zoomed.pan.x - (m1.x - m0.x) / k, y: zoomed.pan.y + (m1.y - m0.y) / k },
   };
 }
+
+/** One finger dragging this far after a double tap halves or doubles the range. */
+const DRAG_ZOOM_HALVING_PX = 150;
+
+/**
+ * A finger dragged `dy` px after a double tap: up zooms in, down zooms out, about `anchor`.
+ */
+export function dragZoom(v: View, rangeNm: number, anchor: Point, dy: number): Zoomed {
+  return zoomAbout(v, rangeNm, anchor.x, anchor.y, 2 ** (dy / DRAG_ZOOM_HALVING_PX));
+}
+
+/** A second touch this soon and this close to a tap makes a double tap. */
+const DOUBLE_TAP_MS = 300;
+const DOUBLE_TAP_PX = 40;
+
+export interface Tap extends Point {
+  /** Event time in ms. */
+  t: number;
+}
+
+/** Whether a touch-down at `down` is the second half of a double tap after `tap`. */
+export function isDoubleTap(tap: Tap | null, down: Tap): boolean {
+  return (
+    tap !== null &&
+    down.t - tap.t <= DOUBLE_TAP_MS &&
+    Math.hypot(down.x - tap.x, down.y - tap.y) <= DOUBLE_TAP_PX
+  );
+}
