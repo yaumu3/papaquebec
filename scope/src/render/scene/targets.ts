@@ -179,6 +179,9 @@ function drawDataBlock(
     plain: d.color,
     intent,
   });
+  if (block.line3) {
+    text.text(block.line3, { ...at, px: dx, py: lineY + 2 * DB_LINE }, FONT_PX, intent, { align });
+  }
 }
 
 export function buildTargets(input: TargetInput): TargetScene {

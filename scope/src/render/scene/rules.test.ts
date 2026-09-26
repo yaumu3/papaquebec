@@ -5,6 +5,7 @@ import { Shape } from '../protocol';
 import {
   airspaceColor,
   dataBlock,
+  extraLines,
   type Run,
   isStale,
   targetShape,
@@ -185,6 +186,21 @@ describe('dataBlock', () => {
     ]);
   });
 
+  it('puts the heading that steers the aircraft on a third line', () => {
+    // Arrange
+    const cases = [
+      track({ selHeading: 95, navModes: ['autopilot'] }),
+      track({ selHeading: 95, navModes: ['approach'] }),
+      track(),
+    ];
+
+    // Act
+    const out = cases.map((t) => dataBlock(t, 0).line3);
+
+    // Assert
+    expect(out).toEqual(['095°', null, null]);
+  });
+
   it('prints the selected level as the crew set it, without the QNH correction', () => {
     // Arrange
     const t = track({ alt: 5000, selAlt: 5000 });
@@ -195,6 +211,24 @@ describe('dataBlock', () => {
 
     // Assert
     expect(text(block.line2)).toBe('047 050 B789');
+  });
+});
+
+describe('extraLines', () => {
+  it('counts the emergency prefix and the selected heading line', () => {
+    // Arrange
+    const cases = [
+      track(),
+      track({ squawk: '7700' }),
+      track({ selHeading: 95 }),
+      track({ squawk: '7700', selHeading: 95 }),
+    ];
+
+    // Act
+    const out = cases.map(extraLines);
+
+    // Assert
+    expect(out).toEqual([0, 1, 1, 2]);
   });
 });
 

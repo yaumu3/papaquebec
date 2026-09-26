@@ -6,7 +6,8 @@ import {
   STANDARD_ALTIMETER,
   uncorrected,
 } from '../../lib/altitude';
-import { climbArrow, climbState, emergencyCode, formatGsWake } from '../../lib/format';
+import { steeringHeading } from '../../lib/autopilot';
+import { climbArrow, climbState, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
 import type { Visibility } from '../../state/filter';
 import type { Track } from '../../state/track';
 import { Shape } from '../protocol';
@@ -65,7 +66,12 @@ export function isEmergency(t: Track): boolean {
 
 /** Data block lines beyond the standard two. */
 export function extraLines(t: Track): number {
-  return isEmergency(t) ? 1 : 0;
+  return (isEmergency(t) ? 1 : 0) + (headingLine(t) === null ? 0 : 1);
+}
+
+function headingLine(t: Track): string | null {
+  const heading = steeringHeading(t);
+  return heading === undefined ? null : `${padBearing(heading)}°`;
 }
 
 /** Emergency over selected over stale over ground over climb state. */
@@ -107,6 +113,8 @@ export interface DataBlock {
   prefix: 'HJ' | 'RF' | 'EM' | null;
   line1: string;
   line2: Run[];
+  /** Selected heading, all intent; null when there is none to show. */
+  line3: string | null;
 }
 
 const plain = (text: string): Run => ({ text, intent: false });
@@ -130,7 +138,7 @@ function levelRuns(t: Track, altimeter: Altimeter): Run[] {
 /**
  * Identity, then level, trend and selected level with either the type or
  * ground speed with wake, alternating every 8 s on one shared clock so every
- * block reads the same field at the same time.
+ * block reads the same field at the same time, then the selected heading.
  */
 export function dataBlock(
   t: Track,
@@ -144,5 +152,6 @@ export function dataBlock(
     prefix: emergencyCode(t.squawk, t.emergency),
     line1: trackLabel(t),
     line2: [...levelRuns(t, altimeter), plain(` ${second}`)],
+    line3: headingLine(t),
   };
 }

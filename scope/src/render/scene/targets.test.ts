@@ -192,9 +192,9 @@ describe('buildTargets', () => {
     expect(corners.get('867a01')).toBe('ne');
   });
 
-  it('sets the selected level in the dimmed intent tone', () => {
+  it('sets the selected level and a third heading line in the dimmed intent tone', () => {
     // Arrange
-    const t = track({ baroRate: 1500, selAlt: 16000 });
+    const t = track({ baroRate: 1500, selAlt: 16000, selHeading: 95 });
 
     // Act
     const { batches } = buildTargets(input([t]));
@@ -204,8 +204,8 @@ describe('buildTargets', () => {
     const plain = g[0]?.rgb ?? [];
     const intent = plain.map((v) => v * INTENT_TONE);
     const tones = g.map(({ rgb }) => (near(rgb, plain) ? 'p' : near(rgb, intent) ? 'i' : '?'));
-    // ANA241 / 110↑ 160 B789, spaces drawing nothing
-    expect(tones.join('')).toBe(['pppppp', 'pppp', 'iii', 'pppp'].join(''));
+    // ANA241 / 110↑ 160 B789 / 095°, spaces drawing nothing
+    expect(tones.join('')).toBe(['pppppp', 'pppp', 'iii', 'pppp', 'iiii'].join(''));
   });
 
   it('keeps the runs of a right-aligned line contiguous', () => {
