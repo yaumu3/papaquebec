@@ -1,7 +1,7 @@
 import type { AircraftJson, AircraftSnapshot } from '../lib/aircraft';
 import type { Fix, OperatorState, Position, Source, Track } from './track';
 
-export const HISTORY_RETENTION_SEC = 600;
+export const HISTORY_RETENTION_SEC = 3600;
 
 export type ProjectFn = (lat: number, lon: number) => { x: number; y: number };
 
