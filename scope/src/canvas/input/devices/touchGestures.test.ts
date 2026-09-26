@@ -1,6 +1,39 @@
 import { describe, expect, it } from 'bun:test';
 
-import { isDoubleTap } from './touchGestures';
+import { dragZoomFactor, isDoubleTap, pinchOf } from './touchGestures';
+
+describe('pinchOf', () => {
+  it('scales by the change in finger spread about the midpoint, which follows the fingers', () => {
+    // Arrange
+    const start = [
+      { x: 300, y: 300 },
+      { x: 500, y: 300 },
+    ] as const;
+    const now = [
+      { x: 250, y: 320 },
+      { x: 650, y: 320 },
+    ] as const;
+
+    // Act
+    const out = pinchOf(start, now);
+
+    // Assert
+    expect(out).toEqual({ anchor: { x: 400, y: 300 }, factor: 0.5, to: { x: 450, y: 320 } });
+  });
+});
+
+describe('dragZoomFactor', () => {
+  it('zooms in as the finger drags up and out as it drags down', () => {
+    // Arrange
+    const drags = [-150, 150];
+
+    // Act
+    const factors = drags.map(dragZoomFactor);
+
+    // Assert
+    expect(factors).toEqual([0.5, 2]);
+  });
+});
 
 describe('isDoubleTap', () => {
   it('pairs a touch-down with a tap only when it lands soon and nearby', () => {

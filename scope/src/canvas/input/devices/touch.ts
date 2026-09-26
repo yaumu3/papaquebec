@@ -1,5 +1,5 @@
 import { DRAG_THRESHOLD_PX, type Point } from '../geometry';
-import { isDoubleTap, type Pair, type Tap } from './touchGestures';
+import { dragZoomFactor, isDoubleTap, type Pair, pinchOf, type Tap } from './touchGestures';
 
 /** The parts of a `PointerEvent` the recognizer reads. */
 export interface FingerEvent {
@@ -15,16 +15,12 @@ export interface TouchHandlers {
   press(e: FingerEvent): void;
   /** The first finger stayed down, unmoved, for the long-press delay. */
   longPress(at: Point): void;
-  /** A second finger landed; `start` holds both positions. */
-  pinchStart(start: Pair): void;
-  pinch(start: Pair, now: Pair): void;
-  /** One of the two pinching fingers lifted. */
-  pinchEnd(): void;
-  /** A finger that landed just after a tap began sliding; `anchor` is where it landed. */
-  zoomDragStart(anchor: Point): void;
-  /** That finger is now `dy` px below `anchor` (negative above). */
-  zoomDrag(anchor: Point, dy: number): void;
-  zoomDragEnd(): void;
+  /** A second finger landed, or a finger that landed just after a tap began sliding. */
+  zoomStart(): void;
+  /** Scale the range from the zoom's start by `factor` about `anchor`, which moves to `to`. */
+  zoom(anchor: Point, factor: number, to: Point): void;
+  /** A pinching finger or the sliding finger lifted. */
+  zoomEnd(): void;
 }
 
 /** A finger held still this long opens the menu a right click would. */
@@ -49,7 +45,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     longPress = null;
   };
   const endZoom = () => {
-    if (zoom?.started) h.zoomDragEnd();
+    if (zoom?.started) h.zoomEnd();
     zoom = null;
   };
 
@@ -79,7 +75,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
       const [a, b] = [...fingers.entries()];
       if (a && b) {
         pinch = { start: [{ ...a[1] }, { ...b[1] }], ids: [a[0], b[0]] };
-        h.pinchStart(pinch.start);
+        h.zoomStart();
       }
     }
   };
@@ -89,16 +85,19 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     if (pinch) {
       const a = fingers.get(pinch.ids[0]);
       const b = fingers.get(pinch.ids[1]);
-      if (a && b) h.pinch(pinch.start, [a, b]);
+      if (a && b) {
+        const p = pinchOf(pinch.start, [a, b]);
+        h.zoom(p.anchor, p.factor, p.to);
+      }
       return true;
     }
     if (zoom?.id === e.pointerId) {
       const dy = e.clientY - zoom.anchor.y;
       if (!zoom.started && Math.abs(dy) > DRAG_THRESHOLD_PX) {
         zoom.started = true;
-        h.zoomDragStart(zoom.anchor);
+        h.zoomStart();
       }
-      if (zoom.started) h.zoomDrag(zoom.anchor, dy);
+      if (zoom.started) h.zoom(zoom.anchor, dragZoomFactor(dy), zoom.anchor);
       return true;
     }
     if (
@@ -117,7 +116,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     if (pinch) {
       if (fingers.size < 2) {
         pinch = null;
-        h.pinchEnd();
+        h.zoomEnd();
       }
       return true;
     }

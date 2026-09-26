@@ -22,12 +22,9 @@ function recorder() {
   const h: TouchHandlers = {
     press: (e) => calls.push(['press', e.pointerId]),
     longPress: (at) => calls.push(['longPress', at]),
-    pinchStart: (start) => calls.push(['pinchStart', start]),
-    pinch: (start, now) => calls.push(['pinch', start, now]),
-    pinchEnd: () => calls.push(['pinchEnd']),
-    zoomDragStart: (anchor) => calls.push(['zoomDragStart', anchor]),
-    zoomDrag: (anchor, dy) => calls.push(['zoomDrag', anchor, dy]),
-    zoomDragEnd: () => calls.push(['zoomDragEnd']),
+    zoomStart: () => calls.push(['zoomStart']),
+    zoom: (anchor, factor, to) => calls.push(['zoom', anchor, factor, to]),
+    zoomEnd: () => calls.push(['zoomEnd']),
   };
   return { calls, t: trackTouches(h, LONG_PRESS_MS) };
 }
@@ -83,40 +80,24 @@ describe('trackTouches', () => {
     ]);
   });
 
-  it('pinches from where two fingers landed to where they are now', () => {
+  it('zooms by the change in finger spread, following their midpoint', () => {
     // Arrange
     const { calls, t } = recorder();
-    t.down(finger(1, 10, 10));
-    t.down(finger(2, 50, 50));
+    t.down(finger(1, 100, 100));
+    t.down(finger(2, 200, 100));
 
     // Act
-    const consumed = t.move(finger(2, 70, 60));
+    const consumed = t.move(finger(2, 300, 100));
 
     // Assert
     expect(consumed).toBe(true);
     expect(calls.slice(1)).toEqual([
-      [
-        'pinchStart',
-        [
-          { x: 10, y: 10 },
-          { x: 50, y: 50 },
-        ],
-      ],
-      [
-        'pinch',
-        [
-          { x: 10, y: 10 },
-          { x: 50, y: 50 },
-        ],
-        [
-          { x: 10, y: 10 },
-          { x: 70, y: 60 },
-        ],
-      ],
+      ['zoomStart'],
+      ['zoom', { x: 150, y: 100 }, 0.5, { x: 200, y: 100 }],
     ]);
   });
 
-  it('ends the pinch, consuming the lift, when either finger lifts', () => {
+  it('ends the zoom, consuming the lift, when either finger lifts', () => {
     // Arrange
     const { calls, t } = recorder();
     t.down(finger(1, 10, 10));
@@ -127,7 +108,7 @@ describe('trackTouches', () => {
 
     // Assert
     expect(consumed).toBe(true);
-    expect(calls.at(-1)).toEqual(['pinchEnd']);
+    expect(calls.at(-1)).toEqual(['zoomEnd']);
   });
 
   it('leaves single-finger moves and lifts and foreign pointers to the caller', () => {
@@ -154,8 +135,8 @@ describe('trackTouches', () => {
 
     // Assert
     expect(calls.slice(1)).toEqual([
-      ['zoomDragStart', { x: 105, y: 195 }],
-      ['zoomDrag', { x: 105, y: 195 }, -60],
+      ['zoomStart'],
+      ['zoom', { x: 105, y: 195 }, 2 ** (-60 / 150), { x: 105, y: 195 }],
     ]);
   });
 
@@ -171,7 +152,7 @@ describe('trackTouches', () => {
     t.up(finger(2, 100, 260, 260));
 
     // Assert
-    expect(calls.at(-1)).toEqual(['zoomDragEnd']);
+    expect(calls.at(-1)).toEqual(['zoomEnd']);
   });
 
   it('treats an unmoved second touch as neither a press nor a drag zoom', () => {
@@ -207,10 +188,7 @@ describe('trackTouches', () => {
     cases.forEach((c, i) => runs[i]?.t.move(finger(2, 100, 140, c.secondAt + 40)));
 
     // Assert
-    expect(runs.map((r) => r.calls.some(([name]) => name === 'zoomDragStart'))).toEqual([
-      false,
-      false,
-    ]);
+    expect(runs.map((r) => r.calls.some(([name]) => name === 'zoomStart'))).toEqual([false, false]);
   });
 
   it('does not drag-zoom when another touch came between the tap and the second touch', () => {
@@ -227,7 +205,7 @@ describe('trackTouches', () => {
     t.move(finger(3, 100, 140, 240));
 
     // Assert
-    expect(calls.some(([name]) => name === 'zoomDragStart')).toBe(false);
+    expect(calls.some(([name]) => name === 'zoomStart')).toBe(false);
   });
 
   it('does not drag-zoom after a long press', async () => {
@@ -242,7 +220,7 @@ describe('trackTouches', () => {
     t.move(finger(2, 100, 140, 220));
 
     // Assert
-    expect(calls.some(([name]) => name === 'zoomDragStart')).toBe(false);
+    expect(calls.some(([name]) => name === 'zoomStart')).toBe(false);
   });
 
   it('ends a drag zoom and pinches when a second finger lands', () => {
@@ -257,7 +235,7 @@ describe('trackTouches', () => {
     t.down(finger(3, 200, 200, 260));
 
     // Assert
-    expect(calls.slice(-2).map(([name]) => name)).toEqual(['zoomDragEnd', 'pinchStart']);
+    expect(calls.slice(-2).map(([name]) => name)).toEqual(['zoomEnd', 'zoomStart']);
   });
   it('is zooming from the second touch of a double tap until that finger lifts', () => {
     // Arrange

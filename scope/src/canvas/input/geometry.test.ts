@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
 import { pxPerNmFor } from '../view';
-import { dragZoom, pinchZoom, zoomAbout } from './geometry';
+import { zoomAbout, zoomMoving } from './geometry';
 
 const view = (rangeNm: number, cx = 0, cy = 0): View => ({
   centerX: cx,
@@ -46,22 +46,14 @@ describe('zoomAbout', () => {
   });
 });
 
-describe('pinchZoom', () => {
-  it('zooms by the change in finger distance and pans with the midpoint', () => {
+describe('zoomMoving', () => {
+  it('scales about the anchor and carries the world point under it to the destination', () => {
     // Arrange
     const v = view(40);
-    const start = [
-      { x: 300, y: 300 },
-      { x: 500, y: 300 },
-    ] as const;
-    const end = [
-      { x: 250, y: 320 },
-      { x: 650, y: 320 },
-    ] as const;
-    const midBefore = toWorld(v, 400, 300);
+    const anchorWorld = toWorld(v, 400, 300);
 
     // Act
-    const out = pinchZoom(v, 40, start, end);
+    const out = zoomMoving(v, 40, { x: 400, y: 300 }, 0.5, { x: 450, y: 320 });
 
     // Assert
     expect(out.rangeNm).toBeCloseTo(20, 6);
@@ -70,32 +62,7 @@ describe('pinchZoom', () => {
       450,
       320,
     );
-    expect(after.x).toBeCloseTo(midBefore.x, 6);
-    expect(after.y).toBeCloseTo(midBefore.y, 6);
-  });
-});
-
-describe('dragZoom', () => {
-  it('zooms in as the finger drags up and out as it drags down, about the anchor', () => {
-    // Arrange
-    const v = view(40);
-    const anchor = { x: 600, y: 200 };
-    const before = toWorld(v, anchor.x, anchor.y);
-
-    // Act
-    const out = [-150, 150].map((dy) => dragZoom(v, 40, anchor, dy));
-
-    // Assert
-    expect(out[0]?.rangeNm).toBeCloseTo(20, 6);
-    expect(out[1]?.rangeNm).toBeCloseTo(80, 6);
-    for (const o of out) {
-      const after = toWorld(
-        { ...v, centerX: o.pan.x, centerY: o.pan.y, pxPerNm: pxPerNmFor(800, 600, o.rangeNm) },
-        anchor.x,
-        anchor.y,
-      );
-      expect(after.x).toBeCloseTo(before.x, 6);
-      expect(after.y).toBeCloseTo(before.y, 6);
-    }
+    expect(after.x).toBeCloseTo(anchorWorld.x, 6);
+    expect(after.y).toBeCloseTo(anchorWorld.y, 6);
   });
 });

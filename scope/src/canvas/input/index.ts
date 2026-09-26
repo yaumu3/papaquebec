@@ -33,14 +33,7 @@ import { blockAt, fixAt, RBL_SNAP_PX, rblAt, targetAt, targetScreen } from '../h
 import { rblMenu, scopeMenu, targetMenu } from '../menus';
 import { anchorFor, appendRbl } from '../rbl';
 import { trackTouches } from './devices/touch';
-import {
-  DRAG_THRESHOLD_PX,
-  dragZoom,
-  pinchZoom,
-  type Point,
-  type Zoomed,
-  zoomAbout,
-} from './geometry';
+import { DRAG_THRESHOLD_PX, type Point, type Zoomed, zoomAbout, zoomMoving } from './geometry';
 
 /** Wheel sensitivity: one 100 px notch scales the range by about 1.2. */
 const ZOOM_PER_PX = 0.0018;
@@ -135,7 +128,7 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
   } | null = null;
   /** A drag that began on a target; once it moves it is a pending RBL anchored there. */
   let rblDrag: { hex: string; sx: number; sy: number; moved: boolean } | null = null;
-  /** The view and range a pinch or drag zoom started from. */
+  /** The view and range a continuous zoom started from. */
   let zoomBase: { view: View; rangeNm: number } | null = null;
   let suppressClick = false;
   let suppressMenu = false;
@@ -202,19 +195,14 @@ export function attachInput(canvas: HTMLCanvasElement, view: () => View): () => 
       suppressClick = true;
       openMenu(at.x, at.y);
     },
-    pinchStart: () => {
+    zoomStart: () => {
       endDrags();
       startZoom();
     },
-    pinch: (start, now) => {
-      if (zoomBase) applyZoom(pinchZoom(zoomBase.view, zoomBase.rangeNm, start, now));
+    zoom: (anchor, factor, to) => {
+      if (zoomBase) applyZoom(zoomMoving(zoomBase.view, zoomBase.rangeNm, anchor, factor, to));
     },
-    pinchEnd: endZoom,
-    zoomDragStart: startZoom,
-    zoomDrag: (anchor, dy) => {
-      if (zoomBase) applyZoom(dragZoom(zoomBase.view, zoomBase.rangeNm, anchor, dy));
-    },
-    zoomDragEnd: endZoom,
+    zoomEnd: endZoom,
   });
 
   const onDown = (e: PointerEvent) => {

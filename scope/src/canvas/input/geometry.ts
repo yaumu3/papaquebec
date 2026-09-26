@@ -33,36 +33,18 @@ export function zoomAbout(
   };
 }
 
-const mid = (a: Point, b: Point): Point => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-const gap = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y);
-
-/**
- * Two fingers moving from `start` to `end`: the range shrinks as they spread, and the world
- * point that was under their midpoint follows the midpoint.
- */
-export function pinchZoom(
+/** Scales about `anchor`, then pans so the world point that was under it sits under `to`. */
+export function zoomMoving(
   v: View,
   rangeNm: number,
-  start: readonly [Point, Point],
-  end: readonly [Point, Point],
+  anchor: Point,
+  factor: number,
+  to: Point,
 ): Zoomed {
-  const factor = gap(...start) / Math.max(1, gap(...end));
-  const m0 = mid(...start);
-  const m1 = mid(...end);
-  const zoomed = zoomAbout(v, rangeNm, m0.x, m0.y, factor);
+  const zoomed = zoomAbout(v, rangeNm, anchor.x, anchor.y, factor);
   const k = pxPerNmFor(v.widthPx, v.heightPx, zoomed.rangeNm);
   return {
     rangeNm: zoomed.rangeNm,
-    pan: { x: zoomed.pan.x - (m1.x - m0.x) / k, y: zoomed.pan.y + (m1.y - m0.y) / k },
+    pan: { x: zoomed.pan.x - (to.x - anchor.x) / k, y: zoomed.pan.y + (to.y - anchor.y) / k },
   };
-}
-
-/** One finger dragging this far after a double tap halves or doubles the range. */
-const DRAG_ZOOM_HALVING_PX = 150;
-
-/**
- * A finger dragged `dy` px after a double tap: up zooms in, down zooms out, about `anchor`.
- */
-export function dragZoom(v: View, rangeNm: number, anchor: Point, dy: number): Zoomed {
-  return zoomAbout(v, rangeNm, anchor.x, anchor.y, 2 ** (dy / DRAG_ZOOM_HALVING_PX));
 }
