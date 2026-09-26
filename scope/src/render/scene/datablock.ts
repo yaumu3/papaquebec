@@ -8,7 +8,7 @@ import {
 import { steeringHeading } from '../../lib/autopilot';
 import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
 import type { Track } from '../../state/track';
-import { DB_FONT_PX, DB_LINE } from '../layout/labels';
+import { DB_FONT_PX, DB_HEIGHT, DB_LINE } from '../layout/labels';
 import type { Anchor, LineBatch, TextBatch } from './pack';
 import { isEmergency, THEME, trackLabel } from './rules';
 
@@ -79,6 +79,10 @@ export function dataBlock(
 
 /** Brightness of downlinked intent against the block's own color. */
 export const INTENT_TONE = 0.65;
+/** Brightness of a leader against the block's color, unless emphasised. */
+const LEADER_TONE = 0.5;
+/** The leader starts at the target glyph's corner and stops this far short of the block, CSS px. */
+const LEADER_INSET = 3;
 
 function dim(hex: string, f: number): string {
   const n = Number.parseInt(hex.slice(1, 7), 16);
@@ -127,11 +131,17 @@ export function drawDataBlock(
   const above = dy < 0;
   const blockY = dy - (above ? blockExtraLines(block) * DB_LINE : 0);
   const align = right ? 'left' : 'right';
+  const sx = right ? 1 : -1;
+  const sy = above ? -1 : 1;
   // Leader from the glyph edge to the block edge that faces the target.
   lines.segment(
-    { ...at, px: right ? 3 : -3, py: above ? -3 : 3 },
-    { ...at, px: right ? dx - 3 : dx + 3, py: above ? dy + 13 : blockY - 3 },
-    emphasised ? color : dim(color, 0.5),
+    { ...at, px: sx * LEADER_INSET, py: sy * LEADER_INSET },
+    {
+      ...at,
+      px: dx - sx * LEADER_INSET,
+      py: above ? dy + DB_HEIGHT / 2 : blockY - LEADER_INSET,
+    },
+    emphasised ? color : dim(color, LEADER_TONE),
   );
   let lineY = blockY;
   if (block.prefix) {
