@@ -15,12 +15,15 @@ import {
 } from './format';
 
 describe('climbState / climbArrow', () => {
-  it('classifies vertical rate with a ±200 fpm dead band', () => {
+  it('classifies vertical rate with a ±320 fpm dead band', () => {
     // Arrange
     const cases: [number | undefined, string, string][] = [
       [1500, 'climbing', '↑'],
       [-1200, 'descending', '↓'],
-      [100, 'level', ' '],
+      [384, 'climbing', '↑'],
+      [-384, 'descending', '↓'],
+      [320, 'level', ' '],
+      [-320, 'level', ' '],
       [undefined, 'level', ' '],
     ];
 
