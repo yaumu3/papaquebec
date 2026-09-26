@@ -137,25 +137,7 @@ describe('dataBlock', () => {
 });
 
 describe('extraLines', () => {
-  it('counts the emergency prefix and the selected heading line', () => {
-    // Arrange
-    const cases = [
-      track(),
-      track({ squawk: '7700' }),
-      track({ selHeading: 95 }),
-      track({ squawk: '7700', selHeading: 95 }),
-    ];
-
-    // Act
-    const out = cases.map(extraLines);
-
-    // Assert
-    expect(out).toEqual([0, 1, 1, 2]);
-  });
-});
-
-describe('blockExtraLines', () => {
-  it('agrees with extraLines on the lines a track would print', () => {
+  it('counts the emergency prefix and the heading line alike for a track and its block', () => {
     // Arrange
     const cases = [
       track(),
