@@ -40,8 +40,20 @@ function deltaSigma(b: number, sinS: number, cosS: number, cos2Sm: number): numb
   );
 }
 
-/** Vincenty's C, weighting the longitude correction. */
-const lambdaWeight = (cos2Alpha: number) => (F / 16) * cos2Alpha * (4 + F * (4 - 3 * cos2Alpha));
+/** How much the ellipsoid's longitude difference exceeds the auxiliary sphere's over the arc σ. */
+function longitudeCorrection(
+  sinAlpha: number,
+  cos2Alpha: number,
+  sigma: number,
+  sinS: number,
+  cosS: number,
+  cos2Sm: number,
+): number {
+  const c = (F / 16) * cos2Alpha * (4 + F * (4 - 3 * cos2Alpha));
+  return (
+    (1 - c) * F * sinAlpha * (sigma + c * sinS * (cos2Sm + c * cosS * (-1 + 2 * cos2Sm * cos2Sm)))
+  );
+}
 
 /** Distance and initial true course from `a` to `b` along the geodesic. */
 export function inverse(a: GeoPoint, b: GeoPoint): RangeBearing {
@@ -67,14 +79,8 @@ export function inverse(a: GeoPoint, b: GeoPoint): RangeBearing {
     const sinAlpha = (cosU1 * cosU2 * sinL) / sinS;
     cos2Alpha = 1 - sinAlpha * sinAlpha;
     cos2Sm = cos2Alpha === 0 ? 0 : cosS - (2 * sinU1 * sinU2) / cos2Alpha;
-    const c = lambdaWeight(cos2Alpha);
     const prev = lambda;
-    lambda =
-      l +
-      (1 - c) *
-        F *
-        sinAlpha *
-        (sigma + c * sinS * (cos2Sm + c * cosS * (-1 + 2 * cos2Sm * cos2Sm)));
+    lambda = l + longitudeCorrection(sinAlpha, cos2Alpha, sigma, sinS, cosS, cos2Sm);
     if (Math.abs(lambda - prev) < CONVERGED) break;
   }
   const s = series(cos2Alpha);
@@ -113,10 +119,7 @@ export function direct(from: GeoPoint, bearingTrue: number, distanceNm: number):
   const x = sinU1 * sinS - cosU1 * cosS * cosA1;
   const lat = Math.atan2(sinU1 * cosS + cosU1 * sinS * cosA1, (1 - F) * Math.hypot(sinAlpha, x));
   const lambda = Math.atan2(sinS * sinA1, cosU1 * cosS - sinU1 * sinS * cosA1);
-  const c = lambdaWeight(cos2Alpha);
-  const l =
-    lambda -
-    (1 - c) * F * sinAlpha * (sigma + c * sinS * (cos2Sm + c * cosS * (-1 + 2 * cos2Sm * cos2Sm)));
+  const l = lambda - longitudeCorrection(sinAlpha, cos2Alpha, sigma, sinS, cosS, cos2Sm);
   return { lat: lat / RAD, lon: from.lon + l / RAD };
 }
 
