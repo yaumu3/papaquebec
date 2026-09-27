@@ -19,7 +19,7 @@ describe('range rings', () => {
     const range = 40;
 
     // Act
-    const radii = ringRadii(range);
+    const radii = ringRadii(range, range);
 
     // Assert
     expect(radii).toEqual([10, 20, 30, 40]);
@@ -30,9 +30,21 @@ describe('range rings', () => {
     const range = 35;
 
     // Act
-    const radii = ringRadii(range);
+    const radii = ringRadii(range, range);
 
     // Assert
     expect(radii).toEqual([10, 20, 30]);
+  });
+
+  it('keeps the range spacing for rings out to a wider extent', () => {
+    // Arrange
+    const range = 40;
+    const extent = 65;
+
+    // Act
+    const radii = ringRadii(range, extent);
+
+    // Assert
+    expect(radii).toEqual([10, 20, 30, 40, 50, 60]);
   });
 });

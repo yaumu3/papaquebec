@@ -8,6 +8,7 @@ import { buildStatic, STATIC_ORDER } from '../render/scene/static';
 import { buildTargets } from '../render/scene/targets';
 import {
   aero,
+  canvasSize,
   coast,
   declination,
   hovered,
@@ -26,6 +27,7 @@ import {
 import { settings } from '../state/settings';
 import { projectNm, trackStore } from '../state/tracks';
 import { RBL_SNAP_PX, targetAt } from './hit';
+import { halfLongEdgeNm } from './view';
 
 const ORDER = [...STATIC_ORDER, 'targets', 'overlays'];
 
@@ -58,6 +60,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   createEffect(() => {
     const a = atlas();
     if (!a || projectionVersion() === 0) return;
+    const { width, height } = canvasSize();
     const layers = buildStatic({
       coast: coast(),
       aero: aero(),
@@ -65,6 +68,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       layers: { ...settings.layers },
       labelDensity: settings.labelDensity,
       rangeNm: settings.rangeNm,
+      ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
       atlas: a,
     });
     for (const l of layers) renderer.setLayer(l.name, l.batches);
