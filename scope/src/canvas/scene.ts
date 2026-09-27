@@ -6,6 +6,7 @@ import { LAYER_ORDER, type LayerName } from '../render/layers';
 import type { AtlasInfo, Batch, View } from '../render/protocol';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
+import { ringPaths } from '../render/scene/rings';
 import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
 import { buildTargets } from '../render/scene/targets';
 import {
@@ -22,6 +23,7 @@ import {
   projectionVersion,
   selected,
   selectedTrace,
+  site,
   setRenderError,
   setRenderInfo,
   snapshotVersion,
@@ -87,14 +89,21 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       }
     });
 
+  /** Ring outlines round the site, kept until the projection changes with it. */
+  const ringPath = createMemo(() => {
+    const s = site();
+    return s ? ringPaths(s, projectNm) : null;
+  });
   show((a) => {
-    if (!projected()) return null;
+    const path = ringPath();
+    if (!projected() || !path) return null;
     const { width, height } = canvasSize();
     return {
       rings: buildRings({
         layers: { ...settings.layers },
         rangeNm: settings.rangeNm,
         ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
+        ringPath: path,
         atlas: a,
       }),
     };

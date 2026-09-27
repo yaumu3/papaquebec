@@ -4,7 +4,7 @@ import type { ProjectFn } from '../../state/trackStore';
 import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
-import { ringRadii } from './rings';
+import { CIRCLE_SEGMENTS, ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
 export interface RingsInput {
@@ -12,6 +12,8 @@ export interface RingsInput {
   rangeNm: number;
   /** How far out rings are drawn, so they reach the longer canvas edge. */
   ringExtentNm: number;
+  /** A ring's outline on the scope plane, starting at its northern point. */
+  ringPath: (radiusNm: number) => Anchor[];
   atlas: AtlasInfo;
 }
 
@@ -26,7 +28,6 @@ export interface MapInput {
   atlas: AtlasInfo;
 }
 
-const CIRCLE_SEGMENTS = 96;
 const NAVAID_MAX_RANGE = 120;
 
 function circle(cx: number, cy: number, r: number): Anchor[] {
@@ -62,8 +63,10 @@ export function buildRings(input: RingsInput): Batch[] {
   const text = new TextBatch(input.atlas);
   if (input.layers.rings) {
     for (const r of ringRadii(input.rangeNm, input.ringExtentNm)) {
-      lines.polyline(circle(0, 0, r), r === input.rangeNm ? THEME.ringEdge : THEME.ring);
-      text.text(String(r), { x: 0, y: r, px: 3, py: 1 }, 9, THEME.ringLabel);
+      const path = input.ringPath(r);
+      lines.polyline(path, r === input.rangeNm ? THEME.ringEdge : THEME.ring);
+      const north = path[0];
+      if (north) text.text(String(r), { ...north, px: 3, py: 1 }, 9, THEME.ringLabel);
     }
   }
   return [lines.finish(), text.finish()];

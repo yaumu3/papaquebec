@@ -31,19 +31,29 @@ function mapInput(over: Partial<MapInput> = {}): MapInput {
   };
 }
 
+/** A stand-in ring outline of two segments, its first point north at `(1, r)`. */
+const ringPath = (r: number) => [
+  { x: 1, y: r },
+  { x: r, y: 0 },
+  { x: 1, y: r },
+];
+
 const count = (batches: Batch[], kind: Batch['kind']) =>
   batches.filter((b) => b.kind === kind).reduce((n, b) => n + b.count, 0);
 
 describe('buildRings', () => {
-  it('draws the rings alone, with each radius printed on it', () => {
+  it('draws each ring along its path, with the radius printed at its first, northern point', () => {
     // Arrange
-    const input = { layers: allLayers, rangeNm: 40, ringExtentNm: 40, atlas };
+    const input = { layers: allLayers, rangeNm: 40, ringExtentNm: 40, ringPath, atlas };
 
     // Act
     const batches = buildRings(input);
 
     // Assert
+    const text = batches.find((b) => b.kind === 'text');
+    expect(count(batches, 'lines')).toBe(4 * 2);
     expect(count(batches, 'text')).toBe('10203040'.length);
+    expect([text?.data[0], text?.data[1]]).toEqual([1, 10]);
   });
 });
 
