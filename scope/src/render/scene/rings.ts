@@ -4,9 +4,10 @@ export function ringStepNm(rangeNm: number): number {
   return 20;
 }
 
-export function ringRadii(rangeNm: number): number[] {
+/** Rings spaced for `rangeNm`, drawn out to `extentNm`. */
+export function ringRadii(rangeNm: number, extentNm: number): number[] {
   const step = ringStepNm(rangeNm);
   const out: number[] = [];
-  for (let r = step; r <= rangeNm; r += step) out.push(r);
+  for (let r = step; r <= extentNm; r += step) out.push(r);
   return out;
 }

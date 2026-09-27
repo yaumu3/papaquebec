@@ -13,6 +13,8 @@ export interface StaticInput {
   layers: Layers;
   labelDensity: LabelDensity;
   rangeNm: number;
+  /** How far out rings are drawn, so they reach the longer canvas edge. */
+  ringExtentNm: number;
   atlas: AtlasInfo;
 }
 
@@ -43,11 +45,13 @@ function density(d: LabelDensity): number {
   return { off: 0, sparse: 1, normal: 2, dense: 3 }[d];
 }
 
-function buildRings(input: Pick<StaticInput, 'layers' | 'rangeNm' | 'atlas'>): NamedLayer {
+function buildRings(
+  input: Pick<StaticInput, 'layers' | 'rangeNm' | 'ringExtentNm' | 'atlas'>,
+): NamedLayer {
   const lines = new LineBatch();
   const text = new TextBatch(input.atlas);
   if (input.layers.rings) {
-    for (const r of ringRadii(input.rangeNm)) {
+    for (const r of ringRadii(input.rangeNm, input.ringExtentNm)) {
       lines.polyline(circle(0, 0, r), r === input.rangeNm ? THEME.ringEdge : THEME.ring);
       text.text(String(r), { x: 0, y: r, px: 3, py: 1 }, 9, THEME.ringLabel);
     }

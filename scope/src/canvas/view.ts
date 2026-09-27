@@ -11,6 +11,10 @@ export function pxPerNmFor(width: number, height: number, rangeNm: number): numb
   return ((Math.min(width, height) / 2) * RANGE_FILL) / rangeNm;
 }
 
+export function halfLongEdgeNm(width: number, height: number, rangeNm: number): number {
+  return Math.max(width, height) / 2 / pxPerNmFor(width, height, rangeNm);
+}
+
 export function createView(): () => View {
   return createMemo<View>(() => {
     const { width, height, dpr } = canvasSize();
