@@ -6,6 +6,7 @@ import { LAYER_ORDER, type LayerName } from '../render/layers';
 import type { AtlasInfo, Batch, View } from '../render/protocol';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
+import { ringPaths } from '../render/scene/rings';
 import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
 import { buildTargets } from '../render/scene/targets';
 import {
@@ -22,12 +23,13 @@ import {
   projectionVersion,
   selected,
   selectedTrace,
+  site,
   setRenderError,
   setRenderInfo,
   snapshotVersion,
 } from '../state/scope';
 import { settings } from '../state/settings';
-import { projectNm, trackStore } from '../state/tracks';
+import { projectNm, trackStore, unprojectNm } from '../state/tracks';
 import { RBL_SNAP_PX, targetAt } from './hit';
 import { debounce } from './settle';
 import { halfLongEdgeNm } from './view';
@@ -87,14 +89,21 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       }
     });
 
+  /** Ring outlines round the site, kept until the projection changes with it; none before either is set. */
+  const ringPath = createMemo(() => {
+    const s = site();
+    return s ? ringPaths(s, projectNm) : null;
+  });
   show((a) => {
-    if (!projected()) return null;
+    const path = ringPath();
+    if (!path) return null;
     const { width, height } = canvasSize();
     return {
       rings: buildRings({
         layers: { ...settings.layers },
         rangeNm: settings.rangeNm,
         ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
+        ringPath: path,
         atlas: a,
       }),
     };
@@ -168,6 +177,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         rangeCursor: rangeCursor(),
         pointer: measuring ? pointer() : null,
         declination: declination(),
+        project: projectNm,
+        unproject: unprojectNm,
         view: v,
         atlas: a,
         snap: (cx, cy) => targetAt(v, cx, cy, RBL_SNAP_PX),

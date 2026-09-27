@@ -1,9 +1,8 @@
 import type { AircraftJson, AircraftSnapshot } from '../lib/aircraft';
+import type { ProjectFn } from '../lib/geo';
 import type { Fix, OperatorState, Position, Source, Track } from './track';
 
 export const HISTORY_RETENTION_SEC = 3600;
-
-export type ProjectFn = (lat: number, lon: number) => { x: number; y: number };
 
 export interface FeedStats {
   /** Snapshot time, seconds since epoch. */

@@ -1,34 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  bearingTrue,
   closestApproach,
-  distanceNm,
   distanceToSegment,
   trueToMagnetic,
   velocityNm,
   nearest,
   rankByDistance,
 } from './geo';
-
-describe('bearingTrue', () => {
-  it('measures clockwise from north on the projected plane', () => {
-    // Arrange
-    const cases: [number, number, number][] = [
-      [0, 10, 0],
-      [10, 0, 90],
-      [0, -10, 180],
-      [-10, 0, 270],
-      [10, 10, 45],
-    ];
-
-    // Act
-    const results = cases.map(([dx, dy]) => bearingTrue(dx, dy));
-
-    // Assert
-    results.forEach((b, i) => expect(b).toBeCloseTo(cases[i]?.[2] ?? NaN, 9));
-  });
-});
 
 describe('trueToMagnetic', () => {
   it('subtracts east declination and wraps into 0..360', () => {
@@ -45,20 +24,6 @@ describe('trueToMagnetic', () => {
 
     // Assert
     results.forEach((m, i) => expect(m).toBeCloseTo(cases[i]?.[2] ?? NaN, 9));
-  });
-});
-
-describe('distanceNm', () => {
-  it('is the Euclidean distance on the projected plane', () => {
-    // Arrange
-    const a = { x: 1, y: 2 };
-    const b = { x: 4, y: 6 };
-
-    // Act
-    const d = distanceNm(a, b);
-
-    // Assert
-    expect(d).toBe(5);
   });
 });
 

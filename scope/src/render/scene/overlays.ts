@@ -1,12 +1,14 @@
 import { formatMmSs, padBearing } from '../../lib/format';
 import {
-  bearingTrue,
   closestApproach,
-  distanceNm,
+  type GeoPoint,
+  type ProjectFn,
   trueToMagnetic,
+  type UnprojectFn,
   type Vec2,
   velocityNm,
 } from '../../lib/geo';
+import { geodesicPath, inverse } from '../../lib/geodesic';
 import type { RangeCursorOrigin, Rbl, RblAnchor, RblPending } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
@@ -23,6 +25,10 @@ export interface OverlayInput {
   pointer: { cx: number; cy: number } | null;
   /** Magnetic declination at the site, degrees east. */
   declination: number;
+  /** Lat/lon onto the scope plane, for lines drawn along the geodesic. */
+  project: ProjectFn;
+  /** The scope plane back to lat/lon, for ends that are not targets. */
+  unproject: UnprojectFn;
   view: View;
   atlas: AtlasInfo;
   /** Snaps a screen point to a target, if one is close. */
@@ -30,7 +36,10 @@ export interface OverlayInput {
 }
 
 interface Point {
+  /** Where it is drawn on the scope plane. */
   pos: Vec2;
+  /** Where it is on the earth, which readouts measure between. */
+  geo: GeoPoint;
   vel: Vec2 | null;
   label: string;
 }
@@ -39,29 +48,47 @@ function trackPoint(t: Track): Point | null {
   const p = t.position;
   if (p.kind !== 'live' && p.kind !== 'last') return null;
   const vel = t.gs !== undefined && t.track !== undefined ? velocityNm(t.gs, t.track) : null;
-  return { pos: { x: p.x, y: p.y }, vel, label: trackLabel(t) };
+  return { pos: { x: p.x, y: p.y }, geo: { lat: p.lat, lon: p.lon }, vel, label: trackLabel(t) };
 }
 
-function anchorPoint(a: RblAnchor, tracks: Map<string, Track>): Point | null {
+/** A still point placed on the scope plane rather than reported by a target. */
+function freePoint(pos: Vec2, label: string, unproject: UnprojectFn): Point {
+  return { pos, geo: unproject(pos.x, pos.y), vel: null, label };
+}
+
+/** Where an RBL end is: on its target while it has a position, else where it was placed. */
+export function anchorPoint(
+  a: RblAnchor,
+  ends: Pick<OverlayInput, 'tracks' | 'unproject'>,
+): Point | null {
   if (a.kind === 'target') {
-    const t = tracks.get(a.hex);
+    const t = ends.tracks.get(a.hex);
     return t ? trackPoint(t) : null;
   }
-  return { pos: { x: a.x, y: a.y }, vel: null, label: '' };
+  return freePoint({ x: a.x, y: a.y }, '', ends.unproject);
+}
+
+/** The line an RBL is drawn along, on the scope plane; hit tests follow the same one. */
+export function rblPath(a: { geo: GeoPoint }, b: { geo: GeoPoint }, project: ProjectFn): Vec2[] {
+  return geodesicPath([a.geo, b.geo], project);
 }
 
 function mousePoint(input: OverlayInput): Point | null {
   if (!input.pointer) return null;
   const snapped = input.snap(input.pointer.cx, input.pointer.cy);
   if (snapped) return trackPoint(snapped);
-  const w = toWorld(input.view, input.pointer.cx, input.pointer.cy);
-  return { pos: w, vel: null, label: '' };
+  return freePoint(toWorld(input.view, input.pointer.cx, input.pointer.cy), '', input.unproject);
+}
+
+/** How far `b` lies from `a` along the geodesic, in NM, and on what initial magnetic bearing. */
+function measure(a: Point, b: Point, declination: number): { dist: number; brg: number } {
+  const r = inverse(a.geo, b.geo);
+  return { dist: r.distanceNm, brg: trueToMagnetic(r.bearingTrue, declination) };
 }
 
 /** Distance, magnetic bearing, ETE when only A moves, CPA when both move. */
 export function rblLines(a: Point, b: Point, declination: number): string[] {
-  const dist = distanceNm(a.pos, b.pos);
-  const brg = trueToMagnetic(bearingTrue(b.pos.x - a.pos.x, b.pos.y - a.pos.y), declination);
+  const { dist, brg } = measure(a, b, declination);
   let first = `${dist.toFixed(1)} / ${padBearing(brg)}°`;
   const lines = [first];
   if (a.vel && !b.vel) {
@@ -86,13 +113,13 @@ function drawRbl(
   onTarget: [boolean, boolean],
   tag: string | null,
   labelAt: Anchor,
-  declination: number,
+  input: OverlayInput,
 ): void {
-  lines.segment(a.pos, b.pos, THEME.cursor);
+  lines.polyline(rblPath(a, b, input.project), THEME.cursor);
   markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
   if (tag !== null)
     markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
-  rblLines(a, b, declination).forEach((line, i) => {
+  rblLines(a, b, input.declination).forEach((line, i) => {
     text.text(line, { ...labelAt, py: (labelAt.py ?? 0) + i * 13 }, 11, THEME.cursor);
   });
   if (tag !== null)
@@ -110,29 +137,28 @@ function drawRangeCursor(
 ): void {
   const origin = input.rangeCursor;
   if (!origin || !input.pointer) return;
-  let o: Vec2;
-  let label: string;
+  let from: Point | null;
   if (origin.kind === 'target') {
     const t = input.tracks.get(origin.hex);
-    const p = t ? trackPoint(t) : null;
-    if (!p) return;
-    o = p.pos;
-    label = p.label;
+    from = t ? trackPoint(t) : null;
   } else {
-    o = { x: origin.x, y: origin.y };
-    label = origin.kind === 'fix' ? origin.name : `${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`;
+    const label =
+      origin.kind === 'fix' ? origin.name : `${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`;
+    from = freePoint({ x: origin.x, y: origin.y }, label, input.unproject);
   }
+  if (!from) return;
+  const o = from.pos;
   const m = toWorld(input.view, input.pointer.cx, input.pointer.cy);
-  const dist = distanceNm(o, m);
-  const brg = trueToMagnetic(bearingTrue(m.x - o.x, m.y - o.y), input.declination);
-  lines.segment(o, m, THEME.cursor, { dash: [2, 3] });
+  const to = freePoint(m, '', input.unproject);
+  const { dist, brg } = measure(from, to, input.declination);
+  lines.polyline(geodesicPath([from.geo, to.geo], input.project), THEME.cursor, { dash: [2, 3] });
   markers.marker(o, Shape.Ring, 8, THEME.cursor);
   markers.marker(o, Shape.Dot, 4, THEME.cursor);
   lines.segment({ ...m, px: -8 }, { ...m, px: 8 }, THEME.cursor);
   lines.segment({ ...m, py: -8 }, { ...m, py: 8 }, THEME.cursor);
   text.text(`${dist.toFixed(1)} NM`, { ...m, px: 12, py: 6 }, 11, THEME.cursor);
   text.text(`${padBearing(brg)}°`, { ...m, px: 12, py: 19 }, 11, THEME.cursor);
-  text.text(label, { ...m, px: 12, py: 32 }, 10, THEME.cursorDim);
+  text.text(from.label, { ...m, px: 12, py: 32 }, 10, THEME.cursorDim);
 }
 
 export function buildOverlays(input: OverlayInput): Batch[] {
@@ -141,8 +167,8 @@ export function buildOverlays(input: OverlayInput): Batch[] {
   const text = new TextBatch(input.atlas);
 
   for (const rbl of input.rbls) {
-    const a = anchorPoint(rbl.a, input.tracks);
-    const b = anchorPoint(rbl.b, input.tracks);
+    const a = anchorPoint(rbl.a, input);
+    const b = anchorPoint(rbl.b, input);
     if (!a || !b) continue;
     const mid: Anchor = { x: (a.pos.x + b.pos.x) / 2, y: (a.pos.y + b.pos.y) / 2, px: 6, py: -6 };
     drawRbl(
@@ -154,12 +180,12 @@ export function buildOverlays(input: OverlayInput): Batch[] {
       [rbl.a.kind === 'target', rbl.b.kind === 'target'],
       rbl.tag,
       mid,
-      input.declination,
+      input,
     );
   }
   const pending = input.rblPending?.a;
   if (pending) {
-    const a = anchorPoint(pending, input.tracks);
+    const a = anchorPoint(pending, input);
     const b = mousePoint(input);
     if (a && b && input.pointer) {
       const w = toWorld(input.view, input.pointer.cx, input.pointer.cy);
@@ -172,7 +198,7 @@ export function buildOverlays(input: OverlayInput): Batch[] {
         [pending.kind === 'target', false],
         null,
         { ...w, px: 12, py: 12 },
-        input.declination,
+        input,
       );
     }
   }

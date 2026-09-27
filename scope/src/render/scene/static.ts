@@ -1,9 +1,10 @@
-import type { AeroLayers, CoastData, LatLon } from '../../lib/mapdata';
+import type { ProjectFn } from '../../lib/geo';
+import type { AeroLayers, CoastData } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
-import type { ProjectFn } from '../../state/trackStore';
 import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
+import { closedRoute, projectedCircle, route } from './paths';
 import { ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
@@ -12,6 +13,8 @@ export interface RingsInput {
   rangeNm: number;
   /** How far out rings are drawn, so they reach the longer canvas edge. */
   ringExtentNm: number;
+  /** A ring's outline on the scope plane, starting at its northern point. */
+  ringPath: (radiusNm: number) => Anchor[];
   atlas: AtlasInfo;
 }
 
@@ -26,27 +29,7 @@ export interface MapInput {
   atlas: AtlasInfo;
 }
 
-const CIRCLE_SEGMENTS = 96;
 const NAVAID_MAX_RANGE = 120;
-
-function circle(cx: number, cy: number, r: number): Anchor[] {
-  const pts: Anchor[] = [];
-  for (let i = 0; i <= CIRCLE_SEGMENTS; i++) {
-    const a = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
-    pts.push({ x: cx + r * Math.sin(a), y: cy + r * Math.cos(a) });
-  }
-  return pts;
-}
-
-const route = (points: LatLon[], project: ProjectFn): Anchor[] =>
-  points.map(([lat, lon]) => project(lat, lon));
-
-/** A route back to its first point, for an outline. */
-function closedRoute(points: LatLon[], project: ProjectFn): Anchor[] {
-  const pts = route(points, project);
-  const first = pts[0];
-  return first ? [...pts, first] : pts;
-}
 
 function density(d: LabelDensity): number {
   return { off: 0, sparse: 1, normal: 2, dense: 3 }[d];
@@ -62,8 +45,10 @@ export function buildRings(input: RingsInput): Batch[] {
   const text = new TextBatch(input.atlas);
   if (input.layers.rings) {
     for (const r of ringRadii(input.rangeNm, input.ringExtentNm)) {
-      lines.polyline(circle(0, 0, r), r === input.rangeNm ? THEME.ringEdge : THEME.ring);
-      text.text(String(r), { x: 0, y: r, px: 3, py: 1 }, 9, THEME.ringLabel);
+      const path = input.ringPath(r);
+      lines.polyline(path, r === input.rangeNm ? THEME.ringEdge : THEME.ring);
+      const north = path[0];
+      if (north) text.text(String(r), { ...north, px: 3, py: 1 }, 9, THEME.ringLabel);
     }
   }
   return [lines.finish(), text.finish()];
@@ -94,8 +79,8 @@ function airspaceLayer({ aero, project, layers, atlas }: MapInput, labels: numbe
     for (const a of aero.airspace) {
       const style = a.dashed ? { dash: [4, 3] as [number, number] } : {};
       if ('center' in a) {
-        const c = project(a.center[0], a.center[1]);
-        lines.polyline(circle(c.x, c.y, a.radiusNm), THEME.airspace, style);
+        const [lat, lon] = a.center;
+        lines.polyline(projectedCircle({ lat, lon }, a.radiusNm, project), THEME.airspace, style);
         continue;
       }
       const pts = closedRoute(a.points, project);
@@ -125,7 +110,10 @@ function coastLayer({ coast, project, layers }: MapInput): Batch[] {
   if (layers.coast) {
     for (const line of coast.lines) {
       lines.polyline(
-        line.map(([lon, lat]) => project(lat, lon)),
+        route(
+          line.map(([lon, lat]) => [lat, lon]),
+          project,
+        ),
         THEME.coast,
       );
     }

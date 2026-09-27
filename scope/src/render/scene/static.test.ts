@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { inverse } from '../../lib/geodesic';
 import type { AeroLayers } from '../../lib/mapdata';
 import { MAP_PRESETS } from '../../state/settingsDefaults';
 import { MAP_LAYERS } from '../layers';
@@ -31,19 +32,29 @@ function mapInput(over: Partial<MapInput> = {}): MapInput {
   };
 }
 
+/** A stand-in ring outline of two segments, its first point north at `(1, r)`. */
+const ringPath = (r: number) => [
+  { x: 1, y: r },
+  { x: r, y: 0 },
+  { x: 1, y: r },
+];
+
 const count = (batches: Batch[], kind: Batch['kind']) =>
   batches.filter((b) => b.kind === kind).reduce((n, b) => n + b.count, 0);
 
 describe('buildRings', () => {
-  it('draws the rings alone, with each radius printed on it', () => {
+  it('draws each ring along its path, with the radius printed at its first, northern point', () => {
     // Arrange
-    const input = { layers: allLayers, rangeNm: 40, ringExtentNm: 40, atlas };
+    const input = { layers: allLayers, rangeNm: 40, ringExtentNm: 40, ringPath, atlas };
 
     // Act
     const batches = buildRings(input);
 
     // Assert
+    const text = batches.find((b) => b.kind === 'text');
+    expect(count(batches, 'lines')).toBe(4 * 2);
     expect(count(batches, 'text')).toBe('10203040'.length);
+    expect([text?.data[0], text?.data[1]]).toEqual([1, 10]);
   });
 });
 
@@ -71,6 +82,54 @@ describe('buildMap', () => {
 
     // Assert
     expect(drawn).toEqual([1, 0]);
+  });
+});
+
+describe('buildMap airspace', () => {
+  it('draws a circular airspace as the geodesic circle of its radius', () => {
+    // Arrange
+    const center = { lat: 35.5, lon: 139.8 };
+    const circle = {
+      name: 'CTR',
+      center: [center.lat, center.lon] as [number, number],
+      radiusNm: 5,
+    };
+    const input = mapInput({ aero: { ...aero, airspace: [circle] } });
+
+    // Act
+    const { airspace } = buildMap(input);
+
+    // Assert
+    const lines = airspace.find((b) => b.kind === 'lines');
+    const starts = Array.from({ length: lines?.count ?? 0 }, (_, i) => ({
+      lon: lines?.data[i * 16] ?? 0,
+      lat: lines?.data[i * 16 + 1] ?? 0,
+    }));
+    expect(starts.length).toBeGreaterThan(0);
+    // Within what Float32 instance data holds of a longitude near 140°, about half a metre.
+    expect(starts.every((p) => Math.abs(inverse(center, p).distanceNm - 5) < 1e-3)).toBe(true);
+  });
+});
+
+describe('buildMap edges', () => {
+  it('splits long sector and coast edges along the geodesic, closing the outline', () => {
+    // Arrange
+    const outline: [number, number][] = [
+      [35, 130],
+      [35, 150],
+      [40, 140],
+    ];
+    const input = mapInput({
+      aero: { ...aero, sectors: [{ name: 'S', points: outline }] },
+      coast: { lines: [outline.map(([lat, lon]) => [lon, lat] as [number, number])] },
+    });
+
+    // Act
+    const { sector, coast } = buildMap(input);
+
+    // Assert
+    expect(count(sector, 'lines')).toBeGreaterThan(3);
+    expect(count(coast, 'lines')).toBeGreaterThan(2);
   });
 });
 

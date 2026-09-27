@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { ringRadii, ringStepNm } from './rings';
+import { CIRCLE_SEGMENTS } from './paths';
+import { ringPaths, ringRadii, ringStepNm } from './rings';
 
 describe('range rings', () => {
   it('spaces rings by 5, 10 or 20 NM depending on the displayed range', () => {
@@ -46,5 +47,28 @@ describe('range rings', () => {
 
     // Assert
     expect(radii).toEqual([10, 20, 30, 40, 50, 60]);
+  });
+});
+
+/** Lat/lon as the plane, so a test can read the geodesic straight off the anchors. */
+const flat = (lat: number, lon: number) => ({ x: lon, y: lat });
+const NARITA = { lat: 35.765, lon: 140.386 };
+
+describe('ringPaths', () => {
+  it('works each ring out once, however often it is drawn', () => {
+    // Arrange
+    let projected = 0;
+    const paths = ringPaths(NARITA, (lat, lon) => {
+      projected++;
+      return flat(lat, lon);
+    });
+    const first = paths(20);
+
+    // Act
+    const again = paths(20);
+
+    // Assert
+    expect(again).toBe(first);
+    expect(projected).toBe(CIRCLE_SEGMENTS + 1);
   });
 });

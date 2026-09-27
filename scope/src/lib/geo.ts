@@ -7,20 +7,10 @@ export interface Vec2 {
 
 export const NM_IN_METERS = 1852;
 
-/** True bearing in degrees, 0..360, of a displacement on the projected plane. */
-export function bearingTrue(dx: number, dy: number): number {
-  const b = Math.atan2(dx, dy) / RAD;
-  return b < 0 ? b + 360 : b;
-}
-
 /** True bearing to magnetic, given declination in degrees east positive. */
 export function trueToMagnetic(trueDeg: number, declinationDeg: number): number {
   const m = (trueDeg - declinationDeg) % 360;
   return m < 0 ? m + 360 : m;
-}
-
-export function distanceNm(a: Vec2, b: Vec2): number {
-  return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
 /** Velocity components in knots from ground speed and true track. */
@@ -71,6 +61,11 @@ export interface GeoPoint {
   lat: number;
   lon: number;
 }
+
+/** Lat/lon onto a projected plane. */
+export type ProjectFn = (lat: number, lon: number) => Vec2;
+/** The inverse of a `ProjectFn`: a point on the plane back to lat/lon. */
+export type UnprojectFn = (x: number, y: number) => GeoPoint;
 
 /** Equirectangular distance, good enough to rank nearby items. */
 function flatDistance(lat: number, lon: number, p: GeoPoint): number {
