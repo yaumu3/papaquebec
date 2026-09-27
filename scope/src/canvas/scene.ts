@@ -1,9 +1,9 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js';
 
 import { buildAtlas } from '../render/atlas/build';
-import { createRenderer } from '../render/facade';
-import { MAP_LAYERS } from '../render/layers';
-import type { AtlasInfo, View } from '../render/protocol';
+import { createRenderer, type RenderStatus } from '../render/facade';
+import { LAYER_ORDER, type LayerName } from '../render/layers';
+import type { AtlasInfo, Batch, View } from '../render/protocol';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
@@ -35,75 +35,91 @@ import { halfLongEdgeNm } from './view';
 /** How long a zoom must rest before data blocks are laid out again at the new scale. */
 const ZOOM_SETTLE_MS = 150;
 
+type Layers = Partial<Record<LayerName, Batch[]>>;
+
+/** Whether the site is known, so map data can be projected onto the scope. */
+const projected = () => projectionVersion() > 0;
+
+function reportStatus(s: RenderStatus): void {
+  if (s.kind === 'ready') {
+    setRenderInfo(`GPU ${s.where === 'worker' ? 'worker' : 'main thread'} · ${s.adapter}`);
+    setRenderError(null);
+  } else if (s.kind === 'error') {
+    setRenderError(s.message);
+  }
+}
+
 /**
- * Connects state to the renderer. Each effect rebuilds one layer when its
- * inputs change; the only timer is the one that settles a zoom.
+ * The scale data blocks are laid out at. Pans leave it alone, and a zoom moves it only once it
+ * settles; until then the blocks keep their corners, drawn at the live scale.
+ */
+function settledScale(view: () => View): () => number {
+  const scale = createMemo(() => view().pxPerNm);
+  const [settled, setSettled] = createSignal(untrack(scale));
+  createEffect(on(scale, debounce(ZOOM_SETTLE_MS, setSettled), { defer: true }));
+  return settled;
+}
+
+/**
+ * Connects state to the renderer. Each layer is rebuilt when what its builder reads changes;
+ * the only timer is the one that settles a zoom.
  */
 export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
-  const [atlas, setAtlas] = createSignal<AtlasInfo | null>(null);
-  const renderer = createRenderer(canvas, view(), (s) => {
-    if (s.kind === 'ready') {
-      setRenderInfo(`GPU ${s.where === 'worker' ? 'worker' : 'main thread'} · ${s.adapter}`);
-      setRenderError(null);
-    } else if (s.kind === 'error') {
-      setRenderError(s.message);
-    }
-  });
+  const renderer = createRenderer(canvas, view(), reportStatus);
   onCleanup(() => renderer.destroy());
-  /**
-   * The scale data blocks are laid out at. Pans leave it alone, and a zoom moves it only once it
-   * settles; until then the blocks keep their corners, drawn at the live scale.
-   */
-  const scale = createMemo(() => view().pxPerNm);
-  const [layoutScale, setLayoutScale] = createSignal(untrack(scale));
-  /** Bumped by each targets build, which moves targets and their blocks under the hover. */
-  const [targetsBuilt, setTargetsBuilt] = createSignal(0);
-  createEffect(on(scale, debounce(ZOOM_SETTLE_MS, setLayoutScale), { defer: true }));
+  createEffect(() => renderer.setView(view()));
 
+  const [atlas, setAtlas] = createSignal<AtlasInfo | null>(null);
   void buildAtlas().then(({ info, pixels }) => {
     renderer.setAtlas(info, pixels);
     setAtlas(info);
   });
 
-  createEffect(() => {
-    renderer.setView(view());
-  });
+  /** Hands the renderer the layers `build` returns, again whenever what it reads changes. */
+  const show = (build: (atlas: AtlasInfo) => Layers | null) =>
+    createEffect(() => {
+      const a = atlas();
+      const layers = a && build(a);
+      if (!layers) return;
+      for (const name of LAYER_ORDER) {
+        const batches = layers[name];
+        if (batches) renderer.setLayer(name, batches);
+      }
+    });
 
-  createEffect(() => {
-    const a = atlas();
-    if (!a || projectionVersion() === 0) return;
+  show((a) => {
+    if (!projected()) return null;
     const { width, height } = canvasSize();
-    renderer.setLayer(
-      'rings',
-      buildRings({
+    return {
+      rings: buildRings({
         layers: { ...settings.layers },
         rangeNm: settings.rangeNm,
         ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
         atlas: a,
       }),
-    );
+    };
   });
 
   /** Zooming reaches the map layers only when it shows or hides the navaids. */
   const navaidsInRange = createMemo(() => navaidsShownAt(settings.rangeNm));
-  createEffect(() => {
-    const a = atlas();
-    if (!a || projectionVersion() === 0) return;
-    const layers = buildMap({
-      coast: coast(),
-      aero: aero(),
-      project: projectNm,
-      layers: { ...settings.layers },
-      labelDensity: settings.labelDensity,
-      navaidsInRange: navaidsInRange(),
-      atlas: a,
-    });
-    for (const name of MAP_LAYERS) renderer.setLayer(name, layers[name]);
-  });
+  show((a) =>
+    projected()
+      ? buildMap({
+          coast: coast(),
+          aero: aero(),
+          project: projectNm,
+          layers: { ...settings.layers },
+          labelDensity: settings.labelDensity,
+          navaidsInRange: navaidsInRange(),
+          atlas: a,
+        })
+      : null,
+  );
 
-  createEffect(() => {
-    const a = atlas();
-    if (!a) return;
+  const layoutScale = settledScale(view);
+  /** Bumped once blocks are placed, which moves targets and their blocks under the hover. */
+  const [blocksPlaced, setBlocksPlaced] = createSignal(0);
+  show((a) => {
     snapshotVersion();
     const { batches, corners } = buildTargets({
       tracks: trackStore.tracks.values(),
@@ -122,56 +138,40 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       const t = trackStore.tracks.get(hex);
       if (t) t.ops.autoCorner = corner;
     }
-    renderer.setLayer('targets', batches);
-    setTargetsBuilt((n) => n + 1);
+    setBlocksPlaced((n) => n + 1);
+    return { targets: batches };
   });
 
-  createEffect(() => {
-    targetsBuilt();
+  show(() => {
+    blocksPlaced();
     const hex = hovered();
-    renderer.setLayer(
-      'hover',
-      buildHover({
+    return {
+      hover: buildHover({
         track: hex ? (trackStore.tracks.get(hex) ?? null) : null,
         selected: selected(),
         filter: { ...settings.filter },
         altimeter: { ...settings.altimeter },
         labelDrag: labelDrag(),
       }),
-    );
+    };
   });
 
-  createEffect(
-    on(
-      [
-        atlas,
-        rbls,
-        rblPending,
-        rangeCursor,
-        snapshotVersion,
-        view,
-        declination,
-        () => (rblPending() || rangeCursor() ? pointer() : null),
-      ],
-      () => {
-        const a = atlas();
-        if (!a) return;
-        const v = view();
-        renderer.setLayer(
-          'overlays',
-          buildOverlays({
-            tracks: trackStore.tracks,
-            rbls: rbls(),
-            rblPending: rblPending(),
-            rangeCursor: rangeCursor(),
-            pointer: pointer(),
-            declination: declination(),
-            view: v,
-            atlas: a,
-            snap: (cx, cy) => targetAt(v, cx, cy, RBL_SNAP_PX),
-          }),
-        );
-      },
-    ),
-  );
+  show((a) => {
+    snapshotVersion();
+    const v = view();
+    const measuring = rblPending() !== null || rangeCursor() !== null;
+    return {
+      overlays: buildOverlays({
+        tracks: trackStore.tracks,
+        rbls: rbls(),
+        rblPending: rblPending(),
+        rangeCursor: rangeCursor(),
+        pointer: measuring ? pointer() : null,
+        declination: declination(),
+        view: v,
+        atlas: a,
+        snap: (cx, cy) => targetAt(v, cx, cy, RBL_SNAP_PX),
+      }),
+    };
+  });
 }
