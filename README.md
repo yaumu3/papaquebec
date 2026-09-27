@@ -138,7 +138,7 @@ Conventions:
   follows the altitude (`240↑350`), or a `✓` replaces the arrow while the aircraft holds it within
   200 ft on its own altimeter, and a selected heading (`270°`) adds a third line while it steers the
   aircraft, not LNAV or an approach.
-- **Trails** are NATS-style slashes decimated to eight-second slots.
+- **Trails** are slashes decimated to eight-second slots.
 - **Bearings** shown to the operator are magnetic, 001 to 360.
 - **The top bar** carries only runtime state.
 
