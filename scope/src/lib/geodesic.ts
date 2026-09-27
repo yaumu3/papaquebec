@@ -4,7 +4,7 @@
  * XXIII/176, 1975). Sub-millimetre at radar ranges; the inverse fails to converge only for
  * nearly antipodal points, which a scope never measures.
  */
-import { type GeoPoint, NM_IN_METERS } from './geo';
+import { type GeoPoint, NM_IN_METERS, type Vec2 } from './geo';
 import { WGS84 } from './projection';
 import { RAD } from './units';
 
@@ -125,4 +125,40 @@ export function geodesicCircle(center: GeoPoint, radiusNm: number, segments: num
   return Array.from({ length: segments + 1 }, (_, i) =>
     direct(center, (360 * (i % segments)) / segments, radiusNm),
   );
+}
+
+/** How far a drawn chord may stray from the geodesic, in NM: about 9 m, under half a pixel at the closest range. */
+export const PATH_TOLERANCE_NM = 0.005;
+
+/**
+ * A line through `points` projected so it follows the geodesics between them. An edge whose
+ * straight chord would bow more than `tolerance` (in plane units) from its geodesic is split
+ * along it; the bow shrinks with the square of the pieces, so a few suffice. Short edges cost
+ * one midpoint check and stay whole.
+ */
+export function geodesicPath(
+  points: readonly GeoPoint[],
+  project: (lat: number, lon: number) => Vec2,
+  tolerance = PATH_TOLERANCE_NM,
+): Vec2[] {
+  const first = points[0];
+  if (!first) return [];
+  const path = [project(first.lat, first.lon)];
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1] ?? first;
+    const b = points[i] ?? a;
+    const pa = path.at(-1) ?? project(a.lat, a.lon);
+    const pb = project(b.lat, b.lon);
+    const { distanceNm, bearingTrue } = inverse(a, b);
+    const along = (k: number) => {
+      const p = direct(a, bearingTrue, distanceNm * k);
+      return project(p.lat, p.lon);
+    };
+    const mid = along(0.5);
+    const bow = Math.hypot(mid.x - (pa.x + pb.x) / 2, mid.y - (pa.y + pb.y) / 2);
+    const pieces = distanceNm > 0 && bow > tolerance ? Math.ceil(Math.sqrt(bow / tolerance)) : 1;
+    for (let k = 1; k < pieces; k++) path.push(along(k / pieces));
+    path.push(pb);
+  }
+  return path;
 }

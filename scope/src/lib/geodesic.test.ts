@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { NM_IN_METERS } from './geo';
-import { direct, geodesicCircle, inverse } from './geodesic';
+import { direct, geodesicCircle, geodesicPath, inverse } from './geodesic';
 
 /** Round trips agree to about 2 mm and 0.004″, far finer than the scope shows. */
 const NM_TOLERANCE = 1e-6;
@@ -96,5 +96,53 @@ describe('geodesicCircle', () => {
     expect(ring.every((p) => Math.abs(inverse(center, p).distanceNm - 120) < NM_TOLERANCE)).toBe(
       true,
     );
+  });
+});
+
+/** Longitude and latitude as the plane: great circles curve on it, meridians and the equator don't. */
+const lonLat = (lat: number, lon: number) => ({ x: lon, y: lat });
+
+describe('geodesicPath', () => {
+  it('keeps an edge whose chord already follows the geodesic as a single piece', () => {
+    // Arrange
+    const meridian = [
+      { lat: 35, lon: 140 },
+      { lat: 38, lon: 140 },
+    ];
+
+    // Act
+    const path = geodesicPath(meridian, lonLat, 0.001);
+
+    // Assert
+    expect(path).toEqual([lonLat(35, 140), lonLat(38, 140)]);
+  });
+
+  it('splits a curving edge into pieces that lie on the geodesic, each within the tolerance', () => {
+    // Arrange
+    const a = { lat: 35, lon: 130 };
+    const b = { lat: 35, lon: 150 };
+    const tolerance = 0.001;
+
+    // Act
+    const path = geodesicPath([a, b], lonLat, tolerance);
+
+    // Assert
+    const whole = inverse(a, b).distanceNm;
+    const inner = path.slice(1, -1).map((p) => ({ lat: p.y, lon: p.x }));
+    expect(path[0]).toEqual(lonLat(a.lat, a.lon));
+    expect(path.at(-1)).toEqual(lonLat(b.lat, b.lon));
+    expect(inner.length).toBeGreaterThan(0);
+    for (const p of inner) {
+      expect(inverse(a, p).distanceNm + inverse(p, b).distanceNm - whole).toBeLessThan(
+        NM_TOLERANCE,
+      );
+    }
+    const bows = path.slice(1).map((q, i) => {
+      const p = path[i] ?? q;
+      const route = inverse({ lat: p.y, lon: p.x }, { lat: q.y, lon: q.x });
+      const mid = direct({ lat: p.y, lon: p.x }, route.bearingTrue, route.distanceNm / 2);
+      return Math.hypot(mid.lon - (p.x + q.x) / 2, mid.lat - (p.y + q.y) / 2);
+    });
+    expect(Math.max(...bows)).toBeLessThan(tolerance);
   });
 });
