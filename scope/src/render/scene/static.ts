@@ -1,11 +1,11 @@
 import type { ProjectFn } from '../../lib/geo';
-import { geodesicPath } from '../../lib/geodesic';
-import type { AeroLayers, CoastData, LatLon } from '../../lib/mapdata';
+import type { AeroLayers, CoastData } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
 import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
-import { projectedCircle, ringRadii } from './rings';
+import { closedRoute, projectedCircle, route } from './paths';
+import { ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
 export interface RingsInput {
@@ -30,19 +30,6 @@ export interface MapInput {
 }
 
 const NAVAID_MAX_RANGE = 120;
-
-/** A route drawn along the geodesics between its points. */
-const route = (points: LatLon[], project: ProjectFn): Anchor[] =>
-  geodesicPath(
-    points.map(([lat, lon]) => ({ lat, lon })),
-    project,
-  );
-
-/** A route back to its first point, for an outline. */
-function closedRoute(points: LatLon[], project: ProjectFn): Anchor[] {
-  const first = points[0];
-  return route(first ? [...points, first] : points, project);
-}
 
 function density(d: LabelDensity): number {
   return { off: 0, sparse: 1, normal: 2, dense: 3 }[d];
@@ -123,8 +110,8 @@ function coastLayer({ coast, project, layers }: MapInput): Batch[] {
   if (layers.coast) {
     for (const line of coast.lines) {
       lines.polyline(
-        geodesicPath(
-          line.map(([lon, lat]) => ({ lat, lon })),
+        route(
+          line.map(([lon, lat]) => [lat, lon]),
           project,
         ),
         THEME.coast,
