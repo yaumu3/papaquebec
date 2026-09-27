@@ -6,15 +6,22 @@ import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
-export interface StaticInput {
+export interface RingsInput {
+  layers: Layers;
+  rangeNm: number;
+  /** How far out rings are drawn, so they reach the longer canvas edge. */
+  ringExtentNm: number;
+  atlas: AtlasInfo;
+}
+
+/** Everything the map layers draw from. Zooming changes none of it but `navaidsInRange`. */
+export interface MapInput {
   coast: CoastData;
   aero: AeroLayers;
   project: ProjectFn;
   layers: Layers;
   labelDensity: LabelDensity;
-  rangeNm: number;
-  /** How far out rings are drawn, so they reach the longer canvas edge. */
-  ringExtentNm: number;
+  navaidsInRange: boolean;
   atlas: AtlasInfo;
 }
 
@@ -23,8 +30,10 @@ export interface NamedLayer {
   batches: Batch[];
 }
 
-/** Draw order of the static layers, back to front. */
-export const STATIC_ORDER = ['rings', 'airways', 'airspace', 'sector', 'coast', 'fixes'];
+/** Draw order of the map layers, back to front. */
+export const MAP_ORDER = ['airways', 'airspace', 'sector', 'coast', 'fixes'];
+/** Draw order of every static layer: the rings under the map. */
+export const STATIC_ORDER = ['rings', ...MAP_ORDER];
 
 const CIRCLE_SEGMENTS = 96;
 const NAVAID_MAX_RANGE = 120;
@@ -45,9 +54,12 @@ function density(d: LabelDensity): number {
   return { off: 0, sparse: 1, normal: 2, dense: 3 }[d];
 }
 
-function buildRings(
-  input: Pick<StaticInput, 'layers' | 'rangeNm' | 'ringExtentNm' | 'atlas'>,
-): NamedLayer {
+/** Navaids clutter a wide range; they show only out to `NAVAID_MAX_RANGE`. */
+export function navaidsShownAt(rangeNm: number): boolean {
+  return rangeNm <= NAVAID_MAX_RANGE;
+}
+
+export function buildRings(input: RingsInput): NamedLayer {
   const lines = new LineBatch();
   const text = new TextBatch(input.atlas);
   if (input.layers.rings) {
@@ -59,10 +71,10 @@ function buildRings(
   return { name: 'rings', batches: [lines.finish(), text.finish()] };
 }
 
-export function buildStatic(input: StaticInput): NamedLayer[] {
+export function buildMap(input: MapInput): NamedLayer[] {
   const { aero, project, layers, atlas } = input;
   const labels = density(input.labelDensity);
-  const out: NamedLayer[] = [buildRings(input)];
+  const out: NamedLayer[] = [];
 
   const airways = new LineBatch();
   const airwayText = new TextBatch(atlas);
@@ -143,7 +155,7 @@ export function buildStatic(input: StaticInput): NamedLayer[] {
       }
     }
   }
-  if (layers.navaids && input.rangeNm <= NAVAID_MAX_RANGE) {
+  if (layers.navaids && input.navaidsInRange) {
     for (const n of aero.navaids) {
       const p = project(n.lat, n.lon);
       fixes.marker(p, Shape.Hexagon, 10, THEME.navaid);
