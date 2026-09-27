@@ -134,3 +134,34 @@ describe('createSimSource autopilot intent', () => {
     ]);
   });
 });
+
+describe('createSimSource extra traffic', () => {
+  it('adds the requested number of aircraft, each with its own hex, within the bounds', () => {
+    // Arrange
+    const base = createSimSource(site, () => 1000).poll().aircraft.length;
+    const source = createSimSource(site, () => 1000, 1000, 500);
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    expect(snap.aircraft.length).toBe(base + 500);
+    expect(new Set(snap.aircraft.map((a) => a.hex)).size).toBe(base + 500);
+    expect(
+      snap.aircraft.every(
+        (a) => Math.abs((a.lat ?? 0) - site.lat) < 1 && Math.abs((a.lon ?? 0) - site.lon) < 1.2,
+      ),
+    ).toBe(true);
+  });
+
+  it('places the extra aircraft the same way on every run', () => {
+    // Arrange
+    const first = createSimSource(site, () => 1000, 1000, 50).poll();
+
+    // Act
+    const second = createSimSource(site, () => 1000, 1000, 50).poll();
+
+    // Assert
+    expect(second.aircraft).toEqual(first.aircraft);
+  });
+});

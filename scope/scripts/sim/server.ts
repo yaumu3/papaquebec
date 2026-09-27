@@ -5,6 +5,8 @@ export interface SimOptions {
   site: Site;
   /** Sim seconds per wall second. */
   speed: number;
+  /** Generic targets added to the fleet, for load testing. */
+  extra?: number;
 }
 
 /** A clock in sim seconds that runs `speed` times faster than the wall. */
@@ -16,7 +18,7 @@ export function simClock(speed: number, wallMs: () => number = Date.now): () => 
 /** One request handler: the same for a Bun server and for a Playwright route. */
 export function simHandler(opts: SimOptions): (req: Request) => Response {
   const refresh = Math.round(1000 / opts.speed);
-  const source = createSimSource(opts.site, simClock(opts.speed), refresh);
+  const source = createSimSource(opts.site, simClock(opts.speed), refresh, opts.extra);
   return (req) => {
     const { pathname } = new URL(req.url);
     if (pathname === '/data/receiver.json') return Response.json(source.receiver());

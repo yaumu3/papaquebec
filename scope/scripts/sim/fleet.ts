@@ -192,3 +192,37 @@ export const FLEET: SimAircraft[] = [
     reg: 'JA752J',
   },
 ];
+
+/** Deterministic PRNG (mulberry32), so a load test sees the same traffic every run. */
+function mulberry32(seed: number): () => number {
+  let s = seed;
+  return () => {
+    s = (s + 0x6d2b79f5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** `count` generic en-route targets spread over the sim area, for load testing. */
+export function extraFleet(count: number, radiusNm = 50): SimAircraft[] {
+  const rand = mulberry32(count);
+  return Array.from({ length: count }, (_, i) => {
+    const r = radiusNm * Math.sqrt(rand());
+    const a = rand() * 2 * Math.PI;
+    return {
+      hex: (0xf00000 + i).toString(16),
+      flight: `SIM${String(i).padStart(4, '0')}`,
+      category: 'A3',
+      squawk: (0o1000 + (i % 0o6000)).toString(8),
+      x: r * Math.sin(a),
+      y: r * Math.cos(a),
+      alt: 1000 * Math.round(3 + rand() * 35),
+      gs: Math.round(180 + rand() * 300),
+      track: Math.round(rand() * 360),
+      baroRate: 0,
+      type: 'A320',
+      reg: `JA${String(i).padStart(4, '0')}`,
+    };
+  });
+}

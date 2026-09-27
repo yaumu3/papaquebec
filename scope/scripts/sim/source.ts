@@ -1,6 +1,6 @@
 /** Synthesized traffic around a site, shaped like readsb's `aircraft.json`. */
 import type { AircraftJson, AircraftSnapshot, ReceiverJson } from '../../src/lib/aircraft';
-import { FLEET } from './fleet';
+import { extraFleet, FLEET } from './fleet';
 
 export interface Site {
   lat: number;
@@ -47,14 +47,18 @@ function flyLevel(a: Vertical, now: number, dt: number): void {
   }
 }
 
-/** `clock` returns sim seconds since epoch; `refresh` is what receiver.json advertises. */
+/**
+ * `clock` returns sim seconds since epoch; `refresh` is what receiver.json advertises;
+ * `extra` adds that many generic targets for load testing.
+ */
 export function createSimSource(
   site: Site,
   clock: () => number = () => Date.now() / 1000,
   refresh = 1000,
+  extra = 0,
 ): SimSource {
   let lastTick = clock();
-  const state = FLEET.map((a) =>
+  const state = [...FLEET, ...extraFleet(extra)].map((a) =>
     Object.assign(
       { messages: 0, from: a.alt, rate: Math.abs(a.baroRate) || 1000, since: lastTick },
       a,
