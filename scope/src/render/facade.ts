@@ -14,13 +14,12 @@ export type RenderStatus =
   | { kind: 'ready'; adapter: string; where: 'worker' | 'main' }
   | { kind: 'error'; message: string };
 
+/** Takes the scene as it changes and draws it, one frame per animation frame at most. */
 export interface Renderer {
   setView(view: View): void;
   setAtlas(info: AtlasInfo, pixels: Uint8Array): void;
   /** Takes the batches: once the renderer is up their buffers move to the worker, unusable here. */
   setLayer(name: LayerName, batches: Batch[]): void;
-  /** Coalesced through requestAnimationFrame; many calls, one frame. */
-  draw(): void;
   destroy(): void;
 }
 
@@ -32,6 +31,20 @@ interface Retained {
   view: View | null;
   atlas: { info: AtlasInfo; pixels: Uint8Array } | null;
   layers: Map<LayerName, Batch[]>;
+}
+
+/** The calls a ready renderer takes, whether it draws on this thread or in the worker. */
+type Sink = Pick<GpuRenderer, 'setView' | 'setAtlas' | 'setLayer' | 'draw'>;
+
+/** Posts each call to the render worker, handing layer buffers over rather than copying them. */
+function workerSink(worker: Worker): Sink {
+  const post = (m: ToWorker, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
+  return {
+    setView: (view) => post({ type: 'view', view }),
+    setAtlas: (info, pixels) => post({ type: 'atlas', info, pixels }),
+    setLayer: (name, batches) => post({ type: 'layer', name, batches }, transferables(batches)),
+    draw: () => post({ type: 'draw' }),
+  };
 }
 
 async function probeWorker(worker: Worker): Promise<boolean> {
@@ -63,27 +76,28 @@ export function createRenderer(
   const retained: Retained = { view, atlas: null, layers: new Map() };
   let worker: Worker | null = null;
   let local: GpuRenderer | null = null;
+  /** Whichever renderer is ready to take calls; null until then and once its device is lost. */
+  let sink: Sink | null = null;
   let frame = 0;
-  let ready = false;
   let destroyed = false;
 
-  const send = (m: ToWorker, transfer: Transferable[] = []) => worker?.postMessage(m, transfer);
-  const sendLayer = (name: LayerName, batches: Batch[]) => {
-    if (local) local.setLayer(name, batches);
-    else send({ type: 'layer', name, batches }, transferables(batches));
+  /** Many changes, one frame: draws on the next animation frame unless one is already due. */
+  const requestFrame = () => {
+    if (frame || !sink) return;
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      sink?.draw();
+    });
   };
 
-  const replay = () => {
-    if (retained.atlas) {
-      if (local) local.setAtlas(retained.atlas.info, retained.atlas.pixels);
-      else send({ type: 'atlas', info: retained.atlas.info, pixels: retained.atlas.pixels });
-    }
-    for (const [name, batches] of retained.layers) sendLayer(name, batches);
+  /** Starts taking calls: replays what was kept meanwhile, then draws. */
+  const open = (ready: Sink) => {
+    sink = ready;
+    if (retained.atlas) ready.setAtlas(retained.atlas.info, retained.atlas.pixels);
+    for (const [name, batches] of retained.layers) ready.setLayer(name, batches);
     retained.layers.clear();
-    if (retained.view) {
-      if (local) local.setView(retained.view);
-      else send({ type: 'view', view: retained.view });
-    }
+    if (retained.view) ready.setView(retained.view);
+    requestFrame();
   };
 
   const startMain = async () => {
@@ -92,10 +106,8 @@ export function createRenderer(
     local.onError = (message) => onStatus({ kind: 'error', message });
     try {
       const adapter = await local.init(view);
-      ready = true;
-      replay();
+      open(local);
       onStatus({ kind: 'ready', adapter, where: 'main' });
-      api.draw();
       void local.lost.then((info) =>
         onStatus({ kind: 'error', message: `GPU device lost: ${info.message}; reload the page` }),
       );
@@ -117,14 +129,12 @@ export function createRenderer(
     w.addEventListener('message', (e: MessageEvent<FromWorker>) => {
       const m = e.data;
       if (m.type === 'ready') {
-        ready = true;
-        replay();
+        open(workerSink(w));
         onStatus({ kind: 'ready', adapter: m.adapter, where: 'worker' });
-        api.draw();
       } else if (m.type === 'error') {
         onStatus({ kind: 'error', message: m.message });
       } else if (m.type === 'lost') {
-        ready = false;
+        sink = null;
         w.terminate();
         worker = null;
         if (!destroyed)
@@ -132,33 +142,26 @@ export function createRenderer(
       }
     });
     const offscreen = canvas.transferControlToOffscreen();
-    send({ type: 'init', canvas: offscreen, view }, [offscreen]);
+    const init: ToWorker = { type: 'init', canvas: offscreen, view };
+    w.postMessage(init, [offscreen]);
   };
 
-  const api: Renderer = {
+  void startWorker();
+  return {
     setView(v) {
       retained.view = v;
-      if (!ready) return;
-      if (local) local.setView(v);
-      else send({ type: 'view', view: v });
+      sink?.setView(v);
+      requestFrame();
     },
     setAtlas(info, pixels) {
       retained.atlas = { info, pixels };
-      if (!ready) return;
-      if (local) local.setAtlas(info, pixels);
-      else send({ type: 'atlas', info, pixels });
+      sink?.setAtlas(info, pixels);
+      requestFrame();
     },
     setLayer(name, batches) {
-      if (ready) sendLayer(name, batches);
+      if (sink) sink.setLayer(name, batches);
       else retained.layers.set(name, batches);
-    },
-    draw() {
-      if (frame || !ready) return;
-      frame = requestAnimationFrame(() => {
-        frame = 0;
-        if (local) local.draw();
-        else send({ type: 'draw' });
-      });
+      requestFrame();
     },
     destroy() {
       destroyed = true;
@@ -167,7 +170,4 @@ export function createRenderer(
       local?.destroy();
     },
   };
-
-  void startWorker();
-  return api;
 }

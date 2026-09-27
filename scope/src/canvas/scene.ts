@@ -67,7 +67,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
 
   createEffect(() => {
     renderer.setView(view());
-    renderer.draw();
   });
 
   createEffect(() => {
@@ -83,7 +82,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         atlas: a,
       }),
     );
-    renderer.draw();
   });
 
   /** Zooming reaches the map layers only when it shows or hides the navaids. */
@@ -101,7 +99,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       atlas: a,
     });
     for (const name of MAP_LAYERS) renderer.setLayer(name, layers[name]);
-    renderer.draw();
   });
 
   createEffect(() => {
@@ -126,7 +123,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       if (t) t.ops.autoCorner = corner;
     }
     renderer.setLayer('targets', batches);
-    renderer.draw();
     setTargetsBuilt((n) => n + 1);
   });
 
@@ -143,7 +139,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         labelDrag: labelDrag(),
       }),
     );
-    renderer.draw();
   });
 
   createEffect(
@@ -176,7 +171,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
             snap: (cx, cy) => targetAt(v, cx, cy, RBL_SNAP_PX),
           }),
         );
-        renderer.draw();
       },
     ),
   );
