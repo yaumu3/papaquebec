@@ -1,5 +1,12 @@
 import { GpuRenderer } from './gpu/renderer';
-import type { AtlasInfo, Batch, FromWorker, ToWorker, View } from './protocol';
+import {
+  type AtlasInfo,
+  type Batch,
+  type FromWorker,
+  type ToWorker,
+  transferables,
+  type View,
+} from './protocol';
 
 export type RenderStatus =
   | { kind: 'starting' }
@@ -9,13 +16,17 @@ export type RenderStatus =
 export interface Renderer {
   setView(view: View): void;
   setAtlas(info: AtlasInfo, pixels: Uint8Array): void;
+  /** Takes the batches: once the renderer is up their buffers move to the worker, unusable here. */
   setLayer(name: string, batches: Batch[]): void;
   /** Coalesced through requestAnimationFrame; many calls, one frame. */
   draw(order: readonly string[]): void;
   destroy(): void;
 }
 
-/** What the main thread keeps until the renderer is ready, then replays into it. */
+/**
+ * What the main thread keeps until the renderer is ready, then replays into it. Layers are kept
+ * only until then: after it, nothing replays them, so they move to the worker instead.
+ */
 interface Retained {
   view: View | null;
   atlas: { info: AtlasInfo; pixels: Uint8Array } | null;
@@ -57,16 +68,18 @@ export function createRenderer(
   let destroyed = false;
 
   const send = (m: ToWorker, transfer: Transferable[] = []) => worker?.postMessage(m, transfer);
+  const sendLayer = (name: string, batches: Batch[]) => {
+    if (local) local.setLayer(name, batches);
+    else send({ type: 'layer', name, batches }, transferables(batches));
+  };
 
   const replay = () => {
     if (retained.atlas) {
       if (local) local.setAtlas(retained.atlas.info, retained.atlas.pixels);
       else send({ type: 'atlas', info: retained.atlas.info, pixels: retained.atlas.pixels });
     }
-    for (const [name, batches] of retained.layers) {
-      if (local) local.setLayer(name, batches);
-      else send({ type: 'layer', name, batches });
-    }
+    for (const [name, batches] of retained.layers) sendLayer(name, batches);
+    retained.layers.clear();
     if (retained.view) {
       if (local) local.setView(retained.view);
       else send({ type: 'view', view: retained.view });
@@ -136,10 +149,8 @@ export function createRenderer(
       else send({ type: 'atlas', info, pixels });
     },
     setLayer(name, batches) {
-      retained.layers.set(name, batches);
-      if (!ready) return;
-      if (local) local.setLayer(name, batches);
-      else send({ type: 'layer', name, batches });
+      if (ready) sendLayer(name, batches);
+      else retained.layers.set(name, batches);
     },
     draw(order) {
       pendingOrder = order;
