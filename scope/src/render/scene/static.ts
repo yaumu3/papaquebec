@@ -1,8 +1,9 @@
 import type { AeroLayers, CoastData, LatLon } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
 import type { ProjectFn } from '../../state/trackStore';
+import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
-import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
+import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
 import { ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
@@ -25,16 +26,6 @@ export interface MapInput {
   atlas: AtlasInfo;
 }
 
-export interface NamedLayer {
-  name: string;
-  batches: Batch[];
-}
-
-/** Draw order of the map layers, back to front. */
-export const MAP_ORDER = ['airways', 'airspace', 'sector', 'coast', 'fixes'];
-/** Draw order of every static layer: the rings under the map. */
-export const STATIC_ORDER = ['rings', ...MAP_ORDER];
-
 const CIRCLE_SEGMENTS = 96;
 const NAVAID_MAX_RANGE = 120;
 
@@ -50,6 +41,13 @@ function circle(cx: number, cy: number, r: number): Anchor[] {
 const route = (points: LatLon[], project: ProjectFn): Anchor[] =>
   points.map(([lat, lon]) => project(lat, lon));
 
+/** A route back to its first point, for an outline. */
+function closedRoute(points: LatLon[], project: ProjectFn): Anchor[] {
+  const pts = route(points, project);
+  const first = pts[0];
+  return first ? [...pts, first] : pts;
+}
+
 function density(d: LabelDensity): number {
   return { off: 0, sparse: 1, normal: 2, dense: 3 }[d];
 }
@@ -59,7 +57,7 @@ export function navaidsShownAt(rangeNm: number): boolean {
   return rangeNm <= NAVAID_MAX_RANGE;
 }
 
-export function buildRings(input: RingsInput): NamedLayer {
+export function buildRings(input: RingsInput): Batch[] {
   const lines = new LineBatch();
   const text = new TextBatch(input.atlas);
   if (input.layers.rings) {
@@ -68,102 +66,136 @@ export function buildRings(input: RingsInput): NamedLayer {
       text.text(String(r), { x: 0, y: r, px: 3, py: 1 }, 9, THEME.ringLabel);
     }
   }
-  return { name: 'rings', batches: [lines.finish(), text.finish()] };
+  return [lines.finish(), text.finish()];
 }
 
-export function buildMap(input: MapInput): NamedLayer[] {
-  const { aero, project, layers, atlas } = input;
-  const labels = density(input.labelDensity);
-  const out: NamedLayer[] = [];
-
-  const airways = new LineBatch();
-  const airwayText = new TextBatch(atlas);
+function airwaysLayer({ aero, project, layers, atlas }: MapInput, labels: number): Batch[] {
+  const lines = new LineBatch();
+  const text = new TextBatch(atlas);
   if (layers.airways) {
     for (const aw of aero.airways) {
       const pts = route(aw.points, project);
-      airways.polyline(pts, THEME.airway);
+      lines.polyline(pts, THEME.airway);
       const mid = pts[Math.floor(pts.length / 2)];
       if (labels >= 2 && mid) {
-        airwayText.text(aw.name, { ...mid, px: 4, py: -6 }, 9, THEME.airwayLabel, {
+        text.text(aw.name, { ...mid, px: 4, py: -6 }, 9, THEME.airwayLabel, {
           baseline: 'bottom',
         });
       }
     }
   }
-  out.push({ name: 'airways', batches: [airways.finish(), airwayText.finish()] });
+  return [lines.finish(), text.finish()];
+}
 
-  const airspace = new LineBatch();
-  const airspaceText = new TextBatch(atlas);
+function airspaceLayer({ aero, project, layers, atlas }: MapInput, labels: number): Batch[] {
+  const lines = new LineBatch();
+  const text = new TextBatch(atlas);
   if (layers.airspace) {
     for (const a of aero.airspace) {
       const style = a.dashed ? { dash: [4, 3] as [number, number] } : {};
       if ('center' in a) {
         const c = project(a.center[0], a.center[1]);
-        airspace.polyline(circle(c.x, c.y, a.radiusNm), THEME.airspace, style);
+        lines.polyline(circle(c.x, c.y, a.radiusNm), THEME.airspace, style);
         continue;
       }
-      const pts = route(a.points, project);
+      const pts = closedRoute(a.points, project);
+      lines.polyline(pts, airspaceColor(a.kind), style);
       const first = pts[0];
-      if (first) pts.push(first);
-      airspace.polyline(pts, airspaceColor(a.kind), style);
       if (labels >= 3 && first) {
         const label = a.kind ? `${a.kind} ${a.name}` : a.name;
-        airspaceText.text(label, { ...first, px: 4, py: 2 }, 9, THEME.airspaceLabel);
+        text.text(label, { ...first, px: 4, py: 2 }, 9, THEME.airspaceLabel);
       }
     }
   }
-  out.push({ name: 'airspace', batches: [airspace.finish(), airspaceText.finish()] });
+  return [lines.finish(), text.finish()];
+}
 
-  const sector = new LineBatch();
+function sectorLayer({ aero, project, layers }: MapInput): Batch[] {
+  const lines = new LineBatch();
   if (layers.sector) {
     for (const s of aero.sectors) {
-      const pts = route(s.points, project);
-      const first = pts[0];
-      if (first) pts.push(first);
-      sector.polyline(pts, THEME.sector, { dash: [6, 4] });
+      lines.polyline(closedRoute(s.points, project), THEME.sector, { dash: [6, 4] });
     }
   }
-  out.push({ name: 'sector', batches: [sector.finish()] });
+  return [lines.finish()];
+}
 
-  const coast = new LineBatch(4096);
+function coastLayer({ coast, project, layers }: MapInput): Batch[] {
+  const lines = new LineBatch(4096);
   if (layers.coast) {
-    for (const line of input.coast.lines) {
-      coast.polyline(
+    for (const line of coast.lines) {
+      lines.polyline(
         line.map(([lon, lat]) => project(lat, lon)),
         THEME.coast,
       );
     }
   }
-  out.push({ name: 'coast', batches: [coast.finish()] });
+  return [lines.finish()];
+}
 
-  const fixes = new MarkerBatch();
-  const fixText = new TextBatch(atlas);
-  if (layers.waypoints) {
-    for (const w of aero.waypoints) {
-      const p = project(w.lat, w.lon);
-      fixes.marker(p, Shape.Triangle, 8, THEME.waypoint);
-      if (labels >= 2)
-        fixText.text(w.id, { ...p, px: 5, py: -3 }, 9, THEME.waypointLabel, { baseline: 'bottom' });
-    }
-  }
-  if (layers.airports) {
-    for (const a of aero.airports) {
-      const p = project(a.lat, a.lon);
-      fixes.marker(p, Shape.Ring, 9, THEME.airport);
-      if (labels >= 1) {
-        fixText.text(a.id, { ...p, px: 8, py: -1 }, 10, THEME.airportLabel, { baseline: 'middle' });
+/** How one kind of fix is drawn: its glyph, and its label from a label density up. */
+interface FixStyle {
+  shape: Shape;
+  size: number;
+  color: string;
+  label: {
+    from: number;
+    px: number;
+    py: number;
+    size: number;
+    color: string;
+    baseline: NonNullable<TextStyle['baseline']>;
+  };
+}
+
+const WAYPOINT: FixStyle = {
+  shape: Shape.Triangle,
+  size: 8,
+  color: THEME.waypoint,
+  label: { from: 2, px: 5, py: -3, size: 9, color: THEME.waypointLabel, baseline: 'bottom' },
+};
+const AIRPORT: FixStyle = {
+  shape: Shape.Ring,
+  size: 9,
+  color: THEME.airport,
+  label: { from: 1, px: 8, py: -1, size: 10, color: THEME.airportLabel, baseline: 'middle' },
+};
+const NAVAID: FixStyle = {
+  shape: Shape.Hexagon,
+  size: 10,
+  color: THEME.navaid,
+  label: { from: 1, px: 8, py: -1, size: 10, color: THEME.navaidLabel, baseline: 'middle' },
+};
+
+function fixesLayer(input: MapInput, labels: number): Batch[] {
+  const { aero, project, layers } = input;
+  const markers = new MarkerBatch();
+  const text = new TextBatch(input.atlas);
+  const draw = (fixes: readonly { id: string; lat: number; lon: number }[], style: FixStyle) => {
+    const { label } = style;
+    for (const f of fixes) {
+      const p = project(f.lat, f.lon);
+      markers.marker(p, style.shape, style.size, style.color);
+      if (labels >= label.from) {
+        text.text(f.id, { ...p, px: label.px, py: label.py }, label.size, label.color, {
+          baseline: label.baseline,
+        });
       }
     }
-  }
-  if (layers.navaids && input.navaidsInRange) {
-    for (const n of aero.navaids) {
-      const p = project(n.lat, n.lon);
-      fixes.marker(p, Shape.Hexagon, 10, THEME.navaid);
-      if (labels >= 1)
-        fixText.text(n.id, { ...p, px: 8, py: -1 }, 10, THEME.navaidLabel, { baseline: 'middle' });
-    }
-  }
-  out.push({ name: 'fixes', batches: [fixes.finish(), fixText.finish()] });
+  };
+  if (layers.waypoints) draw(aero.waypoints, WAYPOINT);
+  if (layers.airports) draw(aero.airports, AIRPORT);
+  if (layers.navaids && input.navaidsInRange) draw(aero.navaids, NAVAID);
+  return [markers.finish(), text.finish()];
+}
 
-  return out;
+export function buildMap(input: MapInput): Record<MapLayer, Batch[]> {
+  const labels = density(input.labelDensity);
+  return {
+    airways: airwaysLayer(input, labels),
+    airspace: airspaceLayer(input, labels),
+    sector: sectorLayer(input),
+    coast: coastLayer(input),
+    fixes: fixesLayer(input, labels),
+  };
 }

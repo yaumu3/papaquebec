@@ -1,4 +1,5 @@
 import { PALETTE } from '../../design/palette';
+import { LAYER_ORDER, type LayerName } from '../layers';
 import {
   type AtlasInfo,
   type Batch,
@@ -54,7 +55,7 @@ export class GpuRenderer {
   private atlasBindGroup: GPUBindGroup | null = null;
   private atlasLayout!: GPUBindGroupLayout;
   private msaa: GPUTexture | null = null;
-  private layers = new Map<string, GpuBatch[]>();
+  private layers = new Map<LayerName, GpuBatch[]>();
   private view: View | null = null;
   private sizeDirty = true;
 
@@ -201,7 +202,7 @@ export class GpuRenderer {
     );
   }
 
-  setLayer(name: string, batches: Batch[]): void {
+  setLayer(name: LayerName, batches: Batch[]): void {
     const existing = this.layers.get(name) ?? [];
     const next: GpuBatch[] = batches.map((b, i) => {
       const prev = existing[i];
@@ -244,7 +245,8 @@ export class GpuRenderer {
     return this.msaa.createView();
   }
 
-  draw(order: readonly string[]): void {
+  /** Draws every layer it holds, back to front in `LAYER_ORDER`. */
+  draw(): void {
     if (!this.view) return;
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
@@ -259,7 +261,7 @@ export class GpuRenderer {
       ],
     });
     pass.setBindGroup(0, this.viewBindGroup);
-    for (const name of order) {
+    for (const name of LAYER_ORDER) {
       for (const b of this.layers.get(name) ?? []) {
         if (b.count === 0) continue;
         if (b.kind === 'text') {

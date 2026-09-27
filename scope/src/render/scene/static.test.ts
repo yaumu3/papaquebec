@@ -2,9 +2,10 @@ import { describe, expect, it } from 'bun:test';
 
 import type { AeroLayers } from '../../lib/mapdata';
 import { MAP_PRESETS } from '../../state/settingsDefaults';
+import { MAP_LAYERS } from '../layers';
 import type { Batch } from '../protocol';
 import { atlas } from './atlasFixture';
-import { buildMap, buildRings, MAP_ORDER, type MapInput, navaidsShownAt } from './static';
+import { buildMap, buildRings, type MapInput, navaidsShownAt } from './static';
 
 const allLayers = MAP_PRESETS.all;
 
@@ -39,16 +40,15 @@ describe('buildRings', () => {
     const input = { layers: allLayers, rangeNm: 40, ringExtentNm: 40, atlas };
 
     // Act
-    const layer = buildRings(input);
+    const batches = buildRings(input);
 
     // Assert
-    expect(layer.name).toBe('rings');
-    expect(count(layer.batches, 'text')).toBe('10203040'.length);
+    expect(count(batches, 'text')).toBe('10203040'.length);
   });
 });
 
 describe('buildMap', () => {
-  it('builds every map layer but the rings, back to front', () => {
+  it('builds every map layer', () => {
     // Arrange
     const input = mapInput();
 
@@ -56,8 +56,7 @@ describe('buildMap', () => {
     const layers = buildMap(input);
 
     // Assert
-    expect(layers.map((l) => l.name)).toEqual([...MAP_ORDER]);
-    expect(MAP_ORDER).not.toContain('rings');
+    expect(Object.keys(layers).toSorted()).toEqual([...MAP_LAYERS].toSorted());
   });
 
   it('draws navaids only while the range keeps them in view', () => {
@@ -66,8 +65,8 @@ describe('buildMap', () => {
 
     // Act
     const drawn = cases.map((navaidsInRange) => {
-      const fixes = buildMap(mapInput({ navaidsInRange })).find((l) => l.name === 'fixes');
-      return count(fixes?.batches ?? [], 'markers');
+      const { fixes } = buildMap(mapInput({ navaidsInRange }));
+      return count(fixes, 'markers');
     });
 
     // Assert
