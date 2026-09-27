@@ -111,28 +111,35 @@ function drawRuns(
   }
 }
 
+/** The leader from the target glyph's corner to the block edge that faces the target. */
+export function drawLeader(
+  lines: LineBatch,
+  { at, dx, dy, color, emphasised }: BlockPlacement,
+): void {
+  const sx = dx > 0 ? 1 : -1;
+  const above = dy < 0;
+  lines.segment(
+    { ...at, px: sx * LEADER_INSET, py: (above ? -1 : 1) * LEADER_INSET },
+    {
+      ...at,
+      px: dx - sx * LEADER_INSET,
+      py: above ? dy + DB_HEIGHT / 2 : dy - LEADER_INSET,
+    },
+    emphasised ? color : dim(color, LEADER_TONE),
+  );
+}
+
 export function drawDataBlock(
   lines: LineBatch,
   text: TextBatch,
   block: DataBlock,
-  { at, dx, dy, color, emphasised }: BlockPlacement,
+  placement: BlockPlacement,
 ): void {
-  const right = dx > 0;
+  const { at, dx, dy, color } = placement;
   const above = dy < 0;
   const blockY = dy - (above ? blockExtraLines(block) * DB_LINE : 0);
-  const align = right ? 'left' : 'right';
-  const sx = right ? 1 : -1;
-  const sy = above ? -1 : 1;
-  // Leader from the glyph edge to the block edge that faces the target.
-  lines.segment(
-    { ...at, px: sx * LEADER_INSET, py: sy * LEADER_INSET },
-    {
-      ...at,
-      px: dx - sx * LEADER_INSET,
-      py: above ? dy + DB_HEIGHT / 2 : blockY - LEADER_INSET,
-    },
-    emphasised ? color : dim(color, LEADER_TONE),
-  );
+  const align = dx > 0 ? 'left' : 'right';
+  drawLeader(lines, placement);
   let lineY = blockY;
   if (block.prefix) {
     text.text(block.prefix, { ...at, px: dx, py: lineY }, DB_FONT_PX, THEME.emergency, { align });
