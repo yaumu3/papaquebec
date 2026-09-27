@@ -1,5 +1,5 @@
 import { PALETTE } from '../../design/palette';
-import type { LayerName } from '../layers';
+import { LAYER_ORDER, type LayerName } from '../layers';
 import {
   type AtlasInfo,
   type Batch,
@@ -245,7 +245,8 @@ export class GpuRenderer {
     return this.msaa.createView();
   }
 
-  draw(order: readonly LayerName[]): void {
+  /** Draws every layer it holds, back to front in `LAYER_ORDER`. */
+  draw(): void {
     if (!this.view) return;
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
@@ -260,7 +261,7 @@ export class GpuRenderer {
       ],
     });
     pass.setBindGroup(0, this.viewBindGroup);
-    for (const name of order) {
+    for (const name of LAYER_ORDER) {
       for (const b of this.layers.get(name) ?? []) {
         if (b.count === 0) continue;
         if (b.kind === 'text') {

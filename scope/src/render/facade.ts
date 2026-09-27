@@ -20,7 +20,7 @@ export interface Renderer {
   /** Takes the batches: once the renderer is up their buffers move to the worker, unusable here. */
   setLayer(name: LayerName, batches: Batch[]): void;
   /** Coalesced through requestAnimationFrame; many calls, one frame. */
-  draw(order: readonly LayerName[]): void;
+  draw(): void;
   destroy(): void;
 }
 
@@ -64,7 +64,6 @@ export function createRenderer(
   let worker: Worker | null = null;
   let local: GpuRenderer | null = null;
   let frame = 0;
-  let pendingOrder: readonly LayerName[] = [];
   let ready = false;
   let destroyed = false;
 
@@ -96,7 +95,7 @@ export function createRenderer(
       ready = true;
       replay();
       onStatus({ kind: 'ready', adapter, where: 'main' });
-      api.draw(pendingOrder);
+      api.draw();
       void local.lost.then((info) =>
         onStatus({ kind: 'error', message: `GPU device lost: ${info.message}; reload the page` }),
       );
@@ -121,7 +120,7 @@ export function createRenderer(
         ready = true;
         replay();
         onStatus({ kind: 'ready', adapter: m.adapter, where: 'worker' });
-        api.draw(pendingOrder);
+        api.draw();
       } else if (m.type === 'error') {
         onStatus({ kind: 'error', message: m.message });
       } else if (m.type === 'lost') {
@@ -153,13 +152,12 @@ export function createRenderer(
       if (ready) sendLayer(name, batches);
       else retained.layers.set(name, batches);
     },
-    draw(order) {
-      pendingOrder = order;
+    draw() {
       if (frame || !ready) return;
       frame = requestAnimationFrame(() => {
         frame = 0;
-        if (local) local.draw(pendingOrder);
-        else send({ type: 'draw', order: [...pendingOrder] });
+        if (local) local.draw();
+        else send({ type: 'draw' });
       });
     },
     destroy() {

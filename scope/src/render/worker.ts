@@ -43,7 +43,7 @@ self.addEventListener('message', (e: MessageEvent<ToWorker>) => {
         renderer?.setView(m.view);
         break;
       case 'draw':
-        renderer?.draw(m.order);
+        renderer?.draw();
         break;
     }
   } catch (err) {

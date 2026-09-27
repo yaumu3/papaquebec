@@ -64,7 +64,7 @@ export type ToWorker =
   | { type: 'atlas'; info: AtlasInfo; pixels: Uint8Array }
   | { type: 'layer'; name: LayerName; batches: Batch[] }
   | { type: 'view'; view: View }
-  | { type: 'draw'; order: LayerName[] };
+  | { type: 'draw' };
 
 export type FromWorker =
   | { type: 'probe'; webgpu: boolean }
