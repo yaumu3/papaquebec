@@ -27,7 +27,7 @@ import {
   snapshotVersion,
 } from '../state/scope';
 import { settings } from '../state/settings';
-import { projectNm, trackStore } from '../state/tracks';
+import { projectNm, trackStore, unprojectNm } from '../state/tracks';
 import { RBL_SNAP_PX, targetAt } from './hit';
 import { debounce } from './settle';
 import { halfLongEdgeNm } from './view';
@@ -168,6 +168,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         rangeCursor: rangeCursor(),
         pointer: measuring ? pointer() : null,
         declination: declination(),
+        unproject: unprojectNm,
         view: v,
         atlas: a,
         snap: (cx, cy) => targetAt(v, cx, cy, RBL_SNAP_PX),
