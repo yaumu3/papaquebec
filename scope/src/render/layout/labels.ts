@@ -1,4 +1,5 @@
 import type { Corner } from '../../state/track';
+import { type Rect, RectGrid } from './grid';
 
 /** Data block type size and footprint in CSS pixels: two lines of mono, twelve glyphs wide. */
 export const DB_FONT_PX = 11;
@@ -9,13 +10,6 @@ export const DB_LINE = 12;
 const GLYPH_HALF = 8;
 
 const CORNERS: readonly Corner[] = ['ne', 'nw', 'se', 'sw'];
-
-export interface Rect {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
 
 export interface LabelSubject {
   hex: string;
@@ -56,12 +50,6 @@ export function labelRect(cx: number, cy: number, corner: Corner, extraLines: nu
   return { x0, y0, x1: x0 + DB_WIDTH, y1: y0 + DB_HEIGHT + extra };
 }
 
-function overlap(a: Rect, b: Rect): number {
-  const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
-  const h = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
-  return w > 0 && h > 0 ? w * h : 0;
-}
-
 /**
  * Greedy corner assignment. Pinned blocks are placed first and never moved.
  * Automatic blocks try their current corner first, so an uncontested block
@@ -70,16 +58,19 @@ function overlap(a: Rect, b: Rect): number {
  */
 export function placeLabels(subjects: readonly LabelSubject[]): Map<string, Corner> {
   const result = new Map<string, Corner>();
-  const claimed: Rect[] = subjects.map((s) => ({
-    x0: s.cx - GLYPH_HALF,
-    y0: s.cy - GLYPH_HALF,
-    x1: s.cx + GLYPH_HALF,
-    y1: s.cy + GLYPH_HALF,
-  }));
+  const claimed = new RectGrid();
+  for (const s of subjects) {
+    claimed.add({
+      x0: s.cx - GLYPH_HALF,
+      y0: s.cy - GLYPH_HALF,
+      x1: s.cx + GLYPH_HALF,
+      y1: s.cy + GLYPH_HALF,
+    });
+  }
   const auto: LabelSubject[] = [];
   for (const s of subjects) {
     if (s.pinnedCorner) {
-      claimed.push(labelRect(s.cx, s.cy, s.pinnedCorner, s.extraLines));
+      claimed.add(labelRect(s.cx, s.cy, s.pinnedCorner, s.extraLines));
       result.set(s.hex, s.pinnedCorner);
     } else {
       auto.push(s);
@@ -93,8 +84,7 @@ export function placeLabels(subjects: readonly LabelSubject[]): Map<string, Corn
     let bestCost = Number.POSITIVE_INFINITY;
     for (const corner of order) {
       const r = labelRect(s.cx, s.cy, corner, s.extraLines);
-      let cost = 0;
-      for (const c of claimed) cost += overlap(r, c);
+      const cost = claimed.overlapWith(r);
       if (cost < bestCost) {
         bestCost = cost;
         best = corner;
@@ -102,7 +92,7 @@ export function placeLabels(subjects: readonly LabelSubject[]): Map<string, Corn
       }
       if (cost === 0) break;
     }
-    claimed.push(bestRect);
+    claimed.add(bestRect);
     result.set(s.hex, best);
   }
   return result;
