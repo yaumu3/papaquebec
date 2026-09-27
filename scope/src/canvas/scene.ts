@@ -89,14 +89,14 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       }
     });
 
-  /** Ring outlines round the site, kept until the projection changes with it. */
+  /** Ring outlines round the site, kept until the projection changes with it; none before either is set. */
   const ringPath = createMemo(() => {
     const s = site();
     return s ? ringPaths(s, projectNm) : null;
   });
   show((a) => {
     const path = ringPath();
-    if (!projected() || !path) return null;
+    if (!path) return null;
     const { width, height } = canvasSize();
     return {
       rings: buildRings({
