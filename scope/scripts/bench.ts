@@ -23,7 +23,10 @@ const { values: opt } = parseArgs({
     site: { type: 'string', default: '35.5533,139.7811' }, // RJTT
     seconds: { type: 'string', default: '3' },
     warmup: { type: 'string', default: '6000' },
-    fn: { type: 'string', default: 'buildStatic,buildTargets,buildOverlays,placeLabels,setLayer' },
+    fn: {
+      type: 'string',
+      default: 'buildRings,buildMap,buildTargets,placeLabels,buildHover,buildOverlays,setLayer',
+    },
     json: { type: 'string' },
   },
 });
