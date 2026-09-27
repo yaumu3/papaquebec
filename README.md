@@ -80,6 +80,11 @@ GitHub Actions runs the same four and builds the image on every push and pull re
 the console log; `bun run screenshot` regenerates the README picture from the synthetic fleet. The
 sim and screenshot scripts describe their flags in their headers.
 
+Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight:
+callsigns are `TEST` plus digits (a real airline callsign is three letters then a number), registrations
+`TEST-` plus digits, and addresses come from `D00000`–`DFFFFF`, a block ICAO Annex 10 Vol III reserves
+for future use. The sim tests enforce this for the fleet.
+
 ## Altimeter
 
 The QNH follows the METAR of the station named on the Display panel (blank means the nearest airport
