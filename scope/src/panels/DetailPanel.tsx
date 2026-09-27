@@ -30,8 +30,8 @@ interface Reading {
   tail?: string;
   /** A second value after a dot, in the plain text tone whatever the cell's own. */
   also?: string;
-  /** Tones the second value as the scope's own, not the transponder's. */
-  alsoEnriched?: boolean;
+  /** A unit after the second value. */
+  alsoUnit?: string;
 }
 
 const NONE: Reading = { v: '---' };
@@ -86,16 +86,11 @@ const num = (v: number | undefined, unit: string, digits = 0): Reading =>
 const bearing = (deg: number | undefined): Reading =>
   deg === undefined ? NONE : { v: `${padBearing(deg)}°` };
 
-/** Transmitted true track, then the magnetic one the scope derives. */
+/** Magnetic track the scope derives, then the transmitted true one. */
 function trackReading(t: Track): Reading {
   const mag = magneticTrack(t);
   if (t.track === undefined || mag === undefined) return NONE;
-  return {
-    v: `${padBearing(t.track)}°`,
-    unit: 'T',
-    also: `${padBearing(mag)}°`,
-    alsoEnriched: true,
-  };
+  return { v: `${padBearing(mag)}°`, also: `${padBearing(t.track)}°`, alsoUnit: 'T' };
 }
 
 const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
@@ -135,7 +130,10 @@ function Cell(props: {
         </Show>
         <Show when={props.r.also}>
           <span class={s.sep}>·</span>
-          <span class={cx(s.also, props.r.alsoEnriched && s.alsoEnriched)}>{props.r.also}</span>
+          <span class={s.also}>{props.r.also}</span>
+          <Show when={props.r.alsoUnit}>
+            <span class={s.unit}>{props.r.alsoUnit}</span>
+          </Show>
         </Show>
       </div>
     </div>
@@ -184,7 +182,7 @@ export function DetailPanel() {
                 <Cell k="ALT" r={altitudeReading(t().alt, t().baroRate)} />
                 <Cell k="VS" r={signed(t().baroRate, 'fpm')} />
                 <Cell k="GS" r={num(t().gs, 'kt')} />
-                <Cell k="TRK" r={trackReading(t())} />
+                <Cell k="TRK" r={trackReading(t())} tone="enriched" />
                 <Cell
                   k="LAT"
                   r={positionReadings(t().position)[0]}
