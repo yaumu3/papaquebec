@@ -82,3 +82,47 @@ export function inverse(a: GeoPoint, b: GeoPoint): RangeBearing {
   const course = Math.atan2(cosU2 * sinL, cosU1 * sinU2 - sinU1 * cosU2 * cosL) / RAD;
   return { distanceNm: metres / NM_IN_METERS, bearingTrue: (course + 360) % 360 };
 }
+
+/** The point `distanceNm` along the geodesic that leaves `from` on the true course `bearingTrue`. */
+export function direct(from: GeoPoint, bearingTrue: number, distanceNm: number): GeoPoint {
+  const s = distanceNm * NM_IN_METERS;
+  const sinA1 = Math.sin(bearingTrue * RAD);
+  const cosA1 = Math.cos(bearingTrue * RAD);
+  const tanU1 = (1 - F) * Math.tan(from.lat * RAD);
+  const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
+  const sinU1 = tanU1 * cosU1;
+  const sigma1 = Math.atan2(tanU1, cosA1);
+  const sinAlpha = cosU1 * sinA1;
+  const cos2Alpha = 1 - sinAlpha * sinAlpha;
+  const k = series(cos2Alpha);
+  let sigma = s / (B * k.a);
+  let sinS = 0;
+  let cosS = 1;
+  let cos2Sm = 0;
+  for (let i = 0; i < MAX_ITERATIONS; i++) {
+    cos2Sm = Math.cos(2 * sigma1 + sigma);
+    sinS = Math.sin(sigma);
+    cosS = Math.cos(sigma);
+    const prev = sigma;
+    sigma = s / (B * k.a) + deltaSigma(k.b, sinS, cosS, cos2Sm);
+    if (Math.abs(sigma - prev) < CONVERGED) break;
+  }
+  sinS = Math.sin(sigma);
+  cosS = Math.cos(sigma);
+  cos2Sm = Math.cos(2 * sigma1 + sigma);
+  const x = sinU1 * sinS - cosU1 * cosS * cosA1;
+  const lat = Math.atan2(sinU1 * cosS + cosU1 * sinS * cosA1, (1 - F) * Math.hypot(sinAlpha, x));
+  const lambda = Math.atan2(sinS * sinA1, cosU1 * cosS - sinU1 * sinS * cosA1);
+  const c = lambdaWeight(cos2Alpha);
+  const l =
+    lambda -
+    (1 - c) * F * sinAlpha * (sigma + c * sinS * (cos2Sm + c * cosS * (-1 + 2 * cos2Sm * cos2Sm)));
+  return { lat: lat / RAD, lon: from.lon + l / RAD };
+}
+
+/** `segments + 1` points `radiusNm` from `center`, clockwise from due north and back to it. */
+export function geodesicCircle(center: GeoPoint, radiusNm: number, segments: number): GeoPoint[] {
+  return Array.from({ length: segments + 1 }, (_, i) =>
+    direct(center, (360 * (i % segments)) / segments, radiusNm),
+  );
+}
