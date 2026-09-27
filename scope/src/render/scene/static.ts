@@ -4,7 +4,7 @@ import type { ProjectFn } from '../../state/trackStore';
 import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
-import { CIRCLE_SEGMENTS, ringRadii } from './rings';
+import { projectedCircle, ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
 export interface RingsInput {
@@ -29,15 +29,6 @@ export interface MapInput {
 }
 
 const NAVAID_MAX_RANGE = 120;
-
-function circle(cx: number, cy: number, r: number): Anchor[] {
-  const pts: Anchor[] = [];
-  for (let i = 0; i <= CIRCLE_SEGMENTS; i++) {
-    const a = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
-    pts.push({ x: cx + r * Math.sin(a), y: cy + r * Math.cos(a) });
-  }
-  return pts;
-}
 
 const route = (points: LatLon[], project: ProjectFn): Anchor[] =>
   points.map(([lat, lon]) => project(lat, lon));
@@ -97,8 +88,8 @@ function airspaceLayer({ aero, project, layers, atlas }: MapInput, labels: numbe
     for (const a of aero.airspace) {
       const style = a.dashed ? { dash: [4, 3] as [number, number] } : {};
       if ('center' in a) {
-        const c = project(a.center[0], a.center[1]);
-        lines.polyline(circle(c.x, c.y, a.radiusNm), THEME.airspace, style);
+        const [lat, lon] = a.center;
+        lines.polyline(projectedCircle({ lat, lon }, a.radiusNm, project), THEME.airspace, style);
         continue;
       }
       const pts = closedRoute(a.points, project);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { inverse } from '../../lib/geodesic';
 import type { AeroLayers } from '../../lib/mapdata';
 import { MAP_PRESETS } from '../../state/settingsDefaults';
 import { MAP_LAYERS } from '../layers';
@@ -81,6 +82,32 @@ describe('buildMap', () => {
 
     // Assert
     expect(drawn).toEqual([1, 0]);
+  });
+});
+
+describe('buildMap airspace', () => {
+  it('draws a circular airspace as the geodesic circle of its radius', () => {
+    // Arrange
+    const center = { lat: 35.5, lon: 139.8 };
+    const circle = {
+      name: 'CTR',
+      center: [center.lat, center.lon] as [number, number],
+      radiusNm: 5,
+    };
+    const input = mapInput({ aero: { ...aero, airspace: [circle] } });
+
+    // Act
+    const { airspace } = buildMap(input);
+
+    // Assert
+    const lines = airspace.find((b) => b.kind === 'lines');
+    const starts = Array.from({ length: lines?.count ?? 0 }, (_, i) => ({
+      lon: lines?.data[i * 16] ?? 0,
+      lat: lines?.data[i * 16 + 1] ?? 0,
+    }));
+    expect(starts.length).toBeGreaterThan(0);
+    // Within what Float32 instance data holds of a longitude near 140°, about half a metre.
+    expect(starts.every((p) => Math.abs(inverse(center, p).distanceNm - 5) < 1e-3)).toBe(true);
   });
 });
 
