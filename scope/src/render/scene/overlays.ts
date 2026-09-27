@@ -6,10 +6,10 @@ import {
   type Vec2,
   velocityNm,
 } from '../../lib/geo';
-import { inverse } from '../../lib/geodesic';
+import { geodesicPath, inverse } from '../../lib/geodesic';
 import type { RangeCursorOrigin, Rbl, RblAnchor, RblPending } from '../../state/scope';
 import type { Track } from '../../state/track';
-import type { UnprojectFn } from '../../state/trackStore';
+import type { ProjectFn, UnprojectFn } from '../../state/trackStore';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { THEME, trackLabel } from './rules';
@@ -24,6 +24,8 @@ export interface OverlayInput {
   pointer: { cx: number; cy: number } | null;
   /** Magnetic declination at the site, degrees east. */
   declination: number;
+  /** Lat/lon onto the scope plane, for lines drawn along the geodesic. */
+  project: ProjectFn;
   /** The scope plane back to lat/lon, for ends that are not targets. */
   unproject: UnprojectFn;
   view: View;
@@ -101,13 +103,13 @@ function drawRbl(
   onTarget: [boolean, boolean],
   tag: string | null,
   labelAt: Anchor,
-  declination: number,
+  input: OverlayInput,
 ): void {
-  lines.segment(a.pos, b.pos, THEME.cursor);
+  lines.polyline(geodesicPath([a.geo, b.geo], input.project), THEME.cursor);
   markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
   if (tag !== null)
     markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
-  rblLines(a, b, declination).forEach((line, i) => {
+  rblLines(a, b, input.declination).forEach((line, i) => {
     text.text(line, { ...labelAt, py: (labelAt.py ?? 0) + i * 13 }, 11, THEME.cursor);
   });
   if (tag !== null)
@@ -137,8 +139,9 @@ function drawRangeCursor(
   if (!from) return;
   const o = from.pos;
   const m = toWorld(input.view, input.pointer.cx, input.pointer.cy);
-  const { dist, brg } = measure(from, freePoint(m, '', input.unproject), input.declination);
-  lines.segment(o, m, THEME.cursor, { dash: [2, 3] });
+  const to = freePoint(m, '', input.unproject);
+  const { dist, brg } = measure(from, to, input.declination);
+  lines.polyline(geodesicPath([from.geo, to.geo], input.project), THEME.cursor, { dash: [2, 3] });
   markers.marker(o, Shape.Ring, 8, THEME.cursor);
   markers.marker(o, Shape.Dot, 4, THEME.cursor);
   lines.segment({ ...m, px: -8 }, { ...m, px: 8 }, THEME.cursor);
@@ -167,7 +170,7 @@ export function buildOverlays(input: OverlayInput): Batch[] {
       [rbl.a.kind === 'target', rbl.b.kind === 'target'],
       rbl.tag,
       mid,
-      input.declination,
+      input,
     );
   }
   const pending = input.rblPending?.a;
@@ -185,7 +188,7 @@ export function buildOverlays(input: OverlayInput): Batch[] {
         [pending.kind === 'target', false],
         null,
         { ...w, px: 12, py: 12 },
-        input.declination,
+        input,
       );
     }
   }

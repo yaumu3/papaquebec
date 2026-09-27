@@ -177,6 +177,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         rangeCursor: rangeCursor(),
         pointer: measuring ? pointer() : null,
         declination: declination(),
+        project: projectNm,
         unproject: unprojectNm,
         view: v,
         atlas: a,
