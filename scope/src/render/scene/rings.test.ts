@@ -4,15 +4,15 @@ import { CIRCLE_SEGMENTS } from './paths';
 import { ringPaths, ringRadii, ringStepNm } from './rings';
 
 describe('range rings', () => {
-  it('spaces rings by 5, 10 or 20 NM depending on the displayed range', () => {
+  it('spaces rings by 5, 10, 20 or 50 NM depending on the displayed range', () => {
     // Arrange
-    const ranges = [10, 20, 40, 80, 200];
+    const ranges = [10, 20, 40, 80, 160, 200, 400, 500];
 
     // Act
     const steps = ranges.map(ringStepNm);
 
     // Assert
-    expect(steps).toEqual([5, 5, 10, 10, 20]);
+    expect(steps).toEqual([5, 5, 10, 10, 20, 50, 50, 50]);
   });
 
   it('lists every ring radius up to and including the range', () => {
