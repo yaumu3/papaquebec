@@ -58,10 +58,17 @@ function mousePoint(input: OverlayInput): Point | null {
   return { pos: w, vel: null, label: '' };
 }
 
+/** How far `b` lies from `a`, in NM, and on what magnetic bearing. */
+function measure(a: Point, b: Point, declination: number): { dist: number; brg: number } {
+  return {
+    dist: distanceNm(a.pos, b.pos),
+    brg: trueToMagnetic(bearingTrue(b.pos.x - a.pos.x, b.pos.y - a.pos.y), declination),
+  };
+}
+
 /** Distance, magnetic bearing, ETE when only A moves, CPA when both move. */
 export function rblLines(a: Point, b: Point, declination: number): string[] {
-  const dist = distanceNm(a.pos, b.pos);
-  const brg = trueToMagnetic(bearingTrue(b.pos.x - a.pos.x, b.pos.y - a.pos.y), declination);
+  const { dist, brg } = measure(a, b, declination);
   let first = `${dist.toFixed(1)} / ${padBearing(brg)}°`;
   const lines = [first];
   if (a.vel && !b.vel) {
@@ -110,21 +117,19 @@ function drawRangeCursor(
 ): void {
   const origin = input.rangeCursor;
   if (!origin || !input.pointer) return;
-  let o: Vec2;
-  let label: string;
+  let from: Point | null;
   if (origin.kind === 'target') {
     const t = input.tracks.get(origin.hex);
-    const p = t ? trackPoint(t) : null;
-    if (!p) return;
-    o = p.pos;
-    label = p.label;
+    from = t ? trackPoint(t) : null;
   } else {
-    o = { x: origin.x, y: origin.y };
-    label = origin.kind === 'fix' ? origin.name : `${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`;
+    const label =
+      origin.kind === 'fix' ? origin.name : `${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`;
+    from = { pos: { x: origin.x, y: origin.y }, vel: null, label };
   }
+  if (!from) return;
+  const o = from.pos;
   const m = toWorld(input.view, input.pointer.cx, input.pointer.cy);
-  const dist = distanceNm(o, m);
-  const brg = trueToMagnetic(bearingTrue(m.x - o.x, m.y - o.y), input.declination);
+  const { dist, brg } = measure(from, { pos: m, vel: null, label: '' }, input.declination);
   lines.segment(o, m, THEME.cursor, { dash: [2, 3] });
   markers.marker(o, Shape.Ring, 8, THEME.cursor);
   markers.marker(o, Shape.Dot, 4, THEME.cursor);
@@ -132,7 +137,7 @@ function drawRangeCursor(
   lines.segment({ ...m, py: -8 }, { ...m, py: 8 }, THEME.cursor);
   text.text(`${dist.toFixed(1)} NM`, { ...m, px: 12, py: 6 }, 11, THEME.cursor);
   text.text(`${padBearing(brg)}°`, { ...m, px: 12, py: 19 }, 11, THEME.cursor);
-  text.text(label, { ...m, px: 12, py: 32 }, 10, THEME.cursorDim);
+  text.text(from.label, { ...m, px: 12, py: 32 }, 10, THEME.cursorDim);
 }
 
 export function buildOverlays(input: OverlayInput): Batch[] {
