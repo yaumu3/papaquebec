@@ -4,6 +4,8 @@
  * keeps no scene state beyond those buffers.
  */
 
+import type { LayerName } from './layers';
+
 /** Floats per instance. See `pack.ts` for the layouts. */
 export const LINE_STRIDE = 16;
 export const MARKER_STRIDE = 12;
@@ -60,9 +62,9 @@ export type ToWorker =
   | { type: 'probe' }
   | { type: 'init'; canvas: OffscreenCanvas; view: View }
   | { type: 'atlas'; info: AtlasInfo; pixels: Uint8Array }
-  | { type: 'layer'; name: string; batches: Batch[] }
+  | { type: 'layer'; name: LayerName; batches: Batch[] }
   | { type: 'view'; view: View }
-  | { type: 'draw'; order: string[] };
+  | { type: 'draw'; order: LayerName[] };
 
 export type FromWorker =
   | { type: 'probe'; webgpu: boolean }

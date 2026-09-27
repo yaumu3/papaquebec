@@ -1,6 +1,7 @@
 import type { AeroLayers, CoastData, LatLon } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
 import type { ProjectFn } from '../../state/trackStore';
+import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
 import { ringRadii } from './rings';
@@ -24,16 +25,6 @@ export interface MapInput {
   navaidsInRange: boolean;
   atlas: AtlasInfo;
 }
-
-export interface NamedLayer {
-  name: string;
-  batches: Batch[];
-}
-
-/** Draw order of the map layers, back to front. */
-export const MAP_ORDER = ['airways', 'airspace', 'sector', 'coast', 'fixes'];
-/** Draw order of every static layer: the rings under the map. */
-export const STATIC_ORDER = ['rings', ...MAP_ORDER];
 
 const CIRCLE_SEGMENTS = 96;
 const NAVAID_MAX_RANGE = 120;
@@ -66,7 +57,7 @@ export function navaidsShownAt(rangeNm: number): boolean {
   return rangeNm <= NAVAID_MAX_RANGE;
 }
 
-export function buildRings(input: RingsInput): NamedLayer {
+export function buildRings(input: RingsInput): Batch[] {
   const lines = new LineBatch();
   const text = new TextBatch(input.atlas);
   if (input.layers.rings) {
@@ -75,7 +66,7 @@ export function buildRings(input: RingsInput): NamedLayer {
       text.text(String(r), { x: 0, y: r, px: 3, py: 1 }, 9, THEME.ringLabel);
     }
   }
-  return { name: 'rings', batches: [lines.finish(), text.finish()] };
+  return [lines.finish(), text.finish()];
 }
 
 function airwaysLayer({ aero, project, layers, atlas }: MapInput, labels: number): Batch[] {
@@ -198,13 +189,13 @@ function fixesLayer(input: MapInput, labels: number): Batch[] {
   return [markers.finish(), text.finish()];
 }
 
-export function buildMap(input: MapInput): NamedLayer[] {
+export function buildMap(input: MapInput): Record<MapLayer, Batch[]> {
   const labels = density(input.labelDensity);
-  return [
-    { name: 'airways', batches: airwaysLayer(input, labels) },
-    { name: 'airspace', batches: airspaceLayer(input, labels) },
-    { name: 'sector', batches: sectorLayer(input) },
-    { name: 'coast', batches: coastLayer(input) },
-    { name: 'fixes', batches: fixesLayer(input, labels) },
-  ];
+  return {
+    airways: airwaysLayer(input, labels),
+    airspace: airspaceLayer(input, labels),
+    sector: sectorLayer(input),
+    coast: coastLayer(input),
+    fixes: fixesLayer(input, labels),
+  };
 }

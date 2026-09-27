@@ -2,10 +2,11 @@ import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from '
 
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer } from '../render/facade';
+import { LAYER_ORDER, MAP_LAYERS } from '../render/layers';
 import type { AtlasInfo, View } from '../render/protocol';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
-import { buildMap, buildRings, navaidsShownAt, STATIC_ORDER } from '../render/scene/static';
+import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
 import { buildTargets } from '../render/scene/targets';
 import {
   aero,
@@ -30,8 +31,6 @@ import { projectNm, trackStore } from '../state/tracks';
 import { RBL_SNAP_PX, targetAt } from './hit';
 import { debounce } from './settle';
 import { halfLongEdgeNm } from './view';
-
-const ORDER = [...STATIC_ORDER, 'targets', 'hover', 'overlays'];
 
 /** How long a zoom must rest before data blocks are laid out again at the new scale. */
 const ZOOM_SETTLE_MS = 150;
@@ -68,21 +67,23 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
 
   createEffect(() => {
     renderer.setView(view());
-    renderer.draw(ORDER);
+    renderer.draw(LAYER_ORDER);
   });
 
   createEffect(() => {
     const a = atlas();
     if (!a || projectionVersion() === 0) return;
     const { width, height } = canvasSize();
-    const rings = buildRings({
-      layers: { ...settings.layers },
-      rangeNm: settings.rangeNm,
-      ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
-      atlas: a,
-    });
-    renderer.setLayer(rings.name, rings.batches);
-    renderer.draw(ORDER);
+    renderer.setLayer(
+      'rings',
+      buildRings({
+        layers: { ...settings.layers },
+        rangeNm: settings.rangeNm,
+        ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
+        atlas: a,
+      }),
+    );
+    renderer.draw(LAYER_ORDER);
   });
 
   /** Zooming reaches the map layers only when it shows or hides the navaids. */
@@ -99,8 +100,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       navaidsInRange: navaidsInRange(),
       atlas: a,
     });
-    for (const l of layers) renderer.setLayer(l.name, l.batches);
-    renderer.draw(ORDER);
+    for (const name of MAP_LAYERS) renderer.setLayer(name, layers[name]);
+    renderer.draw(LAYER_ORDER);
   });
 
   createEffect(() => {
@@ -125,7 +126,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       if (t) t.ops.autoCorner = corner;
     }
     renderer.setLayer('targets', batches);
-    renderer.draw(ORDER);
+    renderer.draw(LAYER_ORDER);
     setTargetsBuilt((n) => n + 1);
   });
 
@@ -142,7 +143,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         labelDrag: labelDrag(),
       }),
     );
-    renderer.draw(ORDER);
+    renderer.draw(LAYER_ORDER);
   });
 
   createEffect(
@@ -175,7 +176,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
             snap: (cx, cy) => targetAt(v, cx, cy, RBL_SNAP_PX),
           }),
         );
-        renderer.draw(ORDER);
+        renderer.draw(LAYER_ORDER);
       },
     ),
   );

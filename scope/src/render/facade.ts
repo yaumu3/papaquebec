@@ -1,4 +1,5 @@
 import { GpuRenderer } from './gpu/renderer';
+import type { LayerName } from './layers';
 import {
   type AtlasInfo,
   type Batch,
@@ -17,9 +18,9 @@ export interface Renderer {
   setView(view: View): void;
   setAtlas(info: AtlasInfo, pixels: Uint8Array): void;
   /** Takes the batches: once the renderer is up their buffers move to the worker, unusable here. */
-  setLayer(name: string, batches: Batch[]): void;
+  setLayer(name: LayerName, batches: Batch[]): void;
   /** Coalesced through requestAnimationFrame; many calls, one frame. */
-  draw(order: readonly string[]): void;
+  draw(order: readonly LayerName[]): void;
   destroy(): void;
 }
 
@@ -30,7 +31,7 @@ export interface Renderer {
 interface Retained {
   view: View | null;
   atlas: { info: AtlasInfo; pixels: Uint8Array } | null;
-  layers: Map<string, Batch[]>;
+  layers: Map<LayerName, Batch[]>;
 }
 
 async function probeWorker(worker: Worker): Promise<boolean> {
@@ -63,12 +64,12 @@ export function createRenderer(
   let worker: Worker | null = null;
   let local: GpuRenderer | null = null;
   let frame = 0;
-  let pendingOrder: readonly string[] = [];
+  let pendingOrder: readonly LayerName[] = [];
   let ready = false;
   let destroyed = false;
 
   const send = (m: ToWorker, transfer: Transferable[] = []) => worker?.postMessage(m, transfer);
-  const sendLayer = (name: string, batches: Batch[]) => {
+  const sendLayer = (name: LayerName, batches: Batch[]) => {
     if (local) local.setLayer(name, batches);
     else send({ type: 'layer', name, batches }, transferables(batches));
   };
