@@ -167,25 +167,29 @@ export function geodesicPath(
   project: ProjectFn,
   tolerance = PATH_TOLERANCE_NM,
 ): Vec2[] {
-  const first = points[0];
+  const [first, ...rest] = points;
   if (!first) return [];
-  const path = [project(first.lat, first.lon)];
-  for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1] ?? first;
-    const b = points[i] ?? a;
-    const pa = path.at(-1) ?? project(a.lat, a.lon);
+  let a = first;
+  let pa = project(a.lat, a.lon);
+  const path = [pa];
+  for (const b of rest) {
     const pb = project(b.lat, b.lon);
     const m = sphericalMidpoint(a, b);
     const bow = offLine(project(m.lat, m.lon), pa, pb);
-    if (bow > tolerance) {
-      const pieces = Math.ceil(Math.sqrt(bow / tolerance));
-      const { distanceNm, bearingTrue } = inverse(a, b);
-      for (let k = 1; k < pieces; k++) {
-        const p = direct(a, bearingTrue, (distanceNm * k) / pieces);
-        path.push(project(p.lat, p.lon));
-      }
-    }
+    if (bow > tolerance)
+      path.push(...inBetween(a, b, Math.ceil(Math.sqrt(bow / tolerance)), project));
     path.push(pb);
+    a = b;
+    pa = pb;
   }
   return path;
+}
+
+/** The points that cut the geodesic from `a` to `b` into `pieces` equal parts, projected. */
+function inBetween(a: GeoPoint, b: GeoPoint, pieces: number, project: ProjectFn): Vec2[] {
+  const { distanceNm, bearingTrue } = inverse(a, b);
+  return Array.from({ length: pieces - 1 }, (_, i) => {
+    const p = direct(a, bearingTrue, (distanceNm * (i + 1)) / pieces);
+    return project(p.lat, p.lon);
+  });
 }
