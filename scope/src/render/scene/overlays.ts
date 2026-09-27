@@ -56,12 +56,21 @@ function freePoint(pos: Vec2, label: string, unproject: UnprojectFn): Point {
   return { pos, geo: unproject(pos.x, pos.y), vel: null, label };
 }
 
-function anchorPoint(a: RblAnchor, input: OverlayInput): Point | null {
+/** Where an RBL end is: on its target while it has a position, else where it was placed. */
+export function anchorPoint(
+  a: RblAnchor,
+  ends: Pick<OverlayInput, 'tracks' | 'unproject'>,
+): Point | null {
   if (a.kind === 'target') {
-    const t = input.tracks.get(a.hex);
+    const t = ends.tracks.get(a.hex);
     return t ? trackPoint(t) : null;
   }
-  return freePoint({ x: a.x, y: a.y }, '', input.unproject);
+  return freePoint({ x: a.x, y: a.y }, '', ends.unproject);
+}
+
+/** The line an RBL is drawn along, on the scope plane; hit tests follow the same one. */
+export function rblPath(a: { geo: GeoPoint }, b: { geo: GeoPoint }, project: ProjectFn): Vec2[] {
+  return geodesicPath([a.geo, b.geo], project);
 }
 
 function mousePoint(input: OverlayInput): Point | null {
@@ -106,7 +115,7 @@ function drawRbl(
   labelAt: Anchor,
   input: OverlayInput,
 ): void {
-  lines.polyline(geodesicPath([a.geo, b.geo], input.project), THEME.cursor);
+  lines.polyline(rblPath(a, b, input.project), THEME.cursor);
   markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
   if (tag !== null)
     markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);

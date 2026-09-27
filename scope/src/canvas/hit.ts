@@ -1,13 +1,14 @@
-import { distanceToSegment } from '../lib/geo';
+import { distanceToSegment, type ProjectFn, type UnprojectFn } from '../lib/geo';
 import { blockCorner, labelOffset, labelRect } from '../render/layout/labels';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
+import { anchorPoint, rblPath } from '../render/scene/overlays';
 import { toScreen, toWorld } from '../render/scene/view';
 import { visibility } from '../state/filter';
 import { aero, type Rbl, type RblAnchor, rbls, selected } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
-import { projectNm, trackStore } from '../state/tracks';
+import { projectNm, trackStore, unprojectNm } from '../state/tracks';
 import { anchorFor } from './rbl';
 
 export const TARGET_PX = 14;
@@ -70,21 +71,46 @@ export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
 
 const RBL_PX = 6;
 
-function anchorScreen(view: View, a: RblAnchor): { cx: number; cy: number } | null {
-  if (a.kind === 'target') return targetScreen(view, a.hex);
-  return toScreen(view, a.x, a.y);
+/** What an RBL's ends are resolved and drawn with. */
+export interface RblPlane {
+  tracks: Map<string, Track>;
+  project: ProjectFn;
+  unproject: UnprojectFn;
+}
+
+/** The first of `lines` whose drawn path passes within reach of a screen point. */
+export function rblNear(
+  lines: readonly Rbl[],
+  view: View,
+  cx: number,
+  cy: number,
+  plane: RblPlane,
+): Rbl | null {
+  const p = { x: cx, y: cy };
+  return (
+    lines.find((r) => {
+      const a = anchorPoint(r.a, plane);
+      const b = anchorPoint(r.b, plane);
+      if (!a || !b) return false;
+      const path = rblPath(a, b, plane.project).map((w) => {
+        const s = toScreen(view, w.x, w.y);
+        return { x: s.cx, y: s.cy };
+      });
+      return path.some((q, i) => {
+        const prev = path[i - 1];
+        return prev !== undefined && distanceToSegment(p, prev, q) <= RBL_PX;
+      });
+    }) ?? null
+  );
 }
 
 /** The range/bearing line under a screen point, if any. */
 export function rblAt(view: View, cx: number, cy: number): Rbl | null {
-  const p = { x: cx, y: cy };
-  for (const r of rbls()) {
-    const a = anchorScreen(view, r.a);
-    const b = anchorScreen(view, r.b);
-    if (!a || !b) continue;
-    if (distanceToSegment(p, { x: a.cx, y: a.cy }, { x: b.cx, y: b.cy }) <= RBL_PX) return r;
-  }
-  return null;
+  return rblNear(rbls(), view, cx, cy, {
+    tracks: trackStore.tracks,
+    project: projectNm,
+    unproject: unprojectNm,
+  });
 }
 
 export function fixAt(
