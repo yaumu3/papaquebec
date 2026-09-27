@@ -99,7 +99,7 @@ describe('trackDrags', () => {
 
   it('drags an RBL out of a target and drops its far end where released', () => {
     // Arrange
-    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('abc123')] });
+    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
     const { d } = subject();
     d.start({ x: 401, y: 300 }, precise);
     d.move({ x: 600, y: 200 });
@@ -110,14 +110,14 @@ describe('trackDrags', () => {
     // Assert
     expect(swallow).toBe(true);
     expect(rbls().map(({ a, b }) => ({ a, b }))).toEqual([
-      { a: { kind: 'target', hex: 'abc123' }, b: { kind: 'free', ...toWorld(view, 600, 200) } },
+      { a: { kind: 'target', hex: 'd00123' }, b: { kind: 'free', ...toWorld(view, 600, 200) } },
     ]);
     expect([rblPending(), modeText()]).toEqual([null, null]);
   });
 
   it('drops a pending RBL when the drag is cancelled', () => {
     // Arrange
-    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('abc123')] });
+    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
     const { d } = subject();
     d.start({ x: 401, y: 300 }, precise);
     d.move({ x: 600, y: 200 });

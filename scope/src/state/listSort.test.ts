@@ -67,9 +67,9 @@ describe('sortTracks', () => {
   it('sorts by identity label, registration counting as identity', () => {
     // Arrange
     const tracks = [
-      track('c00001', { flight: 'JAL5' }),
-      track('a00001', { registration: 'JA737T' }),
-      track('b00001'),
+      track('d0000c', { flight: 'TEST04' }),
+      track('d0000a', { registration: 'TEST-02' }),
+      track('d0000b'),
     ];
 
     // Act
@@ -77,8 +77,8 @@ describe('sortTracks', () => {
     const desc = sortTracks(tracks, { key: 'id', dir: 'desc' }).map((t) => t.hex);
 
     // Assert
-    expect(asc).toEqual(['b00001', 'a00001', 'c00001']);
-    expect(desc).toEqual(['c00001', 'a00001', 'b00001']);
+    expect(asc).toEqual(['d0000b', 'd0000a', 'd0000c']);
+    expect(desc).toEqual(['d0000c', 'd0000a', 'd0000b']);
   });
 
   it('sorts numeric columns with unknown values last in either direction', () => {

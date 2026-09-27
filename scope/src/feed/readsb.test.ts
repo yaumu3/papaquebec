@@ -15,7 +15,7 @@ function fakeFetch(bodies: Record<string, unknown>): FetchLike {
 describe('createReadsbSource', () => {
   it('polls aircraft.json under the data base and returns the snapshot as is', async () => {
     // Arrange
-    const snapshot = { now: 1700000000.5, messages: 42, aircraft: [{ hex: 'abc123' }] };
+    const snapshot = { now: 1700000000.5, messages: 42, aircraft: [{ hex: 'd00123' }] };
     const source = createReadsbSource('/data', fakeFetch({ '/data/aircraft.json': snapshot }));
 
     // Act

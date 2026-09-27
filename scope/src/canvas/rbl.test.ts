@@ -12,10 +12,10 @@ describe('anchorFor', () => {
     const world = { x: 3, y: -4 };
 
     // Act
-    const out = [anchorFor({ hex: '867a01' }, world), anchorFor(null, world)];
+    const out = [anchorFor({ hex: 'd00001' }, world), anchorFor(null, world)];
 
     // Assert
-    expect(out).toEqual([target('867a01'), free(3, -4)]);
+    expect(out).toEqual([target('d00001'), free(3, -4)]);
   });
 });
 
@@ -25,10 +25,10 @@ describe('appendRbl', () => {
     const existing: Rbl[] = [{ a: free(0, 0), b: free(1, 1), tag: 'A' }];
 
     // Act
-    const out = appendRbl(existing, target('867a01'), free(5, 5));
+    const out = appendRbl(existing, target('d00001'), free(5, 5));
 
     // Assert
-    expect(out).toEqual([...existing, { a: target('867a01'), b: free(5, 5), tag: 'B' }]);
+    expect(out).toEqual([...existing, { a: target('d00001'), b: free(5, 5), tag: 'B' }]);
   });
 
   it('leaves the list alone when both ends are the same target', () => {
@@ -36,7 +36,7 @@ describe('appendRbl', () => {
     const existing: Rbl[] = [{ a: free(0, 0), b: free(1, 1), tag: 'A' }];
 
     // Act
-    const out = appendRbl(existing, target('867a01'), target('867a01'));
+    const out = appendRbl(existing, target('d00001'), target('d00001'));
 
     // Assert
     expect(out).toBe(existing);

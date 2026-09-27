@@ -58,7 +58,7 @@ describe('buildTargets', () => {
     // Assert
     expect(shapes(batches)).toEqual([Shape.Square]);
     expect(count(batches, 'lines')).toBe(2 + 1 + 1); // two trail slashes, vector, leader
-    expect(count(batches, 'text')).toBe('ANA241'.length + '110B789'.length); // spaces emit nothing
+    expect(count(batches, 'text')).toBe('TEST01'.length + '110B789'.length); // spaces emit nothing
   });
 
   it('reduces a filtered target to a bare hollow diamond', () => {
@@ -82,7 +82,7 @@ describe('buildTargets', () => {
     const band = { ground: true, lowerFl: 0, upperFl: 200, squawk: 'all' as const };
 
     // Act
-    const { batches } = buildTargets(input([t], { filter: band, selected: '867a01' }));
+    const { batches } = buildTargets(input([t], { filter: band, selected: 'd00001' }));
 
     // Assert
     expect(shapes(batches).filter((s) => s !== Shape.Dot)).toEqual([Shape.Square]);
@@ -115,7 +115,7 @@ describe('buildTargets', () => {
   it('draws a dragged block at the drag offset instead of a corner', () => {
     // Arrange
     const t = track();
-    const drag = { hex: '867a01', dx: -40, dy: 30 };
+    const drag = { hex: 'd00001', dx: -40, dy: 30 };
 
     // Act
     const { batches } = buildTargets(input([t], { labelDrag: drag }));
@@ -132,10 +132,10 @@ describe('buildTargets', () => {
   it('draws every retained history fix as a dot for the selected target only', () => {
     // Arrange
     const t = track();
-    const other = track({ hex: '867a02', flight: 'JAL317' });
+    const other = track({ hex: 'd00002', flight: 'TEST02' });
 
     // Act
-    const all = shapes(buildTargets(input([t, other], { selected: '867a01' })).batches);
+    const all = shapes(buildTargets(input([t, other], { selected: 'd00001' })).batches);
     const none = shapes(buildTargets(input([t, other])).batches);
 
     // Assert
@@ -152,7 +152,7 @@ describe('buildTargets', () => {
     ];
 
     // Act
-    const dots = shapes(buildTargets(input([t], { selected: '867a01', trace })).batches).filter(
+    const dots = shapes(buildTargets(input([t], { selected: 'd00001', trace })).batches).filter(
       (s) => s === Shape.Dot,
     );
 
@@ -168,18 +168,18 @@ describe('buildTargets', () => {
     const { corners } = buildTargets(input([t]));
 
     // Assert
-    expect(corners.get('867a01')).toBe('ne');
+    expect(corners.get('d00001')).toBe('ne');
   });
 
   it('lays blocks out at the given scale, moving one aside only where the targets crowd', () => {
     // Arrange
-    const tracks = [trackAt('00000a', 0, 0), trackAt('00000b', 0.3, 0.15)];
+    const tracks = [trackAt('d0000a', 0, 0), trackAt('d0000b', 0.3, 0.15)];
     const scales = [100, 1000];
 
     // Act
     const corners = scales.map((pxPerNm) => buildTargets(input(tracks, { pxPerNm })).corners);
 
     // Assert
-    expect(corners.map((c) => c.get('00000a'))).toEqual(['nw', 'ne']);
+    expect(corners.map((c) => c.get('d0000a'))).toEqual(['nw', 'ne']);
   });
 });

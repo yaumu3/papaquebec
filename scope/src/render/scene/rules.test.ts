@@ -26,8 +26,8 @@ describe('trackColor', () => {
   it('ranks emergency over selected over stale over ground over climb state', () => {
     // Arrange
     const cases: [Track, string | null][] = [
-      [track({ squawk: '7700' }), '867a01'],
-      [track(), '867a01'],
+      [track({ squawk: '7700' }), 'd00001'],
+      [track(), 'd00001'],
       [track({ seenPos: 60 }), null],
       [track({ alt: 'ground', baroRate: 1500 }), null],
       [track({ baroRate: 1500 }), null],
@@ -74,7 +74,7 @@ describe('trackLabel', () => {
     // Arrange
     const cases = [
       track(),
-      track({ flight: undefined, registration: 'JA737T' }),
+      track({ flight: undefined, registration: 'TEST-02' }),
       track({ flight: undefined, registration: undefined }),
     ];
 
@@ -82,7 +82,7 @@ describe('trackLabel', () => {
     const labels = cases.map(trackLabel);
 
     // Assert
-    expect(labels).toEqual(['ANA241', 'JA737T', '867A01']);
+    expect(labels).toEqual(['TEST01', 'TEST-02', 'D00001']);
   });
 });
 

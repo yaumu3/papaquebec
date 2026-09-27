@@ -6,7 +6,7 @@ describe('parseTrace', () => {
   it('turns readsb trace rows into timed positions, skipping rows without a position', () => {
     // Arrange
     const raw = {
-      icao: '8514b4',
+      icao: 'd00010',
       timestamp: 1_700_000_000,
       trace: [
         // near RJAA, tracking east
@@ -21,7 +21,7 @@ describe('parseTrace', () => {
     const trace = parseTrace(raw);
 
     // Assert
-    expect(trace?.hex).toBe('8514b4');
+    expect(trace?.hex).toBe('d00010');
     expect(trace?.points).toEqual([
       { t: 1_700_000_000, lat: 35.7, lon: 140.3, alt: 5000 },
       { t: 1_700_000_004.5, lat: 35.71, lon: 140.32, alt: 'ground' },
