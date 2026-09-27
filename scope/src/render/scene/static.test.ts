@@ -111,6 +111,28 @@ describe('buildMap airspace', () => {
   });
 });
 
+describe('buildMap edges', () => {
+  it('splits long sector and coast edges along the geodesic, closing the outline', () => {
+    // Arrange
+    const outline: [number, number][] = [
+      [35, 130],
+      [35, 150],
+      [40, 140],
+    ];
+    const input = mapInput({
+      aero: { ...aero, sectors: [{ name: 'S', points: outline }] },
+      coast: { lines: [outline.map(([lat, lon]) => [lon, lat] as [number, number])] },
+    });
+
+    // Act
+    const { sector, coast } = buildMap(input);
+
+    // Assert
+    expect(count(sector, 'lines')).toBeGreaterThan(3);
+    expect(count(coast, 'lines')).toBeGreaterThan(2);
+  });
+});
+
 describe('navaidsShownAt', () => {
   it('shows navaids out to 120 NM and hides them beyond', () => {
     // Arrange

@@ -1,3 +1,4 @@
+import { geodesicPath } from '../../lib/geodesic';
 import type { AeroLayers, CoastData, LatLon } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
 import type { ProjectFn } from '../../state/trackStore';
@@ -30,14 +31,17 @@ export interface MapInput {
 
 const NAVAID_MAX_RANGE = 120;
 
+/** A route drawn along the geodesics between its points. */
 const route = (points: LatLon[], project: ProjectFn): Anchor[] =>
-  points.map(([lat, lon]) => project(lat, lon));
+  geodesicPath(
+    points.map(([lat, lon]) => ({ lat, lon })),
+    project,
+  );
 
 /** A route back to its first point, for an outline. */
 function closedRoute(points: LatLon[], project: ProjectFn): Anchor[] {
-  const pts = route(points, project);
-  const first = pts[0];
-  return first ? [...pts, first] : pts;
+  const first = points[0];
+  return route(first ? [...points, first] : points, project);
 }
 
 function density(d: LabelDensity): number {
@@ -119,7 +123,10 @@ function coastLayer({ coast, project, layers }: MapInput): Batch[] {
   if (layers.coast) {
     for (const line of coast.lines) {
       lines.polyline(
-        line.map(([lon, lat]) => project(lat, lon)),
+        geodesicPath(
+          line.map(([lon, lat]) => ({ lat, lon })),
+          project,
+        ),
         THEME.coast,
       );
     }
