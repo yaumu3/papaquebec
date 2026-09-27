@@ -13,7 +13,7 @@ export type BatchKind = 'lines' | 'markers' | 'text';
 
 export interface Batch {
   kind: BatchKind;
-  data: Float32Array;
+  data: Float32Array<ArrayBuffer>;
   count: number;
 }
 
@@ -69,3 +69,8 @@ export type FromWorker =
   | { type: 'ready'; adapter: string }
   | { type: 'error'; message: string }
   | { type: 'lost'; reason: string };
+
+/** The buffers behind a layer's batches, each once, to hand to the worker rather than copy. */
+export function transferables(batches: readonly Batch[]): ArrayBuffer[] {
+  return [...new Set(batches.map((b) => b.data.buffer))];
+}

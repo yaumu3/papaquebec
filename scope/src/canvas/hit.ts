@@ -1,5 +1,5 @@
 import { distanceToSegment } from '../lib/geo';
-import { labelOffset, labelRect } from '../render/layout/labels';
+import { blockCorner, labelOffset, labelRect } from '../render/layout/labels';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { toScreen, toWorld } from '../render/scene/view';
@@ -60,7 +60,7 @@ export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
   for (const t of trackStore.tracks.values()) {
     const s = targetScreen(view, t.hex);
     if (!s || hidden(t)) continue;
-    const corner = t.ops.pinnedCorner ?? t.ops.autoCorner;
+    const corner = blockCorner(t.ops);
     const r = labelRect(s.cx, s.cy, corner, extraLines(t));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)
       return { hex: t.hex, ...labelOffset(corner) };

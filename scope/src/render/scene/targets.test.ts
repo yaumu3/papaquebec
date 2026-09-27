@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
-import { type Batch, Shape, type View } from '../protocol';
+import { type Batch, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildTargets, type TargetInput } from './targets';
 import { makeTrack } from './trackFixture';
-
-const view: View = { centerX: 0, centerY: 0, pxPerNm: 10, widthPx: 800, heightPx: 600, dpr: 1 };
 
 function track(over: Partial<Track> = {}): Track {
   return makeTrack({
@@ -20,6 +18,10 @@ function track(over: Partial<Track> = {}): Track {
   });
 }
 
+/** A live target at world `x`, `y` NM. */
+const trackAt = (hex: string, x: number, y: number) =>
+  track({ hex, position: { kind: 'live', lat: 0, lon: 0, x, y } });
+
 function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
   return {
     tracks,
@@ -28,8 +30,7 @@ function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
     vectorMin: 2,
     trailSec: 60,
     selected: null,
-    hovered: null,
-    view,
+    pxPerNm: 10,
     atlas,
     labelDrag: null,
     altimeter: { transitionAltFt: 14000, qnhInHg: 29.92 },
@@ -168,5 +169,17 @@ describe('buildTargets', () => {
 
     // Assert
     expect(corners.get('867a01')).toBe('ne');
+  });
+
+  it('lays blocks out at the given scale, moving one aside only where the targets crowd', () => {
+    // Arrange
+    const tracks = [trackAt('00000a', 0, 0), trackAt('00000b', 0.3, 0.15)];
+    const scales = [100, 1000];
+
+    // Act
+    const corners = scales.map((pxPerNm) => buildTargets(input(tracks, { pxPerNm })).corners);
+
+    // Assert
+    expect(corners.map((c) => c.get('00000a'))).toEqual(['nw', 'ne']);
   });
 });
