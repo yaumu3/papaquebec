@@ -5,7 +5,8 @@ import { projectedCircle } from './paths';
 export function ringStepNm(rangeNm: number): number {
   if (rangeNm <= 20) return 5;
   if (rangeNm <= 80) return 10;
-  return 20;
+  if (rangeNm <= 160) return 20;
+  return 50;
 }
 
 /** Rings spaced for `rangeNm`, drawn out to `extentNm`. */
