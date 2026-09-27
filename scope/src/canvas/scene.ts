@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js';
+import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js';
 
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer } from '../render/facade';
@@ -27,13 +27,17 @@ import {
 import { settings } from '../state/settings';
 import { projectNm, trackStore } from '../state/tracks';
 import { RBL_SNAP_PX, targetAt } from './hit';
+import { debounce } from './settle';
 import { halfLongEdgeNm } from './view';
 
 const ORDER = [...STATIC_ORDER, 'targets', 'overlays'];
 
+/** How long a zoom must rest before data blocks are laid out again at the new scale. */
+const ZOOM_SETTLE_MS = 150;
+
 /**
  * Connects state to the renderer. Each effect rebuilds one layer when its
- * inputs change; nothing here runs on a timer.
+ * inputs change; the only timer is the one that settles a zoom.
  */
 export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   const [atlas, setAtlas] = createSignal<AtlasInfo | null>(null);
@@ -46,8 +50,13 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     }
   });
   onCleanup(() => renderer.destroy());
-  /** Pans leave the scale, and so the targets layer, untouched. */
+  /**
+   * The scale data blocks are laid out at. Pans leave it alone, and a zoom moves it only once it
+   * settles; until then the blocks keep their corners, drawn at the live scale.
+   */
   const scale = createMemo(() => view().pxPerNm);
+  const [layoutScale, setLayoutScale] = createSignal(untrack(scale));
+  createEffect(on(scale, debounce(ZOOM_SETTLE_MS, setLayoutScale), { defer: true }));
 
   void buildAtlas().then(({ info, pixels }) => {
     renderer.setAtlas(info, pixels);
@@ -92,7 +101,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       labelDrag: labelDrag(),
       altimeter: { ...settings.altimeter },
       trace: selectedTrace()?.hex === selected() ? (selectedTrace()?.fixes ?? null) : null,
-      pxPerNm: scale(),
+      pxPerNm: layoutScale(),
       atlas: a,
     });
     for (const [hex, corner] of corners) {
