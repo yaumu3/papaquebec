@@ -1,4 +1,4 @@
-import type { Corner } from '../../state/track';
+import type { Corner, OperatorState } from '../../state/track';
 import { type Rect, RectGrid } from './grid';
 
 /** Data block type size and footprint in CSS pixels: two lines of mono, twelve glyphs wide. */
@@ -27,6 +27,11 @@ const OFFSETS: Record<Corner, { dx: number; dy: number }> = {
   se: { dx: 22, dy: 14 },
   sw: { dx: -22, dy: 14 },
 };
+
+/** The corner a block sits in: the operator's pin, else where the placer last put it. */
+export function blockCorner(ops: Pick<OperatorState, 'pinnedCorner' | 'autoCorner'>): Corner {
+  return ops.pinnedCorner ?? ops.autoCorner;
+}
 
 /** Offset from the target to the block's near corner, in CSS pixels. */
 export function labelOffset(corner: Corner): { dx: number; dy: number } {

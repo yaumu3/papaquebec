@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Corner } from '../../state/track';
-import { DB_HEIGHT, labelRect, type LabelSubject, placeLabels } from './labels';
+import { blockCorner, DB_HEIGHT, labelRect, type LabelSubject, placeLabels } from './labels';
 
 function subject(
   hex: string,
@@ -95,5 +95,21 @@ describe('placeLabels', () => {
 
     // Assert
     expect(['ne', 'nw', 'se', 'sw']).toContain(placed.get('auto') ?? 'none');
+  });
+});
+
+describe('blockCorner', () => {
+  it('is the pinned corner when there is one, else the one the placer last chose', () => {
+    // Arrange
+    const ops = [
+      { pinnedCorner: 'sw', autoCorner: 'ne' },
+      { pinnedCorner: null, autoCorner: 'se' },
+    ] as const;
+
+    // Act
+    const corners = ops.map(blockCorner);
+
+    // Assert
+    expect(corners).toEqual(['sw', 'se']);
   });
 });
