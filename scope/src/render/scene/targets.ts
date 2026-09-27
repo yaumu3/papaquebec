@@ -4,11 +4,10 @@ import { type Filter, visibility, type Visibility } from '../../state/filter';
 import type { Corner, Fix, Track } from '../../state/track';
 import { labelOffset, type LabelSubject, placeLabels } from '../layout/labels';
 import { decimateTrail } from '../layout/trails';
-import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
+import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { dataBlock, drawDataBlock, extraLines } from './datablock';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { targetShape, THEME, trackColor } from './rules';
-import { toScreen } from './view';
 
 export interface TargetInput {
   tracks: Iterable<Track>;
@@ -24,7 +23,11 @@ export interface TargetInput {
   altimeter: Altimeter;
   /** Full-day trace of the selected target, if readsb keeps one. */
   trace: readonly Fix[] | null;
-  view: View;
+  /**
+   * Scale the blocks are laid out at. Only the scale matters: panning moves every target alike,
+   * so the layout, and the whole layer, stays valid.
+   */
+  pxPerNm: number;
   atlas: AtlasInfo;
 }
 
@@ -49,6 +52,7 @@ interface Drawable {
   t: Track;
   x: number;
   y: number;
+  /** CSS px from the world origin, y down. */
   cx: number;
   cy: number;
   visibility: Visibility;
@@ -60,13 +64,12 @@ function drawables(input: TargetInput): Drawable[] {
   for (const t of input.tracks) {
     const p = t.position;
     if (p.kind !== 'live' && p.kind !== 'last') continue;
-    const { cx, cy } = toScreen(input.view, p.x, p.y);
     out.push({
       t,
       x: p.x,
       y: p.y,
-      cx,
-      cy,
+      cx: p.x * input.pxPerNm,
+      cy: -p.y * input.pxPerNm,
       visibility: visibility(t, input.selected, input.filter, input.altimeter),
       color: trackColor(t, input.selected),
     });

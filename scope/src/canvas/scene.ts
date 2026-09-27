@@ -1,4 +1,4 @@
-import { createEffect, createSignal, on, onCleanup } from 'solid-js';
+import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js';
 
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer } from '../render/facade';
@@ -46,6 +46,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     }
   });
   onCleanup(() => renderer.destroy());
+  /** Pans leave the scale, and so the targets layer, untouched. */
+  const scale = createMemo(() => view().pxPerNm);
 
   void buildAtlas().then(({ info, pixels }) => {
     renderer.setAtlas(info, pixels);
@@ -90,7 +92,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       labelDrag: labelDrag(),
       altimeter: { ...settings.altimeter },
       trace: selectedTrace()?.hex === selected() ? (selectedTrace()?.fixes ?? null) : null,
-      view: view(),
+      pxPerNm: scale(),
       atlas: a,
     });
     for (const [hex, corner] of corners) {
