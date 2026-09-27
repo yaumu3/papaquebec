@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from '
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer } from '../render/facade';
 import type { AtlasInfo, View } from '../render/protocol';
+import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { buildMap, buildRings, navaidsShownAt, STATIC_ORDER } from '../render/scene/static';
 import { buildTargets } from '../render/scene/targets';
@@ -30,7 +31,7 @@ import { RBL_SNAP_PX, targetAt } from './hit';
 import { debounce } from './settle';
 import { halfLongEdgeNm } from './view';
 
-const ORDER = [...STATIC_ORDER, 'targets', 'overlays'];
+const ORDER = [...STATIC_ORDER, 'targets', 'hover', 'overlays'];
 
 /** How long a zoom must rest before data blocks are laid out again at the new scale. */
 const ZOOM_SETTLE_MS = 150;
@@ -56,6 +57,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
    */
   const scale = createMemo(() => view().pxPerNm);
   const [layoutScale, setLayoutScale] = createSignal(untrack(scale));
+  /** Bumped by each targets build, which moves targets and their blocks under the hover. */
+  const [targetsBuilt, setTargetsBuilt] = createSignal(0);
   createEffect(on(scale, debounce(ZOOM_SETTLE_MS, setLayoutScale), { defer: true }));
 
   void buildAtlas().then(({ info, pixels }) => {
@@ -111,7 +114,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       vectorMin: settings.vectorMin,
       trailSec: settings.trailSec,
       selected: selected(),
-      hovered: hovered(),
       labelDrag: labelDrag(),
       altimeter: { ...settings.altimeter },
       trace: selectedTrace()?.hex === selected() ? (selectedTrace()?.fixes ?? null) : null,
@@ -123,6 +125,23 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       if (t) t.ops.autoCorner = corner;
     }
     renderer.setLayer('targets', batches);
+    renderer.draw(ORDER);
+    setTargetsBuilt((n) => n + 1);
+  });
+
+  createEffect(() => {
+    targetsBuilt();
+    const hex = hovered();
+    renderer.setLayer(
+      'hover',
+      buildHover({
+        track: hex ? (trackStore.tracks.get(hex) ?? null) : null,
+        selected: selected(),
+        filter: { ...settings.filter },
+        altimeter: { ...settings.altimeter },
+        labelDrag: labelDrag(),
+      }),
+    );
     renderer.draw(ORDER);
   });
 

@@ -17,7 +17,6 @@ export interface TargetInput {
   vectorMin: number;
   trailSec: number;
   selected: string | null;
-  hovered: string | null;
   /** A block being dragged: drawn at this offset from its target, in CSS px. */
   labelDrag: LabelDrag | null;
   altimeter: Altimeter;
@@ -35,6 +34,15 @@ export interface LabelDrag {
   hex: string;
   dx: number;
   dy: number;
+}
+
+/** Where a block sits from its target: with the drag while one is under way, else in its corner. */
+export function blockOffset(
+  hex: string,
+  corner: Corner,
+  drag: LabelDrag | null,
+): { dx: number; dy: number } {
+  return drag && drag.hex === hex ? { dx: drag.dx, dy: drag.dy } : labelOffset(corner);
 }
 
 export interface TargetScene {
@@ -151,14 +159,11 @@ export function buildTargets(input: TargetInput): TargetScene {
     }
     markers.marker(at, targetShape(d.t, d.visibility), GLYPH_PX, d.color);
     if (d.t.hex === input.selected) drawSelection(lines, d);
-    else if (d.t.hex === input.hovered) markers.marker(at, Shape.HollowSquare, 14, THEME.hover);
-    const drag = input.labelDrag;
-    const offset = drag && drag.hex === d.t.hex ? drag : labelOffset(corners.get(d.t.hex) ?? 'ne');
     drawDataBlock(lines, text, dataBlock(d.t, input.now, input.altimeter), {
       at,
-      ...offset,
+      ...blockOffset(d.t.hex, corners.get(d.t.hex) ?? 'ne', input.labelDrag),
       color: d.color,
-      emphasised: d.t.hex === input.selected || d.t.hex === input.hovered,
+      emphasised: d.t.hex === input.selected,
     });
   }
 

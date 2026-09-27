@@ -30,7 +30,6 @@ function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
     vectorMin: 2,
     trailSec: 60,
     selected: null,
-    hovered: null,
     pxPerNm: 10,
     atlas,
     labelDrag: null,
