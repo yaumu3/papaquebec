@@ -32,7 +32,7 @@ describe('dataBlock', () => {
 
     // Assert
     expect(a?.prefix).toBeNull();
-    expect(a?.line1).toBe('ANA241');
+    expect(a?.line1).toBe('TEST01');
     expect([a, b].map((x) => text(x?.line2 ?? [])).toSorted()).toEqual(['110↓ 29M', '110↓ B789']);
   });
 
@@ -50,7 +50,7 @@ describe('dataBlock', () => {
     const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
-    expect(block.line1).toBe('867A01');
+    expect(block.line1).toBe('D00001');
     expect(['110  [A1]', '110  ---']).toContain(text(block.line2));
   });
 
@@ -67,8 +67,8 @@ describe('dataBlock', () => {
 
   it('flips every block on the same clock, whatever the hex', () => {
     // Arrange
-    const a = track({ hex: '000000' });
-    const b = track({ hex: '0000ff' });
+    const a = track({ hex: 'd00000' });
+    const b = track({ hex: 'd000ff' });
     const now = 4;
 
     // Act
@@ -206,7 +206,7 @@ describe('drawDataBlock', () => {
     const plain = g[0]?.rgb ?? [];
     const intent = plain.map((v) => v * INTENT_TONE);
     const tones = g.map(({ rgb }) => (near(rgb, plain) ? 'p' : near(rgb, intent) ? 'i' : '?'));
-    // ANA241 / 110↑ 160 B789 / 095°, spaces drawing nothing
+    // TEST01 / 110↑ 160 B789 / 095°, spaces drawing nothing
     expect(tones.join('')).toBe(['pppppp', 'pppp', 'iii', 'pppp', 'iiii'].join(''));
   });
 
@@ -220,7 +220,7 @@ describe('drawDataBlock', () => {
     const g = glyphs(t, nw);
 
     // Assert
-    const line2 = g.slice('ANA241'.length).map((x) => x.px);
+    const line2 = g.slice('TEST01'.length).map((x) => x.px);
     const columns = line2.map((px) => Math.round((px - (line2[0] ?? 0)) / advance));
     expect(columns).toEqual([0, 1, 2, 3, 4, 5, 6, 8, 9, 10, 11]); // 110↑160 B789
   });

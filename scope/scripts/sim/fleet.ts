@@ -1,5 +1,6 @@
 /** The synthetic fleet: fictional targets that exercise every glyph, color and prefix. */
 export interface SimAircraft {
+  /** From D00000–DFFFFF, which ICAO Annex 10 Vol III reserves for future use, so no real aircraft has it. */
   hex: string;
   flight?: string;
   category: string;
@@ -25,8 +26,8 @@ export interface SimAircraft {
 /** A small fleet that exercises every color, glyph and prefix the scope draws. */
 export const FLEET: SimAircraft[] = [
   {
-    hex: '867a01',
-    flight: 'ANA241',
+    hex: 'd00001',
+    flight: 'TEST01',
     category: 'A3',
     squawk: '2431',
     x: 27,
@@ -36,13 +37,13 @@ export const FLEET: SimAircraft[] = [
     track: 235,
     baroRate: -1200,
     type: 'B789',
-    reg: 'JA893A',
+    reg: 'TEST-01',
     selAlt: 6000,
     modes: ['autopilot', 'vnav', 'lnav'],
   },
   {
-    hex: '867a02',
-    flight: 'JAL317',
+    hex: 'd00002',
+    flight: 'TEST02',
     category: 'A3',
     squawk: '1724',
     x: 17,
@@ -52,14 +53,14 @@ export const FLEET: SimAircraft[] = [
     track: 210,
     baroRate: -1000,
     type: 'B738',
-    reg: 'JA348J',
+    reg: 'TEST-02',
     selAlt: 4000,
     selHeading: 210,
     modes: ['autopilot'],
   },
   {
-    hex: '867a03',
-    flight: 'JAL318',
+    hex: 'd00003',
+    flight: 'TEST03',
     category: 'A3',
     squawk: '2106',
     x: 5,
@@ -69,13 +70,13 @@ export const FLEET: SimAircraft[] = [
     track: 90,
     baroRate: 1500,
     type: 'B738',
-    reg: 'JA349J',
+    reg: 'TEST-03',
     selAlt: 7000,
     modes: ['autopilot', 'vnav', 'lnav'],
   },
   {
-    hex: '867a04',
-    flight: 'SKY013',
+    hex: 'd00004',
+    flight: 'TEST04',
     category: 'A3',
     squawk: '4421',
     x: -13,
@@ -85,10 +86,10 @@ export const FLEET: SimAircraft[] = [
     track: 25,
     baroRate: -800,
     type: 'B738',
-    reg: 'JA73NY',
+    reg: 'TEST-04',
   },
   {
-    hex: '867a05',
+    hex: 'd00005',
     category: 'A1',
     squawk: '1200',
     x: -13,
@@ -99,11 +100,11 @@ export const FLEET: SimAircraft[] = [
     baroRate: 0,
     mlat: true,
     type: 'C172',
-    reg: 'JA4081',
+    reg: 'TEST-05',
   },
   {
-    hex: '867a06',
-    flight: 'SFJ72',
+    hex: 'd00006',
+    flight: 'TEST06',
     category: 'A3',
     squawk: '3452',
     x: 20,
@@ -113,13 +114,13 @@ export const FLEET: SimAircraft[] = [
     track: 255,
     baroRate: 0,
     type: 'A320',
-    reg: 'JA25MC',
+    reg: 'TEST-06',
     selAlt: 14000,
     modes: ['autopilot', 'althold', 'lnav'],
   },
   {
-    hex: '867a07',
-    flight: 'NCA125',
+    hex: 'd00007',
+    flight: 'TEST07',
     category: 'A5',
     squawk: '5512',
     x: -8,
@@ -129,14 +130,14 @@ export const FLEET: SimAircraft[] = [
     track: 260,
     baroRate: 0,
     type: 'B74F',
-    reg: 'JA12KZ',
+    reg: 'TEST-07',
     selAlt: 21000,
     selHeading: 260,
     modes: ['autopilot', 'althold'],
   },
   {
-    hex: '867a08',
-    flight: 'IBX012',
+    hex: 'd00008',
+    flight: 'TEST08',
     category: 'A3',
     squawk: '7012',
     x: 32,
@@ -146,10 +147,10 @@ export const FLEET: SimAircraft[] = [
     track: 250,
     baroRate: -600,
     type: 'CRJ7',
-    reg: 'JA10RJ',
+    reg: 'TEST-08',
   },
   {
-    hex: '867a09',
+    hex: 'd00009',
     category: 'A2',
     squawk: '7700',
     x: -28,
@@ -159,11 +160,11 @@ export const FLEET: SimAircraft[] = [
     track: 95,
     baroRate: -1200,
     type: 'C68A',
-    reg: 'JA00PQ',
+    reg: 'TEST-09',
   },
   {
-    hex: '867a0a',
-    flight: 'ANA857',
+    hex: 'd0000a',
+    flight: 'TEST10',
     category: 'A3',
     squawk: '2201',
     x: 0.6,
@@ -174,11 +175,11 @@ export const FLEET: SimAircraft[] = [
     baroRate: 0,
     ground: true,
     type: 'A321',
-    reg: 'JA131A',
+    reg: 'TEST-10',
   },
   {
-    hex: '867a0b',
-    flight: 'JAL903',
+    hex: 'd0000b',
+    flight: 'TEST11',
     category: 'A5',
     squawk: '3112',
     x: -0.5,
@@ -189,7 +190,7 @@ export const FLEET: SimAircraft[] = [
     baroRate: 0,
     ground: true,
     type: 'B773',
-    reg: 'JA752J',
+    reg: 'TEST-11',
   },
 ];
 
@@ -211,8 +212,8 @@ export function extraFleet(count: number, radiusNm = 50): SimAircraft[] {
     const r = radiusNm * Math.sqrt(rand());
     const a = rand() * 2 * Math.PI;
     return {
-      hex: (0xf00000 + i).toString(16),
-      flight: `SIM${String(i).padStart(4, '0')}`,
+      hex: (0xd10000 + i).toString(16),
+      flight: `TEST${String(i).padStart(4, '0')}`,
       category: 'A3',
       squawk: (0o1000 + (i % 0o6000)).toString(8),
       x: r * Math.sin(a),
@@ -222,7 +223,7 @@ export function extraFleet(count: number, radiusNm = 50): SimAircraft[] {
       track: Math.round(rand() * 360),
       baroRate: 0,
       type: 'A320',
-      reg: `JA${String(i).padStart(4, '0')}`,
+      reg: `TEST-${String(i).padStart(4, '0')}`,
     };
   });
 }

@@ -109,8 +109,8 @@ describe('createSimSource autopilot intent', () => {
     const snap = source.poll();
 
     // Assert
-    const nca125 = snap.aircraft.find((a) => a.flight?.trim() === 'NCA125');
-    expect([nca125?.alt_baro, nca125?.nav_altitude_mcp, nca125?.baro_rate]).toEqual([
+    const test07 = snap.aircraft.find((a) => a.flight?.trim() === 'TEST07');
+    expect([test07?.alt_baro, test07?.nav_altitude_mcp, test07?.baro_rate]).toEqual([
       17000, 21000, 1000,
     ]);
   });
@@ -128,8 +128,8 @@ describe('createSimSource autopilot intent', () => {
     const snap = source.poll();
 
     // Assert
-    const jal318 = snap.aircraft.find((a) => a.flight?.trim() === 'JAL318');
-    expect([jal318?.alt_baro, jal318?.nav_altitude_mcp, jal318?.baro_rate]).toEqual([
+    const test03 = snap.aircraft.find((a) => a.flight?.trim() === 'TEST03');
+    expect([test03?.alt_baro, test03?.nav_altitude_mcp, test03?.baro_rate]).toEqual([
       7000, 5000, 0,
     ]);
   });
@@ -152,6 +152,33 @@ describe('createSimSource extra traffic', () => {
         (a) => Math.abs((a.lat ?? 0) - site.lat) < 1 && Math.abs((a.lon ?? 0) - site.lon) < 1.2,
       ),
     ).toBe(true);
+  });
+
+  it('flies every aircraft under a fictional TEST callsign and registration', () => {
+    // Arrange
+    const source = createSimSource(site, () => 1000, 1000, 50);
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    const callsigns = snap.aircraft.flatMap((a) => (a.flight ? [a.flight.trim()] : []));
+    const regs = snap.aircraft.map((a) => a.r ?? '');
+    expect(callsigns.length).toBeGreaterThan(50);
+    expect(callsigns.filter((c) => !c.startsWith('TEST'))).toEqual([]);
+    expect(regs.filter((r) => !r.startsWith('TEST-'))).toEqual([]);
+  });
+
+  it('addresses every aircraft from the block ICAO reserves for future use', () => {
+    // Arrange
+    const source = createSimSource(site, () => 1000, 1000, 50);
+
+    // Act
+    const snap = source.poll();
+
+    // Assert
+    const outside = snap.aircraft.map((a) => a.hex).filter((h) => !/^d[0-9a-f]{5}$/.test(h));
+    expect(outside).toEqual([]);
   });
 
   it('places the extra aircraft the same way on every run', () => {

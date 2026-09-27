@@ -35,9 +35,9 @@ describe('chunkToSnapshots', () => {
           now: 1000.5,
           messages: 42,
           aircraft: [
-            ['8514b4', 33250, 450, 92.1, 36.9, 139.0, 1.7, 'adsb_icao', 'JAL123 ', 9], // Nikko
-            ['abc123', 'ground', null, null, 35.7, 140.3, 0.2, 'mlat', null, 3], // near RJAA
-            ['def456', 5000, 200, 10, 35.8, 140.4, 0.5, 'tisb_icao', null, 1], // near RJAA
+            ['d00010', 33250, 450, 92.1, 36.9, 139.0, 1.7, 'adsb_icao', 'TEST03 ', 9], // Nikko
+            ['d00123', 'ground', null, null, 35.7, 140.3, 0.2, 'mlat', null, 3], // near RJAA
+            ['d00456', 5000, 200, 10, 35.8, 140.4, 0.5, 'tisb_icao', null, 1], // near RJAA
             ['bad'],
           ],
         },
@@ -52,7 +52,7 @@ describe('chunkToSnapshots', () => {
     expect(snaps.map((s) => s.now)).toEqual([1000.5, 999]);
     expect(snaps[0]?.aircraft).toEqual([
       {
-        hex: '8514b4',
+        hex: 'd00010',
         alt_baro: 33250,
         gs: 450,
         track: 92.1,
@@ -60,11 +60,11 @@ describe('chunkToSnapshots', () => {
         lon: 139.0,
         seen: 1.7,
         seen_pos: 1.7,
-        flight: 'JAL123 ',
+        flight: 'TEST03 ',
         messages: 9,
       },
       {
-        hex: 'abc123',
+        hex: 'd00123',
         alt_baro: 'ground',
         lat: 35.7,
         lon: 140.3,
@@ -74,7 +74,7 @@ describe('chunkToSnapshots', () => {
         mlat: ['lat', 'lon'],
       },
       {
-        hex: 'def456',
+        hex: 'd00456',
         alt_baro: 5000,
         gs: 200,
         track: 10,

@@ -176,7 +176,7 @@ describe('createTrackStore', () => {
     const store = createTrackStore(project);
     const a: AircraftJson = {
       ...live('a'),
-      flight: 'ANA241  ',
+      flight: 'TEST01  ',
       squawk: '2431',
       category: 'A3',
       gs: 290,
@@ -187,7 +187,7 @@ describe('createTrackStore', () => {
       messages: 50,
       rssi: -12.3,
       t: 'B789',
-      r: 'JA893A',
+      r: 'TEST-01',
       emergency: 'none',
     };
 
@@ -196,7 +196,7 @@ describe('createTrackStore', () => {
 
     // Assert
     expect(store.tracks.get('a')).toMatchObject({
-      flight: 'ANA241',
+      flight: 'TEST01',
       squawk: '2431',
       category: 'A3',
       gs: 290,
@@ -207,7 +207,7 @@ describe('createTrackStore', () => {
       messages: 50,
       rssi: -12.3,
       type: 'B789',
-      registration: 'JA893A',
+      registration: 'TEST-01',
       emergency: 'none',
       seen: 0.2,
       seenPos: 0.2,

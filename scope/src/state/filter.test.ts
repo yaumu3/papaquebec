@@ -157,9 +157,9 @@ describe('altitudeUnfiltered', () => {
 describe('visibility', () => {
   it('shows the selected target in full even where the filter would reduce it', () => {
     // Arrange
-    const t = { hex: '867a01', alt: 45000, squawk: '2000', emergency: undefined };
+    const t = { hex: 'd00001', alt: 45000, squawk: '2000', emergency: undefined };
     const band: Filter = { ...base, upperFl: 200 };
-    const selections = ['867a01', '867a02', null];
+    const selections = ['d00001', 'd00002', null];
 
     // Act
     const out = selections.map((sel) => visibility(t, sel, band, STANDARD_ALTIMETER));

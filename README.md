@@ -80,6 +80,11 @@ GitHub Actions runs the same four and builds the image on every push and pull re
 the console log; `bun run screenshot` regenerates the README picture from the synthetic fleet. The
 sim and screenshot scripts describe their flags in their headers.
 
+Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight:
+callsigns are `TEST` plus digits (a real airline callsign is three letters then a number), registrations
+`TEST-` plus digits, and addresses come from `D00000`–`DFFFFF`, a block ICAO Annex 10 Vol III reserves
+for future use. The sim tests enforce this for the fleet.
+
 ## Altimeter
 
 The QNH follows the METAR of the station named on the Display panel (blank means the nearest airport
@@ -133,7 +138,7 @@ Conventions:
   follows the altitude (`240↑350`), or a `✓` replaces the arrow while the aircraft holds it within
   200 ft on its own altimeter, and a selected heading (`270°`) adds a third line while it steers the
   aircraft, not LNAV or an approach.
-- **Trails** are NATS-style slashes decimated to eight-second slots.
+- **Trails** are slashes decimated to eight-second slots.
 - **Bearings** shown to the operator are magnetic, 001 to 360.
 - **The top bar** carries only runtime state.
 

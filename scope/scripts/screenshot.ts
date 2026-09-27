@@ -4,7 +4,7 @@
  * answers the data paths from the synthetic fleet at that speed instead of a receiver.
  *
  *   bun scripts/screenshot.ts --out shot.png [--url http://localhost:4173/] [--preview]
- *     [--sim 10] [--site lat,lon] [--wait 6000] [--select JAL317] [--hint] [--scale 2]
+ *     [--sim 10] [--site lat,lon] [--wait 6000] [--select TEST02] [--hint] [--scale 2]
  *
  * `--hint` opens the keyboard and mouse hint pane, as the `?` key does.
  */

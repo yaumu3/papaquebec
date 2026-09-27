@@ -66,7 +66,7 @@ const labels = (items: { label: string }[] | undefined) => items?.map((i) => i.l
 
 describe('createActions', () => {
   beforeEach(() => {
-    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('abc123')] });
+    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
     setRange(40);
     setSettings('trailSec', 0);
     setPan({ x: 0, y: 0 });
@@ -95,7 +95,7 @@ describe('createActions', () => {
     });
 
     // Assert
-    expect(picked).toEqual(['abc123', null]);
+    expect(picked).toEqual(['d00123', null]);
   });
 
   it('places the first and then the second end of a pending RBL with taps', () => {
@@ -112,7 +112,7 @@ describe('createActions', () => {
 
     // Assert
     expect(rbls().map(({ a: from, b: to }) => ({ from, to }))).toEqual([
-      { from: { kind: 'target', hex: 'abc123' }, to: { kind: 'free', ...toWorld(view, 600, 200) } },
+      { from: { kind: 'target', hex: 'd00123' }, to: { kind: 'free', ...toWorld(view, 600, 200) } },
     ]);
     expect([rblPending(), modeText(), selected()]).toEqual([null, null, null]);
   });
@@ -120,7 +120,7 @@ describe('createActions', () => {
   it('opens the target menu on a target and the scope menu elsewhere', () => {
     // Arrange
     const a = subject();
-    const t = trackStore.tracks.get('abc123');
+    const t = trackStore.tracks.get('d00123');
     const at = [
       { x: 405, y: 300 },
       { x: 600, y: 200 },
@@ -153,7 +153,7 @@ describe('createActions', () => {
 
     // Assert
     expect(origins).toEqual([
-      { kind: 'target', hex: 'abc123' },
+      { kind: 'target', hex: 'd00123' },
       { kind: 'free', ...toWorld(view, 600, 200) },
     ]);
   });
@@ -171,7 +171,7 @@ describe('createActions', () => {
 
     // Assert
     expect(seen).toEqual([
-      [{ cx: 405, cy: 300 }, 'abc123'],
+      [{ cx: 405, cy: 300 }, 'd00123'],
       [null, null],
     ]);
   });

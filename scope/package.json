@@ -13,7 +13,7 @@
     "preview": "bunx --bun vite preview",
     "sim": "bun scripts/sim.ts",
     "bench": "bun run build --minify false && bun scripts/bench.ts --preview",
-    "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select JAL317 --hint --scale 1 --out ../docs/screenshot.png",
+    "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select TEST02 --hint --scale 1 --out ../docs/screenshot.png",
     "test": "bun test",
     "lint": "bunx --bun oxlint --type-aware",
     "format": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt",

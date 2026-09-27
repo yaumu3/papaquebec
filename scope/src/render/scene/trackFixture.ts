@@ -1,10 +1,10 @@
 import type { Track } from '../../state/track';
 
-/** A live, level ANA241 over RJFF with every optional readout unknown; tests override what they exercise. */
+/** A live, level airliner over RJFF with every optional readout unknown; tests override what they exercise. */
 export function makeTrack(over: Partial<Track> = {}): Track {
   return {
-    hex: '867a01',
-    flight: 'ANA241',
+    hex: 'd00001',
+    flight: 'TEST01',
     squawk: '2431',
     category: 'A3',
     alt: 11000,
@@ -16,7 +16,7 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     messages: 1,
     rssi: -10,
     type: 'B789',
-    registration: 'JA893A',
+    registration: 'TEST-01',
     description: 'Boeing 787-9',
     emergency: undefined,
     tas: undefined,
