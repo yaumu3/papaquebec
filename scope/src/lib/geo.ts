@@ -62,6 +62,11 @@ export interface GeoPoint {
   lon: number;
 }
 
+/** Lat/lon onto a projected plane. */
+export type ProjectFn = (lat: number, lon: number) => Vec2;
+/** The inverse of a `ProjectFn`: a point on the plane back to lat/lon. */
+export type UnprojectFn = (x: number, y: number) => GeoPoint;
+
 /** Equirectangular distance, good enough to rank nearby items. */
 function flatDistance(lat: number, lon: number, p: GeoPoint): number {
   const k = Math.cos((lat * Math.PI) / 180);

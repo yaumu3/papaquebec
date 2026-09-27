@@ -1,7 +1,7 @@
+import type { ProjectFn } from '../../lib/geo';
 import { geodesicPath } from '../../lib/geodesic';
 import type { AeroLayers, CoastData, LatLon } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
-import type { ProjectFn } from '../../state/trackStore';
 import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';

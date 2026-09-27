@@ -1,12 +1,8 @@
 import type { AircraftJson, AircraftSnapshot } from '../lib/aircraft';
-import type { GeoPoint } from '../lib/geo';
+import type { ProjectFn } from '../lib/geo';
 import type { Fix, OperatorState, Position, Source, Track } from './track';
 
 export const HISTORY_RETENTION_SEC = 3600;
-
-export type ProjectFn = (lat: number, lon: number) => { x: number; y: number };
-/** The inverse of a `ProjectFn`: a point on the scope plane, in NM, back to lat/lon. */
-export type UnprojectFn = (x: number, y: number) => GeoPoint;
 
 export interface FeedStats {
   /** Snapshot time, seconds since epoch. */

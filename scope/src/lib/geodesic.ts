@@ -4,7 +4,7 @@
  * XXIII/176, 1975). Sub-millimetre at radar ranges; the inverse fails to converge only for
  * nearly antipodal points, which a scope never measures.
  */
-import { type GeoPoint, NM_IN_METERS, type Vec2 } from './geo';
+import { type GeoPoint, NM_IN_METERS, type ProjectFn, type Vec2 } from './geo';
 import { WGS84 } from './projection';
 import { RAD } from './units';
 
@@ -164,7 +164,7 @@ function offLine(p: Vec2, a: Vec2, b: Vec2): number {
  */
 export function geodesicPath(
   points: readonly GeoPoint[],
-  project: (lat: number, lon: number) => Vec2,
+  project: ProjectFn,
   tolerance = PATH_TOLERANCE_NM,
 ): Vec2[] {
   const first = points[0];

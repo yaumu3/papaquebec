@@ -1,6 +1,5 @@
-import type { GeoPoint } from '../../lib/geo';
+import type { GeoPoint, ProjectFn } from '../../lib/geo';
 import { geodesicCircle } from '../../lib/geodesic';
-import type { ProjectFn } from '../../state/trackStore';
 import type { Anchor } from './pack';
 
 /** Segments in a drawn circle: its chords stay within a pixel of it at any range the scope shows. */

@@ -1,7 +1,7 @@
-import { NM_IN_METERS } from '../lib/geo';
+import { NM_IN_METERS, type ProjectFn, type UnprojectFn } from '../lib/geo';
 import { createLcc, type Projection } from '../lib/projection';
 import { bumpProjection, type Site } from './scope';
-import { createTrackStore, type ProjectFn, type UnprojectFn } from './trackStore';
+import { createTrackStore } from './trackStore';
 
 /** Standard parallels straddle the site by this much, degrees. */
 const PARALLEL_OFFSET_DEG = 6;

@@ -2,14 +2,15 @@ import { formatMmSs, padBearing } from '../../lib/format';
 import {
   closestApproach,
   type GeoPoint,
+  type ProjectFn,
   trueToMagnetic,
+  type UnprojectFn,
   type Vec2,
   velocityNm,
 } from '../../lib/geo';
 import { geodesicPath, inverse } from '../../lib/geodesic';
 import type { RangeCursorOrigin, Rbl, RblAnchor, RblPending } from '../../state/scope';
 import type { Track } from '../../state/track';
-import type { ProjectFn, UnprojectFn } from '../../state/trackStore';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { THEME, trackLabel } from './rules';
