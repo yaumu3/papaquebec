@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER } from '../lib/altitude';
-import { altitudeUnfiltered, classify, type Filter, FL_MAX, FL_MIN } from './filter';
+import { altitudeUnfiltered, classify, type Filter, FL_MAX, FL_MIN, visibility } from './filter';
 
 const base: Filter = { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' };
 
@@ -151,5 +151,20 @@ describe('altitudeUnfiltered', () => {
 
     // Assert
     expect(out).toEqual([true, false, false, false, true]);
+  });
+});
+
+describe('visibility', () => {
+  it('shows the selected target in full even where the filter would reduce it', () => {
+    // Arrange
+    const t = { hex: '867a01', alt: 45000, squawk: '2000', emergency: undefined };
+    const band: Filter = { ...base, upperFl: 200 };
+    const selections = ['867a01', '867a02', null];
+
+    // Act
+    const out = selections.map((sel) => visibility(t, sel, band, STANDARD_ALTIMETER));
+
+    // Assert
+    expect(out).toEqual(['shown', 'filtered', 'filtered']);
   });
 });

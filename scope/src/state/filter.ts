@@ -57,3 +57,13 @@ export function classify(t: Filterable, filter: Filter, altimeter: Altimeter): V
   if (filter.squawk === 'emergency') return 'filtered';
   return 'shown';
 }
+
+/** Selecting a filtered target is the operator asking to see it in full. */
+export function visibility(
+  t: Filterable & { hex: string },
+  selected: string | null,
+  filter: Filter,
+  altimeter: Altimeter,
+): Visibility {
+  return t.hex === selected ? 'shown' : classify(t, filter, altimeter);
+}
