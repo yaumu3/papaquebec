@@ -1,7 +1,7 @@
 /**
  * Open the built scope in headless Chromium with WebGPU and save a screenshot plus the console
  * log. Expects a server on `--url`, or starts `vite preview` itself with `--preview`. `--sim`
- * starts a server flying the synthetic fleet at that speed in place of a receiver.
+ * instead starts a server that flies the synthetic fleet at that speed and serves the build.
  *
  *   bun scripts/screenshot.ts --out shot.png [--url http://localhost:4173/] [--preview]
  *     [--sim 10] [--site lat,lon] [--wait 6000] [--select TEST02] [--hint] [--scale 2]
@@ -28,11 +28,10 @@ const { values: opt } = parseArgs({
 });
 
 const { page, log, close } = await openScope({
-  url: opt.url,
-  preview: opt.preview,
-  sim: opt.sim === undefined ? null : Number(opt.sim),
-  extra: 0,
-  site: opt.site,
+  from:
+    opt.sim === undefined
+      ? { url: opt.url, preview: opt.preview }
+      : { sim: { speed: Number(opt.sim), extra: 0, site: opt.site } },
   scale: Number(opt.scale),
 });
 await page.waitForTimeout(Number(opt.wait));

@@ -17,8 +17,6 @@ import { inclusiveMs } from './profile';
 
 const { values: opt } = parseArgs({
   options: {
-    url: { type: 'string', default: 'http://localhost:4173/' },
-    preview: { type: 'boolean', default: false },
     extra: { type: 'string', default: '300' },
     site: { type: 'string', default: '35.5533,139.7811' }, // RJTT
     seconds: { type: 'string', default: '3' },
@@ -219,11 +217,7 @@ function summarize(name: string, s: Sample, ms: Map<string, number>) {
 }
 
 const { page, log, close } = await openScope({
-  url: opt.url,
-  preview: opt.preview,
-  sim: 1,
-  extra: Number(opt.extra),
-  site: opt.site,
+  from: { sim: { speed: 1, extra: Number(opt.extra), site: opt.site } },
   scale: 2,
 });
 try {
