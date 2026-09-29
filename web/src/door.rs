@@ -2,6 +2,7 @@
 //! name or address the browser asked for, or plain http behind someone else's.
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -45,6 +46,13 @@ impl Certificates {
     #[must_use]
     pub fn authority_pem(&self) -> String {
         self.authority.certificate_pem()
+    }
+
+    /// What a browser that names nothing opened, as it names no address it
+    /// opens: the one subject the door is kept to, or else the address the
+    /// connection reached, which behind a port mapping is not the one opened.
+    fn unnamed(&self, reached: IpAddr) -> Subject {
+        self.only.clone().unwrap_or(Subject::Address(reached))
     }
 
     fn config_for(&self, subject: Subject) -> Result<Arc<ServerConfig>, Failure> {
@@ -103,8 +111,8 @@ pub async fn serve(listener: TcpListener, certificates: Option<Arc<Certificates>
     }
 }
 
-/// A browser names the host it opened, unless that is an address; then the
-/// address the connection reached is what it opened.
+/// Over TLS, with a certificate for the host the browser names, or for what it
+/// opened when it names none.
 async fn secure(
     stream: TcpStream,
     certificates: &Certificates,
@@ -114,7 +122,7 @@ async fn secure(
     let hello = LazyConfigAcceptor::new(Acceptor::default(), stream).await?;
     let subject = match hello.client_hello().server_name() {
         Some(name) => Subject::Name(name.to_ascii_lowercase()),
-        None => Subject::Address(reached),
+        None => certificates.unnamed(reached),
     };
     let config = certificates.config_for(subject)?;
     answer(hello.into_stream(config).await?, router).await
@@ -266,6 +274,21 @@ mod tests {
             answered.map(|answered| answered.is_some()),
             [true, false, false]
         );
+    }
+
+    /// Behind a port mapping, the door is reached at an address of its own, not
+    /// the one the browser opened, and a browser names no address it opens.
+    #[tokio::test]
+    async fn address_the_door_is_kept_to_is_served_behind_a_port_mapping() {
+        // Arrange
+        let kept_to = Subject::Address([192, 0, 2, 10].into()); // TEST-NET-1
+        let (address, trusted) = door(Some(kept_to)).await;
+
+        // Act
+        let answered = ask(address, &trusted, "192.0.2.10", &[]).await;
+
+        // Assert
+        assert!(answered.is_some());
     }
 
     #[tokio::test]

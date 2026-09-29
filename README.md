@@ -57,11 +57,12 @@ Environment on the service, all optional:
   position; the scope itself then needs `?site=` (see Development).
 - `PQ_FEED_PORT` (default `443`): the UDP port of the feed. The scope connects to the same
   number, so publish it unchanged (`4500:4500/udp` with `PQ_FEED_PORT=4500`).
-- `PQ_ADDRESS` (default `https://`): how the scope is served. `https://` answers to any name or
-  address; a host (`https://<host>`, or just `<host>`) keeps the certificates to that one; `http://`
-  serves plain http on port 80 for a setup that terminates TLS itself, such as
-  [Tailscale](https://tailscale.com) or an existing reverse proxy (then publish `80`, not `443`).
-  Each takes a `:<port>` to listen on instead.
+- `PQ_ADDRESS` (default `https://`): how the scope is served. `https://` answers to any name; a
+  host (`https://<host>`, or just `<host>`) keeps the certificates to that one. A browser that opens
+  an address does not say which, and behind Docker's port mapping the container sees only its own,
+  so opening the scope by address needs that address here. `http://` serves plain http on port 80
+  for a setup that terminates TLS itself, such as [Tailscale](https://tailscale.com) or an existing
+  reverse proxy (then publish `80`, not `443`). Each takes a `:<port>` to listen on instead.
 
 Ports can be remapped (`8443:443`) when 443 is taken. The feed needs no certificate trusted: the
 server makes its own for it every week and the scope accepts it by its hash, read over https. The
