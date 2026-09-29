@@ -1,61 +1,57 @@
 /// <reference lib="webworker" />
 import type { AircraftSnapshot, ReceiverJson } from '../lib/aircraft';
-import { loadChunkHistory, wasSuspended } from './history';
-import { createReadsbSource } from './readsb';
-import type { FeedSource } from './source';
+import type { FeedMessage } from './decode';
+import { type FeedDown, followFeed, openWebTransport } from './push';
 
 export type FeedCommand = {
   type: 'start';
-  base: string;
-  /** Where tar1090 keeps its track history chunks. */
-  historyBase: string;
+  /** Where the feeder publishes how to reach it. */
+  feedInfo: string;
 };
 
 export type FeedEvent =
   | { type: 'receiver'; receiver: ReceiverJson }
-  /** tar1090 history replayed in time order before polling starts or resumes. */
+  /** The history a session brings, in time order, before its first snapshot. */
   | { type: 'backfill'; snapshots: AircraftSnapshot[] }
   | { type: 'snapshot'; snapshot: AircraftSnapshot; receivedAt: number }
-  | { type: 'error'; message: string; at: number };
+  | { type: 'down'; reason: FeedDown };
 
-const MIN_INTERVAL_MS = 500;
+const RETRY_MS = 2000;
+/** Ten of readsb's one-second snapshots. */
+const DEADLINE_MS = 10_000;
 const post = (e: FeedEvent) => self.postMessage(e);
+const down = (reason: FeedDown) => post({ type: 'down', reason });
 
-async function run(cmd: FeedCommand): Promise<void> {
-  const source: FeedSource = createReadsbSource(cmd.base);
-  let interval = 1000;
+function run(cmd: FeedCommand): void {
+  if (typeof WebTransport !== 'function') return down({ kind: 'unsupported' });
+  /** The last snapshot taken; a session resumes after it, so what comes is newer. */
   let lastNow = 0;
-  let lastPolledAt = 0;
-  /** Replays tar1090's history newer than the last snapshot seen. */
-  const backfill = async () => {
-    const snapshots = await loadChunkHistory(fetch, cmd.historyBase, lastNow).catch(() => []);
-    if (snapshots.length > 0) post({ type: 'backfill', snapshots });
-  };
-  try {
-    const receiver = await source.receiver();
-    interval = Math.max(MIN_INTERVAL_MS, receiver.refresh ?? 1000);
-    post({ type: 'receiver', receiver });
-    await backfill();
-  } catch (err) {
-    post({ type: 'error', message: `receiver.json: ${String(err)}`, at: Date.now() });
-  }
-  const tick = async () => {
-    const started = Date.now();
-    if (lastNow > 0 && wasSuspended(lastPolledAt, started)) await backfill();
-    try {
-      const snapshot = await source.poll();
-      lastNow = snapshot.now;
-      lastPolledAt = Date.now();
-      post({ type: 'snapshot', snapshot, receivedAt: Date.now() });
-    } catch (err) {
-      post({ type: 'error', message: String(err), at: Date.now() });
+  const take = (message: FeedMessage) => {
+    if (message.kind === 'hello') {
+      post({ type: 'receiver', receiver: message.receiver });
+      if (message.history.length > 0) post({ type: 'backfill', snapshots: message.history });
+      lastNow = Math.max(lastNow, message.history.at(-1)?.now ?? 0);
+      return;
     }
-    const elapsed = Date.now() - started;
-    setTimeout(() => void tick(), Math.max(0, interval - elapsed));
+    // A new session starts with the latest snapshot, which may be the last one taken.
+    if (message.snapshot.now <= lastNow) return;
+    lastNow = message.snapshot.now;
+    post({ type: 'snapshot', snapshot: message.snapshot, receivedAt: Date.now() });
   };
-  void tick();
+  followFeed({
+    infoUrl: cmd.feedInfo,
+    host: self.location.hostname,
+    fetchFn: fetch,
+    open: openWebTransport,
+    onMessage: take,
+    onDown: down,
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    retryMs: RETRY_MS,
+    deadlineMs: DEADLINE_MS,
+    since: () => lastNow,
+  });
 }
 
 self.addEventListener('message', (e: MessageEvent<FeedCommand>) => {
-  if (e.data.type === 'start') void run(e.data);
+  if (e.data.type === 'start') run(e.data);
 });

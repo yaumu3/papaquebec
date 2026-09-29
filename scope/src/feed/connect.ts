@@ -1,23 +1,21 @@
 import { decimalYear, magneticDeclination } from '../lib/wmm';
-import { markStale } from '../state/feedLine';
 import {
   bumpSnapshot,
-  feedStatus,
   setDeclination,
   setFeedStatus,
   setReceiverAnswered,
   setSite,
+  site,
   type Site,
 } from '../state/scope';
 import { configureProjection, hasProjection, trackStore } from '../state/tracks';
-import { startFeed } from './facade';
+import { type FeedPlaces, startFeed } from './facade';
 
-export interface FeedOptions {
+export interface FeedOptions extends FeedPlaces {
+  /** Where tar1090 serves readsb's traces, when it keeps them. */
   base: string;
-  /** Overrides receiver.json. */
+  /** Overrides the receiver's own position. */
   siteOverride: Site | null;
-  /** tar1090's chunk history. */
-  historyBase: string;
 }
 
 function siteFromUrl(params: URLSearchParams): Site | null {
@@ -32,25 +30,34 @@ export function feedOptionsFromUrl(search: string): FeedOptions {
   return {
     base: '/data',
     siteOverride: siteFromUrl(params),
-    historyBase: '/chunks',
+    feedInfo: '/feed/info.json',
   };
 }
 
-function adoptSite(site: Site): void {
-  configureProjection(site);
-  setDeclination(magneticDeclination(site.lat, site.lon, 0, decimalYear(new Date())));
-  setSite(site);
+function adoptSite(position: Site): void {
+  configureProjection(position);
+  setDeclination(magneticDeclination(position.lat, position.lon, 0, decimalYear(new Date())));
+  setSite(position);
+}
+
+/** Time the page spends hidden is not counted against the feed. */
+function noteShown(): void {
+  if (document.visibilityState === 'visible') setFeedStatus((s) => ({ ...s, shownAt: Date.now() }));
 }
 
 /** Starts the feed worker and routes its events into the stores. */
 export function connectFeed(opts: FeedOptions): () => void {
   if (opts.siteOverride) adoptSite(opts.siteOverride);
 
-  const handle = startFeed(opts.base, opts.historyBase, (e) => {
+  const { base: _, siteOverride: __, ...places } = opts;
+  const handle = startFeed(places, (e) => {
     switch (e.type) {
       case 'receiver':
         setReceiverAnswered(true);
-        if (!opts.siteOverride && e.receiver.lat !== undefined && e.receiver.lon !== undefined) {
+        if (opts.siteOverride || e.receiver.lat === undefined || e.receiver.lon === undefined)
+          break;
+        // Every session greets with the receiver; only a new position is worth a reprojection.
+        if (site()?.lat !== e.receiver.lat || site()?.lon !== e.receiver.lon) {
           adoptSite({ lat: e.receiver.lat, lon: e.receiver.lon });
         }
         break;
@@ -62,19 +69,19 @@ export function connectFeed(opts: FeedOptions): () => void {
       case 'snapshot':
         if (!hasProjection()) return;
         trackStore.ingest(e.snapshot);
-        setFeedStatus({ kind: 'rx', lastAt: e.receivedAt });
+        setFeedStatus((s) => ({ ...s, lastAt: e.receivedAt, reason: null }));
         bumpSnapshot();
         break;
-      case 'error':
-        setFeedStatus({ kind: 'dead', message: e.message, since: e.at });
+      case 'down':
+        setFeedStatus((s) => ({ ...s, reason: e.reason }));
         break;
     }
   });
 
-  const staleTimer = setInterval(() => setFeedStatus(markStale(feedStatus(), Date.now())), 1000);
+  document.addEventListener('visibilitychange', noteShown);
 
   return () => {
-    clearInterval(staleTimer);
+    document.removeEventListener('visibilitychange', noteShown);
     handle.stop();
   };
 }

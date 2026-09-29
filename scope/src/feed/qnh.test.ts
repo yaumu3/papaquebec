@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { FetchLike } from './http';
 import { fetchQnhFrom, IEM_CURRENTS, qnhSourceFromUrl } from './qnh';
-import type { FetchLike } from './source';
 
 const now = new Date('2026-09-22T11:30:00Z');
 
