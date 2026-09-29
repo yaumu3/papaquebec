@@ -197,7 +197,7 @@ mod tests {
         let seen = published(receivers, vec![], vec![Ok(at(10.0))]).await;
 
         // Assert
-        assert_eq!(seen, [(Some(RECEIVER), vec![10.0], Some(10.0))]);
+        assert_eq!(seen, [(Some(RECEIVER), vec![], Some(10.0))]);
     }
 
     #[tokio::test(start_paused = true)]
@@ -209,6 +209,6 @@ mod tests {
         let seen = published(vec![Ok(RECEIVER)], kept, vec![Ok(at(20.0))]).await;
 
         // Assert
-        assert_eq!(seen, [(Some(RECEIVER), vec![1.0, 9.0, 20.0], Some(20.0))]);
+        assert_eq!(seen, [(Some(RECEIVER), vec![1.0, 9.0], Some(20.0))]);
     }
 }

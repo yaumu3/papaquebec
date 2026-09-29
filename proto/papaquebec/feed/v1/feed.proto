@@ -18,8 +18,9 @@ message Frame {
 // What a session needs before the first snapshot.
 message Hello {
   Receiver receiver = 1;
-  // The snapshots after the one the session asked to resume from, oldest first:
-  // one every 8 s for up to an hour, each aircraft reduced to what a trail needs.
+  // The snapshots after the one the session asked to resume from and before the
+  // latest, which follows in full, oldest first: one every 8 s for up to an hour,
+  // each aircraft reduced to what a trail needs.
   repeated Snapshot history = 2;
 }
 

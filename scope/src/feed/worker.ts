@@ -30,6 +30,7 @@ function run(cmd: FeedCommand): void {
     if (message.kind === 'hello') {
       post({ type: 'receiver', receiver: message.receiver });
       if (message.history.length > 0) post({ type: 'backfill', snapshots: message.history });
+      // The history stops short of the latest snapshot, which follows in full.
       lastNow = Math.max(lastNow, message.history.at(-1)?.now ?? 0);
       return;
     }

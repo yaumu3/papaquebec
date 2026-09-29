@@ -93,6 +93,7 @@ pub struct Published {
     history: Arc<[Snapshot]>,
     /// The latest snapshot as a frame after its length, encoded once for every session.
     latest: Bytes,
+    latest_now_s: f64,
 }
 
 impl Published {
@@ -101,17 +102,18 @@ impl Published {
         Self {
             receiver,
             history,
+            latest_now_s: latest.now_s,
             latest: Frame::from(latest).encode_length_delimited_to_vec().into(),
         }
     }
 
     /// The frame that opens a session resuming after `since`, after its length.
+    /// Its history stops short of the latest snapshot, which follows it in full.
     #[must_use]
     pub fn hello(&self, since: f64) -> Bytes {
-        let after = self
-            .history
-            .iter()
-            .filter(|snapshot| snapshot.now_s > since);
+        let between =
+            |snapshot: &&Snapshot| since < snapshot.now_s && snapshot.now_s < self.latest_now_s;
+        let after = self.history.iter().filter(between);
         let hello = Hello {
             receiver: Some(self.receiver),
             history: after.cloned().collect(),
@@ -177,6 +179,22 @@ mod tests {
         let expected = Body::Hello(Hello {
             receiver: Some(RECEIVER),
             history: vec![at(26.0)],
+        });
+        assert_eq!(hello, Some(expected));
+    }
+
+    #[test]
+    fn hello_leaves_the_latest_to_follow_in_full() {
+        // Arrange
+        let published = Published::new(RECEIVER, history_of([10.0, 18.0, 26.0]), at(26.0));
+
+        // Act
+        let hello = body(published.hello(f64::NEG_INFINITY));
+
+        // Assert
+        let expected = Body::Hello(Hello {
+            receiver: Some(RECEIVER),
+            history: vec![at(10.0), at(18.0)],
         });
         assert_eq!(hello, Some(expected));
     }
