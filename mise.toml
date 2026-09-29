@@ -1,3 +1,43 @@
 [tools]
 bun = "1.4"
 rust = "1.98"
+
+[tasks."dev:feeder"]
+description = "The feeder, publishing how to reach it where the dev server finds it"
+dir = "scope"
+run = "cargo run"
+
+[tasks."dev:scope"]
+description = "The scope's dev server"
+dir = "scope"
+run = "bun run dev"
+
+[tasks.dev]
+description = "The scope and the feeder, following the tar1090 at PQ_TAR1090"
+depends = ["dev:feeder", "dev:scope"]
+
+[tasks.sim]
+description = "The scope and the feeder flying the synthetic fleet around PQ_SITE (RJTT by default)"
+run = 'PQ_SIM="${PQ_SITE:-35.5533,139.7811}" mise run dev'
+
+[tasks."check:feeder"]
+description = "The feeder's checks, as CI runs them"
+run = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets --locked -- -D warnings",
+  "cargo test --workspace --locked",
+]
+
+[tasks."check:scope"]
+description = "The scope's checks, as CI runs them"
+dir = "scope"
+run = ["bun run format:check", "bun run lint", "bun run test", "bun run build"]
+
+[tasks.check]
+description = "Every check CI runs"
+depends = ["check:feeder", "check:scope"]
+
+[tasks.bench]
+description = "Load test the scope with the sim's extra traffic; flags follow"
+dir = "scope"
+run = "bun run bench"
