@@ -62,14 +62,13 @@ struct Traces {
 /// As long as the scope waits on its feed.
 const TRACE_WAIT: Duration = Duration::from_secs(10);
 
-/// A trace as tar1090 answers with it, which is gzipped already. Nothing above
-/// the traces is reachable through a path that climbs.
+/// A trace as tar1090 answers with it, which is gzipped already.
 async fn trace(
     State(traces): State<Traces>,
     Path(trace): Path<String>,
     asked: HeaderMap,
 ) -> Response {
-    if trace.split('/').any(|part| part == "..") {
+    if !beneath_the_traces(&trace) {
         return StatusCode::NOT_FOUND.into_response();
     }
     let url = format!("{}/{trace}", traces.base);
@@ -94,6 +93,18 @@ async fn trace(
     }
 }
 
+/// Whether the path stays beneath the traces as tar1090 reads it: segments of
+/// characters URLs leave as they are (RFC 3986's unreserved), none of them a
+/// step up or aside, so nothing is decoded or normalized into a climb on the way.
+fn beneath_the_traces(trace: &str) -> bool {
+    trace.split('/').all(|part| {
+        !matches!(part, "" | "." | "..")
+            && part
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"-._~".contains(&byte))
+    })
+}
+
 /// A tar1090 that was too slow, or that failed otherwise.
 fn unanswered(failure: &reqwest::Error) -> Response {
     if failure.is_timeout() {
@@ -115,7 +126,7 @@ mod tests {
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
-    use super::{Site, router};
+    use super::{Site, beneath_the_traces, router};
 
     /// A build of the scope and generated map data, each in a directory of its own.
     struct Served {
@@ -340,6 +351,8 @@ mod tests {
             "/data/aircraft.json",
             "/data/traces/../aircraft.json",
             "/data/traces/%2e%2e/aircraft.json",
+            "/data/traces/%252e%252e/aircraft.json",
+            "/data/traces/.%252e/aircraft.json",
         ];
 
         // Act
@@ -355,6 +368,19 @@ mod tests {
                 .all(|status| *status == StatusCode::NOT_FOUND),
             "{statuses:?}"
         );
+    }
+
+    /// readsb marks an address that is not ICAO's, such as a TIS-B target's, with `~`.
+    #[test]
+    fn traces_of_any_address_stay_beneath_the_traces() {
+        // Arrange
+        let traces = ["01/trace_full_d00001.json", "a1/trace_full_~d000a1.json"];
+
+        // Act
+        let beneath = traces.map(beneath_the_traces);
+
+        // Assert
+        assert_eq!(beneath, [true, true]);
     }
 
     #[tokio::test]
