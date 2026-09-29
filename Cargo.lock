@@ -72,11 +72,14 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 name = "authority"
 version = "0.1.0"
 dependencies = [
+ "pem 4.0.0",
  "rcgen",
  "rustls",
  "rustls-pki-types",
+ "tempfile",
  "time",
  "x509-parser",
+ "yasna",
 ]
 
 [[package]]
