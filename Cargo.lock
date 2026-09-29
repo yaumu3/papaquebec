@@ -2025,6 +2025,7 @@ dependencies = [
  "axum",
  "feeder",
  "http-body-util",
+ "reqwest",
  "tempfile",
  "tokio",
  "tower",

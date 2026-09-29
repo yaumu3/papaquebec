@@ -1,49 +1,122 @@
 //! What the server answers over HTTP.
 
 use std::path::PathBuf;
+use std::time::Duration;
 
 use axum::Router;
+use axum::extract::{Path, State};
+use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
+use axum::http::{HeaderMap, StatusCode};
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 
-/// Where the files served are kept.
-pub struct Places {
+/// What the server has to serve.
+pub struct Site {
     /// The scope as built.
     pub dist: PathBuf,
     /// The map data generated around the receiver.
     pub map: PathBuf,
+    /// The tar1090 that may keep traces, unless the traffic is synthesized.
+    pub tar1090: Option<String>,
 }
 
-/// The scope's build, with the generated map data under `/map`, compressed for
-/// whoever accepts it.
-pub fn router(places: &Places) -> Router {
-    Router::new()
-        .nest_service("/map", ServeDir::new(&places.map))
-        .fallback_service(ServeDir::new(&places.dist))
+/// The scope's build, with the generated map data under `/map` and tar1090's
+/// traces under `/data/traces`, compressed for whoever accepts it.
+pub fn router(site: &Site) -> Router {
+    let mut router = Router::new();
+    if let Some(tar1090) = &site.tar1090 {
+        let traces = Traces {
+            client: reqwest::Client::new(),
+            base: format!("{}/data/traces", tar1090.trim_end_matches('/')),
+        };
+        router = router.route("/data/traces/{*trace}", get(trace).with_state(traces));
+    }
+    router
+        .nest_service("/map", ServeDir::new(&site.map))
+        .fallback_service(ServeDir::new(&site.dist))
         .layer(CompressionLayer::new())
+}
+
+#[derive(Clone)]
+struct Traces {
+    client: reqwest::Client,
+    base: String,
+}
+
+/// As long as the scope waits on its feed.
+const TRACE_WAIT: Duration = Duration::from_secs(10);
+
+/// A trace as tar1090 answers with it, which is gzipped already. Nothing above
+/// the traces is reachable through a path that climbs.
+async fn trace(
+    State(traces): State<Traces>,
+    Path(trace): Path<String>,
+    asked: HeaderMap,
+) -> Response {
+    if trace.split('/').any(|part| part == "..") {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let url = format!("{}/{trace}", traces.base);
+    let mut request = traces.client.get(url).timeout(TRACE_WAIT);
+    if let Some(accepted) = asked.get(ACCEPT_ENCODING) {
+        request = request.header(ACCEPT_ENCODING, accepted);
+    }
+    let answer = match request.send().await {
+        Ok(answer) => answer,
+        Err(failure) => return unanswered(&failure),
+    };
+    let status = answer.status();
+    let mut headers = HeaderMap::new();
+    for name in [CONTENT_TYPE, CONTENT_ENCODING] {
+        if let Some(value) = answer.headers().get(&name) {
+            headers.insert(name, value.clone());
+        }
+    }
+    match answer.bytes().await {
+        Ok(body) => (status, headers, body).into_response(),
+        Err(failure) => unanswered(&failure),
+    }
+}
+
+/// A tar1090 that was too slow, or that failed otherwise.
+fn unanswered(failure: &reqwest::Error) -> Response {
+    if failure.is_timeout() {
+        StatusCode::GATEWAY_TIMEOUT.into_response()
+    } else {
+        StatusCode::BAD_GATEWAY.into_response()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use axum::body::Body;
     use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
     use axum::http::{Request, StatusCode};
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
-    use super::{Places, router};
+    use super::{Site, router};
 
     /// A build of the scope and generated map data, each in a directory of its own.
     struct Served {
-        places: Places,
+        site: Site,
         _directory: tempfile::TempDir,
     }
 
     fn served() -> Served {
+        served_beside(None)
+    }
+
+    fn served_beside(tar1090: Option<String>) -> Served {
         let directory = tempfile::tempdir().expect("a directory");
-        let places = Places {
+        let places = Site {
             dist: directory.path().join("dist"),
             map: directory.path().join("public/map"),
+            tar1090,
         };
         let script = format!("// the scope\n{}", "render();\n".repeat(64));
         for (path, contents) in [
@@ -66,7 +139,7 @@ mod tests {
             std::fs::write(path, contents).expect("written");
         }
         Served {
-            places,
+            site: places,
             _directory: directory,
         }
     }
@@ -84,7 +157,7 @@ mod tests {
             request = request.header(ACCEPT_ENCODING, encoding);
         }
         let request = request.body(Body::empty()).expect("a request");
-        let response = router(&served.places)
+        let response = router(&served.site)
             .oneshot(request)
             .await
             .expect("answers");
@@ -180,5 +253,133 @@ mod tests {
                 .all(|status| *status == StatusCode::NOT_FOUND),
             "{statuses:?}"
         );
+    }
+
+    /// What a day's trace looks like on the wire: tar1090 keeps them gzipped.
+    const TRACE: &[u8] = &[0x1f, 0x8b, 0x08, 0x00, 0x74, 0x72, 0x61, 0x63, 0x65];
+    const TRACE_PATH: &str = "/data/traces/01/trace_full_d00001.json";
+
+    /// A tar1090 that keeps the trace of one aircraft, answering as nginx does.
+    async fn tar1090() -> String {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("binds");
+        let base = format!("http://{}", listener.local_addr().expect("bound"));
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = listener.accept().await {
+                let mut request = [0; 1024];
+                let read = stream.read(&mut request).await.unwrap_or(0);
+                let line = String::from_utf8_lossy(&request[..read]);
+                let (status, kind, body) = match line.split_whitespace().nth(1) {
+                    Some(TRACE_PATH) => ("200 OK", "content-encoding: gzip\r\n", TRACE),
+                    Some("/data/aircraft.json") => ("200 OK", "", &b"{}"[..]),
+                    _ => ("404 Not Found", "", &b""[..]),
+                };
+                let head = format!(
+                    "HTTP/1.1 {status}\r\ncontent-type: application/json\r\n{kind}\
+                     content-length: {}\r\nconnection: close\r\n\r\n",
+                    body.len()
+                );
+                let _ = stream.write_all(head.as_bytes()).await;
+                let _ = stream.write_all(body).await;
+            }
+        });
+        base
+    }
+
+    #[tokio::test]
+    async fn trace_is_passed_on_as_tar1090_answers() {
+        // Arrange
+        let served = served_beside(Some(tar1090().await));
+
+        // Act
+        let answer = get(&served, TRACE_PATH, Some("gzip")).await;
+
+        // Assert
+        assert_eq!(answer.status, StatusCode::OK);
+        assert_eq!(answer.content_type.as_deref(), Some("application/json"));
+        assert_eq!(answer.encoding.as_deref(), Some("gzip"));
+        assert_eq!(answer.body, TRACE);
+    }
+
+    #[tokio::test]
+    async fn only_traces_are_passed_on() {
+        // Arrange
+        let served = served_beside(Some(tar1090().await));
+        let paths = [
+            "/data/traces/01/trace_full_d00002.json",
+            "/data/aircraft.json",
+            "/data/traces/../aircraft.json",
+            "/data/traces/%2e%2e/aircraft.json",
+        ];
+
+        // Act
+        let mut statuses = Vec::new();
+        for path in paths {
+            statuses.push(get(&served, path, None).await.status);
+        }
+
+        // Assert
+        assert!(
+            statuses
+                .iter()
+                .all(|status| *status == StatusCode::NOT_FOUND),
+            "{statuses:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn tar1090_that_cannot_be_reached_is_a_bad_gateway() {
+        // Arrange
+        let served = served_beside(Some("http://127.0.0.1:1".into()));
+
+        // Act
+        let answer = get(&served, TRACE_PATH, None).await;
+
+        // Assert
+        assert_eq!(answer.status, StatusCode::BAD_GATEWAY);
+    }
+
+    /// A tar1090 that takes every request and never answers.
+    async fn silent_tar1090() -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("binds");
+        let base = format!("http://{}", listener.local_addr().expect("bound"));
+        tokio::spawn(async move {
+            let mut held = Vec::new();
+            while let Ok((stream, _)) = listener.accept().await {
+                held.push(stream);
+            }
+        });
+        base
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn tar1090_that_never_answers_is_given_up_on() {
+        // Arrange
+        let served = served_beside(Some(silent_tar1090().await));
+
+        // Act
+        let answer =
+            tokio::time::timeout(Duration::from_secs(60), get(&served, TRACE_PATH, None)).await;
+
+        // Assert
+        let status = answer.map(|answer| answer.status).ok();
+        assert_eq!(status, Some(StatusCode::GATEWAY_TIMEOUT));
+    }
+
+    #[tokio::test]
+    async fn there_are_no_traces_without_a_tar1090() {
+        // Arrange
+        let served = served();
+
+        // Act
+        let answer = get(&served, TRACE_PATH, None).await;
+
+        // Assert
+        assert_eq!(answer.status, StatusCode::NOT_FOUND);
     }
 }
