@@ -276,6 +276,9 @@ mod tests {
             "/../secret.txt",
             "/assets/../../secret.txt",
             "/map/../../secret.txt",
+            "/%2e%2e/secret.txt",
+            "/%252e%252e/secret.txt",
+            "/map/%252e%252e/%252e%252e/secret.txt",
         ];
 
         // Act
