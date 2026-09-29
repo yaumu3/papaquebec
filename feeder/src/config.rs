@@ -14,7 +14,7 @@ pub enum Origin {
     Tar1090(String),
     /// `PQ_SIM` (`lat,lon`): synthesized traffic around the site, in place of
     /// tar1090. `PQ_SIM_SPEED` runs it that many times faster than the clock, up to 1000,
-    /// and `PQ_SIM_EXTRA` adds that many generic targets.
+    /// and `PQ_SIM_EXTRA` adds that many generic targets, up to 10000.
     Sim { site: Site, speed: f64, extra: u32 },
 }
 
@@ -41,7 +41,7 @@ impl Config {
                     .parse()
                     .map_err(|error| format!("PQ_SIM={site}: {error}"))?,
                 speed: parsed(&lookup, "PQ_SIM_SPEED")?.map_or(Ok(1.0), sim_speed)?,
-                extra: parsed(&lookup, "PQ_SIM_EXTRA")?.unwrap_or(0),
+                extra: parsed(&lookup, "PQ_SIM_EXTRA")?.map_or(Ok(0), sim_extra)?,
             },
             None => {
                 Origin::Tar1090(lookup("PQ_TAR1090").unwrap_or_else(|| "http://tar1090".into()))
@@ -74,6 +74,19 @@ fn parsed<T: FromStr>(
 /// The sim is asked once per sim second, so any faster would mean asking more
 /// often than every millisecond.
 const FASTEST_SIM: f64 = 1000.0;
+
+/// Far beyond a real receiver's traffic, which is what a load test wants; the
+/// sim builds every target up front, and more would also run their addresses out
+/// of the block reserved for them.
+const MOST_EXTRA: u32 = 10_000;
+
+fn sim_extra(extra: u32) -> Result<u32, Failure> {
+    if extra <= MOST_EXTRA {
+        Ok(extra)
+    } else {
+        Err(format!("PQ_SIM_EXTRA={extra}: more than {MOST_EXTRA}").into())
+    }
+}
 
 fn sim_speed(speed: f64) -> Result<f64, Failure> {
     if speed > 0.0 && speed <= FASTEST_SIM {
@@ -217,7 +230,7 @@ mod tests {
     #[test]
     fn sim_that_cannot_be_flown_is_refused() {
         // Arrange
-        let environments: [&[(&str, &str)]; 13] = [
+        let environments: [&[(&str, &str)]; 14] = [
             &[("PQ_SIM", "33.5844")],
             &[("PQ_SIM", "north,east")],
             &[("PQ_SIM", "91,130")],
@@ -231,6 +244,7 @@ mod tests {
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "1e300")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "1000.5")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_EXTRA", "-1")],
+            &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_EXTRA", "10001")],
         ];
 
         // Act
@@ -257,5 +271,24 @@ mod tests {
             _ => None,
         };
         assert_eq!(speed.map(f64::to_bits), Some(1000.0_f64.to_bits()));
+    }
+
+    #[test]
+    fn sim_may_add_up_to_ten_thousand_generic_targets() {
+        // Arrange
+        let lookup = environment(&[
+            ("PQ_SIM", "33.5844,130.4517"), // RJFF
+            ("PQ_SIM_EXTRA", "10000"),
+        ]);
+
+        // Act
+        let config = Config::read(lookup);
+
+        // Assert
+        let extra = match config.map(|config| config.origin) {
+            Ok(Origin::Sim { extra, .. }) => Some(extra),
+            _ => None,
+        };
+        assert_eq!(extra, Some(10_000));
     }
 }
