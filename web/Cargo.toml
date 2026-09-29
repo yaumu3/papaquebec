@@ -15,6 +15,7 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
+authority = { path = "../authority" }
 axum = { version = "0.8.9", default-features = false, features = [
   "http1",
   "http2",
@@ -22,8 +23,11 @@ axum = { version = "0.8.9", default-features = false, features = [
   "tokio",
 ] }
 feeder = { path = "../feeder" }
+hyper-util = { version = "0.1.21", features = ["server-auto", "tokio", "service"] }
 reqwest = { version = "0.13.5", default-features = false }
-tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
+rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync", "net"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12"] }
 tower-http = { version = "0.6.11", features = ["fs", "compression-gzip"] }
 
 [dev-dependencies]
