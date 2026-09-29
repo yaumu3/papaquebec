@@ -6,6 +6,7 @@
 //! reserves for future use.
 
 use std::f64::consts::TAU;
+use std::str::FromStr;
 
 use super::Upstream;
 use crate::Failure;
@@ -28,6 +29,21 @@ const MESSAGES_PER_AIRCRAFT_S: f64 = 2.0;
 pub struct Site {
     pub lat_deg: f64,
     pub lon_deg: f64,
+}
+
+impl FromStr for Site {
+    type Err = Failure;
+
+    /// `lat,lon` in degrees.
+    fn from_str(site: &str) -> Result<Self, Failure> {
+        let (lat, lon) = site.split_once(',').ok_or("expected lat,lon")?;
+        let (lat_deg, lon_deg) = (lat.trim().parse::<f64>()?, lon.trim().parse::<f64>()?);
+        // Asked as "within", which NaN never is.
+        if !(-90.0..=90.0).contains(&lat_deg) || !(-180.0..=180.0).contains(&lon_deg) {
+            return Err("outside the globe".into());
+        }
+        Ok(Self { lat_deg, lon_deg })
+    }
 }
 
 /// One aircraft as it starts out.
@@ -617,5 +633,42 @@ mod tests {
             lon_deg: Some(SITE.lon_deg),
         };
         assert_eq!(receiver.ok(), Some(expected));
+    }
+
+    #[test]
+    fn site_is_read_from_lat_lon() {
+        // Arrange
+        let written = ["33.5844,130.4517", " 33.5844 , 130.4517 ", "-90,180"]; // RJFF
+
+        // Act
+        let sites = written.map(str::parse::<Site>);
+
+        // Assert
+        let poles = Site {
+            lat_deg: -90.0,
+            lon_deg: 180.0,
+        };
+        assert_eq!(sites.map(Result::ok), [Some(SITE), Some(SITE), Some(poles)]);
+    }
+
+    #[test]
+    fn site_that_is_nowhere_is_refused() {
+        // Arrange
+        let written = [
+            "33.5844",
+            "north,east",
+            "91,130",
+            "33,181",
+            "NaN,130",
+            "33,NaN",
+            "inf,130",
+            "",
+        ];
+
+        // Act
+        let sites = written.map(str::parse::<Site>);
+
+        // Assert
+        assert!(sites.iter().all(Result::is_err));
     }
 }

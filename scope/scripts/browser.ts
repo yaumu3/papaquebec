@@ -1,22 +1,22 @@
 /**
- * The built scope in headless Chromium with WebGPU, optionally fed by a feeder flying the sim.
+ * The built scope in headless Chromium with WebGPU, optionally served by a server flying the sim.
  * Chromium is launched on Metal; change `--use-angle` below on other platforms.
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-
 import { type Browser, chromium, type Page } from 'playwright';
 
-export interface ScopeBrowserOptions {
-  url: string;
-  /** Start `vite preview` on the URL's port instead of expecting a server there. */
-  preview: boolean;
-  /** Sim speed; a feeder flying the sim is started unless null. */
-  sim: number | null;
+/** The synthetic fleet a server started for the purpose flies, serving the build itself. */
+export interface Sim {
+  speed: number;
   /** Generic targets the sim adds to its fleet. */
   extra: number;
   site: string;
+}
+
+/** Where the page comes from: the sim, or a URL with `vite preview` started on its port if asked. */
+export type Source = { sim: Sim } | { url: string; preview: boolean };
+
+export interface ScopeBrowserOptions {
+  from: Source;
   scale: number;
 }
 
@@ -33,62 +33,75 @@ const answers = (url: string) =>
     () => false,
   );
 
-async function untilUp(url: string, tries: number): Promise<void> {
-  if (tries === 0 || (await answers(url))) return;
+/** Resolves once `url` answers; rejects once `running` says its server stopped, or after `tries`. */
+export async function untilUp(
+  url: string,
+  tries: number,
+  running: () => boolean = () => true,
+): Promise<void> {
+  if (await answers(url)) return;
+  if (!running()) throw new Error(`the server for ${url} stopped`);
+  if (tries <= 1) throw new Error(`${url} did not answer`);
   await Bun.sleep(200);
-  return untilUp(url, tries - 1);
+  return untilUp(url, tries - 1, running);
 }
 
-/** `vite preview` on the URL's port, resolved once it answers. */
-async function startPreview(url: string): Promise<() => void> {
-  const port = new URL(url).port || '4173';
-  const proc = Bun.spawn(['bunx', '--bun', 'vite', 'preview', '--port', port], {
-    stdout: 'ignore',
-  });
-  await untilUp(url, 50);
-  return () => proc.kill();
+/** What `run` resolves to; when it fails instead, `stop` is called first. */
+export async function stoppedOnFailure<T>(stop: () => void, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (error) {
+    stop();
+    throw error;
+  }
 }
 
-/** Apart from the dev feeder's, so both can run. */
-const SIM_FEED_PORT = '4434';
+/** A process started, and whether it still runs. */
+function spawned(command: string[], env: Record<string, string | undefined> = process.env) {
+  const proc = Bun.spawn(command, { env, stdout: 'ignore' });
+  return {
+    running: () => proc.exitCode === null && proc.signalCode === null,
+    stop: () => proc.kill(),
+  };
+}
 
-interface SimFeeder {
-  /** What the feeder published about how to reach it. */
-  info: () => string;
+/** A page being served, and how to stop serving it. */
+interface Served {
+  url: string;
   stop: () => void;
 }
 
-/** A feeder flying the sim, resolved once it has been built and listens. */
-async function startSimFeeder(opt: ScopeBrowserOptions, speed: number): Promise<SimFeeder> {
-  const directory = mkdtempSync(join(tmpdir(), 'pq-feed-'));
-  const info = join(directory, 'info.json');
-  const proc = Bun.spawn(['cargo', 'run', '--quiet'], {
-    env: {
-      ...process.env,
-      PQ_SIM: opt.site,
-      PQ_SIM_SPEED: String(speed),
-      PQ_SIM_EXTRA: String(opt.extra),
-      PQ_FEED_PORT: SIM_FEED_PORT,
-      PQ_FEED_INFO: info,
-    },
-    stdout: 'ignore',
+/** `vite preview` on the URL's port, resolved once it answers. */
+async function startPreview(url: string): Promise<Served> {
+  const port = new URL(url).port || '4173';
+  const preview = spawned(['bunx', '--bun', 'vite', 'preview', '--port', port]);
+  await stoppedOnFailure(preview.stop, () => untilUp(url, 50, preview.running));
+  return { url, stop: preview.stop };
+}
+
+/** Apart from the dev server's, so both can run. */
+const SIM_PORTS = { page: 8434, feed: 4434 };
+
+/** A server flying the sim and serving the build, resolved once it answers. */
+async function startSimServer(sim: Sim): Promise<Served> {
+  const url = `http://localhost:${SIM_PORTS.page}/`;
+  const server = spawned(['cargo', 'run', '--quiet'], {
+    ...process.env,
+    PQ_ADDRESS: `http://:${SIM_PORTS.page}`,
+    PQ_FEED_PORT: String(SIM_PORTS.feed),
+    PQ_SIM: sim.site,
+    PQ_SIM_SPEED: String(sim.speed),
+    PQ_SIM_EXTRA: String(sim.extra),
   });
-  const stop = () => {
-    proc.kill();
-    rmSync(directory, { recursive: true, force: true });
-  };
-  /** Long enough for a first build of the feeder. */
-  const published = async (tries: number): Promise<void> => {
-    if (existsSync(info)) return;
-    if (tries === 0 || proc.exitCode !== null) {
-      stop();
-      throw new Error('the feeder did not start');
-    }
-    await Bun.sleep(500);
-    return published(tries - 1);
-  };
-  await published(600);
-  return { info: () => readFileSync(info, 'utf8'), stop };
+  // Long enough for a first build of the server.
+  await stoppedOnFailure(server.stop, () => untilUp(`${url}feed/info.json`, 1500, server.running));
+  return { url, stop: server.stop };
+}
+
+function serve(from: Source): Promise<Served> {
+  if ('sim' in from) return startSimServer(from.sim);
+  if (from.preview) return startPreview(from.url);
+  return Promise.resolve({ url: from.url, stop: () => {} });
 }
 
 function launch(): Promise<Browser> {
@@ -104,36 +117,29 @@ function launch(): Promise<Browser> {
 }
 
 export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser> {
-  const stopPreview = opt.preview ? await startPreview(opt.url) : () => {};
-  const browser = await launch();
-  const context = await browser.newContext({
-    viewport: { width: 1600, height: 1000 },
-    deviceScaleFactor: opt.scale,
+  const served = await serve(opt.from);
+  return stoppedOnFailure(served.stop, async () => {
+    const browser = await launch();
+    const context = await browser.newContext({
+      viewport: { width: 1600, height: 1000 },
+      deviceScaleFactor: opt.scale,
+    });
+    const page = await context.newPage();
+    const log: string[] = [];
+    page.on('console', (m) => log.push(`[${m.type()}] ${m.text()}`));
+    page.on('pageerror', (e) => log.push(`[pageerror] ${e.message}`));
+    page.on('worker', (w) => {
+      log.push(`[worker] ${w.url()}`);
+      w.on('console', (m) => log.push(`[worker ${m.type()}] ${m.text()}`));
+    });
+    await page.goto(served.url);
+    return {
+      page,
+      log,
+      close: async () => {
+        await browser.close();
+        served.stop();
+      },
+    };
   });
-  const feeder = opt.sim === null ? null : await startSimFeeder(opt, opt.sim);
-  if (feeder) {
-    // The sim has no tar1090 behind it to keep traces.
-    await context.route(/\/data\//, (route) => route.fulfill({ status: 404 }));
-    await context.route(/\/feed\/info\.json$/, (route) =>
-      route.fulfill({ status: 200, body: feeder.info(), contentType: 'application/json' }),
-    );
-  }
-  const page = await context.newPage();
-  const log: string[] = [];
-  page.on('console', (m) => log.push(`[${m.type()}] ${m.text()}`));
-  page.on('pageerror', (e) => log.push(`[pageerror] ${e.message}`));
-  page.on('worker', (w) => {
-    log.push(`[worker] ${w.url()}`);
-    w.on('console', (m) => log.push(`[worker ${m.type()}] ${m.text()}`));
-  });
-  await page.goto(opt.url);
-  return {
-    page,
-    log,
-    close: async () => {
-      await browser.close();
-      feeder?.stop();
-      stopPreview();
-    },
-  };
 }

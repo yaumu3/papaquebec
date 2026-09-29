@@ -4,8 +4,9 @@ use std::num::NonZeroU16;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::Failure;
-use crate::upstream::sim::Site;
+use authority::Subject;
+use feeder::Failure;
+use feeder::upstream::sim::Site;
 
 /// Where the traffic comes from.
 #[derive(Debug, PartialEq)]
@@ -24,8 +25,77 @@ pub struct Config {
     /// `PQ_FEED_PORT`: the UDP port to listen on. The scope connects to the
     /// same number, so a container must publish it unchanged.
     pub port: u16,
-    /// `PQ_FEED_INFO`: where to publish how to connect, for the web server to serve.
-    pub info: PathBuf,
+    /// `PQ_ADDRESS`: how the scope is served.
+    pub door: Door,
+    /// `XDG_DATA_HOME`, or `.local/share` in `HOME`: where the authority is kept,
+    /// and where Caddy kept its own.
+    pub data: Option<PathBuf>,
+}
+
+/// How the scope is served, read from an address in the forms Caddy took:
+/// `https://`, `https://<host>` or just `<host>`, `http://`, each with an
+/// optional `:<port>`.
+#[derive(Debug, PartialEq)]
+pub enum Door {
+    /// Over https with certificates from the local authority, for the one host
+    /// only when the address names one.
+    Secure { port: u16, only: Option<Subject> },
+    /// Plainly, behind something else that speaks https.
+    Plain { port: u16 },
+}
+
+impl FromStr for Door {
+    type Err = Failure;
+
+    fn from_str(address: &str) -> Result<Self, Failure> {
+        let (secure, rest) = match address.split_once("://") {
+            Some(("https", rest)) => (true, rest),
+            Some(("http", rest)) => (false, rest),
+            Some((scheme, _)) => return Err(format!("{scheme} is neither https nor http").into()),
+            None => (true, address),
+        };
+        let (host, port) = host_and_port(rest)?;
+        match (secure, host) {
+            (true, only) => Ok(Self::Secure {
+                port: port.unwrap_or(443),
+                only: only.map(subject),
+            }),
+            (false, None) => Ok(Self::Plain {
+                port: port.unwrap_or(80),
+            }),
+            (false, Some(_)) => {
+                Err("a host names a certificate, which plain http has none of".into())
+            }
+        }
+    }
+}
+
+/// `host`, `host:port`, `[v6]:port` or `:port`.
+fn host_and_port(rest: &str) -> Result<(Option<&str>, Option<u16>), Failure> {
+    let (host, port) = match rest.strip_prefix('[') {
+        Some(bracketed) => {
+            let (host, after) = bracketed
+                .split_once(']')
+                .ok_or("an address opened with [ is not closed")?;
+            (host, after.strip_prefix(':'))
+        }
+        None => match rest.rsplit_once(':') {
+            Some((host, port)) => (host, Some(port)),
+            None => (rest, None),
+        },
+    };
+    let port = port.map(str::parse::<NonZeroU16>).transpose()?;
+    Ok((
+        Some(host).filter(|host| !host.is_empty()),
+        port.map(NonZeroU16::get),
+    ))
+}
+
+fn subject(host: &str) -> Subject {
+    match host.parse() {
+        Ok(address) => Subject::Address(address),
+        Err(_) => Subject::Name(host.to_ascii_lowercase()),
+    }
 }
 
 impl Config {
@@ -48,11 +118,23 @@ impl Config {
             }
         };
         let port: Option<NonZeroU16> = parsed(&lookup, "PQ_FEED_PORT")?;
-        let info = lookup("PQ_FEED_INFO");
+        let door = match lookup("PQ_ADDRESS") {
+            Some(address) => address
+                .parse()
+                .map_err(|error| format!("PQ_ADDRESS={address}: {error}"))?,
+            None => Door::Secure {
+                port: 443,
+                only: None,
+            },
+        };
+        let data = lookup("XDG_DATA_HOME")
+            .map(PathBuf::from)
+            .or_else(|| lookup("HOME").map(|home| PathBuf::from(home).join(".local/share")));
         Ok(Self {
             origin,
             port: port.map_or(4433, NonZeroU16::get),
-            info: info.map_or_else(|| "public/feed/info.json".into(), PathBuf::from),
+            door,
+            data,
         })
     }
 }
@@ -96,27 +178,14 @@ fn sim_speed(speed: f64) -> Result<f64, Failure> {
     }
 }
 
-impl FromStr for Site {
-    type Err = Failure;
-
-    /// `lat,lon` in degrees.
-    fn from_str(site: &str) -> Result<Self, Failure> {
-        let (lat, lon) = site.split_once(',').ok_or("expected lat,lon")?;
-        let (lat_deg, lon_deg) = (lat.trim().parse::<f64>()?, lon.trim().parse::<f64>()?);
-        // Asked as "within", which NaN never is.
-        if !(-90.0..=90.0).contains(&lat_deg) || !(-180.0..=180.0).contains(&lon_deg) {
-            return Err("outside the globe".into());
-        }
-        Ok(Self { lat_deg, lon_deg })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
-    use super::{Config, Origin};
-    use crate::upstream::sim::Site;
+    use authority::Subject;
+    use feeder::upstream::sim::Site;
+
+    use super::{Config, Door, Origin};
 
     fn environment(pairs: &'static [(&str, &str)]) -> impl Fn(&str) -> Option<String> {
         |name| {
@@ -128,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn empty_environment_gives_the_container_s_defaults() {
+    fn empty_environment_gives_the_defaults() {
         // Arrange
         let lookup = environment(&[]);
 
@@ -139,7 +208,11 @@ mod tests {
         let expected = Config {
             origin: Origin::Tar1090("http://tar1090".into()),
             port: 4433,
-            info: PathBuf::from("public/feed/info.json"),
+            door: Door::Secure {
+                port: 443,
+                only: None,
+            },
+            data: None,
         };
         assert_eq!(config.ok(), Some(expected));
     }
@@ -150,7 +223,9 @@ mod tests {
         let lookup = environment(&[
             ("PQ_TAR1090", "http://localhost:8090"),
             ("PQ_FEED_PORT", "8443"),
-            ("PQ_FEED_INFO", "/srv/feed.json"),
+            ("PQ_ADDRESS", "https://raspberrypi.local:8443"),
+            ("XDG_DATA_HOME", "/srv/data"),
+            ("HOME", "/home/pq"),
         ]);
 
         // Act
@@ -160,7 +235,11 @@ mod tests {
         let expected = Config {
             origin: Origin::Tar1090("http://localhost:8090".into()),
             port: 8443,
-            info: PathBuf::from("/srv/feed.json"),
+            door: Door::Secure {
+                port: 8443,
+                only: Some(Subject::Name("raspberrypi.local".into())),
+            },
+            data: Some(PathBuf::from("/srv/data")),
         };
         assert_eq!(config.ok(), Some(expected));
     }
@@ -230,14 +309,8 @@ mod tests {
     #[test]
     fn sim_that_cannot_be_flown_is_refused() {
         // Arrange
-        let environments: [&[(&str, &str)]; 14] = [
-            &[("PQ_SIM", "33.5844")],
+        let environments: [&[(&str, &str)]; 8] = [
             &[("PQ_SIM", "north,east")],
-            &[("PQ_SIM", "91,130")],
-            &[("PQ_SIM", "33,181")],
-            &[("PQ_SIM", "NaN,130")],
-            &[("PQ_SIM", "33,NaN")],
-            &[("PQ_SIM", "inf,130")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "0")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "NaN")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "inf")],
@@ -290,5 +363,76 @@ mod tests {
             _ => None,
         };
         assert_eq!(extra, Some(10_000));
+    }
+
+    #[test]
+    fn data_is_kept_where_xdg_would_keep_it() {
+        // Arrange
+        let lookup = environment(&[("HOME", "/home/pq")]);
+
+        // Act
+        let config = Config::read(lookup);
+
+        // Assert
+        let data = config.ok().and_then(|config| config.data);
+        assert_eq!(data, Some(PathBuf::from("/home/pq/.local/share")));
+    }
+
+    #[test]
+    fn address_is_read_in_the_forms_caddy_took() {
+        // Arrange
+        let secure = |port, only| Door::Secure { port, only };
+        let name = |name: &str| Some(Subject::Name(name.into()));
+        let address = |address: &str| Some(Subject::Address(address.parse().expect("an address")));
+        let cases = [
+            ("https://", secure(443, None)),
+            (
+                "https://raspberrypi.local",
+                secure(443, name("raspberrypi.local")),
+            ),
+            (
+                "https://RaspberryPi.local",
+                secure(443, name("raspberrypi.local")),
+            ),
+            ("raspberrypi.local", secure(443, name("raspberrypi.local"))),
+            (
+                "https://192.168.3.10:8443",
+                secure(8443, address("192.168.3.10")),
+            ),
+            ("https://[::1]:8443", secure(8443, address("::1"))),
+            ("https://:8443", secure(8443, None)),
+            ("http://", Door::Plain { port: 80 }),
+            ("http://:8080", Door::Plain { port: 8080 }),
+        ];
+
+        // Act
+        let read = cases.each_ref().map(|(written, _)| {
+            Config::read(|name| (name == "PQ_ADDRESS").then(|| (*written).to_owned()))
+                .map(|c| c.door)
+        });
+
+        // Assert
+        let expected = cases.map(|(_, door)| Some(door));
+        assert_eq!(read.map(Result::ok), expected);
+    }
+
+    #[test]
+    fn address_that_cannot_be_served_is_refused() {
+        // Arrange
+        let written = [
+            "ftp://raspberrypi.local",
+            "https://raspberrypi.local:0",
+            "https://raspberrypi.local:65536",
+            "https://raspberrypi.local:port",
+            "http://raspberrypi.local",
+            "https://[::1",
+        ];
+
+        // Act
+        let read = written
+            .map(|written| Config::read(|name| (name == "PQ_ADDRESS").then(|| written.to_owned())));
+
+        // Assert
+        assert!(read.iter().all(Result::is_err));
     }
 }

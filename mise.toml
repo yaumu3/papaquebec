@@ -2,9 +2,10 @@
 bun = "1.4"
 rust = { version = "1.98", components = ["clippy", "rustfmt"] }
 
-[tasks."dev:feeder"]
-description = "The feeder, publishing how to reach it where the dev server finds it"
+[tasks."dev:web"]
+description = "The server, over plain http for the dev server to pass requests on to"
 dir = "scope"
+env = { PQ_ADDRESS = "http://:8080" }
 run = "cargo run"
 
 [tasks."dev:scope"]
@@ -13,15 +14,15 @@ dir = "scope"
 run = "bun run dev"
 
 [tasks.dev]
-description = "The scope and the feeder, following the tar1090 at PQ_TAR1090"
-depends = ["dev:feeder", "dev:scope"]
+description = "The scope and its server, following the tar1090 at PQ_TAR1090"
+depends = ["dev:web", "dev:scope"]
 
 [tasks.sim]
-description = "The scope and the feeder flying the synthetic fleet around PQ_SITE (RJTT by default)"
+description = "The scope and its server flying the synthetic fleet around PQ_SITE (RJTT by default)"
 run = 'PQ_SIM="${PQ_SITE:-35.5533,139.7811}" mise run dev'
 
-[tasks."check:feeder"]
-description = "The feeder's checks, as CI runs them"
+[tasks."check:server"]
+description = "The checks of the server's crates, as CI runs them"
 run = [
   "cargo fmt --all --check",
   "cargo clippy --workspace --all-targets --locked -- -D warnings",
@@ -35,7 +36,7 @@ run = ["bun run format:check", "bun run lint", "bun run test", "bun run build"]
 
 [tasks.check]
 description = "Every check CI runs"
-depends = ["check:feeder", "check:scope"]
+depends = ["check:server", "check:scope"]
 
 [tasks.bench]
 description = "Load test the scope with the sim's extra traffic; flags follow"

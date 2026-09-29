@@ -5,7 +5,6 @@ scope/src/feed/gen/
 *.log
 .vite/
 coverage/
-scope/public/feed/
 scope/public/map/coast.json
 scope/public/map/aero.json
 scope/public/aero.schema.json
