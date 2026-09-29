@@ -1,5 +1,5 @@
 /**
- * The built scope in headless Chromium with WebGPU, optionally fed by a feeder flying the sim.
+ * The built scope in headless Chromium with WebGPU, optionally fed by a server flying the sim.
  * Chromium is launched on Metal; change `--use-angle` below on other platforms.
  */
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -12,7 +12,7 @@ export interface ScopeBrowserOptions {
   url: string;
   /** Start `vite preview` on the URL's port instead of expecting a server there. */
   preview: boolean;
-  /** Sim speed; a feeder flying the sim is started unless null. */
+  /** Sim speed; a server flying the sim is started unless null. */
   sim: number | null;
   /** Generic targets the sim adds to its fleet. */
   extra: number;
@@ -49,17 +49,17 @@ async function startPreview(url: string): Promise<() => void> {
   return () => proc.kill();
 }
 
-/** Apart from the dev feeder's, so both can run. */
+/** Apart from the dev server's, so both can run. */
 const SIM_FEED_PORT = '4434';
 
-interface SimFeeder {
-  /** What the feeder published about how to reach it. */
+interface SimServer {
+  /** What the server published about how to reach its feed. */
   info: () => string;
   stop: () => void;
 }
 
-/** A feeder flying the sim, resolved once it has been built and listens. */
-async function startSimFeeder(opt: ScopeBrowserOptions, speed: number): Promise<SimFeeder> {
+/** A server flying the sim, resolved once it has been built and listens. */
+async function startSimServer(opt: ScopeBrowserOptions, speed: number): Promise<SimServer> {
   const directory = mkdtempSync(join(tmpdir(), 'pq-feed-'));
   const info = join(directory, 'info.json');
   const proc = Bun.spawn(['cargo', 'run', '--quiet'], {
@@ -77,12 +77,12 @@ async function startSimFeeder(opt: ScopeBrowserOptions, speed: number): Promise<
     proc.kill();
     rmSync(directory, { recursive: true, force: true });
   };
-  /** Long enough for a first build of the feeder. */
+  /** Long enough for a first build of the server. */
   const published = async (tries: number): Promise<void> => {
     if (existsSync(info)) return;
     if (tries === 0 || proc.exitCode !== null) {
       stop();
-      throw new Error('the feeder did not start');
+      throw new Error('the server did not start');
     }
     await Bun.sleep(500);
     return published(tries - 1);
@@ -110,12 +110,12 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
     viewport: { width: 1600, height: 1000 },
     deviceScaleFactor: opt.scale,
   });
-  const feeder = opt.sim === null ? null : await startSimFeeder(opt, opt.sim);
-  if (feeder) {
+  const server = opt.sim === null ? null : await startSimServer(opt, opt.sim);
+  if (server) {
     // The sim has no tar1090 behind it to keep traces.
     await context.route(/\/data\//, (route) => route.fulfill({ status: 404 }));
     await context.route(/\/feed\/info\.json$/, (route) =>
-      route.fulfill({ status: 200, body: feeder.info(), contentType: 'application/json' }),
+      route.fulfill({ status: 200, body: server.info(), contentType: 'application/json' }),
     );
   }
   const page = await context.newPage();
@@ -132,7 +132,7 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
     log,
     close: async () => {
       await browser.close();
-      feeder?.stop();
+      server?.stop();
       stopPreview();
     },
   };

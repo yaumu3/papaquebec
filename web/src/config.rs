@@ -4,8 +4,8 @@ use std::num::NonZeroU16;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use crate::Failure;
-use crate::upstream::sim::Site;
+use feeder::Failure;
+use feeder::upstream::sim::Site;
 
 /// Where the traffic comes from.
 #[derive(Debug, PartialEq)]
@@ -96,27 +96,12 @@ fn sim_speed(speed: f64) -> Result<f64, Failure> {
     }
 }
 
-impl FromStr for Site {
-    type Err = Failure;
-
-    /// `lat,lon` in degrees.
-    fn from_str(site: &str) -> Result<Self, Failure> {
-        let (lat, lon) = site.split_once(',').ok_or("expected lat,lon")?;
-        let (lat_deg, lon_deg) = (lat.trim().parse::<f64>()?, lon.trim().parse::<f64>()?);
-        // Asked as "within", which NaN never is.
-        if !(-90.0..=90.0).contains(&lat_deg) || !(-180.0..=180.0).contains(&lon_deg) {
-            return Err("outside the globe".into());
-        }
-        Ok(Self { lat_deg, lon_deg })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
 
     use super::{Config, Origin};
-    use crate::upstream::sim::Site;
+    use feeder::upstream::sim::Site;
 
     fn environment(pairs: &'static [(&str, &str)]) -> impl Fn(&str) -> Option<String> {
         |name| {
@@ -230,14 +215,8 @@ mod tests {
     #[test]
     fn sim_that_cannot_be_flown_is_refused() {
         // Arrange
-        let environments: [&[(&str, &str)]; 14] = [
-            &[("PQ_SIM", "33.5844")],
+        let environments: [&[(&str, &str)]; 8] = [
             &[("PQ_SIM", "north,east")],
-            &[("PQ_SIM", "91,130")],
-            &[("PQ_SIM", "33,181")],
-            &[("PQ_SIM", "NaN,130")],
-            &[("PQ_SIM", "33,NaN")],
-            &[("PQ_SIM", "inf,130")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "0")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "NaN")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "inf")],

@@ -1,7 +1,7 @@
 /**
  * Open the built scope in headless Chromium with WebGPU and save a screenshot plus the console
  * log. Expects a server on `--url`, or starts `vite preview` itself with `--preview`. `--sim`
- * starts a feeder flying the synthetic fleet at that speed in place of a receiver.
+ * starts a server flying the synthetic fleet at that speed in place of a receiver.
  *
  *   bun scripts/screenshot.ts --out shot.png [--url http://localhost:4173/] [--preview]
  *     [--sim 10] [--site lat,lon] [--wait 6000] [--select TEST02] [--hint] [--scale 2]

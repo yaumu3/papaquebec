@@ -217,10 +217,11 @@ built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
 panels and UI, design tokens. The rules: `state/` is the only shared state, `lib/` imports no
 framework, worker code never imports Solid or touches the DOM, and components are styled only
 through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
-`feeder/src/` has the wire contract (`proto`), readsb's JSON (`readsb`), what every session is
-served from (`feed`), the traffic sources behind one `Upstream` trait (`upstream/`: tar1090 and the
-sim), the WebTransport endpoint (`transport`) and the environment (`config`); `proto/` holds the
-schema both sides generate their types from.
+The server is the `papaquebec` binary of `web/`, which reads the environment (`config`) and runs
+the feed. `feeder/src/` is the feed as a library: the wire contract (`proto`), readsb's JSON
+(`readsb`), what every session is served from (`feed`), the traffic sources behind one `Upstream`
+trait (`upstream/`: tar1090 and the sim) and the WebTransport endpoint (`transport`). `proto/` holds
+the schema both sides generate their types from.
 
 **Stack.**
 

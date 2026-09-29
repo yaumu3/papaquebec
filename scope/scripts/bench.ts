@@ -1,5 +1,5 @@
 /**
- * Load test: the built scope in headless Chromium, fed by a feeder flying the sim with extra
+ * Load test: the built scope in headless Chromium, fed by a server flying the sim with extra
  * traffic, driven through idle, pan, zoom and hover. Reports main-thread frame intervals and long tasks, the
  * messages posted to the render worker (one `layer:<name>` per layer rebuild) with their bytes,
  * and the sampled time in each function named in `--fn`, callees included. Function names need

@@ -1,14 +1,17 @@
-//! Feeds the scope with aircraft data over WebTransport.
+//! Serves the scope and its feed.
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+mod config;
+
 use feeder::Failure;
-use feeder::config::{Config, Origin};
 use feeder::transport::Server;
 use feeder::upstream::follow;
 use feeder::upstream::sim::{Sim, sim_clock};
 use feeder::upstream::tar1090::Tar1090;
 use tokio::sync::watch;
+
+use crate::config::{Config, Origin};
 
 /// readsb rewrites `aircraft.json` about once a second.
 const ASK_EVERY: Duration = Duration::from_millis(250);

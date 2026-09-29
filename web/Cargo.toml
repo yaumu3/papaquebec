@@ -1,0 +1,19 @@
+[package]
+name = "web"
+description = "Serves the scope and its feed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[[bin]]
+name = "papaquebec"
+path = "src/main.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+feeder = { path = "../feeder" }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }

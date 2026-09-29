@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Builds the scope and the feeder, and serves them over https next to docker-tar1090; see
+# Builds the scope and its server, and serves them over https next to docker-tar1090; see
 # README.md, Deployment.
 FROM oven/bun:1-alpine AS build
 WORKDIR /app
@@ -9,17 +9,18 @@ COPY proto/ /proto/
 COPY scope/ ./
 RUN bun run build
 
-FROM rust:1.98-alpine AS feeder
+FROM rust:1.98-alpine AS server
 RUN apk add --no-cache musl-dev
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY proto/ proto/
 COPY feeder/ feeder/
+COPY web/ web/
 RUN cargo build --release --locked
 
 FROM oven/bun:1-alpine
 COPY --from=caddy:2 /usr/bin/caddy /usr/bin/caddy
-COPY --from=feeder /src/target/release/feeder /usr/bin/feeder
+COPY --from=server /src/target/release/papaquebec /usr/bin/papaquebec
 WORKDIR /app
 COPY scope/package.json ./
 COPY scope/scripts/build-coast.ts scope/scripts/build-aero.ts scope/scripts/site.ts scope/scripts/guards.ts scope/scripts/countries.ts scope/scripts/countries.json scope/scripts/openaip.ts ./scripts/
