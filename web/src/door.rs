@@ -2,7 +2,6 @@
 //! name or address the browser asked for, or plain http behind someone else's.
 
 use std::collections::HashMap;
-use std::io;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
@@ -42,6 +41,12 @@ impl Certificates {
         }
     }
 
+    /// The certificate devices are given to trust.
+    #[must_use]
+    pub fn authority_pem(&self) -> String {
+        self.authority.certificate_pem()
+    }
+
     fn config_for(&self, subject: Subject) -> Result<Arc<ServerConfig>, Failure> {
         if self.only.as_ref().is_some_and(|only| *only != subject) {
             return Err(format!("{subject:?} is not what the door is kept to").into());
@@ -74,17 +79,16 @@ impl Certificates {
 
 /// Answers every connection with `router`, over https when there are
 /// certificates to issue and plainly otherwise.
-///
-/// # Errors
-///
-/// When the listener can accept no more.
-pub async fn serve(
-    listener: TcpListener,
-    certificates: Option<Arc<Certificates>>,
-    router: Router,
-) -> io::Result<()> {
+pub async fn serve(listener: TcpListener, certificates: Option<Arc<Certificates>>, router: Router) {
     loop {
-        let (stream, _) = listener.accept().await?;
+        // A connection reset while it waited fails here, and only that connection.
+        let stream = match listener.accept().await {
+            Ok((stream, _)) => stream,
+            Err(failure) => {
+                eprintln!("door: {failure}");
+                continue;
+            }
+        };
         let (certificates, router) = (certificates.clone(), router.clone());
         tokio::spawn(async move {
             let answered = match certificates {
@@ -285,22 +289,50 @@ mod tests {
         );
     }
 
+    /// Asks for the page over plain http.
+    async fn ask_plainly(mut stream: TcpStream) -> Option<String> {
+        let request = b"GET / HTTP/1.1\r\nhost: scope\r\nconnection: close\r\n\r\n";
+        stream.write_all(request).await.ok()?;
+        let mut response = String::new();
+        stream.read_to_string(&mut response).await.ok()?;
+        Some(response)
+    }
+
     #[tokio::test]
     async fn page_is_served_plainly_without_an_authority() {
         // Arrange
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("binds");
         let address = listener.local_addr().expect("bound");
         tokio::spawn(serve(listener, None, page()));
-        let mut stream = TcpStream::connect(address).await.expect("connects");
-        let request = b"GET / HTTP/1.1\r\nhost: scope\r\nconnection: close\r\n\r\n";
-        stream.write_all(request).await.expect("asks");
+        let stream = TcpStream::connect(address).await.expect("connects");
 
         // Act
-        let mut response = String::new();
-        let read = stream.read_to_string(&mut response).await;
+        let response = ask_plainly(stream).await;
 
         // Assert
-        assert!(read.is_ok());
+        let response = response.expect("answers");
+        assert!(response.ends_with("the scope"), "{response}");
+    }
+
+    #[tokio::test]
+    async fn door_stays_open_after_a_connection_is_abandoned_unaccepted() {
+        // Arrange
+        // Both families, as the server listens; macOS gives a reset IPv4 one no address.
+        let listener = TcpListener::bind("[::]:0").await.expect("binds");
+        let port = listener.local_addr().expect("bound").port();
+        let address = SocketAddr::from(([127, 0, 0, 1], port));
+        let abandoned = TcpStream::connect(address).await.expect("connects");
+        abandoned.set_zero_linger().expect("resets when dropped");
+        drop(abandoned);
+        // Loopback delivers in order, so the reset has arrived once this connects.
+        let stream = TcpStream::connect(address).await.expect("connects");
+        tokio::spawn(serve(listener, None, page()));
+
+        // Act
+        let response = ask_plainly(stream).await;
+
+        // Assert
+        let response = response.expect("answers");
         assert!(response.ends_with("the scope"), "{response}");
     }
 }
