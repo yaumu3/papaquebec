@@ -1,11 +1,10 @@
 //! The WebTransport endpoint the scope connects to.
 //!
 //! Browsers accept its self-signed certificate by hash, provided it is ECDSA
-//! and valid for no more than two weeks, so the hash is published for the
-//! scope to read and the certificate is renewed well within that time.
+//! and valid for no more than two weeks, so the hash is told to whoever asks
+//! and the certificate is renewed well within that time.
 
 use std::io;
-use std::path::{Path, PathBuf};
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
@@ -37,32 +36,28 @@ pub struct Info {
 pub struct Server {
     endpoint: Arc<Endpoint<endpoint_side::Server>>,
     certificate_hash: Arc<RwLock<String>>,
-    info: PathBuf,
     /// One permit per open session.
     sessions: Arc<Semaphore>,
 }
 
 impl Server {
-    /// Listens on `port`, or on a free one for 0, and publishes how to connect at `info`.
+    /// Listens on `port`, or on a free one for 0.
     ///
     /// # Errors
     ///
-    /// When the port cannot be bound or `info` cannot be written.
-    pub fn bind(port: u16, info: PathBuf) -> io::Result<Self> {
-        Self::bind_for(port, info, MAX_SESSIONS)
+    /// When the port cannot be bound.
+    pub fn bind(port: u16) -> io::Result<Self> {
+        Self::bind_for(port, MAX_SESSIONS)
     }
 
-    fn bind_for(port: u16, info: PathBuf, sessions: usize) -> io::Result<Self> {
+    fn bind_for(port: u16, sessions: usize) -> io::Result<Self> {
         let identity = identity()?;
-        let hash = hash(&identity);
-        let server = Self {
+        let certificate_hash = Arc::new(RwLock::new(hash(&identity)));
+        Ok(Self {
             endpoint: Arc::new(Endpoint::server(config(port, identity))?),
-            certificate_hash: Arc::default(),
-            info,
+            certificate_hash,
             sessions: Arc::new(Semaphore::new(sessions)),
-        };
-        server.announce(&hash)?;
-        Ok(server)
+        })
     }
 
     /// The port bound.
@@ -76,17 +71,19 @@ impl Server {
         address.port()
     }
 
-    /// Replaces the certificate, publishing its hash first so that a failure
-    /// leaves the old one in place; sessions already open carry on.
+    /// Replaces the certificate; sessions already open carry on.
     ///
     /// # Errors
     ///
-    /// When `info` cannot be written.
+    /// When no certificate can be made.
     pub fn renew(&self) -> io::Result<()> {
         let identity = identity()?;
-        self.announce(&hash(&identity))?;
+        let hash = hash(&identity);
         self.endpoint
-            .reload_config(config(self.port(), identity), false)
+            .reload_config(config(self.port(), identity), false)?;
+        let published = self.certificate_hash.write();
+        *published.unwrap_or_else(PoisonError::into_inner) = hash;
+        Ok(())
     }
 
     /// Renews the certificate every `every`, and `retry` after a renewal that failed.
@@ -136,21 +133,6 @@ impl Server {
             port: self.port(),
             certificate_hash: hash.unwrap_or_else(PoisonError::into_inner).clone(),
         }
-    }
-
-    /// Written beside and moved into place, so a reader never sees half of it.
-    fn announce(&self, hash: &str) -> io::Result<()> {
-        let info = Info {
-            port: self.port(),
-            certificate_hash: hash.to_owned(),
-        };
-        let beside = self.info.with_extension("tmp");
-        std::fs::create_dir_all(self.info.parent().unwrap_or(Path::new(".")))?;
-        std::fs::write(&beside, serde_json::to_string(&info)?)?;
-        std::fs::rename(beside, &self.info)?;
-        let published = self.certificate_hash.write();
-        *published.unwrap_or_else(PoisonError::into_inner) = info.certificate_hash;
-        Ok(())
     }
 }
 
@@ -239,7 +221,6 @@ async fn session(
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use std::time::Duration;
 
     use prost::Message;
@@ -297,8 +278,6 @@ mod tests {
     /// A server bound to a free port.
     struct Started {
         server: Server,
-        info: PathBuf,
-        _directory: tempfile::TempDir,
     }
 
     fn started(feed: &Feed) -> Started {
@@ -306,44 +285,14 @@ mod tests {
     }
 
     fn started_with(feed: &Feed, sessions: usize) -> Started {
-        let directory = tempfile::tempdir().expect("directory");
-        let info = directory.path().join("feed/info.json");
-        let server = Server::bind_for(0, info.clone(), sessions).expect("binds");
+        let server = Server::bind_for(0, sessions).expect("binds");
         tokio::spawn(server.clone().serve(feed.subscribe()));
-        Started {
-            server,
-            info,
-            _directory: directory,
-        }
-    }
-
-    /// Its directory can be cleaned up whatever a test left it as.
-    impl Drop for Started {
-        fn drop(&mut self) {
-            self.writable(true);
-        }
+        Started { server }
     }
 
     impl Started {
-        /// Lets the info file be written, or not, as a full or read-only disk would.
-        fn writable(&self, writable: bool) {
-            use std::os::unix::fs::PermissionsExt;
-
-            let directory = self.info.parent().expect("a directory");
-            let mode = if writable { 0o755 } else { 0o555 };
-            std::fs::set_permissions(directory, std::fs::Permissions::from_mode(mode))
-                .expect("permissions");
-        }
-
-        fn info(&self) -> serde_json::Value {
-            serde_json::from_slice(&std::fs::read(&self.info).expect("written")).expect("json")
-        }
-
         fn hash(&self) -> String {
-            self.info()["certificateHash"]
-                .as_str()
-                .expect("hash")
-                .to_owned()
+            self.server.info().certificate_hash
         }
 
         /// Connects as the scope does: trusting only the hash, from a page served
@@ -408,20 +357,6 @@ mod tests {
         tokio::time::timeout(Duration::from_secs(5), read)
             .await
             .ok()?
-    }
-
-    #[tokio::test]
-    async fn info_names_the_port_and_the_certificate() {
-        // Arrange
-        let (feed, _) = watch::channel(None);
-        let started = started(&feed);
-
-        // Act
-        let info = started.info();
-
-        // Assert
-        assert_eq!(info["port"], started.server.port());
-        assert_eq!(info["certificateHash"].as_str().map(str::len), Some(64));
     }
 
     #[tokio::test]
@@ -518,6 +453,28 @@ mod tests {
         assert_ne!(started.hash(), old);
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn certificate_is_renewed_every_period() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started(&feed);
+        let every = Duration::from_secs(600);
+        tokio::spawn(started.server.clone().keep_renewed(every, every));
+        // Half a minute past each renewal, not racing it.
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        let mut hashes = vec![started.hash()];
+
+        // Act
+        for _ in 0..2 {
+            tokio::time::sleep(every).await;
+            hashes.push(started.hash());
+        }
+
+        // Assert
+        assert_ne!(hashes[0], hashes[1]);
+        assert_ne!(hashes[1], hashes[2]);
+    }
+
     #[tokio::test]
     async fn renewed_certificate_is_accepted() {
         // Arrange
@@ -598,51 +555,6 @@ mod tests {
 
         // Assert
         assert_eq!(read, [Some(12.5), Some(3.0), None, None]);
-    }
-
-    #[tokio::test]
-    async fn failed_publication_keeps_the_old_certificate() {
-        // Arrange
-        let (feed, _) = watch::channel(None);
-        let started = started(&feed);
-        let old = started.hash();
-        started.writable(false);
-        let renewed = started.server.renew();
-        assert!(
-            renewed.is_err(),
-            "precondition: the hash cannot be published"
-        );
-
-        // Act
-        let connection = started.connect(&old).await;
-
-        // Assert
-        assert!(connection.is_some());
-        assert_eq!(started.hash(), old);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn failed_renewal_is_tried_again_soon() {
-        // Arrange
-        let (feed, _) = watch::channel(None);
-        let started = started(&feed);
-        let old = started.hash();
-        let (every, retry) = (Duration::from_secs(600), Duration::from_secs(60));
-        tokio::spawn(started.server.clone().keep_renewed(every, retry));
-        started.writable(false);
-        tokio::time::sleep(every + Duration::from_secs(1)).await;
-        assert_eq!(
-            started.hash(),
-            old,
-            "precondition: the first renewal failed"
-        );
-        started.writable(true);
-
-        // Act
-        tokio::time::sleep(retry).await;
-
-        // Assert
-        assert_ne!(started.hash(), old);
     }
 
     #[tokio::test]
@@ -741,7 +653,7 @@ mod tests {
 
         // Assert
         assert_eq!(info.port, started.server.port());
-        assert_eq!(info.certificate_hash, started.hash());
+        assert!(started.connect(&info.certificate_hash).await.is_some());
     }
 
     #[tokio::test]
@@ -757,7 +669,7 @@ mod tests {
 
         // Assert
         assert_ne!(info.certificate_hash, old);
-        assert_eq!(info.certificate_hash, started.hash());
+        assert!(started.connect(&info.certificate_hash).await.is_some());
     }
 
     #[test]

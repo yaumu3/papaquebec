@@ -3,8 +3,9 @@ bun = "1.4"
 rust = { version = "1.98", components = ["clippy", "rustfmt"] }
 
 [tasks."dev:web"]
-description = "The server, publishing how to reach its feed where the dev server finds it"
+description = "The server, over plain http for the dev server to pass requests on to"
 dir = "scope"
+env = { PQ_ADDRESS = "http://:8080" }
 run = "cargo run"
 
 [tasks."dev:scope"]

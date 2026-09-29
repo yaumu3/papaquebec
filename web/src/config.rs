@@ -25,8 +25,6 @@ pub struct Config {
     /// `PQ_FEED_PORT`: the UDP port to listen on. The scope connects to the
     /// same number, so a container must publish it unchanged.
     pub port: u16,
-    /// `PQ_FEED_INFO`: where to publish how to connect, for the web server to serve.
-    pub info: PathBuf,
     /// `PQ_ADDRESS`: how the scope is served.
     pub door: Door,
     /// `XDG_DATA_HOME`, or `.local/share` in `HOME`: where the authority is kept,
@@ -120,7 +118,6 @@ impl Config {
             }
         };
         let port: Option<NonZeroU16> = parsed(&lookup, "PQ_FEED_PORT")?;
-        let info = lookup("PQ_FEED_INFO");
         let door = match lookup("PQ_ADDRESS") {
             Some(address) => address
                 .parse()
@@ -136,7 +133,6 @@ impl Config {
         Ok(Self {
             origin,
             port: port.map_or(4433, NonZeroU16::get),
-            info: info.map_or_else(|| "public/feed/info.json".into(), PathBuf::from),
             door,
             data,
         })
@@ -212,7 +208,6 @@ mod tests {
         let expected = Config {
             origin: Origin::Tar1090("http://tar1090".into()),
             port: 4433,
-            info: PathBuf::from("public/feed/info.json"),
             door: Door::Secure {
                 port: 443,
                 only: None,
@@ -228,7 +223,6 @@ mod tests {
         let lookup = environment(&[
             ("PQ_TAR1090", "http://localhost:8090"),
             ("PQ_FEED_PORT", "8443"),
-            ("PQ_FEED_INFO", "/srv/feed.json"),
             ("PQ_ADDRESS", "https://raspberrypi.local:8443"),
             ("XDG_DATA_HOME", "/srv/data"),
             ("HOME", "/home/pq"),
@@ -241,7 +235,6 @@ mod tests {
         let expected = Config {
             origin: Origin::Tar1090("http://localhost:8090".into()),
             port: 8443,
-            info: PathBuf::from("/srv/feed.json"),
             door: Door::Secure {
                 port: 8443,
                 only: Some(Subject::Name("raspberrypi.local".into())),

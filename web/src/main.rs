@@ -26,7 +26,7 @@ const RENEW_RETRY: Duration = Duration::from_mins(1);
 #[tokio::main]
 async fn main() -> Result<(), Failure> {
     let config = Config::read(|name| std::env::var(name).ok())?;
-    let server = Server::bind(config.port, config.info)?;
+    let server = Server::bind(config.port)?;
     let (feed, listening) = watch::channel(None);
     eprintln!("feeding from {:?} on udp/{}", config.origin, server.port());
 
