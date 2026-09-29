@@ -13,7 +13,7 @@ pub enum Origin {
     /// `PQ_TAR1090`: the tar1090 to follow.
     Tar1090(String),
     /// `PQ_SIM` (`lat,lon`): synthesized traffic around the site, in place of
-    /// tar1090. `PQ_SIM_SPEED` runs it that many times faster than the clock
+    /// tar1090. `PQ_SIM_SPEED` runs it that many times faster than the clock, up to 1000,
     /// and `PQ_SIM_EXTRA` adds that many generic targets.
     Sim { site: Site, speed: f64, extra: u32 },
 }
@@ -40,8 +40,7 @@ impl Config {
                 site: site
                     .parse()
                     .map_err(|error| format!("PQ_SIM={site}: {error}"))?,
-                speed: parsed(&lookup, "PQ_SIM_SPEED")?
-                    .map_or(Ok(1.0), |speed| positive("PQ_SIM_SPEED", speed))?,
+                speed: parsed(&lookup, "PQ_SIM_SPEED")?.map_or(Ok(1.0), sim_speed)?,
                 extra: parsed(&lookup, "PQ_SIM_EXTRA")?.unwrap_or(0),
             },
             None => {
@@ -72,11 +71,15 @@ fn parsed<T: FromStr>(
     Ok(Some(read))
 }
 
-fn positive(name: &str, value: f64) -> Result<f64, Failure> {
-    if value > 0.0 {
-        Ok(value)
+/// The sim is asked once per sim second, so any faster would mean asking more
+/// often than every millisecond.
+const FASTEST_SIM: f64 = 1000.0;
+
+fn sim_speed(speed: f64) -> Result<f64, Failure> {
+    if speed > 0.0 && speed <= FASTEST_SIM {
+        Ok(speed)
     } else {
-        Err(format!("{name}={value}: not above zero").into())
+        Err(format!("PQ_SIM_SPEED={speed:?}: not above 0 and at most {FASTEST_SIM}").into())
     }
 }
 
@@ -213,12 +216,16 @@ mod tests {
     #[test]
     fn sim_that_cannot_be_flown_is_refused() {
         // Arrange
-        let environments: [&[(&str, &str)]; 6] = [
+        let environments: [&[(&str, &str)]; 10] = [
             &[("PQ_SIM", "33.5844")],
             &[("PQ_SIM", "north,east")],
             &[("PQ_SIM", "91,130")],
             &[("PQ_SIM", "33,181")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "0")],
+            &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "NaN")],
+            &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "inf")],
+            &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "1e300")],
+            &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SPEED", "1000.5")],
             &[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_EXTRA", "-1")],
         ];
 
@@ -227,5 +234,24 @@ mod tests {
 
         // Assert
         assert!(configs.iter().all(Result::is_err));
+    }
+
+    #[test]
+    fn sim_may_run_up_to_a_thousand_times_faster_than_the_clock() {
+        // Arrange
+        let lookup = environment(&[
+            ("PQ_SIM", "33.5844,130.4517"), // RJFF
+            ("PQ_SIM_SPEED", "1000"),
+        ]);
+
+        // Act
+        let config = Config::read(lookup);
+
+        // Assert
+        let speed = match config.map(|config| config.origin) {
+            Ok(Origin::Sim { speed, .. }) => Some(speed),
+            _ => None,
+        };
+        assert_eq!(speed.map(f64::to_bits), Some(1000.0_f64.to_bits()));
     }
 }
