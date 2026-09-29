@@ -160,6 +160,14 @@ impl Authority {
         &self.certificate
     }
 
+    /// The certificate as a file a device can be handed.
+    #[must_use]
+    pub fn certificate_pem(&self) -> String {
+        let certificate = pem::Pem::new("CERTIFICATE", self.certificate.to_vec());
+        let unix = pem::EncodeConfig::new().set_line_ending(pem::LineEnding::LF);
+        pem::encode_config(&certificate, unix)
+    }
+
     /// A certificate for the subject, with a key of its own.
     ///
     /// # Errors
@@ -612,5 +620,20 @@ mod tests {
         // Assert
         let opened = opened.expect("opens");
         assert!(matches!(opened.how, How::Created { refused: Some(_) }));
+    }
+
+    #[test]
+    fn certificate_is_handed_out_as_pem() {
+        // Arrange
+        let authority = Authority::create().expect("an authority").0;
+
+        // Act
+        let written = authority.certificate_pem();
+
+        // Assert
+        let handed_out = pem::parse(&written).expect("pem");
+        assert_eq!(handed_out.tag(), "CERTIFICATE");
+        assert_eq!(handed_out.contents(), authority.certificate().as_ref());
+        assert!(!written.contains('\r'), "lines end as they do on Unix");
     }
 }

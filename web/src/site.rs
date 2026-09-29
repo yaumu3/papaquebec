@@ -1,14 +1,16 @@
 //! What the server answers over HTTP.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 
-use axum::Router;
 use axum::extract::{Path, State};
-use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
+use axum::http::header::{ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
+use axum::{Json, Router};
+use feeder::transport::Info;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::ServeDir;
 
@@ -20,12 +22,24 @@ pub struct Site {
     pub map: PathBuf,
     /// The tar1090 that may keep traces, unless the traffic is synthesized.
     pub tar1090: Option<String>,
+    /// How the scope reaches the feed, asked each time as its certificate changes.
+    pub feed: Arc<dyn Fn() -> Info + Send + Sync>,
+    /// The certificate devices are given to trust, when the server has an authority.
+    pub authority: Option<String>,
 }
 
-/// The scope's build, with the generated map data under `/map` and tar1090's
-/// traces under `/data/traces`, compressed for whoever accepts it.
+/// The scope's build, with the generated map data under `/map`, tar1090's traces
+/// under `/data/traces`, how to reach the feed and the authority's certificate,
+/// compressed for whoever accepts it.
 pub fn router(site: &Site) -> Router {
-    let mut router = Router::new();
+    let feed = Arc::clone(&site.feed);
+    let info = move || async move { ([(CACHE_CONTROL, "no-store")], Json(feed())) };
+    let mut router = Router::new().route("/feed/info.json", get(info));
+    if let Some(certificate) = site.authority.clone() {
+        let offer =
+            move || async move { ([(CONTENT_TYPE, "application/x-x509-ca-cert")], certificate) };
+        router = router.route("/root.crt", get(offer));
+    }
     if let Some(tar1090) = &site.tar1090 {
         let traces = Traces {
             client: reqwest::Client::new(),
@@ -91,11 +105,13 @@ fn unanswered(failure: &reqwest::Error) -> Response {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
     use axum::body::Body;
-    use axum::http::header::{ACCEPT_ENCODING, CONTENT_ENCODING, CONTENT_TYPE};
+    use axum::http::header::{ACCEPT_ENCODING, CACHE_CONTROL, CONTENT_ENCODING, CONTENT_TYPE};
     use axum::http::{Request, StatusCode};
+    use feeder::transport::Info;
     use http_body_util::BodyExt;
     use tower::ServiceExt;
 
@@ -111,12 +127,21 @@ mod tests {
         served_beside(None)
     }
 
+    fn info(certificate_hash: &str) -> Info {
+        Info {
+            port: 443,
+            certificate_hash: certificate_hash.into(),
+        }
+    }
+
     fn served_beside(tar1090: Option<String>) -> Served {
         let directory = tempfile::tempdir().expect("a directory");
         let places = Site {
             dist: directory.path().join("dist"),
             map: directory.path().join("public/map"),
             tar1090,
+            feed: Arc::new(|| info("ab")),
+            authority: Some("-----BEGIN CERTIFICATE-----\n".into()),
         };
         let script = format!("// the scope\n{}", "render();\n".repeat(64));
         for (path, contents) in [
@@ -148,6 +173,7 @@ mod tests {
         status: StatusCode,
         content_type: Option<String>,
         encoding: Option<String>,
+        cache_control: Option<String>,
         body: Vec<u8>,
     }
 
@@ -169,6 +195,7 @@ mod tests {
             status: response.status(),
             content_type: header(CONTENT_TYPE),
             encoding: header(CONTENT_ENCODING),
+            cache_control: header(CACHE_CONTROL),
             body: response
                 .into_body()
                 .collect()
@@ -378,6 +405,56 @@ mod tests {
 
         // Act
         let answer = get(&served, TRACE_PATH, None).await;
+
+        // Assert
+        assert_eq!(answer.status, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn feed_info_is_answered_as_it_stands_and_not_to_be_kept() {
+        // Arrange
+        let hash = Arc::new(Mutex::new("ab"));
+        let renewed = Arc::clone(&hash);
+        let mut served = served();
+        served.site.feed = Arc::new(move || info(&hash.lock().expect("a hash")));
+        let before = get(&served, "/feed/info.json", None).await;
+        *renewed.lock().expect("a hash") = "cd";
+
+        // Act
+        let after = get(&served, "/feed/info.json", None).await;
+
+        // Assert
+        assert_eq!(before.body, br#"{"port":443,"certificateHash":"ab"}"#);
+        assert_eq!(after.body, br#"{"port":443,"certificateHash":"cd"}"#);
+        assert_eq!(after.content_type.as_deref(), Some("application/json"));
+        assert_eq!(after.cache_control.as_deref(), Some("no-store"));
+    }
+
+    #[tokio::test]
+    async fn authority_s_certificate_is_offered_for_trusting() {
+        // Arrange
+        let served = served();
+
+        // Act
+        let answer = get(&served, "/root.crt", None).await;
+
+        // Assert
+        assert_eq!(answer.status, StatusCode::OK);
+        assert_eq!(
+            answer.content_type.as_deref(),
+            Some("application/x-x509-ca-cert")
+        );
+        assert_eq!(answer.body, b"-----BEGIN CERTIFICATE-----\n");
+    }
+
+    #[tokio::test]
+    async fn there_is_no_certificate_without_an_authority() {
+        // Arrange
+        let mut served = served();
+        served.site.authority = None;
+
+        // Act
+        let answer = get(&served, "/root.crt", None).await;
 
         // Assert
         assert_eq!(answer.status, StatusCode::NOT_FOUND);

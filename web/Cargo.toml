@@ -15,7 +15,12 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
-axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "tokio"] }
+axum = { version = "0.8.9", default-features = false, features = [
+  "http1",
+  "http2",
+  "json",
+  "tokio",
+] }
 feeder = { path = "../feeder" }
 reqwest = { version = "0.13.5", default-features = false }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }

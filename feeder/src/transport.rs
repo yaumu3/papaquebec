@@ -6,9 +6,10 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
+use serde::Serialize;
 use tokio::sync::{Semaphore, watch};
 use url::Url;
 use wtransport::endpoint::IncomingSession;
@@ -23,9 +24,19 @@ use crate::feed::Published;
 /// of history, and a client on the network can claim any origin.
 const MAX_SESSIONS: usize = 32;
 
+/// How the scope reaches the feed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Info {
+    pub port: u16,
+    /// SHA-256 of the certificate the endpoint presents, in hex.
+    pub certificate_hash: String,
+}
+
 #[derive(Clone)]
 pub struct Server {
     endpoint: Arc<Endpoint<endpoint_side::Server>>,
+    certificate_hash: Arc<RwLock<String>>,
     info: PathBuf,
     /// One permit per open session.
     sessions: Arc<Semaphore>,
@@ -46,6 +57,7 @@ impl Server {
         let hash = hash(&identity);
         let server = Self {
             endpoint: Arc::new(Endpoint::server(config(port, identity))?),
+            certificate_hash: Arc::default(),
             info,
             sessions: Arc::new(Semaphore::new(sessions)),
         };
@@ -116,13 +128,29 @@ impl Server {
         }
     }
 
+    /// How to reach the endpoint now.
+    #[must_use]
+    pub fn info(&self) -> Info {
+        let hash = self.certificate_hash.read();
+        Info {
+            port: self.port(),
+            certificate_hash: hash.unwrap_or_else(PoisonError::into_inner).clone(),
+        }
+    }
+
     /// Written beside and moved into place, so a reader never sees half of it.
     fn announce(&self, hash: &str) -> io::Result<()> {
-        let info = serde_json::json!({ "port": self.port(), "certificateHash": hash });
+        let info = Info {
+            port: self.port(),
+            certificate_hash: hash.to_owned(),
+        };
         let beside = self.info.with_extension("tmp");
         std::fs::create_dir_all(self.info.parent().unwrap_or(Path::new(".")))?;
-        std::fs::write(&beside, info.to_string())?;
-        std::fs::rename(beside, &self.info)
+        std::fs::write(&beside, serde_json::to_string(&info)?)?;
+        std::fs::rename(beside, &self.info)?;
+        let published = self.certificate_hash.write();
+        *published.unwrap_or_else(PoisonError::into_inner) = info.certificate_hash;
+        Ok(())
     }
 }
 
@@ -700,5 +728,51 @@ mod tests {
 
         // Assert
         assert!(second.is_some());
+    }
+
+    #[tokio::test]
+    async fn server_says_how_to_reach_it() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started(&feed);
+
+        // Act
+        let info = started.server.info();
+
+        // Assert
+        assert_eq!(info.port, started.server.port());
+        assert_eq!(info.certificate_hash, started.hash());
+    }
+
+    #[tokio::test]
+    async fn server_says_the_certificate_it_renewed_to() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started(&feed);
+        let old = started.server.info().certificate_hash;
+        started.server.renew().expect("renews");
+
+        // Act
+        let info = started.server.info();
+
+        // Assert
+        assert_ne!(info.certificate_hash, old);
+        assert_eq!(info.certificate_hash, started.hash());
+    }
+
+    #[test]
+    fn info_is_written_as_the_scope_reads_it() {
+        // Arrange
+        let info = super::Info {
+            port: 4433,
+            certificate_hash: "ab".repeat(32),
+        };
+
+        // Act
+        let json = serde_json::to_value(&info);
+
+        // Assert
+        let expected = serde_json::json!({ "port": 4433, "certificateHash": "ab".repeat(32) });
+        assert_eq!(json.ok(), Some(expected));
     }
 }
