@@ -14,6 +14,7 @@ use tokio::sync::watch;
 const ASK_EVERY: Duration = Duration::from_millis(250);
 /// Half of the two weeks a browser accepts a certificate by hash for.
 const RENEW_EVERY: Duration = Duration::from_hours(7 * 24);
+const RENEW_RETRY: Duration = Duration::from_mins(1);
 
 #[tokio::main]
 async fn main() -> Result<(), Failure> {
@@ -29,7 +30,7 @@ async fn main() -> Result<(), Failure> {
             tokio::spawn(follow(sim, Duration::from_secs_f64(1.0 / speed), feed))
         }
     };
-    tokio::spawn(renew(server.clone()));
+    tokio::spawn(server.clone().keep_renewed(RENEW_EVERY, RENEW_RETRY));
     server.serve(listening).await;
     Ok(())
 }
@@ -38,15 +39,4 @@ async fn main() -> Result<(), Failure> {
 fn wall() -> f64 {
     let since = SystemTime::now().duration_since(UNIX_EPOCH);
     since.map_or(0.0, |since| since.as_secs_f64())
-}
-
-async fn renew(server: Server) {
-    let mut tick = tokio::time::interval(RENEW_EVERY);
-    tick.tick().await;
-    loop {
-        tick.tick().await;
-        if let Err(error) = server.renew() {
-            eprintln!("certificate not renewed: {error}");
-        }
-    }
 }

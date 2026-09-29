@@ -52,17 +52,32 @@ impl Server {
         address.port()
     }
 
-    /// Replaces the certificate; sessions already open carry on.
+    /// Replaces the certificate, publishing its hash first so that a failure
+    /// leaves the old one in place; sessions already open carry on.
     ///
     /// # Errors
     ///
     /// When `info` cannot be written.
     pub fn renew(&self) -> io::Result<()> {
         let identity = identity()?;
-        let hash = hash(&identity);
+        self.announce(&hash(&identity))?;
         self.endpoint
-            .reload_config(config(self.port(), identity), false)?;
-        self.announce(&hash)
+            .reload_config(config(self.port(), identity), false)
+    }
+
+    /// Renews the certificate every `every`, and `retry` after a renewal that failed.
+    pub async fn keep_renewed(self, every: Duration, retry: Duration) {
+        let mut wait = every;
+        loop {
+            tokio::time::sleep(wait).await;
+            wait = match self.renew() {
+                Ok(()) => every,
+                Err(error) => {
+                    eprintln!("certificate not renewed: {error}");
+                    retry
+                }
+            };
+        }
     }
 
     /// Greets every session once the feed has started, with the history after the
@@ -226,7 +241,24 @@ mod tests {
         }
     }
 
+    /// Its directory can be cleaned up whatever a test left it as.
+    impl Drop for Started {
+        fn drop(&mut self) {
+            self.writable(true);
+        }
+    }
+
     impl Started {
+        /// Lets the info file be written, or not, as a full or read-only disk would.
+        fn writable(&self, writable: bool) {
+            use std::os::unix::fs::PermissionsExt;
+
+            let directory = self.info.parent().expect("a directory");
+            let mode = if writable { 0o755 } else { 0o555 };
+            std::fs::set_permissions(directory, std::fs::Permissions::from_mode(mode))
+                .expect("permissions");
+        }
+
         fn info(&self) -> serde_json::Value {
             serde_json::from_slice(&std::fs::read(&self.info).expect("written")).expect("json")
         }
@@ -482,5 +514,50 @@ mod tests {
 
         // Assert
         assert_eq!(read, [Some(12.5), Some(3.0), None, None]);
+    }
+
+    #[tokio::test]
+    async fn failed_publication_keeps_the_old_certificate() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started(&feed);
+        let old = started.hash();
+        started.writable(false);
+        let renewed = started.server.renew();
+        assert!(
+            renewed.is_err(),
+            "precondition: the hash cannot be published"
+        );
+
+        // Act
+        let connection = started.connect(&old).await;
+
+        // Assert
+        assert!(connection.is_some());
+        assert_eq!(started.hash(), old);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn failed_renewal_is_tried_again_soon() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started(&feed);
+        let old = started.hash();
+        let (every, retry) = (Duration::from_secs(600), Duration::from_secs(60));
+        tokio::spawn(started.server.clone().keep_renewed(every, retry));
+        started.writable(false);
+        tokio::time::sleep(every + Duration::from_secs(1)).await;
+        assert_eq!(
+            started.hash(),
+            old,
+            "precondition: the first renewal failed"
+        );
+        started.writable(true);
+
+        // Act
+        tokio::time::sleep(retry).await;
+
+        // Assert
+        assert_ne!(started.hash(), old);
     }
 }
