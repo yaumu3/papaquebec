@@ -14,6 +14,7 @@ RUN apk add --no-cache musl-dev
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY proto/ proto/
+COPY authority/ authority/
 COPY feeder/ feeder/
 COPY web/ web/
 RUN cargo build --release --locked
