@@ -1,6 +1,6 @@
 [tools]
 bun = "1.4"
-rust = "1.98"
+rust = { version = "1.98", components = ["clippy", "rustfmt"] }
 
 [tasks."dev:feeder"]
 description = "The feeder, publishing how to reach it where the dev server finds it"
