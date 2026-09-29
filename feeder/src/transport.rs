@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::watch;
+use tokio::sync::{Semaphore, watch};
 use url::Url;
 use wtransport::endpoint::IncomingSession;
 use wtransport::endpoint::endpoint_side;
@@ -19,10 +19,16 @@ use wtransport::{Endpoint, Identity, ServerConfig};
 use crate::Failure;
 use crate::feed::Published;
 
+/// A household's screens with room to spare: every session costs up to an hour
+/// of history, and a client on the network can claim any origin.
+const MAX_SESSIONS: usize = 32;
+
 #[derive(Clone)]
 pub struct Server {
     endpoint: Arc<Endpoint<endpoint_side::Server>>,
     info: PathBuf,
+    /// One permit per open session.
+    sessions: Arc<Semaphore>,
 }
 
 impl Server {
@@ -32,11 +38,16 @@ impl Server {
     ///
     /// When the port cannot be bound or `info` cannot be written.
     pub fn bind(port: u16, info: PathBuf) -> io::Result<Self> {
+        Self::bind_for(port, info, MAX_SESSIONS)
+    }
+
+    fn bind_for(port: u16, info: PathBuf, sessions: usize) -> io::Result<Self> {
         let identity = identity()?;
         let hash = hash(&identity);
         let server = Self {
             endpoint: Arc::new(Endpoint::server(config(port, identity))?),
             info,
+            sessions: Arc::new(Semaphore::new(sessions)),
         };
         server.announce(&hash)?;
         Ok(server)
@@ -81,15 +92,24 @@ impl Server {
         }
     }
 
-    /// Greets every session once the feed has started, with the history after the
+    /// Greets every session, up to the limit, once the feed has started, with the history after the
     /// `since` it asks for, sends it the latest snapshot, then each one published,
     /// all on one stream so they arrive in order.
     pub async fn serve(self, feed: watch::Receiver<Option<Published>>) {
         loop {
             let incoming = self.endpoint.accept().await;
             let feed = feed.clone();
+            let permit = Arc::clone(&self.sessions).try_acquire_owned();
             tokio::spawn(async move {
-                if let Err(failure) = session(incoming, feed).await {
+                let served = match permit {
+                    Ok(permit) => {
+                        let served = session(incoming, feed).await;
+                        drop(permit);
+                        served
+                    }
+                    Err(_) => refuse_busy(incoming).await,
+                };
+                if let Err(failure) = served {
                     eprintln!("session: {failure}");
                 }
             });
@@ -146,6 +166,11 @@ fn same_host(origin: Option<&str>, authority: &str) -> bool {
     host(&format!("https://{authority}")).is_some_and(|addressed| addressed == origin)
 }
 
+async fn refuse_busy(incoming: IncomingSession) -> Result<(), Failure> {
+    incoming.await?.too_many_requests().await;
+    Err("refused a session: too many are open".into())
+}
+
 async fn session(
     incoming: IncomingSession,
     mut feed: watch::Receiver<Option<Published>>,
@@ -195,7 +220,7 @@ mod tests {
     use wtransport::tls::Sha256Digest;
     use wtransport::{ClientConfig, Connection, Endpoint, RecvStream};
 
-    use super::{Server, same_host, since};
+    use super::{MAX_SESSIONS, Server, same_host, since};
     use crate::feed::Published;
     use crate::proto::{Frame, Hello, Receiver, Snapshot, frame::Body};
 
@@ -249,9 +274,13 @@ mod tests {
     }
 
     fn started(feed: &Feed) -> Started {
+        started_with(feed, MAX_SESSIONS)
+    }
+
+    fn started_with(feed: &Feed, sessions: usize) -> Started {
         let directory = tempfile::tempdir().expect("directory");
         let info = directory.path().join("feed/info.json");
-        let server = Server::bind(0, info.clone()).expect("binds");
+        let server = Server::bind_for(0, info.clone(), sessions).expect("binds");
         tokio::spawn(server.clone().serve(feed.subscribe()));
         Started {
             server,
@@ -640,5 +669,36 @@ mod tests {
 
         // Assert
         assert_eq!(judged, cases.map(|(_, _, allowed)| allowed));
+    }
+
+    #[tokio::test]
+    async fn session_beyond_the_limit_is_refused() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started_with(&feed, 1);
+        let first = started.connect(&started.hash()).await;
+        assert!(first.is_some(), "precondition: the first session is open");
+
+        // Act
+        let second = started.connect(&started.hash()).await;
+
+        // Assert
+        assert!(second.is_none());
+    }
+
+    #[tokio::test]
+    async fn closed_session_makes_room_for_another() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started_with(&feed, 1);
+        let first = started.connect(&started.hash()).await.expect("connects");
+        first.close(0u32.into(), b"done");
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Act
+        let second = started.connect(&started.hash()).await;
+
+        // Assert
+        assert!(second.is_some());
     }
 }
