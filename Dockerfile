@@ -4,6 +4,7 @@ FROM oven/bun:1-alpine AS build
 WORKDIR /app
 COPY scope/package.json scope/bun.lock ./
 RUN bun install --frozen-lockfile
+COPY proto/ /proto/
 COPY scope/ ./
 RUN bun run build
 

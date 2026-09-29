@@ -1,5 +1,6 @@
 node_modules/
 scope/dist/
+scope/src/feed/gen/
 .DS_Store
 *.log
 .vite/

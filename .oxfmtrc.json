@@ -8,6 +8,7 @@
     "scope/dist",
     "scope/node_modules",
     "scope/public/map",
+    "scope/src/feed/gen",
     "scope/scripts/countries.json",
     "docs"
   ]

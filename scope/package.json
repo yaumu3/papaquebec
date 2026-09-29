@@ -5,25 +5,29 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "bunx --bun vite",
+    "dev": "bun run proto && bunx --bun vite",
     "map": "bun scripts/build-coast.ts && bun scripts/build-aero.ts",
+    "proto": "bunx --bun buf generate ../proto --template buf.gen.yaml",
     "schema": "bun scripts/build-schema.ts",
     "icons": "bun scripts/build-icons.ts",
-    "build": "bun run schema && bun run icons && bunx --bun tsc --noEmit && bunx --bun vite build",
+    "build": "bun run proto && bun run schema && bun run icons && bunx --bun tsc --noEmit && bunx --bun vite build",
     "preview": "bunx --bun vite preview",
     "sim": "bun scripts/sim.ts",
     "bench": "bun run build --minify false && bun scripts/bench.ts --preview",
     "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select TEST02 --hint --scale 1 --out ../docs/screenshot.png",
-    "test": "bun test",
-    "lint": "bunx --bun oxlint --type-aware",
+    "test": "bun run proto && bun test",
+    "lint": "bun run proto && bunx --bun oxlint --type-aware",
     "format": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt",
     "format:check": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt --check"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "^2.16.0",
     "solid-js": "^1.9.15",
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@bufbuild/buf": "^1.73.0",
+    "@bufbuild/protoc-gen-es": "^2.16.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/bun": "latest",
     "@webgpu/types": "^0.1.74",
