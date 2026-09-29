@@ -86,18 +86,13 @@ impl Server {
         Ok(())
     }
 
-    /// Renews the certificate every `every`, and `retry` after a renewal that failed.
-    pub async fn keep_renewed(self, every: Duration, retry: Duration) {
-        let mut wait = every;
+    /// Renews the certificate every `every`.
+    pub async fn keep_renewed(self, every: Duration) {
         loop {
-            tokio::time::sleep(wait).await;
-            wait = match self.renew() {
-                Ok(()) => every,
-                Err(error) => {
-                    eprintln!("certificate not renewed: {error}");
-                    retry
-                }
-            };
+            tokio::time::sleep(every).await;
+            if let Err(error) = self.renew() {
+                eprintln!("certificate not renewed: {error}");
+            }
         }
     }
 
@@ -459,7 +454,7 @@ mod tests {
         let (feed, _) = watch::channel(None);
         let started = started(&feed);
         let every = Duration::from_secs(600);
-        tokio::spawn(started.server.clone().keep_renewed(every, every));
+        tokio::spawn(started.server.clone().keep_renewed(every));
         // Half a minute past each renewal, not racing it.
         tokio::time::sleep(Duration::from_secs(30)).await;
         let mut hashes = vec![started.hash()];
