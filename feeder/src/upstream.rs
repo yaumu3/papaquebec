@@ -1,5 +1,6 @@
 //! Where the traffic comes from.
 
+pub mod sim;
 pub mod tar1090;
 
 use std::time::Duration;
