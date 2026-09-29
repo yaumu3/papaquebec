@@ -12,7 +12,6 @@
     "icons": "bun scripts/build-icons.ts",
     "build": "bun run proto && bun run schema && bun run icons && bunx --bun tsc --noEmit && bunx --bun vite build",
     "preview": "bunx --bun vite preview",
-    "sim": "bun scripts/sim.ts",
     "bench": "bun run build --minify false && bun scripts/bench.ts --preview",
     "screenshot": "bun run build && bun scripts/screenshot.ts --preview --sim 10 --wait 15000 --select TEST02 --hint --scale 1 --out ../docs/screenshot.png",
     "test": "bun run proto && bun test",
