@@ -1,0 +1,30 @@
+[package]
+name = "feeder"
+description = "Feeds the scope with aircraft data over WebTransport"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+bytes = "1.12.1"
+flate2 = "1.1.10"
+prost = "0.14.4"
+reqwest = { version = "0.13.5", default-features = false }
+serde = "1"
+serde_json = "1.0.151"
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "time", "sync"] }
+url = "2.5.8"
+wtransport = { version = "0.7.2", features = ["self-signed"] }
+
+[build-dependencies]
+prost-build = "0.14.4"
+protox = "0.9.1"
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1.53.1", features = ["io-util", "net", "test-util"] }

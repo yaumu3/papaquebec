@@ -1,6 +1,6 @@
 import { isRecord } from '../lib/guards';
 import { type MetarQnh, parseMetarQnh } from '../lib/metar';
-import type { FetchLike } from './source';
+import type { FetchLike } from './http';
 
 /** Iowa State University's mesonet: NOAA's METAR feed relayed for every station, CORS open. */
 export const IEM_CURRENTS = 'https://mesonet.agron.iastate.edu/api/1/currents.json';

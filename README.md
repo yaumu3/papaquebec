@@ -2,9 +2,9 @@
 
 A passive ADS-B scope in the visual vocabulary of a radar display rather than a map: position
 symbols, data blocks and trails on a dark screen. It is served beside
-[`docker-tar1090`](https://github.com/sdr-enthusiasts/docker-tar1090) in place of its web UI, with
-no backend of its own: [`readsb`](https://github.com/wiedehopf/readsb) decodes and publishes, the
-scope draws.
+[`docker-tar1090`](https://github.com/sdr-enthusiasts/docker-tar1090) in place of its web UI:
+[`readsb`](https://github.com/wiedehopf/readsb) decodes, a small feeder pushes what it hears to the
+browser, and the scope draws.
 
 ![The scope over Tokyo with synthesized traffic](docs/screenshot.png)
 
@@ -12,9 +12,13 @@ scope draws.
 
 The scope runs in its own container beside `docker-tar1090`: a [Caddy](https://caddyserver.com) that
 serves the build over https (browsers expose WebGPU only in secure contexts, which the tar1090 image
-cannot provide) and proxies the two data paths to [tar1090](https://github.com/wiedehopf/tar1090),
-which stays stock on port 80. At start the container asks tar1090 for the receiver position and
-generates the map data around it, so nothing needs configuring beyond the compose entry.
+cannot provide) and proxies the selected aircraft's day trace to
+[tar1090](https://github.com/wiedehopf/tar1090), which stays stock on port 80. Beside it runs the
+feeder, the scope's one source of traffic: it follows tar1090's `aircraft.json`, keeps the last
+hour of it, starting from tar1090's own history, and pushes each new snapshot over
+[WebTransport](https://developer.mozilla.org/docs/Web/API/WebTransport_API). At start the container
+asks tar1090 for the receiver position and generates the map data around it, so nothing needs
+configuring beyond the compose entry.
 
 1. Clone this repository on the machine that runs tar1090.
 2. Add the service to the compose file that runs tar1090, then `docker compose up -d --build`:
@@ -30,6 +34,7 @@ services:
     ports:
       - 443:443
       - 443:443/udp # HTTP/3
+      - 4433:4433/udp # the feed
     volumes:
       - caddy_data:/data # the certificate authority
       - map_data:/app/public/map
@@ -49,41 +54,54 @@ volumes:
 Environment on the service, all optional:
 
 - `PQ_TAR1090` (default `http://tar1090`): the tar1090 service, if it is named differently.
-- `PQ_SITE` (`lat,lon`): the map center, when readsb is not told its position.
+- `PQ_SITE` (`lat,lon`): the center of the generated map data, when readsb is not told its
+  position; the scope itself then needs `?site=` (see Development).
+- `PQ_FEED_PORT` (default `4433`): the UDP port of the feed. The scope connects to the same
+  number, so publish it unchanged (`4500:4500/udp` with `PQ_FEED_PORT=4500`).
 - `PQ_ADDRESS` (default `https://`): the Caddy site address. A host name or IP pins the certificate
   to it; `http://` serves plain http on port 80 for a setup that terminates TLS itself, such as
   [Tailscale](https://tailscale.com) or an existing reverse proxy (then publish `80`, not `443`).
 
-Ports can be remapped (`8443:443`) when 443 is taken. An update is `git pull` and `up -d --build`
-again; a restart refreshes the aeronautical data. Optionally, `READSB_ENABLE_TRACES=true` on
-tar1090 with a `/var/globe_history` volume lets the selected target show its whole day instead of
-the last ten minutes.
+Ports can be remapped (`8443:443`) when 443 is taken. The feed needs no certificate trusted: the
+feeder makes its own every week and the scope accepts it by its hash, read over https. The feeder
+accepts a session only from a page served by the host it addresses, so another site cannot read it
+through a visitor's browser. An update is `git pull` and `up -d --build` again; a restart refreshes
+the aeronautical data. Optionally, `READSB_ENABLE_TRACES=true` on tar1090 with a
+`/var/globe_history` volume lets the selected target show its whole day instead of the last hour.
 
 ## Development
 
-`mise install` pins Bun. The dev and preview servers proxy `/data` and `/chunks` to a tar1090,
-or to the synthetic fleet served by `bun run sim`, a stand-in tar1090 on port 8090:
+`mise install` pins Bun and Rust, and `mise run` starts the pieces together; `mise tasks` lists
+them. The feeder follows a tar1090 or flies a synthetic fleet in its place, and the dev server
+proxies traces to the same tar1090:
 
 ```sh
-cd scope
-export PQ_TAR1090=http://<host>     # or http://localhost:8090 with `bun run sim`
-bun run map            # map data around the receiver, see below
-bun run dev
+export PQ_TAR1090=http://<host>
+(cd scope && bun run map)   # map data around the receiver, see below
+mise run dev                # the scope and the feeder, on real traffic
+mise run sim                # the same on the synthetic fleet; PQ_SITE=lat,lon moves it
+mise run check              # everything CI runs
+mise run bench              # a load test, see below
 ```
+
+The sim needs no tar1090: the feeder tells the scope the site it flies around, RJTT unless `PQ_SITE`
+says otherwise (with `PQ_SITE` exported, `bun run map` builds the map around the same site). The
+feeder flies it whenever `PQ_SIM` is set to a site; `PQ_SIM_SPEED` runs it up to 1000 times faster
+than the clock and `PQ_SIM_EXTRA` adds up to 10000 generic targets.
 
 Query parameters: `?site=<lat>,<lon>` overrides the receiver position, `?wx=<base>` reads METARs
 from your own [Aviation Weather Center](https://aviationweather.gov) proxy.
 
-Checks: `bun test`, `bun run lint`, `bun run format:check`, `bun run build`.
-GitHub Actions runs the same four and builds the image on every push and pull request.
-`bun scripts/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a frame plus
-the console log; `bun run screenshot` regenerates the README picture from the synthetic fleet. The
-sim and screenshot scripts describe their flags in their headers.
+GitHub Actions runs the same checks and builds the image on every push to `main` and every pull
+request. `bun scripts/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a
+frame plus the console log; with `--sim` it starts a feeder of its own flying the sim, as `mise run
+bench`, a load test with extra sim traffic, always does. `bun run screenshot` regenerates the README
+picture that way. Both describe their flags in their headers.
 
 Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight:
 callsigns are `TEST` plus digits (a real airline callsign is three letters then a number), registrations
 `TEST-` plus digits, and addresses come from `D00000`–`DFFFFF`, a block ICAO Annex 10 Vol III reserves
-for future use. The sim tests enforce this for the fleet.
+for future use. The sim's tests enforce this for the fleet.
 
 ## Altimeter
 
@@ -161,22 +179,33 @@ flowchart LR
         readsb -- "aircraft.json, 1 Hz" --> nginx
     end
     subgraph p["papaquebec"]
-        caddy[("caddy<br/>scope build, map data")]
+        caddy[("caddy<br/>scope build, map data, feed info")]
+        feeder
     end
     subgraph b["browser"]
         feed[feed worker] --> store[main thread<br/>track store] --> render[render worker<br/>WebGPU]
     end
-    nginx -- "/data, /chunks" --> caddy -- https --> feed
+    nginx -- "/data/traces" --> caddy -- https --> store
+    nginx -- "receiver, aircraft, chunks" --> feeder -- "WebTransport, protobuf" --> feed
+    feeder -. "port, certificate hash" .-> caddy
 ```
 
 **Data.** The contract is `readsb`'s `aircraft.json`
 ([`README-json.md`](https://github.com/wiedehopf/readsb/blob/dev/README-json.md)); `lib/` types the
-subset read, every field optional. Each poll is a full snapshot and the track store is rebuilt from
-it; liveness is `readsb`'s `seen`. Only position history and operator state (selection, pinned
-corner, hidden trail) persist across snapshots. At start-up tar1090's own chunk history (`/chunks/`)
-backfills the trails; selecting a target fetches its readsb day trace
-(`/data/traces/`) when the container keeps them. Live `lat/lon` draws normally, `lastPosition` draws
-stale, rough or absent positions appear only in text.
+subset read, every field optional. The feeder carries the same snapshot as protobuf
+(`proto/papaquebec/feed/v1/feed.proto`, named after RTCA DO-260B), which the feed worker reads back
+into that contract. Each session is one ordered stream: a hello with the receiver's position and the
+history since the snapshot the scope last took (one every eight seconds, up to an hour), then live
+snapshots. The feeder seeds that history from tar1090's own (`/chunks/`) when it starts, so a
+session after a restart, a lost connection or a sleeping phone fills the trails' gap by itself.
+Every wait on a session has a deadline, and a missed one only means connecting again; the top bar
+tells the feed's state from the age of its data.
+
+Each snapshot is a full one and the track store is rebuilt from it; liveness is `readsb`'s `seen`.
+Only position history and operator state (selection, pinned corner, hidden trail) persist across
+snapshots. Selecting a target fetches its readsb day trace (`/data/traces/`) when the container
+keeps them. Live `lat/lon` draws normally, `lastPosition` draws stale, rough or absent positions
+appear only in text.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has
 no adapter). The main thread owns all state and sends packed buffers; one draw per layer per frame,
@@ -187,11 +216,26 @@ built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
 **Layout.** `scope/src/` is split by role: pure library, shared state, feed, renderer, canvas input,
 panels and UI, design tokens. The rules: `state/` is the only shared state, `lib/` imports no
 framework, worker code never imports Solid or touches the DOM, and components are styled only
-through the design tokens. `scripts/` holds the data tools.
+through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
+`feeder/src/` has the wire contract (`proto`), readsb's JSON (`readsb`), what every session is
+served from (`feed`), the traffic sources behind one `Upstream` trait (`upstream/`: tar1090 and the
+sim), the WebTransport endpoint (`transport`) and the environment (`config`); `proto/` holds the
+schema both sides generate their types from.
 
-**Stack.** TypeScript strict, [Solid](https://www.solidjs.com), [Vite](https://vite.dev) and raw
-[WebGPU](https://www.w3.org/TR/webgpu/); [Bun](https://bun.sh) via [`mise`](https://mise.jdx.dev);
-[oxlint and oxfmt](https://oxc.rs).
+**Stack.**
+
+- **Scope**
+  - TypeScript (strict), [Solid](https://www.solidjs.com) and [Vite](https://vite.dev)
+  - raw [WebGPU](https://www.w3.org/TR/webgpu/)
+  - [protobuf-es](https://github.com/bufbuild/protobuf-es) for the feed, its types generated by
+    [buf](https://buf.build)
+  - [oxlint and oxfmt](https://oxc.rs)
+- **Feeder**
+  - Rust on [tokio](https://tokio.rs)
+  - [wtransport](https://github.com/BiagioFesta/wtransport) for WebTransport and
+    [prost](https://github.com/tokio-rs/prost) for protobuf
+  - clippy and rustfmt
+- **Toolchains**: [Bun](https://bun.sh) and Rust, pinned by [`mise`](https://mise.jdx.dev)
 
 ## License
 

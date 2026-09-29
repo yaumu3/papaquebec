@@ -7,6 +7,7 @@ import {
   hintVisible,
   modeText,
   receiverAnswered,
+  tick,
   renderError,
   site,
 } from '../state/scope';
@@ -14,7 +15,7 @@ import { HINT, type HintBlock } from './hint';
 
 import s from './Overlays.module.css';
 
-const banner = () => bannerText(renderError(), feedStatus(), site(), receiverAnswered());
+const banner = () => bannerText(renderError(), feedStatus(), tick(), site(), receiverAnswered());
 
 /** Every binding on one grid so keycaps and actions align across the blocks. */
 function Hint() {

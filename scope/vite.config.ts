@@ -9,7 +9,6 @@ export default defineConfig({
   server: {
     proxy: {
       '/data': { target: TAR1090, changeOrigin: true },
-      '/chunks': { target: TAR1090, changeOrigin: true },
       // An Aviation Weather Center proxy for trying the ?wx=/wx path locally.
       '/wx/metar': {
         target: 'https://aviationweather.gov',

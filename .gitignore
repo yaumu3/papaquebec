@@ -1,12 +1,15 @@
 node_modules/
 scope/dist/
+scope/src/feed/gen/
 .DS_Store
 *.log
 .vite/
 coverage/
+scope/public/feed/
 scope/public/map/coast.json
 scope/public/map/aero.json
 scope/public/aero.schema.json
 scope/public/favicon.ico
 scope/public/icon-192.png
 scope/public/apple-touch-icon.png
+target/

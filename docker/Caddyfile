@@ -10,8 +10,10 @@
 	handle /data/* {
 		reverse_proxy {$PQ_TAR1090}
 	}
-	handle /chunks/* {
-		reverse_proxy {$PQ_TAR1090}
+	handle /feed/* {
+		root * /app/public
+		header Cache-Control no-store
+		file_server
 	}
 	handle /map/* {
 		root * /app/public

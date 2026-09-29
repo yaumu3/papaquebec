@@ -69,6 +69,4 @@ export interface AircraftSnapshot {
 export interface ReceiverJson {
   lat?: number;
   lon?: number;
-  version?: string;
-  refresh?: number;
 }

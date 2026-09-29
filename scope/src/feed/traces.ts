@@ -1,6 +1,5 @@
 import { parseTrace, type Trace } from '../lib/trace';
-import { getJson } from './readsb';
-import type { FetchLike } from './source';
+import { type FetchLike, getJson } from './http';
 
 /** readsb keeps today's trace per aircraft under the last two hex digits. */
 function traceUrl(base: string, hex: string): string {

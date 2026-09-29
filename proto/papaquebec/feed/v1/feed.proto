@@ -1,0 +1,246 @@
+syntax = "proto3";
+
+// Names and code values follow RTCA DO-260B (1090 MHz Extended Squitter, ADS-B
+// version 2). Values are carried in engineering units, not in the encodings of
+// the messages they came from. Field numbers left free within a group are for
+// the values of that group not carried yet.
+package papaquebec.feed.v1;
+
+// Every frame of a session travels on its one unidirectional stream, each after
+// its length as a varint. The first is a Hello; snapshots follow.
+message Frame {
+  oneof body {
+    Snapshot snapshot = 1;
+    Hello hello = 2;
+  }
+}
+
+// What a session needs before the first snapshot.
+message Hello {
+  Receiver receiver = 1;
+  // The snapshots after the one the session asked to resume from and before the
+  // latest, which follows in full, oldest first: one every 8 s for up to an hour,
+  // each aircraft reduced to what a trail needs.
+  repeated Snapshot history = 2;
+}
+
+// The receiver's own position, when it knows it.
+message Receiver {
+  optional double lat_deg = 1;
+  optional double lon_deg = 2;
+}
+
+// Every aircraft the receiver knows at one instant.
+message Snapshot {
+  // Unix time; it rises from one snapshot to the next.
+  double now_s = 1;
+  // Messages the receiver has decoded since it started.
+  uint64 messages = 2;
+  repeated Aircraft aircraft = 3;
+}
+
+// A field is absent when the receiver does not know it.
+message Aircraft {
+  Address address = 1;
+
+  // Aircraft Identification and Category message.
+  // Up to eight characters, trailing spaces removed.
+  optional string identification = 2;
+  optional EmitterCategory emitter_category = 3;
+
+  // Aircraft Status message.
+  // The 12-bit Mode A code; its four octal digits are the squawk.
+  optional uint32 mode_a_code = 4;
+  optional EmergencyPriorityStatus emergency_priority_status = 5;
+
+  // Airborne and Surface Position messages.
+  optional double lat_deg = 10;
+  optional double lon_deg = 11;
+  Source position_source = 12;
+  AirGroundState air_ground_state = 13;
+  // Pressure altitude, referenced to 1013.25 hPa.
+  optional sint32 baro_altitude_ft = 14;
+  // GNSS height above the WGS-84 ellipsoid, as version 2 requires.
+  optional sint32 geometric_altitude_ft = 15;
+  optional LastPosition last_position = 16;
+  optional RoughPosition rough_position = 17;
+
+  // Velocity. Ground speed, track and vertical rate come from the Airborne
+  // Velocity message; the rest from it or from Comm-B replies.
+  optional double ground_speed_kt = 20;
+  // True track over the ground.
+  optional double track_deg = 21;
+  optional sint32 baro_vertical_rate_fpm = 22;
+  optional double indicated_airspeed_kt = 24;
+  optional double true_airspeed_kt = 25;
+  optional double mach = 28;
+
+  optional TargetState target_state = 40;
+  optional Quality quality = 41;
+  optional Meteo meteo = 42;
+  optional Registry registry = 43;
+  optional Reception reception = 44;
+}
+
+message Address {
+  // The 24 bits of the address field.
+  fixed32 value = 1;
+  AddressType type = 2;
+}
+
+enum AddressType {
+  ADDRESS_TYPE_UNSPECIFIED = 0;
+  // The aircraft address ICAO assigned.
+  ADDRESS_TYPE_ICAO = 1;
+  // Anonymous, ground vehicle, fixed obstruction or TIS-B track file.
+  ADDRESS_TYPE_NON_ICAO = 2;
+}
+
+// Category set and code, numbered `set * 8 + code` with set A = 0 to D = 3.
+// Set C is named as in DO-260B; ICAO Doc 9871 assigns its codes differently.
+enum EmitterCategory {
+  // A0: no emitter category information.
+  EMITTER_CATEGORY_UNSPECIFIED = 0;
+  // Below 15 500 lb.
+  EMITTER_CATEGORY_A1_LIGHT = 1;
+  // 15 500 lb to below 75 000 lb.
+  EMITTER_CATEGORY_A2_SMALL = 2;
+  // 75 000 lb to below 300 000 lb.
+  EMITTER_CATEGORY_A3_LARGE = 3;
+  // A large aircraft with a strong wake, such as the Boeing 757.
+  EMITTER_CATEGORY_A4_HIGH_VORTEX_LARGE = 4;
+  // 300 000 lb and above.
+  EMITTER_CATEGORY_A5_HEAVY = 5;
+  // Above 5 g and above 400 kt.
+  EMITTER_CATEGORY_A6_HIGH_PERFORMANCE = 6;
+  EMITTER_CATEGORY_A7_ROTORCRAFT = 7;
+  EMITTER_CATEGORY_B0_NO_INFORMATION = 8;
+  EMITTER_CATEGORY_B1_GLIDER = 9;
+  EMITTER_CATEGORY_B2_LIGHTER_THAN_AIR = 10;
+  EMITTER_CATEGORY_B3_PARACHUTIST = 11;
+  EMITTER_CATEGORY_B4_ULTRALIGHT = 12;
+  EMITTER_CATEGORY_B5_RESERVED = 13;
+  EMITTER_CATEGORY_B6_UNMANNED = 14;
+  EMITTER_CATEGORY_B7_SPACE_VEHICLE = 15;
+  EMITTER_CATEGORY_C0_NO_INFORMATION = 16;
+  EMITTER_CATEGORY_C1_SURFACE_EMERGENCY_VEHICLE = 17;
+  EMITTER_CATEGORY_C2_SURFACE_SERVICE_VEHICLE = 18;
+  EMITTER_CATEGORY_C3_POINT_OBSTACLE = 19;
+  EMITTER_CATEGORY_C4_CLUSTER_OBSTACLE = 20;
+  EMITTER_CATEGORY_C5_LINE_OBSTACLE = 21;
+  EMITTER_CATEGORY_C6_RESERVED = 22;
+  EMITTER_CATEGORY_C7_RESERVED = 23;
+  EMITTER_CATEGORY_D0_RESERVED = 24;
+  EMITTER_CATEGORY_D1_RESERVED = 25;
+  EMITTER_CATEGORY_D2_RESERVED = 26;
+  EMITTER_CATEGORY_D3_RESERVED = 27;
+  EMITTER_CATEGORY_D4_RESERVED = 28;
+  EMITTER_CATEGORY_D5_RESERVED = 29;
+  EMITTER_CATEGORY_D6_RESERVED = 30;
+  EMITTER_CATEGORY_D7_RESERVED = 31;
+}
+
+// Numbered as the Emergency/Priority Status subfield encodes them, so zero is a
+// reported state; the field's presence tells it from unknown.
+enum EmergencyPriorityStatus {
+  EMERGENCY_PRIORITY_STATUS_NO_EMERGENCY = 0;
+  EMERGENCY_PRIORITY_STATUS_GENERAL_EMERGENCY = 1;
+  EMERGENCY_PRIORITY_STATUS_LIFEGUARD_MEDICAL = 2;
+  EMERGENCY_PRIORITY_STATUS_MINIMUM_FUEL = 3;
+  EMERGENCY_PRIORITY_STATUS_NO_COMMUNICATIONS = 4;
+  EMERGENCY_PRIORITY_STATUS_UNLAWFUL_INTERFERENCE = 5;
+  EMERGENCY_PRIORITY_STATUS_DOWNED_AIRCRAFT = 6;
+  EMERGENCY_PRIORITY_STATUS_RESERVED = 7;
+}
+
+// Where a value came from, when not from the aircraft's own broadcast.
+enum Source {
+  SOURCE_UNSPECIFIED = 0;
+  // Traffic Information Service, a ground station broadcasting radar tracks.
+  SOURCE_TISB = 4;
+  // Multilateration by several ground receivers; never broadcast.
+  SOURCE_MLAT = 5;
+}
+
+enum AirGroundState {
+  // Unknown or uncertain.
+  AIR_GROUND_STATE_UNSPECIFIED = 0;
+  AIR_GROUND_STATE_ON_GROUND = 2;
+}
+
+// The last position known for an aircraft that has since stopped reporting one.
+message LastPosition {
+  double lat_deg = 1;
+  double lon_deg = 2;
+  optional uint32 nic = 3;
+  optional uint32 rc_m = 4;
+  // Age of the position at the snapshot's instant.
+  double seen_pos_s = 5;
+}
+
+// A position estimated from the receiver's range, for an aircraft that reports none.
+message RoughPosition {
+  double lat_deg = 1;
+  double lon_deg = 2;
+}
+
+// Target State and Status message, or the Comm-B selected vertical intention register.
+message TargetState {
+  // Selected on the mode control panel or flight control unit.
+  optional sint32 selected_altitude_mcp_ft = 1;
+  // Selected by the flight management system.
+  optional sint32 selected_altitude_fms_ft = 2;
+  // DO-260B leaves true or magnetic undefined.
+  optional double selected_heading_deg = 3;
+  // QNH or QFE, as the crew set it.
+  optional double baro_setting_hpa = 4;
+  // Absent when the aircraft does not report its modes; present and all false
+  // when it reports that none is engaged.
+  optional Modes modes = 5;
+
+  message Modes {
+    bool autopilot = 1;
+    bool vnav = 2;
+    bool altitude_hold = 3;
+    bool approach = 4;
+    bool lnav = 5;
+    bool tcas = 6;
+  }
+}
+
+// Integrity and accuracy, from the position and Operational Status messages.
+message Quality {
+  // Navigation Integrity Category, 0 to 11.
+  optional uint32 nic = 2;
+  // Navigation Accuracy Category for position, 0 to 11.
+  optional uint32 nac_p = 4;
+}
+
+// Not ADS-B: read from Comm-B replies or derived by the receiver from the speeds.
+message Meteo {
+  optional double wind_speed_kt = 1;
+  // True, the direction the wind blows from.
+  optional double wind_dir_deg = 2;
+  // Outside air temperature.
+  optional double oat_c = 3;
+  // Total air temperature.
+  optional double tat_c = 4;
+}
+
+// Not ADS-B: looked up from an aircraft database by the address.
+message Registry {
+  optional string registration = 1;
+  // ICAO Doc 8643 designator.
+  optional string type_designator = 2;
+  optional string type_description = 3;
+}
+
+// Not ADS-B: what the receiver observed of the aircraft's transmissions.
+message Reception {
+  optional uint64 messages = 1;
+  optional double rssi_dbfs = 2;
+  // Age of the last message at the snapshot's instant.
+  optional double seen_s = 3;
+  // Age of the last position at the snapshot's instant.
+  optional double seen_pos_s = 4;
+}

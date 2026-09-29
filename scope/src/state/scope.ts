@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 
+import type { FeedDown } from '../feed/push';
 import type { Vec2 } from '../lib/geo';
 import type { CoastData } from '../lib/mapdata';
 import type { ListSort } from './listSort';
@@ -12,12 +13,15 @@ export { aero };
 export { declination, magneticTrack, setDeclination } from './magnetic';
 import type { Fix } from './track';
 
-/** Feed liveness, as readsb reports it; the scope keeps no timer of its own beyond "when did we last hear". */
-export type FeedStatus =
-  | { kind: 'connecting' }
-  | { kind: 'rx'; lastAt: number }
-  | { kind: 'stale'; lastAt: number }
-  | { kind: 'dead'; message: string; since: number };
+/** What the scope knows of the feed; `feedState` tells its state from this and the clock. */
+export interface FeedStatus {
+  /** When the last snapshot arrived; null before the first. */
+  lastAt: number | null;
+  /** When the page was last shown. */
+  shownAt: number;
+  /** Why the last session failed or ended, until a snapshot arrives. */
+  reason: FeedDown | null;
+}
 
 export interface Site {
   lat: number;
@@ -40,7 +44,7 @@ export type RangeCursorOrigin =
   | { kind: 'free'; x: number; y: number };
 
 export const [site, setSite] = createSignal<Site | null>(null);
-/** True once receiver.json has been read, whether or not it carried a position. */
+/** True once the feed has greeted with the receiver, whether or not it knows its position. */
 export const [receiverAnswered, setReceiverAnswered] = createSignal(false);
 /** Bumped whenever the projection is (re)configured; projected geometry must be rebuilt. */
 const [projectionVersionSignal, setProjectionVersion] = createSignal(0);
@@ -48,7 +52,11 @@ export const projectionVersion = projectionVersionSignal;
 export const bumpProjection = (): void => {
   setProjectionVersion((v) => v + 1);
 };
-export const [feedStatus, setFeedStatus] = createSignal<FeedStatus>({ kind: 'connecting' });
+export const [feedStatus, setFeedStatus] = createSignal<FeedStatus>({
+  lastAt: null,
+  shownAt: Date.now(),
+  reason: null,
+});
 /** Bumped on every snapshot; coarse-grained reactivity over the track store. */
 const [snapshotVersionSignal, setSnapshotVersion] = createSignal(0);
 export const snapshotVersion = snapshotVersionSignal;

@@ -1,16 +1,18 @@
 /**
- * The built scope in headless Chromium with WebGPU, optionally fed by the sim. Chromium is
- * launched on Metal; change `--use-angle` below on other platforms.
+ * The built scope in headless Chromium with WebGPU, optionally fed by a feeder flying the sim.
+ * Chromium is launched on Metal; change `--use-angle` below on other platforms.
  */
-import { type Browser, chromium, type Page } from 'playwright';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { simHandler } from './sim/server';
+import { type Browser, chromium, type Page } from 'playwright';
 
 export interface ScopeBrowserOptions {
   url: string;
   /** Start `vite preview` on the URL's port instead of expecting a server there. */
   preview: boolean;
-  /** Sim speed; the data paths are answered by the sim unless null. */
+  /** Sim speed; a feeder flying the sim is started unless null. */
   sim: number | null;
   /** Generic targets the sim adds to its fleet. */
   extra: number;
@@ -47,6 +49,48 @@ async function startPreview(url: string): Promise<() => void> {
   return () => proc.kill();
 }
 
+/** Apart from the dev feeder's, so both can run. */
+const SIM_FEED_PORT = '4434';
+
+interface SimFeeder {
+  /** What the feeder published about how to reach it. */
+  info: () => string;
+  stop: () => void;
+}
+
+/** A feeder flying the sim, resolved once it has been built and listens. */
+async function startSimFeeder(opt: ScopeBrowserOptions, speed: number): Promise<SimFeeder> {
+  const directory = mkdtempSync(join(tmpdir(), 'pq-feed-'));
+  const info = join(directory, 'info.json');
+  const proc = Bun.spawn(['cargo', 'run', '--quiet'], {
+    env: {
+      ...process.env,
+      PQ_SIM: opt.site,
+      PQ_SIM_SPEED: String(speed),
+      PQ_SIM_EXTRA: String(opt.extra),
+      PQ_FEED_PORT: SIM_FEED_PORT,
+      PQ_FEED_INFO: info,
+    },
+    stdout: 'ignore',
+  });
+  const stop = () => {
+    proc.kill();
+    rmSync(directory, { recursive: true, force: true });
+  };
+  /** Long enough for a first build of the feeder. */
+  const published = async (tries: number): Promise<void> => {
+    if (existsSync(info)) return;
+    if (tries === 0 || proc.exitCode !== null) {
+      stop();
+      throw new Error('the feeder did not start');
+    }
+    await Bun.sleep(500);
+    return published(tries - 1);
+  };
+  await published(600);
+  return { info: () => readFileSync(info, 'utf8'), stop };
+}
+
 function launch(): Promise<Browser> {
   return chromium.launch({
     headless: true,
@@ -66,17 +110,13 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
     viewport: { width: 1600, height: 1000 },
     deviceScaleFactor: opt.scale,
   });
-  if (opt.sim !== null) {
-    const [lat = 0, lon = 0] = opt.site.split(',').map(Number);
-    const handle = simHandler({ site: { lat, lon }, speed: opt.sim, extra: opt.extra });
-    await context.route(/\/(data|chunks)\//, async (route) => {
-      const res = handle(new Request(route.request().url()));
-      await route.fulfill({
-        status: res.status,
-        body: await res.text(),
-        contentType: 'application/json',
-      });
-    });
+  const feeder = opt.sim === null ? null : await startSimFeeder(opt, opt.sim);
+  if (feeder) {
+    // The sim has no tar1090 behind it to keep traces.
+    await context.route(/\/data\//, (route) => route.fulfill({ status: 404 }));
+    await context.route(/\/feed\/info\.json$/, (route) =>
+      route.fulfill({ status: 200, body: feeder.info(), contentType: 'application/json' }),
+    );
   }
   const page = await context.newPage();
   const log: string[] = [];
@@ -92,6 +132,7 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
     log,
     close: async () => {
       await browser.close();
+      feeder?.stop();
       stopPreview();
     },
   };
