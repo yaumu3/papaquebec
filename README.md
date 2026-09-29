@@ -3,22 +3,21 @@
 A passive ADS-B scope in the visual vocabulary of a radar display rather than a map: position
 symbols, data blocks and trails on a dark screen. It is served beside
 [`docker-tar1090`](https://github.com/sdr-enthusiasts/docker-tar1090) in place of its web UI:
-[`readsb`](https://github.com/wiedehopf/readsb) decodes, a small feeder pushes what it hears to the
+[`readsb`](https://github.com/wiedehopf/readsb) decodes, a small server pushes what it hears to the
 browser, and the scope draws.
 
 ![The scope over Tokyo with synthesized traffic](docs/screenshot.png)
 
 ## Deployment
 
-The scope runs in its own container beside `docker-tar1090`: a [Caddy](https://caddyserver.com) that
-serves the build over https (browsers expose WebGPU only in secure contexts, which the tar1090 image
-cannot provide) and proxies the selected aircraft's day trace to
-[tar1090](https://github.com/wiedehopf/tar1090), which stays stock on port 80. Beside it runs the
-feeder, the scope's one source of traffic: it follows tar1090's `aircraft.json`, keeps the last
-hour of it, starting from tar1090's own history, and pushes each new snapshot over
-[WebTransport](https://developer.mozilla.org/docs/Web/API/WebTransport_API). At start the container
-asks tar1090 for the receiver position and generates the map data around it, so nothing needs
-configuring beyond the compose entry.
+The scope runs in its own container beside `docker-tar1090`: one server that serves the build over
+https (browsers expose WebGPU only in secure contexts, which the tar1090 image cannot provide),
+proxies the selected aircraft's day trace to [tar1090](https://github.com/wiedehopf/tar1090), which
+stays stock on port 80, and feeds the scope its one source of traffic: it follows tar1090's
+`aircraft.json`, keeps the last hour of it, starting from tar1090's own history, and pushes each new
+snapshot over [WebTransport](https://developer.mozilla.org/docs/Web/API/WebTransport_API). At start
+the container asks tar1090 for the receiver position and generates the map data around it, so
+nothing needs configuring beyond the compose entry.
 
 1. Clone this repository on the machine that runs tar1090.
 2. Add the service to the compose file that runs tar1090, then `docker compose up -d --build`:
@@ -33,8 +32,7 @@ services:
     restart: unless-stopped
     ports:
       - 443:443
-      - 443:443/udp # HTTP/3
-      - 4433:4433/udp # the feed
+      - 443:443/udp # the feed
     volumes:
       - caddy_data:/data # the certificate authority
       - map_data:/app/public/map
@@ -46,47 +44,53 @@ volumes:
 ```
 
 3. Open `https://<host>/` on the machine's name (Raspberry Pi OS announces `<hostname>.local`).
-   Caddy signs a certificate for whatever name is asked for with its own local authority, so the
-   browser objects until that authority is trusted once per device: download `https://<host>/root.crt`
-   and add it to the system trust (Settings > General > VPN & Device Management, then Certificate
-   Trust Settings on iOS; Keychain Access on macOS; `certutil`/`update-ca-certificates` elsewhere).
+   The server signs a certificate for whatever name or address is asked for with its own local
+   authority, so the browser objects until that authority is trusted once per device: download
+   `https://<host>/root.crt` and add it to the system trust (Settings > General > VPN & Device
+   Management, then Certificate Trust Settings on iOS; Keychain Access on macOS;
+   `certutil`/`update-ca-certificates` elsewhere).
 
 Environment on the service, all optional:
 
 - `PQ_TAR1090` (default `http://tar1090`): the tar1090 service, if it is named differently.
 - `PQ_SITE` (`lat,lon`): the center of the generated map data, when readsb is not told its
   position; the scope itself then needs `?site=` (see Development).
-- `PQ_FEED_PORT` (default `4433`): the UDP port of the feed. The scope connects to the same
+- `PQ_FEED_PORT` (default `443`): the UDP port of the feed. The scope connects to the same
   number, so publish it unchanged (`4500:4500/udp` with `PQ_FEED_PORT=4500`).
-- `PQ_ADDRESS` (default `https://`): the Caddy site address. A host name or IP pins the certificate
-  to it; `http://` serves plain http on port 80 for a setup that terminates TLS itself, such as
+- `PQ_ADDRESS` (default `https://`): how the scope is served. `https://` answers to any name or
+  address; a host (`https://<host>`, or just `<host>`) keeps the certificates to that one; `http://`
+  serves plain http on port 80 for a setup that terminates TLS itself, such as
   [Tailscale](https://tailscale.com) or an existing reverse proxy (then publish `80`, not `443`).
+  Each takes a `:<port>` to listen on instead.
 
 Ports can be remapped (`8443:443`) when 443 is taken. The feed needs no certificate trusted: the
-feeder makes its own every week and the scope accepts it by its hash, read over https. The feeder
-accepts a session only from a page served by the host it addresses, so another site cannot read it
-through a visitor's browser. An update is `git pull` and `up -d --build` again; a restart refreshes
-the aeronautical data. Optionally, `READSB_ENABLE_TRACES=true` on tar1090 with a
-`/var/globe_history` volume lets the selected target show its whole day instead of the last hour.
+server makes its own for it every week and the scope accepts it by its hash, read over https. The
+feed accepts a session only from a page served by the host it addresses, so another site cannot read
+it through a visitor's browser. An update is `git pull` and `up -d --build` again; a restart
+refreshes the aeronautical data. A container that ran Caddy before keeps its authority, adopted from
+the same volume, so trusting devices need nothing new; its `4433:4433/udp` line can go. Optionally,
+`READSB_ENABLE_TRACES=true` on tar1090 with a `/var/globe_history` volume lets the selected target
+show its whole day instead of the last hour.
 
 ## Development
 
 `mise install` pins Bun and Rust, and `mise run` starts the pieces together; `mise tasks` lists
-them. The feeder follows a tar1090 or flies a synthetic fleet in its place, and the dev server
-proxies traces to the same tar1090:
+them. The server follows a tar1090 or flies a synthetic fleet in its place; here it speaks plain
+http on port 8080, and the dev server passes the feed's info and the traces on to it (`PQ_WEB`
+names another):
 
 ```sh
 export PQ_TAR1090=http://<host>
 (cd scope && bun run map)   # map data around the receiver, see below
-mise run dev                # the scope and the feeder, on real traffic
+mise run dev                # the scope and its server, on real traffic
 mise run sim                # the same on the synthetic fleet; PQ_SITE=lat,lon moves it
 mise run check              # everything CI runs
 mise run bench              # a load test, see below
 ```
 
-The sim needs no tar1090: the feeder tells the scope the site it flies around, RJTT unless `PQ_SITE`
+The sim needs no tar1090: the server tells the scope the site it flies around, RJTT unless `PQ_SITE`
 says otherwise (with `PQ_SITE` exported, `bun run map` builds the map around the same site). The
-feeder flies it whenever `PQ_SIM` is set to a site; `PQ_SIM_SPEED` runs it up to 1000 times faster
+server flies it whenever `PQ_SIM` is set to a site; `PQ_SIM_SPEED` runs it up to 1000 times faster
 than the clock and `PQ_SIM_EXTRA` adds up to 10000 generic targets.
 
 Query parameters: `?site=<lat>,<lon>` overrides the receiver position, `?wx=<base>` reads METARs
@@ -94,9 +98,9 @@ from your own [Aviation Weather Center](https://aviationweather.gov) proxy.
 
 GitHub Actions runs the same checks and builds the image on every push to `main` and every pull
 request. `bun scripts/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a
-frame plus the console log; with `--sim` it starts a feeder of its own flying the sim, as `mise run
-bench`, a load test with extra sim traffic, always does. `bun run screenshot` regenerates the README
-picture that way. Both describe their flags in their headers.
+frame plus the console log; with `--sim` it starts a server of its own that flies the sim and serves
+the build, as `mise run bench`, a load test with extra sim traffic, always does. `bun run
+screenshot` regenerates the README picture that way. Both describe their flags in their headers.
 
 Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight:
 callsigns are `TEST` plus digits (a real airline callsign is three letters then a number), registrations
@@ -179,15 +183,15 @@ flowchart LR
         readsb -- "aircraft.json, 1 Hz" --> nginx
     end
     subgraph p["papaquebec"]
-        caddy[("caddy<br/>scope build, map data, feed info")]
+        web[("web<br/>scope build, map data, feed info")]
         feeder
     end
     subgraph b["browser"]
         feed[feed worker] --> store[main thread<br/>track store] --> render[render worker<br/>WebGPU]
     end
-    nginx -- "/data/traces" --> caddy -- https --> store
+    nginx -- "/data/traces" --> web -- https --> store
     nginx -- "receiver, aircraft, chunks" --> feeder -- "WebTransport, protobuf" --> feed
-    feeder -. "port, certificate hash" .-> caddy
+    feeder -. "port, certificate hash" .-> web
 ```
 
 **Data.** The contract is `readsb`'s `aircraft.json`
@@ -217,11 +221,13 @@ built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
 panels and UI, design tokens. The rules: `state/` is the only shared state, `lib/` imports no
 framework, worker code never imports Solid or touches the DOM, and components are styled only
 through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
-The server is the `papaquebec` binary of `web/`, which reads the environment (`config`) and runs
-the feed. `feeder/src/` is the feed as a library: the wire contract (`proto`), readsb's JSON
-(`readsb`), what every session is served from (`feed`), the traffic sources behind one `Upstream`
-trait (`upstream/`: tar1090 and the sim) and the WebTransport endpoint (`transport`). `proto/` holds
-the schema both sides generate their types from.
+The server is the `papaquebec` binary of `web/`: it reads the environment (`config`), answers for
+the scope's files, the traces and the feed's info (`site`) at a door that speaks https or plain http
+(`door`), and runs the feed. `authority/` is the local certificate authority behind the door,
+adopting the one Caddy kept when it finds it. `feeder/src/` is the feed as a library: the wire
+contract (`proto`), readsb's JSON (`readsb`), what every session is served from (`feed`), the
+traffic sources behind one `Upstream` trait (`upstream/`: tar1090 and the sim) and the WebTransport
+endpoint (`transport`). `proto/` holds the schema both sides generate their types from.
 
 **Stack.**
 
@@ -231,8 +237,11 @@ the schema both sides generate their types from.
   - [protobuf-es](https://github.com/bufbuild/protobuf-es) for the feed, its types generated by
     [buf](https://buf.build)
   - [oxlint and oxfmt](https://oxc.rs)
-- **Feeder**
+- **Server**
   - Rust on [tokio](https://tokio.rs)
+  - [axum](https://github.com/tokio-rs/axum) and [hyper](https://hyper.rs) over
+    [rustls](https://github.com/rustls/rustls), with certificates made by
+    [rcgen](https://github.com/rustls/rcgen)
   - [wtransport](https://github.com/BiagioFesta/wtransport) for WebTransport and
     [prost](https://github.com/tokio-rs/prost) for protobuf
   - clippy and rustfmt
