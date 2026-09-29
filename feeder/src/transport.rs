@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::watch;
+use url::Url;
 use wtransport::endpoint::IncomingSession;
 use wtransport::endpoint::endpoint_side;
 use wtransport::tls::Sha256DigestFmt;
@@ -133,11 +134,28 @@ fn since(path: &str) -> Option<f64> {
     value.and_then(|since| since.parse().ok())
 }
 
+/// Whether a session comes from a page served by the host it was addressed to,
+/// as the scope's always is. A browser names the page's origin truthfully, so a
+/// page from another site cannot pass; it could otherwise read the receiver's
+/// position. Hosts are compared, not ports: the page and the feed have their own.
+fn same_host(origin: Option<&str>, authority: &str) -> bool {
+    let host = |url: &str| Url::parse(url).ok()?.host_str().map(str::to_owned);
+    let Some(origin) = origin.and_then(host) else {
+        return false;
+    };
+    host(&format!("https://{authority}")).is_some_and(|addressed| addressed == origin)
+}
+
 async fn session(
     incoming: IncomingSession,
     mut feed: watch::Receiver<Option<Published>>,
 ) -> Result<(), Failure> {
     let request = incoming.await?;
+    if !same_host(request.origin(), request.authority()) {
+        let origin = request.origin().unwrap_or("no origin").to_owned();
+        request.forbidden().await;
+        return Err(format!("refused a session from {origin}").into());
+    }
     // A session that names no `since` gets the whole history.
     let since = since(request.path()).unwrap_or(f64::NEG_INFINITY);
     let connection = request.accept().await?;
@@ -173,10 +191,11 @@ mod tests {
 
     use prost::Message;
     use tokio::sync::watch;
+    use wtransport::endpoint::ConnectOptions;
     use wtransport::tls::Sha256Digest;
     use wtransport::{ClientConfig, Connection, Endpoint, RecvStream};
 
-    use super::{Server, since};
+    use super::{Server, same_host, since};
     use crate::feed::Published;
     use crate::proto::{Frame, Hello, Receiver, Snapshot, frame::Body};
 
@@ -270,19 +289,27 @@ mod tests {
                 .to_owned()
         }
 
-        /// Connects as the scope does: trusting only the hash.
+        /// Connects as the scope does: trusting only the hash, from a page served
+        /// by the same host.
         async fn connect(&self, hash: &str) -> Option<Connection> {
             self.connect_to(hash, "/feed").await
         }
 
         async fn connect_to(&self, hash: &str, path: &str) -> Option<Connection> {
+            self.connect_from(hash, path, "https://localhost").await
+        }
+
+        async fn connect_from(&self, hash: &str, path: &str, origin: &str) -> Option<Connection> {
             let config = ClientConfig::builder()
                 .with_bind_default()
                 .with_server_certificate_hashes([digest(hash)])
                 .build();
             let url = format!("https://localhost:{}{path}", self.server.port());
+            let options = ConnectOptions::builder(url)
+                .add_header("origin", origin)
+                .build();
             let endpoint = Endpoint::client(config).ok()?;
-            let connecting = endpoint.connect(url);
+            let connecting = endpoint.connect(options);
             tokio::time::timeout(Duration::from_secs(5), connecting)
                 .await
                 .ok()?
@@ -559,5 +586,59 @@ mod tests {
 
         // Assert
         assert_ne!(started.hash(), old);
+    }
+
+    #[tokio::test]
+    async fn session_from_another_site_is_refused() {
+        // Arrange
+        let (feed, _) = watch::channel(None);
+        let started = started(&feed);
+
+        // Act
+        let connection = started
+            .connect_from(&started.hash(), "/feed", "https://example.com")
+            .await;
+
+        // Assert
+        assert!(connection.is_none());
+    }
+
+    #[test]
+    fn origin_must_name_the_host_the_session_was_addressed_to() {
+        // Arrange
+        let cases = [
+            (
+                Some("https://raspberrypi.local"),
+                "raspberrypi.local:4433",
+                true,
+            ),
+            (
+                Some("https://raspberrypi.local:8443"),
+                "raspberrypi.local:4433",
+                true,
+            ),
+            (
+                Some("https://RaspberryPi.local"),
+                "raspberrypi.local:4433",
+                true,
+            ),
+            (Some("http://localhost:5173"), "localhost:4433", true),
+            (Some("https://192.168.3.10:5174"), "192.168.3.10:4433", true),
+            (Some("https://[::1]:5173"), "[::1]:4433", true),
+            (Some("https://example.com"), "raspberrypi.local:4433", false),
+            (
+                Some("https://raspberrypi.local.example.com"),
+                "raspberrypi.local:4433",
+                false,
+            ),
+            (Some("null"), "raspberrypi.local:4433", false),
+            (None, "raspberrypi.local:4433", false),
+        ];
+
+        // Act
+        let judged = cases.map(|(origin, authority, _)| same_host(origin, authority));
+
+        // Assert
+        assert_eq!(judged, cases.map(|(_, _, allowed)| allowed));
     }
 }

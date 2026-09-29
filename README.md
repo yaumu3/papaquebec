@@ -63,10 +63,11 @@ Environment on the service, all optional:
   [Tailscale](https://tailscale.com) or an existing reverse proxy (then publish `80`, not `443`).
 
 Ports can be remapped (`8443:443`) when 443 is taken. The feed needs no certificate trusted: the
-feeder makes its own every week and the scope accepts it by its hash, read over https. An update is
-`git pull` and `up -d --build` again; a restart refreshes the aeronautical data. Optionally,
-`READSB_ENABLE_TRACES=true` on tar1090 with a `/var/globe_history` volume lets the selected target
-show its whole day instead of the last hour.
+feeder makes its own every week and the scope accepts it by its hash, read over https. The feeder
+accepts a session only from a page served by the host it addresses, so another site cannot read it
+through a visitor's browser. An update is `git pull` and `up -d --build` again; a restart refreshes
+the aeronautical data. Optionally, `READSB_ENABLE_TRACES=true` on tar1090 with a
+`/var/globe_history` volume lets the selected target show its whole day instead of the last hour.
 
 ## Development
 
