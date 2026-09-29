@@ -1,5 +1,7 @@
 //! Where the traffic comes from.
 
+pub mod tar1090;
+
 use std::time::Duration;
 
 use tokio::sync::watch;
