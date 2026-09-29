@@ -15,5 +15,12 @@ path = "src/main.rs"
 workspace = true
 
 [dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "tokio"] }
 feeder = { path = "../feeder" }
 tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "sync"] }
+tower-http = { version = "0.6.11", features = ["fs", "compression-gzip"] }
+
+[dev-dependencies]
+http-body-util = "0.1.5"
+tempfile = "3.27.0"
+tower = { version = "0.5.3", features = ["util"] }
