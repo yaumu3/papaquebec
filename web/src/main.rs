@@ -21,6 +21,7 @@ use web::site::{Site, router};
 const ASK_EVERY: Duration = Duration::from_millis(250);
 /// Half of the two weeks a browser accepts a certificate by hash for.
 const RENEW_EVERY: Duration = Duration::from_hours(7 * 24);
+const RENEW_RETRY: Duration = Duration::from_mins(1);
 
 #[tokio::main]
 async fn main() -> Result<(), Failure> {
@@ -70,7 +71,7 @@ async fn main() -> Result<(), Failure> {
             tokio::spawn(follow(sim, Duration::from_secs_f64(1.0 / speed), feed))
         }
     };
-    tokio::spawn(server.clone().keep_renewed(RENEW_EVERY));
+    tokio::spawn(server.clone().keep_renewed(RENEW_EVERY, RENEW_RETRY));
     server.serve(listening).await;
     Ok(())
 }

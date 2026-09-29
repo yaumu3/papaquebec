@@ -86,14 +86,9 @@ impl Server {
         Ok(())
     }
 
-    /// Renews the certificate every `every`.
-    pub async fn keep_renewed(self, every: Duration) {
-        loop {
-            tokio::time::sleep(every).await;
-            if let Err(error) = self.renew() {
-                eprintln!("certificate not renewed: {error}");
-            }
-        }
+    /// Renews the certificate every `every`, and `retry` after a renewal that failed.
+    pub async fn keep_renewed(self, every: Duration, retry: Duration) {
+        renewing(every, retry, || self.renew()).await;
     }
 
     /// Greets every session, up to the limit, once the feed has started, with the history after the
@@ -128,6 +123,22 @@ impl Server {
             port: self.port(),
             certificate_hash: hash.unwrap_or_else(PoisonError::into_inner).clone(),
         }
+    }
+}
+
+/// Calls `renew` every `every`, and `retry` after a call that failed, so that
+/// one failure does not leave the certificate to run out before the next try.
+async fn renewing(every: Duration, retry: Duration, renew: impl Fn() -> io::Result<()>) {
+    let mut wait = every;
+    loop {
+        tokio::time::sleep(wait).await;
+        wait = match renew() {
+            Ok(()) => every,
+            Err(error) => {
+                eprintln!("certificate not renewed: {error}");
+                retry
+            }
+        };
     }
 }
 
@@ -216,6 +227,8 @@ async fn session(
 
 #[cfg(test)]
 mod tests {
+    use std::io;
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
     use prost::Message;
@@ -224,7 +237,7 @@ mod tests {
     use wtransport::tls::Sha256Digest;
     use wtransport::{ClientConfig, Connection, Endpoint, RecvStream};
 
-    use super::{MAX_SESSIONS, Server, same_host, since};
+    use super::{MAX_SESSIONS, Server, renewing, same_host, since};
     use crate::feed::Published;
     use crate::proto::{Frame, Hello, Receiver, Snapshot, frame::Body};
 
@@ -454,7 +467,12 @@ mod tests {
         let (feed, _) = watch::channel(None);
         let started = started(&feed);
         let every = Duration::from_secs(600);
-        tokio::spawn(started.server.clone().keep_renewed(every));
+        tokio::spawn(
+            started
+                .server
+                .clone()
+                .keep_renewed(every, Duration::from_secs(60)),
+        );
         // Half a minute past each renewal, not racing it.
         tokio::time::sleep(Duration::from_secs(30)).await;
         let mut hashes = vec![started.hash()];
@@ -468,6 +486,31 @@ mod tests {
         // Assert
         assert_ne!(hashes[0], hashes[1]);
         assert_ne!(hashes[1], hashes[2]);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn failed_renewal_is_tried_again_soon() {
+        // Arrange
+        let start = tokio::time::Instant::now();
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let called = Arc::clone(&calls);
+        let fails_once = move || {
+            let mut calls = called.lock().expect("calls");
+            calls.push(start.elapsed());
+            match calls.len() {
+                1 => Err(io::Error::other("no certificate")),
+                _ => Ok(()),
+            }
+        };
+        let (every, retry) = (Duration::from_secs(600), Duration::from_secs(60));
+        tokio::spawn(renewing(every, retry, fails_once));
+
+        // Act
+        tokio::time::sleep(every + retry + every + Duration::from_secs(30)).await;
+
+        // Assert
+        let calls = calls.lock().expect("calls").clone();
+        assert_eq!(calls, [every, every + retry, every + retry + every]);
     }
 
     #[tokio::test]
