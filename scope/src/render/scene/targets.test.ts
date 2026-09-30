@@ -34,7 +34,6 @@ function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
     atlas,
     labelDrag: null,
     altimeter: { transitionAltFt: 14000, qnhInHg: 29.92 },
-    trace: null,
     ...over,
   };
 }
@@ -141,23 +140,6 @@ describe('buildTargets', () => {
     // Assert
     expect(all.filter((s) => s === Shape.Dot)).toHaveLength(t.history.length);
     expect(none.filter((s) => s === Shape.Dot)).toHaveLength(0);
-  });
-
-  it('draws the full-day trace as dots as well when one is supplied', () => {
-    // Arrange
-    const t = track();
-    const trace = [
-      { lat: 0, lon: 0, x: -5, y: 2, t: 100, alt: 11000 },
-      { lat: 0, lon: 0, x: -4, y: 2, t: 200, alt: 11000 },
-    ];
-
-    // Act
-    const dots = shapes(buildTargets(input([t], { selected: 'd00001', trace })).batches).filter(
-      (s) => s === Shape.Dot,
-    );
-
-    // Assert
-    expect(dots).toHaveLength(t.history.length + trace.length);
   });
 
   it('returns the corner chosen for each data block so the store can remember it', () => {

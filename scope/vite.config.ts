@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import solid from 'vite-plugin-solid';
 
-/** The server the scope's feed and traces come from, as `mise run dev` starts it. */
+/** The server the scope's feed comes from, as `mise run dev` starts it. */
 const WEB = process.env.PQ_WEB ?? 'http://localhost:8080';
 
 export default defineConfig({
@@ -9,7 +9,6 @@ export default defineConfig({
   base: './',
   server: {
     proxy: {
-      '/data': { target: WEB, changeOrigin: true },
       '/feed': { target: WEB, changeOrigin: true },
       // An Aviation Weather Center proxy for trying the ?wx=/wx path locally.
       '/wx/metar': {

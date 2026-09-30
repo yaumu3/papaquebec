@@ -4,7 +4,6 @@ import { ScopeCanvas } from './canvas/ScopeCanvas';
 import { cx } from './design/cx';
 import { connectFeed, feedOptionsFromUrl } from './feed/connect';
 import { fetchQnhFrom, qnhSourceFromUrl } from './feed/qnh';
-import { fetchTrace } from './feed/traces';
 import { parseAero, parseCoast } from './lib/mapdata';
 import { ContextMenu } from './panels/ContextMenu';
 import { DetailPanel } from './panels/DetailPanel';
@@ -17,9 +16,8 @@ import { TopBar } from './panels/TopBar';
 import { keepUnscrolled } from './state/layout';
 import { setBuiltinAero } from './state/mapsets';
 import { QNH_POLL_MS, qnhReport, setQnhError, setQnhReport, stationCandidates } from './state/qnh';
-import { listSort, panels, selected, setCoast, setSelectedTrace, setTick } from './state/scope';
+import { listSort, panels, setCoast, setTick } from './state/scope';
 import { persist, setSettings, settings } from './state/settings';
-import { projectNm } from './state/tracks';
 
 import s from './app.module.css';
 
@@ -33,23 +31,7 @@ export function App() {
   const wx = qnhSourceFromUrl(location.search);
   onMount(() => {
     const clock = setInterval(() => setTick(Date.now()), 1000);
-    const feed = feedOptionsFromUrl(location.search);
-    const disconnect = connectFeed(feed);
-
-    // The selected target's full-day trace, when readsb writes traces. Stale answers are
-    // dropped, and after the first miss the container is taken not to keep traces.
-    let tracesKept = true;
-    createEffect(() => {
-      const hex = selected();
-      setSelectedTrace(null);
-      if (!hex || !tracesKept) return;
-      void fetchTrace(feed.base, hex).then((trace) => {
-        if (!trace) tracesKept = false;
-        if (!trace || selected() !== hex) return;
-        const fixes = trace.points.map((p) => ({ ...p, ...projectNm(p.lat, p.lon) }));
-        setSelectedTrace({ hex, fixes });
-      });
-    });
+    const disconnect = connectFeed(feedOptionsFromUrl(location.search));
     const unscroll = keepUnscrolled(window);
     onCleanup(() => {
       clearInterval(clock);

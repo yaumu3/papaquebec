@@ -22,7 +22,6 @@ import {
   rbls,
   projectionVersion,
   selected,
-  selectedTrace,
   site,
   setRenderError,
   setRenderInfo,
@@ -139,7 +138,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       selected: selected(),
       labelDrag: labelDrag(),
       altimeter: { ...settings.altimeter },
-      trace: selectedTrace()?.hex === selected() ? (selectedTrace()?.fixes ?? null) : null,
       pxPerNm: layoutScale(),
       atlas: a,
     });

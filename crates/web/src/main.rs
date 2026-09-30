@@ -51,7 +51,6 @@ async fn main() -> Result<(), Failure> {
     let site = Site {
         dist: "dist".into(),
         map: "public/map".into(),
-        tar1090: None,
         feed: Arc::new(move || reached.info()),
         authority: certificates
             .as_ref()
