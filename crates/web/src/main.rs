@@ -1,24 +1,24 @@
 //! Serves the scope and its feed.
 
-use std::net::Ipv6Addr;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use authority::{Authority, How};
 use feeder::Failure;
+use feeder::follow::follow;
+use feeder::registry::{DATABASE, Registry, keep_current};
 use feeder::transport::Server;
-use feeder::upstream::follow;
-use feeder::upstream::sim::{Sim, sim_clock};
-use feeder::upstream::tar1090::Tar1090;
-use tokio::net::TcpListener;
+use sim::Fleet;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 use web::config::{Config, Door, Origin};
 use web::door::{self, Certificates};
 use web::site::{Site, router};
 
-/// readsb rewrites `aircraft.json` about once a second.
-const ASK_EVERY: Duration = Duration::from_millis(250);
+/// How often the scope is told what the receiver hears.
+const PUBLISH_EVERY: Duration = Duration::from_secs(1);
 /// Half of the two weeks a browser accepts a certificate by hash for.
 const RENEW_EVERY: Duration = Duration::from_hours(7 * 24);
 const RENEW_RETRY: Duration = Duration::from_mins(1);
@@ -28,16 +28,21 @@ async fn main() -> Result<(), Failure> {
     let config = Config::read(|name| std::env::var(name).ok())?;
     let server = Server::bind(config.port)?;
     let (feed, listening) = watch::channel(None);
-    eprintln!("feeding from {:?} on udp/{}", config.origin, server.port());
+    let origin = match &config.origin {
+        Origin::Beast { address, .. } => address,
+        Origin::Sim { .. } => "the sim",
+    };
+    eprintln!("feeding from {origin} on udp/{}", server.port());
 
     let (port, certificates) = match config.door {
         Door::Secure { port, only } => {
             let data = config
                 .data
+                .as_deref()
                 .ok_or("no XDG_DATA_HOME or HOME to keep the authority in")?;
             (
                 port,
-                Some(Arc::new(Certificates::new(authority(&data)?, only))),
+                Some(Arc::new(Certificates::new(authority(data)?, only))),
             )
         }
         Door::Plain { port } => (port, None),
@@ -46,10 +51,6 @@ async fn main() -> Result<(), Failure> {
     let site = Site {
         dist: "dist".into(),
         map: "public/map".into(),
-        tar1090: match &config.origin {
-            Origin::Tar1090(base) => Some(base.clone()),
-            Origin::Sim { .. } => None,
-        },
         feed: Arc::new(move || reached.info()),
         authority: certificates
             .as_ref()
@@ -64,13 +65,32 @@ async fn main() -> Result<(), Failure> {
     eprintln!("serving the scope over {secure} on tcp/{port}");
     tokio::spawn(door::serve(listener, certificates, router(&site)));
 
+    let (registered, registry) = watch::channel(Arc::new(Registry::default()));
     match config.origin {
-        Origin::Tar1090(base) => tokio::spawn(follow(Tar1090::new(&base), ASK_EVERY, feed)),
-        Origin::Sim { site, speed, extra } => {
-            let sim = Sim::new(site, sim_clock(speed, wall), extra);
-            tokio::spawn(follow(sim, Duration::from_secs_f64(1.0 / speed), feed))
+        Origin::Beast { address, site } => {
+            match config.data {
+                Some(data) => {
+                    let kept = data.join("papaquebec/aircraft-database.zip");
+                    tokio::spawn(keep_current(DATABASE.into(), kept, registered));
+                }
+                None => eprintln!("aircraft database: no XDG_DATA_HOME or HOME to keep it in"),
+            }
+            let connect = move || TcpStream::connect(address.clone());
+            tokio::spawn(follow(connect, site, wall, PUBLISH_EVERY, registry, feed));
         }
-    };
+        Origin::Sim { site, speed, extra } => {
+            // The sim stands in for the receiver, on a port of its own.
+            let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
+            let address = listener.local_addr()?;
+            let every = PUBLISH_EVERY.div_f64(speed);
+            let clock = sim::clock(speed, wall);
+            let fleet = Fleet::new(site, clock.clone(), extra);
+            registered.send_replace(Arc::new(fleet.registered().collect()));
+            tokio::spawn(sim::serve(listener, fleet, every));
+            let connect = move || TcpStream::connect(address);
+            tokio::spawn(follow(connect, site, clock, every, registry, feed));
+        }
+    }
     tokio::spawn(server.clone().keep_renewed(RENEW_EVERY, RENEW_RETRY));
     server.serve(listening).await;
     Ok(())

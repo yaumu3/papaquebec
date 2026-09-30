@@ -13,7 +13,7 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     alt: undefined,
     gs: undefined,
     track: undefined,
-    baroRate: undefined,
+    verticalRate: undefined,
     nic: undefined,
     nacP: undefined,
     messages: undefined,
@@ -50,7 +50,7 @@ describe('distanceFromSite', () => {
     const cases = [
       track('a', { position: { kind: 'live', lat: 0, lon: 0, x: 3, y: 4 } }),
       track('b', { position: { kind: 'last', lat: 0, lon: 0, x: -6, y: 8 } }),
-      track('c', { position: { kind: 'rr', lat: 0, lon: 0 } }),
+      track('c', { position: { kind: 'none' } }),
     ];
 
     // Act

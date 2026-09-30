@@ -44,7 +44,7 @@ function headingLine(t: Track): string | null {
 function levelRuns(t: Track, altimeter: Altimeter): Run[] {
   const level = formatAltitude(t.alt, altimeter);
   if (holdsSelected(t, altimeter)) return [plain(level), intent('✓')];
-  const trend = plain(level + climbArrow(t.baroRate));
+  const trend = plain(level + climbArrow(t.verticalRate));
   return t.selAlt === undefined
     ? [trend]
     : [trend, intent(formatAltitude(t.selAlt, uncorrected(altimeter)))];

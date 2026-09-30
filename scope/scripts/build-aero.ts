@@ -4,7 +4,7 @@
  * every country whose territory lies within the radius, written to `public/map/aero.json`.
  * Runs before every build; when the exports cannot be reached, an existing file is kept.
  *
- *   bun scripts/build-aero.ts [lat lon] [radiusNm=150]      site from PQ_SITE or PQ_TAR1090
+ *   bun scripts/build-aero.ts [lat lon] [radiusNm=150]      site from PQ_SITE
  */
 import { existsSync, writeFileSync } from 'node:fs';
 
@@ -31,7 +31,7 @@ async function fetchExport(country: string, kind: string): Promise<unknown[]> {
 }
 
 try {
-  const site = await resolveSite(positional, process.env);
+  const site = resolveSite(positional, process.env);
   const countries = countriesNear(site, radiusNm, table);
   console.log(`site ${site.lat}, ${site.lon}; ${radiusNm} NM covers ${countries.join(', ')}`);
   const KINDS = ['asp', 'nav', 'apt', 'rpp'] as const;

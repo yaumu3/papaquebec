@@ -1,0 +1,71 @@
+.about {
+  position: fixed;
+  inset: 0;
+  width: fit-content;
+  height: fit-content;
+  max-width: calc(100% - 2 * var(--edge));
+  margin: auto;
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  box-shadow: 0 0 0 1px var(--panel-outline);
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking);
+  visibility: hidden;
+  z-index: var(--z-overlay);
+}
+.show {
+  visibility: visible;
+}
+.titlebar {
+  height: 18px;
+  padding: 1px var(--space-2) 1px var(--space-3);
+  background: var(--panel-chrome);
+  opacity: 0.92;
+  color: var(--panel-chrome-text);
+  font-weight: 600;
+}
+/* One grid for every row, so that subjects, sources and terms each line up. */
+.body {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  align-items: baseline;
+  gap: var(--space-3) var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  white-space: nowrap;
+}
+.subject {
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+}
+.source {
+  color: var(--text);
+  text-decoration: underline var(--text-dim);
+  text-underline-offset: 3px;
+}
+.source:hover {
+  color: var(--accent);
+  text-decoration-color: var(--accent);
+}
+.terms {
+  color: var(--text);
+}
+.divider {
+  grid-column: 1 / -1;
+  border-top: 1px solid var(--panel-border);
+}
+@media (max-width: 720px) {
+  /* Each subject above its source, with the terms at the other end of the line. */
+  .body {
+    grid-template-columns: 1fr auto;
+    gap: var(--space-1) var(--space-6);
+  }
+  .subject {
+    grid-column: 1 / -1;
+  }
+  .subject:not(:first-child) {
+    margin-top: var(--space-3);
+  }
+  .divider {
+    margin-top: var(--space-3);
+  }
+}

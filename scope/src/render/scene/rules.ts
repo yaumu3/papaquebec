@@ -61,7 +61,7 @@ export function trackColor(t: Track, selected: string | null): string {
   if (t.hex === selected) return THEME.selected;
   if (isStale(t)) return THEME.stale;
   if (t.alt === 'ground') return THEME.ground;
-  switch (climbState(t.baroRate)) {
+  switch (climbState(t.verticalRate)) {
     case 'climbing':
       return THEME.climb;
     case 'descending':

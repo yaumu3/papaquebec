@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-import type { AircraftJson } from '../../lib/aircraft';
+import type { AircraftReport } from '../../lib/aircraft';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
 import {
@@ -31,13 +31,12 @@ const view: View = {
 /** A pointer that lands exactly and hovers. */
 const precise: Precision = { reach: 14, snap: 15, hovers: true };
 
-const aircraft = (hex: string): AircraftJson => ({
+const aircraft = (hex: string): AircraftReport => ({
   hex,
-  lat: 35.5,
-  lon: 139.8,
+  position: { lat: 35.5, lon: 139.8 },
   seen: 0.2,
-  seen_pos: 0.2,
-  alt_baro: 11000,
+  seenPos: 0.2,
+  alt: 11000,
 });
 
 /** A drag tracker over the fixed view, recording every cursor it asks for. */

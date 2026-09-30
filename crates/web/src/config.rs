@@ -6,17 +6,22 @@ use std::str::FromStr;
 
 use authority::Subject;
 use feeder::Failure;
-use feeder::upstream::sim::Site;
+use feeder::position::Position;
 
 /// Where the traffic comes from.
 #[derive(Debug, PartialEq)]
 pub enum Origin {
-    /// `PQ_TAR1090`: the tar1090 to follow.
-    Tar1090(String),
+    /// `PQ_BEAST` (`host:port`): the receiver whose Beast output to follow,
+    /// readsb on its usual port unless set, which hears at `PQ_SITE` (`lat,lon`).
+    Beast { address: String, site: Position },
     /// `PQ_SIM` (`lat,lon`): synthesized traffic around the site, in place of
-    /// tar1090. `PQ_SIM_SPEED` runs it that many times faster than the clock, up to 1000,
+    /// a receiver. `PQ_SIM_SPEED` runs it that many times faster than the clock, up to 1000,
     /// and `PQ_SIM_EXTRA` adds that many generic targets, up to 10000.
-    Sim { site: Site, speed: f64, extra: u32 },
+    Sim {
+        site: Position,
+        speed: f64,
+        extra: u32,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -113,9 +118,12 @@ impl Config {
                 speed: parsed(&lookup, "PQ_SIM_SPEED")?.map_or(Ok(1.0), sim_speed)?,
                 extra: parsed(&lookup, "PQ_SIM_EXTRA")?.map_or(Ok(0), sim_extra)?,
             },
-            None => {
-                Origin::Tar1090(lookup("PQ_TAR1090").unwrap_or_else(|| "http://tar1090".into()))
-            }
+            None => Origin::Beast {
+                address: lookup("PQ_BEAST").unwrap_or_else(|| "readsb:30005".into()),
+                // Positions are decoded around it, and nothing in what a receiver sends tells it.
+                site: parsed(&lookup, "PQ_SITE")?
+                    .ok_or("PQ_SITE is not set: where the receiver is, as lat,lon")?,
+            },
         };
         let port: Option<NonZeroU16> = parsed(&lookup, "PQ_FEED_PORT")?;
         let door = match lookup("PQ_ADDRESS") {
@@ -187,21 +195,33 @@ mod tests {
     use std::path::PathBuf;
 
     use authority::Subject;
-    use feeder::upstream::sim::Site;
+    use feeder::position::Position;
 
     use super::{Config, Door, Origin};
 
-    fn environment(pairs: &'static [(&str, &str)]) -> impl Fn(&str) -> Option<String> {
-        |name| {
-            pairs
-                .iter()
-                .find(|(key, _)| *key == name)
-                .map(|(_, value)| (*value).to_owned())
+    /// RJFF
+    const SITE: Position = Position {
+        lat_deg: 33.5844,
+        lon_deg: 130.4517,
+    };
+
+    /// The variables of the pairs and no other.
+    fn variables<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            let set = pairs.iter().find(|(key, _)| *key == name);
+            set.map(|(_, value)| (*value).to_owned())
+        }
+    }
+
+    /// The variables of a receiver at the site, with the pairs set too, or set otherwise.
+    fn environment<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            variables(pairs)(name).or_else(|| variables(&[("PQ_SITE", "33.5844,130.4517")])(name))
         }
     }
 
     #[test]
-    fn empty_environment_gives_the_defaults() {
+    fn receiver_is_followed_where_readsb_is_expected_by_default() {
         // Arrange
         let lookup = environment(&[]);
 
@@ -210,7 +230,10 @@ mod tests {
 
         // Assert
         let expected = Config {
-            origin: Origin::Tar1090("http://tar1090".into()),
+            origin: Origin::Beast {
+                address: "readsb:30005".into(),
+                site: SITE,
+            },
             port: 4433,
             door: Door::Secure {
                 port: 443,
@@ -225,7 +248,7 @@ mod tests {
     fn environment_overrides_the_defaults() {
         // Arrange
         let lookup = environment(&[
-            ("PQ_TAR1090", "http://localhost:8090"),
+            ("PQ_BEAST", "localhost:30105"),
             ("PQ_FEED_PORT", "4500"),
             ("PQ_ADDRESS", "https://raspberrypi.local:8443"),
             ("XDG_DATA_HOME", "/srv/data"),
@@ -237,7 +260,10 @@ mod tests {
 
         // Assert
         let expected = Config {
-            origin: Origin::Tar1090("http://localhost:8090".into()),
+            origin: Origin::Beast {
+                address: "localhost:30105".into(),
+                site: SITE,
+            },
             port: 4500,
             door: Door::Secure {
                 port: 8443,
@@ -246,6 +272,24 @@ mod tests {
             data: Some(PathBuf::from("/srv/data")),
         };
         assert_eq!(config.ok(), Some(expected));
+    }
+
+    #[test]
+    fn receiver_without_a_site_is_refused_by_the_name_of_the_variable() {
+        // Arrange: not set, and set to nowhere
+        let environments: [&[(&str, &str)]; 2] = [&[], &[("PQ_SITE", "north,east")]];
+
+        // Act
+        let configs = environments.map(|pairs| Config::read(variables(pairs)));
+
+        // Assert
+        let refusals = configs.map(|config| config.err().map(|refusal| refusal.to_string()));
+        assert!(
+            refusals.iter().all(|refusal| refusal
+                .as_ref()
+                .is_some_and(|said| said.contains("PQ_SITE"))),
+            "{refusals:?}"
+        );
     }
 
     /// Safari sends the page's requests over a feed connection to the same host
@@ -271,31 +315,26 @@ mod tests {
         let ports = ["0", "65536", "-1", "feed", ""];
 
         // Act
-        let configs = ports
-            .map(|port| Config::read(|name| (name == "PQ_FEED_PORT").then(|| port.to_owned())));
+        let configs = ports.map(|port| Config::read(environment(&[("PQ_FEED_PORT", port)])));
 
         // Assert
         assert!(configs.iter().all(Result::is_err));
     }
 
     #[test]
-    fn sim_site_replaces_tar1090_with_the_sim() {
+    fn sim_flies_in_place_of_a_receiver_and_needs_no_site_of_one() {
         // Arrange
-        let lookup = environment(&[
-            ("PQ_TAR1090", "http://localhost:8090"),
-            ("PQ_SIM", "33.5844,130.4517"), // RJFF
-        ]);
+        let set = [
+            ("PQ_BEAST", "localhost:30105"),
+            ("PQ_SIM", "33.5844,130.4517"),
+        ];
 
         // Act
-        let config = Config::read(lookup);
+        let config = Config::read(variables(&set));
 
         // Assert
-        let site = Site {
-            lat_deg: 33.5844,
-            lon_deg: 130.4517,
-        };
         let expected = Origin::Sim {
-            site,
+            site: SITE,
             speed: 1.0,
             extra: 0,
         };
@@ -315,12 +354,8 @@ mod tests {
         let config = Config::read(lookup);
 
         // Assert
-        let site = Site {
-            lat_deg: 33.5844,
-            lon_deg: 130.4517,
-        };
         let expected = Origin::Sim {
-            site,
+            site: SITE,
             speed: 10.0,
             extra: 500,
         };
@@ -428,8 +463,7 @@ mod tests {
 
         // Act
         let read = cases.each_ref().map(|(written, _)| {
-            Config::read(|name| (name == "PQ_ADDRESS").then(|| (*written).to_owned()))
-                .map(|c| c.door)
+            Config::read(environment(&[("PQ_ADDRESS", written)])).map(|c| c.door)
         });
 
         // Assert
@@ -450,8 +484,7 @@ mod tests {
         ];
 
         // Act
-        let read = written
-            .map(|written| Config::read(|name| (name == "PQ_ADDRESS").then(|| written.to_owned())));
+        let read = written.map(|written| Config::read(environment(&[("PQ_ADDRESS", written)])));
 
         // Assert
         assert!(read.iter().all(Result::is_err));

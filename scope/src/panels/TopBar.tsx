@@ -5,11 +5,13 @@ import { feedNotice } from '../state/feedLine';
 import { qnhError, qnhReport, qnhStation } from '../state/qnh';
 import { qnhStatus } from '../state/qnhStatus';
 import {
+  aboutVisible,
   feedStatus,
   type PanelId,
   panels,
   renderError,
   renderInfo,
+  setAboutVisible,
   snapshotVersion,
   tick,
   togglePanel,
@@ -109,6 +111,14 @@ export function TopBar() {
             {label}
           </button>
         ))}
+        <button
+          type="button"
+          class={cx(s.btn, s.about, aboutVisible() && s.on)}
+          aria-label="About"
+          onClick={() => setAboutVisible((v) => !v)}
+        >
+          i
+        </button>
       </div>
     </div>
   );

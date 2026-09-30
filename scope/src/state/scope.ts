@@ -11,7 +11,6 @@ export type { PanelId };
 /** The enabled map sets merged; see `mapsets`. */
 export { aero };
 export { declination, magneticTrack, setDeclination } from './magnetic';
-import type { Fix } from './track';
 
 /** What the scope knows of the feed; `feedState` tells its state from this and the clock. */
 export interface FeedStatus {
@@ -64,10 +63,6 @@ export const bumpSnapshot = (): void => {
   setSnapshotVersion((v) => v + 1);
 };
 export const [selected, setSelected] = createSignal<string | null>(null);
-/** Today's readsb trace for the selected target, projected; null when none. */
-export const [selectedTrace, setSelectedTrace] = createSignal<{ hex: string; fixes: Fix[] } | null>(
-  null,
-);
 export const [hovered, setHovered] = createSignal<string | null>(null);
 /** Pan offset from the site, in NM. */
 export const [pan, setPan] = createSignal<Vec2>({ x: 0, y: 0 });
@@ -117,6 +112,7 @@ export const [labelDrag, setLabelDrag] = createSignal<{
   dy: number;
 } | null>(null);
 export const [hintVisible, setHintVisible] = createSignal(false);
+export const [aboutVisible, setAboutVisible] = createSignal(false);
 /** RBL anchor prompt shown center-top; null when idle. */
 export const [modeText, setModeText] = createSignal<string | null>(null);
 /** One-hertz wall clock for the top bar and feed staleness. */

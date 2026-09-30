@@ -1,7 +1,7 @@
 import type { Altimeter } from '../../lib/altitude';
 import { velocityNm } from '../../lib/geo';
 import { type Filter, visibility, type Visibility } from '../../state/filter';
-import type { Corner, Fix, Track } from '../../state/track';
+import type { Corner, Track } from '../../state/track';
 import { labelOffset, type LabelSubject, placeLabels } from '../layout/labels';
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
@@ -20,8 +20,6 @@ export interface TargetInput {
   /** A block being dragged: drawn at this offset from its target, in CSS px. */
   labelDrag: LabelDrag | null;
   altimeter: Altimeter;
-  /** Full-day trace of the selected target, if readsb keeps one. */
-  trace: readonly Fix[] | null;
   /**
    * Scale the blocks are laid out at. Only the scale matters: panning moves every target alike,
    * so the layout, and the whole layer, stays valid.
@@ -99,9 +97,6 @@ function drawTrails(lines: LineBatch, d: Drawable, input: TargetInput): void {
 /** The selected target shows everything the store retained, one dot per fix. */
 function drawHistory(markers: MarkerBatch, d: Drawable, input: TargetInput): void {
   if (d.t.hex !== input.selected) return;
-  for (const f of input.trace ?? []) {
-    markers.marker({ x: f.x, y: f.y }, Shape.Dot, HISTORY_DOT_PX, THEME.history);
-  }
   for (const f of d.t.history)
     markers.marker({ x: f.x, y: f.y }, Shape.Dot, HISTORY_DOT_PX, THEME.history);
 }

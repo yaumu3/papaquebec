@@ -63,14 +63,18 @@ message Aircraft {
   // GNSS height above the WGS-84 ellipsoid, as version 2 requires.
   optional sint32 geometric_altitude_ft = 15;
   optional LastPosition last_position = 16;
-  optional RoughPosition rough_position = 17;
+  // A position estimated from the receiver's range, which the feed once carried.
+  reserved 17;
 
   // Velocity. Ground speed, track and vertical rate come from the Airborne
   // Velocity message; the rest from it or from Comm-B replies.
   optional double ground_speed_kt = 20;
   // True track over the ground.
   optional double track_deg = 21;
+  // The message carries one vertical rate and says which: barometric, or
+  // geometric, from GNSS or inertial reference.
   optional sint32 baro_vertical_rate_fpm = 22;
+  optional sint32 geometric_vertical_rate_fpm = 23;
   optional double indicated_airspeed_kt = 24;
   optional double true_airspeed_kt = 25;
   optional double mach = 28;
@@ -176,12 +180,6 @@ message LastPosition {
   optional uint32 rc_m = 4;
   // Age of the position at the snapshot's instant.
   double seen_pos_s = 5;
-}
-
-// A position estimated from the receiver's range, for an aircraft that reports none.
-message RoughPosition {
-  double lat_deg = 1;
-  double lon_deg = 2;
 }
 
 // Target State and Status message, or the Comm-B selected vertical intention register.

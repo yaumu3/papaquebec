@@ -12,8 +12,6 @@ import { configureProjection, hasProjection, trackStore } from '../state/tracks'
 import { type FeedPlaces, startFeed } from './facade';
 
 export interface FeedOptions extends FeedPlaces {
-  /** Where tar1090 serves readsb's traces, when it keeps them. */
-  base: string;
   /** Overrides the receiver's own position. */
   siteOverride: Site | null;
 }
@@ -28,7 +26,6 @@ function siteFromUrl(params: URLSearchParams): Site | null {
 export function feedOptionsFromUrl(search: string): FeedOptions {
   const params = new URLSearchParams(search);
   return {
-    base: '/data',
     siteOverride: siteFromUrl(params),
     feedInfo: '/feed/info.json',
   };
@@ -49,7 +46,7 @@ function noteShown(): void {
 export function connectFeed(opts: FeedOptions): () => void {
   if (opts.siteOverride) adoptSite(opts.siteOverride);
 
-  const { base: _, siteOverride: __, ...places } = opts;
+  const { siteOverride: _, ...places } = opts;
   const handle = startFeed(places, (e) => {
     switch (e.type) {
       case 'receiver':

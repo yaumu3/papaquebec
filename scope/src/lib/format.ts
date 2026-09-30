@@ -3,15 +3,15 @@ export type ClimbState = 'climbing' | 'descending' | 'level';
 /** Five steps of the ADS-B vertical rate, whose LSB is 64 fpm (RTCA DO-260B). */
 const CLIMB_DEAD_BAND_FPM = 5 * 64;
 
-export function climbState(baroRate: number | undefined): ClimbState {
-  if (baroRate === undefined) return 'level';
-  if (baroRate > CLIMB_DEAD_BAND_FPM) return 'climbing';
-  if (baroRate < -CLIMB_DEAD_BAND_FPM) return 'descending';
+export function climbState(verticalRate: number | undefined): ClimbState {
+  if (verticalRate === undefined) return 'level';
+  if (verticalRate > CLIMB_DEAD_BAND_FPM) return 'climbing';
+  if (verticalRate < -CLIMB_DEAD_BAND_FPM) return 'descending';
   return 'level';
 }
 
-export function climbArrow(baroRate: number | undefined): string {
-  switch (climbState(baroRate)) {
+export function climbArrow(verticalRate: number | undefined): string {
+  switch (climbState(verticalRate)) {
     case 'climbing':
       return '↑';
     case 'descending':
@@ -56,7 +56,7 @@ export function formatGsWake(gs: number | undefined, category: string | undefine
   return String(tens).padStart(2, '0') + wakeLetter(category);
 }
 
-/** Two-letter emergency prefix, or null when there is no emergency; readsb's `reserved` codes are none. */
+/** Two-letter emergency prefix, or null when there is no emergency; a `reserved` status is none. */
 export function emergencyCode(
   squawk: string | undefined,
   emergency: string | undefined,
@@ -92,7 +92,7 @@ const MODE_ABBREVIATIONS: Readonly<Record<string, string>> = {
   approach: 'APP',
 };
 
-/** readsb's engaged mode names, abbreviated as a panel shows them; undefined when none are engaged. */
+/** The names of the engaged modes, abbreviated as a panel shows them; undefined when none are engaged. */
 export function formatModes(modes: string[] | undefined): string | undefined {
   if (!modes?.length) return undefined;
   return modes.map((m) => MODE_ABBREVIATIONS[m] ?? m.toUpperCase()).join(' ');

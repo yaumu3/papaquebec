@@ -78,6 +78,11 @@
   background: var(--control-hover);
   color: var(--text);
 }
+/* As wide as it is tall, which is a line in its padding and border. */
+.about {
+  width: calc(1lh + 8px);
+  padding-inline: 0;
+}
 .on {
   background: var(--control-on-bg);
   color: var(--accent);

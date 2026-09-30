@@ -23,7 +23,7 @@ const near = (x: number[], y: number[]) => x.every((v, k) => Math.abs(v - (y[k] 
 describe('dataBlock', () => {
   it('shows callsign, then altitude with climb arrow and the type or GSW by phase', () => {
     // Arrange
-    const t = track({ baroRate: -1200 });
+    const t = track({ verticalRate: -1200 });
     const phaseA = 0;
     const phaseB = 8;
 
@@ -80,7 +80,7 @@ describe('dataBlock', () => {
 
   it('follows the level and trend with the selected level as intent', () => {
     // Arrange
-    const t = track({ baroRate: 1500, selAlt: 16000 });
+    const t = track({ verticalRate: 1500, selAlt: 16000 });
 
     // Act
     const block = dataBlock(t, 0, STANDARD_ALTIMETER);
@@ -197,7 +197,7 @@ describe('drawDataBlock', () => {
 
   it('sets the selected level and a third heading line in the dimmed intent tone', () => {
     // Arrange
-    const t = track({ baroRate: 1500, selAlt: 16000, selHeading: 95 });
+    const t = track({ verticalRate: 1500, selAlt: 16000, selHeading: 95 });
 
     // Act
     const g = glyphs(t);
@@ -212,7 +212,7 @@ describe('drawDataBlock', () => {
 
   it('keeps the runs of a right-aligned line contiguous', () => {
     // Arrange
-    const t = track({ baroRate: 1500, selAlt: 16000 });
+    const t = track({ verticalRate: 1500, selAlt: 16000 });
     const nw = { ...ne, dx: -22 };
     const advance = (atlas.advance * DB_FONT_PX) / atlas.fontSize;
 

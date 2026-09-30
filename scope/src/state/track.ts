@@ -1,4 +1,6 @@
-export type Source = 'adsb' | 'mlat' | 'tisb';
+import type { PositionSource } from '../lib/aircraft';
+
+export type Source = PositionSource;
 
 export type Corner = 'ne' | 'nw' | 'se' | 'sw';
 
@@ -6,7 +8,6 @@ export type Corner = 'ne' | 'nw' | 'se' | 'sw';
 export type Position =
   | { kind: 'live'; lat: number; lon: number; x: number; y: number }
   | { kind: 'last'; lat: number; lon: number; x: number; y: number }
-  | { kind: 'rr'; lat: number; lon: number }
   | { kind: 'none' };
 
 export interface Fix {
@@ -36,7 +37,8 @@ export interface Track {
   alt: number | 'ground' | undefined;
   gs: number | undefined;
   track: number | undefined;
-  baroRate: number | undefined;
+  /** In fpm: the barometric rate, or the geometric one from an aircraft that reports no other. */
+  verticalRate: number | undefined;
   nic: number | undefined;
   nacP: number | undefined;
   messages: number | undefined;
@@ -49,7 +51,7 @@ export interface Track {
   tas: number | undefined;
   ias: number | undefined;
   mach: number | undefined;
-  /** Wind derived by readsb, knots and degrees true. */
+  /** Wind, knots and degrees true. */
   windSpeed: number | undefined;
   windDir: number | undefined;
   /** Outside and total air temperature, degrees Celsius. */
@@ -60,7 +62,7 @@ export interface Track {
   fmsAlt: number | undefined;
   selHeading: number | undefined;
   navQnh: number | undefined;
-  /** Engaged modes as readsb names them, e.g. autopilot, vnav, lnav. */
+  /** The engaged modes by name, e.g. autopilot, vnav, lnav. */
   navModes: string[] | undefined;
   source: Source;
   seen: number;

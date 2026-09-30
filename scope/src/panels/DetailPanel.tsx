@@ -44,8 +44,6 @@ function positionReadings(p: Position): [Reading, Reading] {
   switch (p.kind) {
     case 'last':
       return [lat, { v: lon, unit: 'LAST KNOWN' }];
-    case 'rr':
-      return [lat, { v: lon, unit: 'ROUGH' }];
     default:
       return [lat, { v: lon }];
   }
@@ -53,9 +51,9 @@ function positionReadings(p: Position): [Reading, Reading] {
 
 function altitudeReading(
   alt: number | 'ground' | undefined,
-  baroRate: number | undefined,
+  verticalRate: number | undefined,
 ): Reading {
-  return levelReading(displayAltitude(alt, settings.altimeter), climbArrow(baroRate).trim());
+  return levelReading(displayAltitude(alt, settings.altimeter), climbArrow(verticalRate).trim());
 }
 
 const selectedReading = (ft: number | undefined): Reading =>
@@ -179,8 +177,8 @@ export function DetailPanel() {
               <Divider />
               <SectionTitle>FLIGHT</SectionTitle>
               <div class={s.grid}>
-                <Cell k="ALT" r={altitudeReading(t().alt, t().baroRate)} />
-                <Cell k="VS" r={signed(t().baroRate, 'fpm')} />
+                <Cell k="ALT" r={altitudeReading(t().alt, t().verticalRate)} />
+                <Cell k="VS" r={signed(t().verticalRate, 'fpm')} />
                 <Cell k="GS" r={num(t().gs, 'kt')} />
                 <Cell k="TRK" r={trackReading(t())} tone="enriched" />
                 <Cell

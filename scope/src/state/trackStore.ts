@@ -1,6 +1,6 @@
-import type { AircraftJson, AircraftSnapshot } from '../lib/aircraft';
+import type { AircraftReport, AircraftSnapshot } from '../lib/aircraft';
 import type { ProjectFn } from '../lib/geo';
-import type { Fix, OperatorState, Position, Source, Track } from './track';
+import type { Fix, OperatorState, Position, Track } from './track';
 
 export const HISTORY_RETENTION_SEC = 3600;
 
@@ -20,22 +20,12 @@ export interface TrackStore {
   reproject(project: ProjectFn): void;
 }
 
-function sourceOf(a: AircraftJson): Source {
-  if (a.mlat?.includes('lat')) return 'mlat';
-  if (a.tisb?.includes('lat')) return 'tisb';
-  return 'adsb';
-}
-
-function positionOf(a: AircraftJson, project: ProjectFn): Position {
-  if (a.lat !== undefined && a.lon !== undefined) {
-    return { kind: 'live', lat: a.lat, lon: a.lon, ...project(a.lat, a.lon) };
+function positionOf(a: AircraftReport, project: ProjectFn): Position {
+  if (a.position) {
+    return { kind: 'live', ...a.position, ...project(a.position.lat, a.position.lon) };
   }
   if (a.lastPosition) {
-    const { lat, lon } = a.lastPosition;
-    return { kind: 'last', lat, lon, ...project(lat, lon) };
-  }
-  if (a.rr_lat !== undefined && a.rr_lon !== undefined) {
-    return { kind: 'rr', lat: a.rr_lat, lon: a.rr_lon };
+    return { kind: 'last', ...a.lastPosition, ...project(a.lastPosition.lat, a.lastPosition.lon) };
   }
   return { kind: 'none' };
 }
@@ -59,47 +49,47 @@ function trimHistory(history: Fix[], now: number): void {
 }
 
 function toTrack(
-  a: AircraftJson,
+  a: AircraftReport,
   previous: Track | undefined,
   now: number,
   project: ProjectFn,
 ): Track {
   const position = positionOf(a, project);
   const history = previous?.history ?? [];
-  appendFix(history, position, now, a.alt_baro);
+  appendFix(history, position, now, a.alt);
   trimHistory(history, now);
   return {
     hex: a.hex,
-    flight: a.flight?.trim() || undefined,
+    flight: a.flight,
     squawk: a.squawk,
     category: a.category,
-    alt: a.alt_baro,
+    alt: a.alt,
     gs: a.gs,
     track: a.track,
-    baroRate: a.baro_rate,
+    verticalRate: a.verticalRate,
     nic: a.nic,
-    nacP: a.nac_p,
+    nacP: a.nacP,
     messages: a.messages,
     rssi: a.rssi,
-    type: a.t,
-    registration: a.r,
-    description: a.desc,
+    type: a.type,
+    registration: a.registration,
+    description: a.description,
     emergency: a.emergency,
     tas: a.tas,
     ias: a.ias,
     mach: a.mach,
-    windSpeed: a.ws,
-    windDir: a.wd,
+    windSpeed: a.windSpeed,
+    windDir: a.windDir,
     oat: a.oat,
     tat: a.tat,
-    selAlt: a.nav_altitude_mcp,
-    fmsAlt: a.nav_altitude_fms,
-    selHeading: a.nav_heading,
-    navQnh: a.nav_qnh,
-    navModes: a.nav_modes,
-    source: sourceOf(a),
+    selAlt: a.selAlt,
+    fmsAlt: a.fmsAlt,
+    selHeading: a.selHeading,
+    navQnh: a.navQnh,
+    navModes: a.navModes,
+    source: a.source ?? 'adsb',
     seen: a.seen ?? 0,
-    seenPos: a.seen_pos,
+    seenPos: a.seenPos,
     position,
     history,
     ops: previous?.ops ?? freshOps(),
@@ -108,7 +98,7 @@ function toTrack(
 
 /**
  * The track store is rebuilt from every snapshot. Only position history and
- * operator state carry over, because readsb does not hold them.
+ * operator state carry over, because the feed does not carry them.
  */
 export function createTrackStore(initialProject: ProjectFn): TrackStore {
   let project = initialProject;
