@@ -1,6 +1,6 @@
 //! Generates the feed's message types from the schema, without a system `protoc`.
 
-const PROTO_ROOT: &str = "../proto";
+const PROTO_ROOT: &str = "../../proto";
 const FEED: &str = "papaquebec/feed/v1/feed.proto";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

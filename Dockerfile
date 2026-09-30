@@ -14,9 +14,7 @@ RUN apk add --no-cache musl-dev
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
 COPY proto/ proto/
-COPY authority/ authority/
-COPY feeder/ feeder/
-COPY web/ web/
+COPY crates/ crates/
 RUN cargo build --release --locked
 
 FROM oven/bun:1-alpine

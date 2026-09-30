@@ -647,7 +647,7 @@ mod wire {
 
     fn testdata(name: &str) -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../proto/testdata")
+            .join("../../proto/testdata")
             .join(name)
     }
 
