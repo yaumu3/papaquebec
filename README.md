@@ -32,7 +32,7 @@ services:
     restart: unless-stopped
     ports:
       - 443:443
-      - 443:443/udp # the feed
+      - 4433:4433/udp # the feed
     volumes:
       - pq_data:/data # the certificate authority
       - map_data:/app/public/map
@@ -55,8 +55,10 @@ Environment on the service, all optional:
 - `PQ_TAR1090` (default `http://tar1090`): the tar1090 service, if it is named differently.
 - `PQ_SITE` (`lat,lon`): the center of the generated map data, when readsb is not told its
   position; the scope itself then needs `?site=` (see Development).
-- `PQ_FEED_PORT` (default `443`): the UDP port of the feed. The scope connects to the same
-  number, so publish it unchanged (`4500:4500/udp` with `PQ_FEED_PORT=4500`).
+- `PQ_FEED_PORT` (default `4433`): the UDP port of the feed. The scope connects to the same
+  number, so publish it unchanged (`4500:4500/udp` with `PQ_FEED_PORT=4500`). It cannot be the
+  page's port: Safari sends the page's own requests over a feed connection to the same host and
+  port, which answers only the feed, so the page would fail to load.
 - `PQ_ADDRESS` (default `https://`): how the scope is served. `https://` answers to any name; a
   host (`https://<host>`, or just `<host>`) keeps the certificates to that one. A browser that opens
   an address does not say which, and behind Docker's port mapping the container sees only its own,
