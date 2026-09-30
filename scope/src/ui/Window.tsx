@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { activeSheet, isPhone } from '../state/layout';
+import { activeSheet, isPhone, isShown } from '../state/layout';
 import { type PanelId, panels } from '../state/scope';
 
 import s from './Window.module.css';
@@ -14,7 +14,7 @@ export function Window(props: {
   bodyClass?: string | undefined;
   children: JSX.Element;
 }) {
-  const shown = () => (isPhone() ? activeSheet() === props.id : panels()[props.id]);
+  const shown = () => isShown(isPhone(), activeSheet(), props.id, panels()[props.id]);
   return (
     <div class={cx(s.win, props.class, !shown() && s.hidden)}>
       <div class={s.titlebar}>{props.title}</div>

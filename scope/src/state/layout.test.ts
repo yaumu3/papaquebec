@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { keepUnscrolled, nextSheet } from './layout';
+import { isShown, keepUnscrolled, nextSheet } from './layout';
 
 /** A window whose resize listeners can be fired by hand, recording every scrollTo. */
 function fakeWindow(scrollY: number) {
@@ -78,5 +78,37 @@ describe('nextSheet', () => {
 
     // Assert
     expect(out).toEqual(['list', null, 'detail']);
+  });
+});
+
+describe('isShown', () => {
+  it('shows a panel on a phone while it holds the sheet, whatever its own toggle says', () => {
+    // Arrange
+    const cases: [string | null, boolean][] = [
+      ['list', false],
+      ['maps', true],
+      [null, true],
+    ];
+
+    // Act
+    const out = cases.map(([sheet, toggled]) => isShown(true, sheet, 'list', toggled));
+
+    // Assert
+    expect(out).toEqual([true, false, false]);
+  });
+
+  it('shows a panel elsewhere while its own toggle is on, whatever holds the sheet', () => {
+    // Arrange
+    const cases: [string | null, boolean][] = [
+      ['list', false],
+      ['maps', true],
+      [null, true],
+    ];
+
+    // Act
+    const out = cases.map(([sheet, toggled]) => isShown(false, sheet, 'list', toggled));
+
+    // Assert
+    expect(out).toEqual([false, true, true]);
   });
 });

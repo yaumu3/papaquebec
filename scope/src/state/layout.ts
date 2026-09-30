@@ -49,3 +49,13 @@ export function nextSheet<T extends string>(current: T | null, tapped: T): T | n
 export function toggleSheet(id: PanelId): void {
   setActiveSheet((cur) => nextSheet(cur, id));
 }
+
+/** On a phone a panel shows while it holds the sheet; elsewhere while its own toggle is on. */
+export function isShown<T extends string>(
+  phone: boolean,
+  sheet: T | null,
+  id: T,
+  toggled: boolean,
+): boolean {
+  return phone ? sheet === id : toggled;
+}
