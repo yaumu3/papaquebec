@@ -10,8 +10,14 @@ function parseSite(lat: string, lon: string): Site {
   const site = { lat: Number(lat), lon: Number(lon) };
   // An empty string would count as zero.
   const written = lat.trim() !== '' && lon.trim() !== '';
-  if (written && Number.isFinite(site.lat) && Number.isFinite(site.lon)) return site;
-  throw new Error(`not a position: ${lat} ${lon}`);
+  if (!written || !Number.isFinite(site.lat) || !Number.isFinite(site.lon)) {
+    throw new Error(`not a position: ${lat} ${lon}`);
+  }
+  // As the server refuses it, so that no map is generated around a site it will not serve.
+  if (Math.abs(site.lat) > 90 || Math.abs(site.lon) > 180) {
+    throw new Error(`outside the globe: ${lat} ${lon}`);
+  }
+  return site;
 }
 
 export function resolveSite(args: readonly string[], env: Env): Site {

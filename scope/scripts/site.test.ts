@@ -2,6 +2,15 @@ import { describe, expect, it } from 'bun:test';
 
 import { resolveSite } from './site';
 
+/** The site resolved, or what it is refused with. */
+function resolved(args: string[], env: Record<string, string>) {
+  try {
+    return resolveSite(args, env);
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
+
 describe('resolveSite', () => {
   it('takes lat and lon from the arguments when both are given', () => {
     // Arrange
@@ -34,19 +43,32 @@ describe('resolveSite', () => {
     ];
 
     // Act
-    const out = given.map(([args, env]) => {
-      try {
-        return resolveSite(args, env);
-      } catch (e) {
-        return e instanceof Error ? e.message : String(e);
-      }
-    });
+    const out = given.map(([args, env]) => resolved(args, env));
 
     // Assert
     expect(out).toEqual([
       'no site: set PQ_SITE to lat,lon',
       'not a position: north east',
       'not a position: 35.6 ',
+    ]);
+  });
+
+  it('takes a site up to the poles and the antimeridian, and refuses one beyond', () => {
+    // Arrange
+    const given: [string[], Record<string, string>][] = [
+      [['-90', '180'], {}],
+      [['91', '140'], {}],
+      [[], { PQ_SITE: '35.6,-181' }],
+    ];
+
+    // Act
+    const out = given.map(([args, env]) => resolved(args, env));
+
+    // Assert
+    expect(out).toEqual([
+      { lat: -90, lon: 180 },
+      'outside the globe: 91 140',
+      'outside the globe: 35.6 -181',
     ]);
   });
 });
