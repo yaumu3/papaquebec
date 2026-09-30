@@ -9,6 +9,7 @@ pub mod message;
 pub mod position;
 pub mod proto;
 pub mod readsb;
+pub mod traffic;
 pub mod transport;
 pub mod upstream;
 
