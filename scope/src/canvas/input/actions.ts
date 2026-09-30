@@ -4,12 +4,13 @@ import {
   type RangeCursorOrigin,
   rblPending,
   rbls,
+  setAboutVisible,
   setHintVisible,
   setHovered,
   setMenu,
   setModeText,
-  setPointer,
   setPan,
+  setPointer,
   setRangeCursor,
   setRblPending,
   setRbls,
@@ -80,7 +81,7 @@ export interface ScopeActions {
   startRbl: () => void;
   deleteLastRbl: () => void;
   clearRbls: () => void;
-  /** Abandons a pending RBL or range cursor and closes the menu. */
+  /** Abandons a pending RBL or range cursor and closes the menu and the about dialog. */
   cancel: () => void;
 }
 
@@ -110,6 +111,7 @@ const plain = {
     setRangeCursor(null);
     setModeText(null);
     setMenu(null);
+    setAboutVisible(false);
   },
 } satisfies Partial<ScopeActions>;
 

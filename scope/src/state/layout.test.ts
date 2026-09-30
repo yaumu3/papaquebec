@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { isShown, keepUnscrolled, nextSheet } from './layout';
+import {
+  activeSheet,
+  isShown,
+  keepUnscrolled,
+  nextSheet,
+  setActiveSheet,
+  toggleSheet,
+} from './layout';
 
 /** A window whose resize listeners can be fired by hand, recording every scrollTo. */
 function fakeWindow(scrollY: number) {
@@ -78,6 +85,19 @@ describe('nextSheet', () => {
 
     // Assert
     expect(out).toEqual(['list', null, 'detail']);
+  });
+});
+
+describe('toggleSheet', () => {
+  it('takes the turn from the about dialog for the panel whose tab is tapped', () => {
+    // Arrange
+    setActiveSheet('about');
+
+    // Act
+    toggleSheet('maps');
+
+    // Assert
+    expect(activeSheet()).toBe('maps');
   });
 });
 

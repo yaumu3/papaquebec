@@ -4,21 +4,23 @@ import type { AircraftReport } from '../../lib/aircraft';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
 import {
+  aboutVisible,
   hintVisible,
   hovered,
   menu,
   modeText,
-  pointer,
   pan,
+  pointer,
   rangeCursor,
   rblPending,
   rbls,
   selected,
+  setAboutVisible,
   setHovered,
   setMenu,
   setModeText,
-  setPointer,
   setPan,
+  setPointer,
   setRangeCursor,
   setRblPending,
   setRbls,
@@ -257,6 +259,18 @@ describe('createActions', () => {
 
     // Assert
     expect([rblPending(), modeText(), rangeCursor(), menu()]).toEqual([null, null, null, null]);
+  });
+
+  it('closes the about dialog on cancel', () => {
+    // Arrange
+    const a = subject();
+    setAboutVisible(true);
+
+    // Act
+    a.cancel();
+
+    // Assert
+    expect(aboutVisible()).toBe(false);
   });
 
   it('waits for the first end of a new RBL', () => {

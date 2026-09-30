@@ -5,6 +5,7 @@ import { cx } from './design/cx';
 import { connectFeed, feedOptionsFromUrl } from './feed/connect';
 import { fetchQnhFrom, qnhSourceFromUrl } from './feed/qnh';
 import { parseAero, parseCoast } from './lib/mapdata';
+import { About } from './panels/About';
 import { ContextMenu } from './panels/ContextMenu';
 import { DetailPanel } from './panels/DetailPanel';
 import { DisplayPanel } from './panels/DisplayPanel';
@@ -92,6 +93,7 @@ export function App() {
       <TabBar />
       <ContextMenu />
       <Overlays />
+      <About />
     </>
   );
 }

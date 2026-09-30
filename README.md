@@ -164,6 +164,8 @@ Conventions:
 - **Trails** are slashes decimated to eight-second slots.
 - **Bearings** shown to the operator are magnetic, 001 to 360.
 - **The top bar** carries only runtime state.
+- **The `i`** beside the panel buttons opens the credits: whose data the scope shows, and on which
+  terms.
 
 Layout:
 
