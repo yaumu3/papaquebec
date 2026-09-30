@@ -76,19 +76,13 @@ async fn main() -> Result<(), Failure> {
     Ok(())
 }
 
-/// The authority kept in the data directory, or Caddy's there, or a new one.
+/// The authority kept in the data directory, or a new one kept there.
 fn authority(data: &Path) -> Result<Authority, Failure> {
-    let own = data.join("papaquebec/authority");
-    let opened = Authority::open(&own, &data.join("caddy/pki/authorities/local"))?;
-    match &opened.how {
-        How::Kept => eprintln!("authority: kept in {}", own.display()),
-        How::Adopted => eprintln!("authority: adopted Caddy's, so devices keep trusting it"),
-        How::Created { refused: None } => {
-            eprintln!("authority: created; devices must trust /root.crt once");
-        }
-        How::Created { refused: Some(why) } => {
-            eprintln!("authority: created, as Caddy's could not be used ({why})");
-        }
+    let kept = data.join("papaquebec/authority");
+    let opened = Authority::open(&kept)?;
+    match opened.how {
+        How::Kept => eprintln!("authority: kept in {}", kept.display()),
+        How::Created => eprintln!("authority: created; devices must trust /root.crt once"),
     }
     Ok(opened.authority)
 }

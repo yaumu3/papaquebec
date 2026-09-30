@@ -18,11 +18,10 @@ use rcgen::{
 use rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use time::{Duration, OffsetDateTime};
 use x509_parser::prelude::{FromDer, X509Certificate};
-use yasna::models::ObjectIdentifier;
 
 pub type Failure = Box<dyn std::error::Error + Send + Sync>;
 
-/// Ten years, as the authority it may take over from has.
+/// Ten years, so that each device trusts it once for good.
 const AUTHORITY_LASTS: Duration = Duration::days(3650);
 /// Well within the 398 days Apple accepts of a server's certificate.
 const CERTIFICATE_LASTS: Duration = Duration::days(90);
@@ -53,11 +52,8 @@ pub struct Kept {
 pub enum How {
     /// It is the one kept from an earlier run.
     Kept,
-    /// It is the one Caddy kept, which devices trust already.
-    Adopted,
-    /// It is new, and devices have yet to trust it. Caddy's may have been there
-    /// and refused, for the reason given.
-    Created { refused: Option<String> },
+    /// It is new, and devices have yet to trust it.
+    Created,
 }
 
 pub struct Opened {
@@ -98,8 +94,7 @@ impl Authority {
         Ok((authority, kept))
     }
 
-    /// An authority from its certificate and key, the key as PKCS #8 or as the
-    /// SEC1 that Caddy keeps.
+    /// An authority from its certificate and PKCS #8 key.
     ///
     /// # Errors
     ///
@@ -107,7 +102,7 @@ impl Authority {
     /// valid now, or the key is not the certificate's.
     pub fn from_pem(certificate_pem: &str, key_pem: &str) -> Result<Self, Failure> {
         let certificate = CertificateDer::from(pem::parse(certificate_pem)?.into_contents());
-        let key = key_pair(key_pem)?;
+        let key = KeyPair::from_pem_and_sign_algo(key_pem, &PKCS_ECDSA_P256_SHA256)?;
         let (_, parsed) = X509Certificate::from_der(&certificate)?;
         if !parsed.is_ca() {
             return Err("the certificate is not an authority's".into());
@@ -125,33 +120,25 @@ impl Authority {
         })
     }
 
-    /// The authority kept in `own`; failing that, the one Caddy kept in `caddys`,
-    /// from then on kept in `own`; failing that, a new one kept in `own`.
+    /// The authority kept in `directory`, or a new one, from then on kept there.
     ///
     /// # Errors
     ///
-    /// When the authority kept in `own` cannot be used, or none can be kept there.
-    pub fn open(own: &Path, caddys: &Path) -> Result<Opened, Failure> {
-        if let Some(kept) = read(own)? {
+    /// When the authority kept there cannot be used, or none can be kept there.
+    pub fn open(directory: &Path) -> Result<Opened, Failure> {
+        if let Some(kept) = read(directory)? {
             let authority = Self::from_pem(&kept.certificate_pem, &kept.key_pem)?;
             return Ok(Opened {
                 authority,
                 how: How::Kept,
             });
         }
-        let adopted = read(caddys).and_then(|kept| match kept {
-            Some(kept) => {
-                Self::from_pem(&kept.certificate_pem, &kept.key_pem).map(|a| Some((a, kept)))
-            }
-            None => Ok(None),
-        });
-        let (authority, kept, how) = match adopted {
-            Ok(Some((authority, kept))) => (authority, kept, How::Adopted),
-            Ok(None) => created(None)?,
-            Err(refused) => created(Some(refused.to_string()))?,
-        };
-        keep(own, &kept)?;
-        Ok(Opened { authority, how })
+        let (authority, kept) = Self::create()?;
+        keep(directory, &kept)?;
+        Ok(Opened {
+            authority,
+            how: How::Created,
+        })
     }
 
     /// What a device is given to trust.
@@ -195,11 +182,6 @@ impl Authority {
     }
 }
 
-fn created(refused: Option<String>) -> Result<(Authority, Kept, How), Failure> {
-    let (authority, kept) = Authority::create()?;
-    Ok((authority, kept, How::Created { refused }))
-}
-
 /// What a directory keeps of an authority, if it keeps one.
 fn read(directory: &Path) -> Result<Option<Kept>, Failure> {
     let (certificate, key) = (directory.join(CERTIFICATE_FILE), directory.join(KEY_FILE));
@@ -223,38 +205,6 @@ fn keep(directory: &Path, kept: &Kept) -> Result<(), Failure> {
     Ok(())
 }
 
-/// A P-256 key from PEM, as PKCS #8 or as SEC1.
-fn key_pair(pem: &str) -> Result<KeyPair, Failure> {
-    let parsed = pem::parse(pem)?;
-    let pkcs8 = match parsed.tag() {
-        "PRIVATE KEY" => parsed.into_contents(),
-        "EC PRIVATE KEY" => pkcs8_of(parsed.contents()),
-        other => return Err(format!("a {other} is not a key an authority can use").into()),
-    };
-    let pkcs8 = PrivatePkcs8KeyDer::from(pkcs8);
-    Ok(KeyPair::from_pkcs8_der_and_sign_algo(
-        &pkcs8,
-        &PKCS_ECDSA_P256_SHA256,
-    )?)
-}
-
-/// A SEC1 key (RFC 5915) wrapped as PKCS #8 (RFC 5958), which names the curve
-/// beside the key instead of within it.
-fn pkcs8_of(sec1: &[u8]) -> Vec<u8> {
-    let ec_public_key = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 2, 1]);
-    let prime256v1 = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 3, 1, 7]);
-    yasna::construct_der(|writer| {
-        writer.write_sequence(|writer| {
-            writer.next().write_u8(0);
-            writer.next().write_sequence(|writer| {
-                writer.next().write_oid(&ec_public_key);
-                writer.next().write_oid(&prime256v1);
-            });
-            writer.next().write_bytes(sec1);
-        });
-    })
-}
-
 fn named(common_name: &str) -> DistinguishedName {
     let mut name = DistinguishedName::new();
     name.push(DnType::CommonName, common_name);
@@ -269,7 +219,7 @@ fn valid_for(lasts: Duration) -> (OffsetDateTime, OffsetDateTime) {
 #[cfg(test)]
 mod tests {
     use std::os::unix::fs::PermissionsExt;
-    use std::path::{Path, PathBuf};
+    use std::path::PathBuf;
     use std::sync::Arc;
 
     use rustls::RootCertStore;
@@ -390,82 +340,18 @@ mod tests {
         assert!((3640..=3660).contains(&validity.whole_days()));
     }
 
-    /// The key as Caddy keeps it: SEC1, naming its curve and carrying the public
-    /// key, where the key this crate makes is PKCS #8.
-    #[expect(
-        clippy::redundant_closure_for_method_calls,
-        reason = "the method itself is not general enough over the reader's lifetime"
-    )]
-    fn as_caddy_keeps(key_pem: &str) -> String {
-        use yasna::Tag;
-        use yasna::models::ObjectIdentifier;
-
-        let pkcs8 = pem::parse(key_pem).expect("a key");
-        let sec1 = yasna::parse_der(pkcs8.contents(), |reader| {
-            reader.read_sequence(|reader| {
-                reader.next().read_u8()?;
-                reader.next().read_der()?;
-                reader.next().read_bytes()
-            })
-        });
-        let (private, public) = yasna::parse_der(&sec1.expect("a key within"), |reader| {
-            reader.read_sequence(|reader| {
-                reader.next().read_u8()?;
-                let private = reader.next().read_bytes()?;
-                let public = reader
-                    .next()
-                    .read_tagged(Tag::context(1), |reader| reader.read_der())?;
-                Ok((private, public))
-            })
-        })
-        .expect("a private and a public key");
-        let prime256v1 = ObjectIdentifier::from_slice(&[1, 2, 840, 10045, 3, 1, 7]);
-        let caddys = yasna::construct_der(|writer| {
-            writer.write_sequence(|writer| {
-                writer.next().write_u8(1);
-                writer.next().write_bytes(&private);
-                writer
-                    .next()
-                    .write_tagged(Tag::context(0), |writer| writer.write_oid(&prime256v1));
-                writer
-                    .next()
-                    .write_tagged(Tag::context(1), |writer| writer.write_der(&public));
-            });
-        });
-        pem::encode(&pem::Pem::new("EC PRIVATE KEY", caddys))
-    }
-
-    /// Two directories: the server's own, and the one Caddy kept its authority in.
-    struct Directories {
-        own: PathBuf,
-        caddys: PathBuf,
+    /// Where the server keeps its authority, in a directory of its own.
+    struct Home {
+        authority: PathBuf,
         _directory: tempfile::TempDir,
     }
 
-    fn directories() -> Directories {
+    fn home() -> Home {
         let directory = tempfile::tempdir().expect("a directory");
-        Directories {
-            own: directory.path().join("papaquebec/authority"),
-            caddys: directory.path().join("caddy/pki/authorities/local"),
+        Home {
+            authority: directory.path().join("papaquebec/authority"),
             _directory: directory,
         }
-    }
-
-    fn keep_in(directory: &Path, certificate_pem: &str, key_pem: &str) {
-        std::fs::create_dir_all(directory).expect("a directory");
-        std::fs::write(directory.join("root.crt"), certificate_pem).expect("written");
-        std::fs::write(directory.join("root.key"), key_pem).expect("written");
-    }
-
-    /// An authority as Caddy would have kept it, and its certificate.
-    fn caddys_authority(directory: &Path) -> Authority {
-        let (authority, kept) = Authority::create().expect("an authority");
-        keep_in(
-            directory,
-            &kept.certificate_pem,
-            &as_caddy_keeps(&kept.key_pem),
-        );
-        authority
     }
 
     #[test]
@@ -479,25 +365,6 @@ mod tests {
             },
         ) = Authority::create().expect("an authority");
         let read = Authority::from_pem(&certificate_pem, &key_pem).expect("reads");
-
-        // Act
-        let issued = read.issue(&name("raspberrypi.local")).expect("issues");
-
-        // Assert
-        assert!(accepted(&original, &issued, "raspberrypi.local"));
-    }
-
-    #[test]
-    fn key_is_read_as_caddy_keeps_it() {
-        // Arrange
-        let (
-            original,
-            Kept {
-                certificate_pem,
-                key_pem,
-            },
-        ) = Authority::create().expect("an authority");
-        let read = Authority::from_pem(&certificate_pem, &as_caddy_keeps(&key_pem)).expect("reads");
 
         // Act
         let issued = read.issue(&name("raspberrypi.local")).expect("issues");
@@ -531,30 +398,30 @@ mod tests {
     #[test]
     fn first_start_creates_an_authority_and_keeps_it() {
         // Arrange
-        let kept = directories();
+        let home = home();
 
         // Act
-        let opened = Authority::open(&kept.own, &kept.caddys);
+        let opened = Authority::open(&home.authority);
 
         // Assert
         let opened = opened.expect("opens");
-        let mode = std::fs::metadata(kept.own.join("root.key"))
+        let mode = std::fs::metadata(home.authority.join("root.key"))
             .expect("kept")
             .permissions()
             .mode();
-        assert!(matches!(opened.how, How::Created { refused: None }));
+        assert!(matches!(opened.how, How::Created));
         assert_eq!(mode & 0o777, 0o600);
-        assert!(kept.own.join("root.crt").exists());
+        assert!(home.authority.join("root.crt").exists());
     }
 
     #[test]
     fn later_start_reads_the_authority_it_kept() {
         // Arrange
-        let kept = directories();
-        let first = Authority::open(&kept.own, &kept.caddys).expect("opens");
+        let home = home();
+        let first = Authority::open(&home.authority).expect("opens");
 
         // Act
-        let second = Authority::open(&kept.own, &kept.caddys);
+        let second = Authority::open(&home.authority);
 
         // Assert
         let second = second.expect("opens");
@@ -563,63 +430,6 @@ mod tests {
             second.authority.certificate(),
             first.authority.certificate()
         );
-    }
-
-    #[test]
-    fn caddys_authority_is_adopted_and_kept() {
-        // Arrange
-        let kept = directories();
-        let caddys = caddys_authority(&kept.caddys);
-
-        // Act
-        let opened = Authority::open(&kept.own, &kept.caddys);
-
-        // Assert
-        let opened = opened.expect("opens");
-        let issued = opened
-            .authority
-            .issue(&name("raspberrypi.local"))
-            .expect("issues");
-        assert!(matches!(opened.how, How::Adopted));
-        assert_eq!(opened.authority.certificate(), caddys.certificate());
-        assert!(accepted(&caddys, &issued, "raspberrypi.local"));
-        assert!(kept.own.join("root.key").exists());
-    }
-
-    #[test]
-    fn own_authority_is_preferred_to_caddys() {
-        // Arrange
-        let kept = directories();
-        let own = Authority::open(&kept.own, &kept.caddys).expect("opens");
-        caddys_authority(&kept.caddys);
-
-        // Act
-        let opened = Authority::open(&kept.own, &kept.caddys);
-
-        // Assert
-        let opened = opened.expect("opens");
-        assert!(matches!(opened.how, How::Kept));
-        assert_eq!(opened.authority.certificate(), own.authority.certificate());
-    }
-
-    #[test]
-    fn unusable_authority_of_caddys_is_replaced_by_a_new_one() {
-        // Arrange
-        let kept = directories();
-        let (_, ours) = Authority::create().expect("an authority");
-        let (_, others) = Authority::create().expect("an authority");
-        keep_in(
-            &kept.caddys,
-            &ours.certificate_pem,
-            &as_caddy_keeps(&others.key_pem),
-        );
-
-        // Act
-        let opened = Authority::open(&kept.own, &kept.caddys);
-
-        // Assert
-        let opened = opened.expect("opens");
-        assert!(matches!(opened.how, How::Created { refused: Some(_) }));
     }
 
     #[test]
