@@ -1,4 +1,6 @@
-export type Source = 'adsb' | 'mlat' | 'tisb';
+import type { PositionSource } from '../lib/aircraft';
+
+export type Source = PositionSource;
 
 export type Corner = 'ne' | 'nw' | 'se' | 'sw';
 
@@ -49,7 +51,7 @@ export interface Track {
   tas: number | undefined;
   ias: number | undefined;
   mach: number | undefined;
-  /** Wind derived by readsb, knots and degrees true. */
+  /** Wind, knots and degrees true. */
   windSpeed: number | undefined;
   windDir: number | undefined;
   /** Outside and total air temperature, degrees Celsius. */
@@ -60,7 +62,7 @@ export interface Track {
   fmsAlt: number | undefined;
   selHeading: number | undefined;
   navQnh: number | undefined;
-  /** Engaged modes as readsb names them, e.g. autopilot, vnav, lnav. */
+  /** The engaged modes by name, e.g. autopilot, vnav, lnav. */
   navModes: string[] | undefined;
   source: Source;
   seen: number;

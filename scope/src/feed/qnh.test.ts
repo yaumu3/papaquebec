@@ -26,7 +26,7 @@ const iemBody = (rows: unknown[]) => JSON.stringify({ data: rows });
 describe('qnhSourceFromUrl', () => {
   it('defaults to the Iowa mirror and switches to a proxied Aviation Weather Center with wx', () => {
     // Arrange
-    const searches = ['?feed=readsb', '?wx=/wx/'];
+    const searches = ['?feed=other', '?wx=/wx/'];
 
     // Act
     const out = searches.map(qnhSourceFromUrl);

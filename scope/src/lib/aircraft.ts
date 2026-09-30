@@ -1,72 +1,75 @@
 /**
- * The subset of readsb's `aircraft.json` that the scope reads.
- * See wiedehopf/readsb README-json.md. Every field is optional because
- * readsb omits what it does not know.
+ * What the feed tells of the aircraft a receiver hears, as the scope reads it. A field is absent
+ * when the receiver does not know it.
  */
-export interface AircraftJson {
+
+/** How a position came: by the aircraft's own broadcast, by multilateration, or rebroadcast from the ground. */
+export type PositionSource = 'adsb' | 'mlat' | 'tisb';
+
+export interface LatLon {
+  lat: number;
+  lon: number;
+}
+
+export interface AircraftReport {
+  /** The six hex digits of the address, after `~` when it is not one ICAO assigned. */
   hex: string;
   flight?: string;
+  /** The Mode A code as four octal digits. */
   squawk?: string;
+  /** Emitter category, `A0` to `D7`. */
   category?: string;
-  lat?: number;
-  lon?: number;
-  /** Barometric altitude in feet, or the literal "ground". */
-  alt_baro?: number | 'ground';
-  /** Geometric (GNSS) altitude in feet; often the first altitude readsb has. */
-  alt_geom?: number;
+  /** Emergency/priority status by name; `none` when the aircraft reports that it has none. */
+  emergency?: string;
+  /** Where it reports being. */
+  position?: LatLon;
+  /** Where it last reported being, once that is no longer current. */
+  lastPosition?: LatLon;
+  /** How the position came, when not by the aircraft's own broadcast. */
+  source?: Exclude<PositionSource, 'adsb'>;
+  /** Pressure altitude in feet, or that it reports being on the ground. */
+  alt?: number | 'ground';
   gs?: number;
   track?: number;
-  baro_rate?: number;
-  /** Vertical rate from GNSS or inertial reference, which an aircraft reports in place of the barometric one. */
-  geom_rate?: number;
-  seen?: number;
-  seen_pos?: number;
-  /** Fields whose value came from MLAT. */
-  mlat?: string[];
-  /** Fields whose value came from TIS-B. */
-  tisb?: string[];
-  lastPosition?: { lat: number; lon: number; nic?: number; rc?: number; seen_pos: number };
+  /** In fpm: the barometric rate, or the geometric one from an aircraft that reports no other. */
+  verticalRate?: number;
   nic?: number;
-  nac_p?: number;
+  nacP?: number;
   messages?: number;
   rssi?: number;
-  /** Type designator, present when readsb enrichment is on. */
-  t?: string;
-  /** Registration, present when readsb enrichment is on. */
-  r?: string;
-  /** Long type description, present when readsb enrichment is on. */
-  desc?: string;
-  /** Emergency status: none, general, lifeguard, minfuel, nordo, unlawful, downed, reserved. */
-  emergency?: string;
+  /** ICAO type designator, registration and long type description, from the aircraft database. */
+  type?: string;
+  registration?: string;
+  description?: string;
   /** Air data speeds: true and indicated airspeed in knots, Mach number. */
   tas?: number;
   ias?: number;
   mach?: number;
-  /** Wind readsb derives from air data, knots and degrees true. */
-  ws?: number;
-  wd?: number;
+  /** Wind, knots and degrees true. */
+  windSpeed?: number;
+  windDir?: number;
   /** Outside and total air temperature, degrees Celsius. */
   oat?: number;
   tat?: number;
-  /** Altitude selected on the MCP/FCU, feet, as the crew set it. */
-  nav_altitude_mcp?: number;
-  /** Altitude the FMS is flying to, feet. */
-  nav_altitude_fms?: number;
-  /** Selected heading, degrees; DO-260B leaves true or magnetic undefined. */
-  nav_heading?: number;
-  /** Altimeter setting the crew has set, hPa. */
-  nav_qnh?: number;
-  /** Engaged modes: autopilot, vnav, althold, approach, lnav, tcas. */
-  nav_modes?: string[];
+  /** Downlinked autopilot intent: MCP/FCU and FMS altitudes in feet, heading, crew QNH in hPa. */
+  selAlt?: number;
+  fmsAlt?: number;
+  selHeading?: number;
+  navQnh?: number;
+  /** The engaged modes by name, e.g. autopilot, vnav, lnav; absent when the aircraft reports none. */
+  navModes?: string[];
+  /** Seconds since its last message, and since its last position. */
+  seen?: number;
+  seenPos?: number;
 }
 
 export interface AircraftSnapshot {
+  /** Seconds since the epoch. */
   now: number;
+  /** Messages the receiver has decoded since it started. */
   messages: number;
-  aircraft: AircraftJson[];
+  aircraft: AircraftReport[];
 }
 
-export interface ReceiverJson {
-  lat?: number;
-  lon?: number;
-}
+/** Where the receiver is, when it knows. */
+export type ReceiverPosition = Partial<LatLon>;

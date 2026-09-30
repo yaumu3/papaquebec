@@ -56,7 +56,7 @@ export function formatGsWake(gs: number | undefined, category: string | undefine
   return String(tens).padStart(2, '0') + wakeLetter(category);
 }
 
-/** Two-letter emergency prefix, or null when there is no emergency; readsb's `reserved` codes are none. */
+/** Two-letter emergency prefix, or null when there is no emergency; a `reserved` status is none. */
 export function emergencyCode(
   squawk: string | undefined,
   emergency: string | undefined,
@@ -92,7 +92,7 @@ const MODE_ABBREVIATIONS: Readonly<Record<string, string>> = {
   approach: 'APP',
 };
 
-/** readsb's engaged mode names, abbreviated as a panel shows them; undefined when none are engaged. */
+/** The names of the engaged modes, abbreviated as a panel shows them; undefined when none are engaged. */
 export function formatModes(modes: string[] | undefined): string | undefined {
   if (!modes?.length) return undefined;
   return modes.map((m) => MODE_ABBREVIATIONS[m] ?? m.toUpperCase()).join(' ');

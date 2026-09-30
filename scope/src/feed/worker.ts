@@ -1,5 +1,5 @@
 /// <reference lib="webworker" />
-import type { AircraftSnapshot, ReceiverJson } from '../lib/aircraft';
+import type { AircraftSnapshot, ReceiverPosition } from '../lib/aircraft';
 import type { FeedMessage } from './decode';
 import { type FeedDown, followFeed, openWebTransport } from './push';
 
@@ -10,14 +10,14 @@ export type FeedCommand = {
 };
 
 export type FeedEvent =
-  | { type: 'receiver'; receiver: ReceiverJson }
+  | { type: 'receiver'; receiver: ReceiverPosition }
   /** The history a session brings, in time order, before its first snapshot. */
   | { type: 'backfill'; snapshots: AircraftSnapshot[] }
   | { type: 'snapshot'; snapshot: AircraftSnapshot; receivedAt: number }
   | { type: 'down'; reason: FeedDown };
 
 const RETRY_MS = 2000;
-/** Ten of readsb's one-second snapshots. */
+/** Ten of the feed's one-second snapshots. */
 const DEADLINE_MS = 10_000;
 const post = (e: FeedEvent) => self.postMessage(e);
 const down = (reason: FeedDown) => post({ type: 'down', reason });

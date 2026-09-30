@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-import type { AircraftJson } from '../../lib/aircraft';
+import type { AircraftReport } from '../../lib/aircraft';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
 import {
@@ -44,13 +44,12 @@ const view: View = {
 const precise: Precision = { reach: 14, snap: 15, hovers: true };
 const loose: Precision = { reach: 24, snap: 24, hovers: false };
 
-const aircraft = (hex: string): AircraftJson => ({
+const aircraft = (hex: string): AircraftReport => ({
   hex,
-  lat: 35.5,
-  lon: 139.8,
+  position: { lat: 35.5, lon: 139.8 },
   seen: 0.2,
-  seen_pos: 0.2,
-  alt_baro: 11000,
+  seenPos: 0.2,
+  alt: 11000,
 });
 
 const line = (tag: string) => ({

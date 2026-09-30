@@ -67,7 +67,7 @@ describe('wakeLetter / formatGsWake', () => {
 });
 
 describe('emergencyCode', () => {
-  it('derives the two-letter prefix from squawk or readsb emergency status', () => {
+  it('derives the two-letter prefix from the squawk or the emergency status', () => {
     // Arrange
     const cases: [string | undefined, string | undefined, 'HJ' | 'RF' | 'EM' | null][] = [
       ['7500', undefined, 'HJ'],
@@ -135,7 +135,7 @@ describe('formatMach', () => {
 });
 
 describe('formatModes', () => {
-  it('abbreviates the engaged modes in readsb order and drops an empty list', () => {
+  it('abbreviates the engaged modes in the order given and drops an empty list', () => {
     // Arrange
     const cases = [
       ['autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'],

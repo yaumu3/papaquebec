@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { AircraftJson, AircraftSnapshot } from '../lib/aircraft';
+import type { AircraftReport, AircraftSnapshot } from '../lib/aircraft';
 import { createTrackStore, HISTORY_RETENTION_SEC } from './trackStore';
 
 /** Equirectangular stub: 1° = 60 NM, good enough to check that projection is applied. */
@@ -8,17 +8,16 @@ const project = (lat: number, lon: number) => ({ x: (lon - 130) * 60, y: (lat - 
 
 const doubled = (lat: number, lon: number) => ({ x: (lon - 130) * 120, y: (lat - 33) * 120 });
 
-function snapshot(now: number, aircraft: AircraftJson[], messages = 0): AircraftSnapshot {
+function snapshot(now: number, aircraft: AircraftReport[], messages = 0): AircraftSnapshot {
   return { now, messages, aircraft };
 }
 
-const live = (hex: string, lat = 33.5, lon = 130.5): AircraftJson => ({
+const live = (hex: string, lat = 33.5, lon = 130.5): AircraftReport => ({
   hex,
-  lat,
-  lon,
+  position: { lat, lon },
   seen: 0.2,
-  seen_pos: 0.2,
-  alt_baro: 11000,
+  seenPos: 0.2,
+  alt: 11000,
 });
 
 describe('createTrackStore', () => {
@@ -113,31 +112,28 @@ describe('createTrackStore', () => {
     });
   });
 
-  it('classifies the position source from the mlat and tisb field lists', () => {
+  it("takes a position as the aircraft's own broadcast unless the feed says how it came", () => {
     // Arrange
     const store = createTrackStore(project);
-    const aircraft: AircraftJson[] = [
-      { ...live('adsb') },
-      { ...live('mlat'), mlat: ['lat', 'lon', 'track'] },
-      { ...live('tisb'), tisb: ['lat', 'lon'] },
-      { ...live('mlatalt'), mlat: ['alt_baro'] },
+    const aircraft: AircraftReport[] = [
+      live('adsb'),
+      { ...live('mlat'), source: 'mlat' },
+      { ...live('tisb'), source: 'tisb' },
     ];
 
     // Act
     store.ingest(snapshot(1000, aircraft));
 
     // Assert
-    expect(store.tracks.get('adsb')?.source).toBe('adsb');
-    expect(store.tracks.get('mlat')?.source).toBe('mlat');
-    expect(store.tracks.get('tisb')?.source).toBe('tisb');
-    expect(store.tracks.get('mlatalt')?.source).toBe('adsb');
+    const sources = ['adsb', 'mlat', 'tisb'].map((hex) => store.tracks.get(hex)?.source);
+    expect(sources).toEqual(['adsb', 'mlat', 'tisb']);
   });
 
   it('falls back from live position to lastPosition, then none', () => {
     // Arrange
     const store = createTrackStore(project);
-    const aircraft: AircraftJson[] = [
-      { hex: 'last', seen: 40, lastPosition: { lat: 34, lon: 131, seen_pos: 40 } }, // Yamaguchi
+    const aircraft: AircraftReport[] = [
+      { hex: 'last', seen: 40, lastPosition: { lat: 34, lon: 131 } }, // Yamaguchi
       { hex: 'none', seen: 1 },
     ];
 
@@ -169,42 +165,23 @@ describe('createTrackStore', () => {
     expect(store.stats.now).toBe(1002);
   });
 
-  it('takes the geometric vertical rate of an aircraft that reports no barometric one', () => {
-    // Arrange
-    const store = createTrackStore(project);
-    const aircraft: AircraftJson[] = [
-      { ...live('both'), baro_rate: -1200, geom_rate: -1100 },
-      { ...live('geometric'), geom_rate: 1856 },
-      live('neither'),
-    ];
-
-    // Act
-    store.ingest(snapshot(1000, aircraft));
-
-    // Assert
-    const rates = ['both', 'geometric', 'neither'].map(
-      (hex) => store.tracks.get(hex)?.verticalRate,
-    );
-    expect(rates).toEqual([-1200, 1856, undefined]);
-  });
-
   it('copies enrichment and readout fields onto the track', () => {
     // Arrange
     const store = createTrackStore(project);
-    const a: AircraftJson = {
+    const a: AircraftReport = {
       ...live('a'),
-      flight: 'TEST01  ',
+      flight: 'TEST01',
       squawk: '2431',
       category: 'A3',
       gs: 290,
       track: 235,
-      baro_rate: -1200,
+      verticalRate: -1200,
       nic: 8,
-      nac_p: 9,
+      nacP: 9,
       messages: 50,
       rssi: -12.3,
-      t: 'B789',
-      r: 'TEST-01',
+      type: 'B789',
+      registration: 'TEST-01',
       emergency: 'none',
     };
 
@@ -261,38 +238,26 @@ describe('createTrackStore', () => {
     expect(store.stats.now).toBe(1000);
     expect(store.tracks.get('a')?.history.map((f) => f.t)).toEqual([1000]);
   });
-
-  it('leaves altitude unknown when only geometric altitude is reported', () => {
-    // Arrange
-    const store = createTrackStore(project);
-    const a: AircraftJson = { hex: 'a', lat: 33.5, lon: 130.5, seen: 0.1, alt_geom: 4250 }; // south of RJFF
-
-    // Act
-    store.ingest(snapshot(1000, [a]));
-
-    // Assert
-    expect(store.tracks.get('a')?.alt).toBeUndefined();
-  });
 });
 
 describe('createTrackStore readouts', () => {
-  it('carries air data and autopilot intent when readsb reports them', () => {
+  it('carries air data and autopilot intent when the feed reports them', () => {
     // Arrange
     const store = createTrackStore(project);
-    const reported: AircraftJson = {
+    const reported: AircraftReport = {
       ...live('a'),
-      ws: 14,
-      wd: 255,
+      windSpeed: 14,
+      windDir: 255,
       oat: 13,
       tat: 23,
       tas: 282,
       ias: 229,
       mach: 0.428,
-      nav_altitude_mcp: 35008,
-      nav_altitude_fms: 35000,
-      nav_heading: 270.7,
-      nav_qnh: 1013.6,
-      nav_modes: ['autopilot', 'vnav', 'lnav'],
+      selAlt: 35008,
+      fmsAlt: 35000,
+      selHeading: 270.7,
+      navQnh: 1013.6,
+      navModes: ['autopilot', 'vnav', 'lnav'],
     };
 
     // Act
