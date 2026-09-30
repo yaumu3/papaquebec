@@ -381,11 +381,9 @@ name = "feeder"
 version = "0.1.0"
 dependencies = [
  "bytes",
- "flate2",
  "prost",
  "prost-build",
  "protox",
- "reqwest",
  "serde",
  "serde_json",
  "tokio",

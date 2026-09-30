@@ -8,7 +8,7 @@ use prost::Message;
 
 use crate::proto::{Aircraft, Frame, Hello, Receiver, Reception, Snapshot};
 
-/// tar1090's own history cadence.
+/// How far apart the snapshots of a trail are kept.
 const CADENCE_S: f64 = 8.0;
 /// The scope keeps an hour of trail; a minute more fills its oldest slot.
 const RETENTION_S: f64 = 3660.0;
@@ -23,17 +23,6 @@ pub struct History {
 }
 
 impl History {
-    /// Starts from what an upstream kept, as given but in time order and within the retention.
-    pub fn seed(&mut self, mut kept: Vec<Snapshot>) {
-        kept.sort_by(|a, b| a.now_s.total_cmp(&b.now_s));
-        let oldest = kept
-            .last()
-            .map_or(f64::NEG_INFINITY, |last| last.now_s - RETENTION_S);
-        let within = kept.into_iter().filter(|snapshot| snapshot.now_s >= oldest);
-        self.kept = within.map(|snapshot| trail_of(&snapshot)).collect();
-        self.shared = self.kept.iter().cloned().collect();
-    }
-
     /// Keeps the snapshot when eight seconds have passed since the last one kept,
     /// and forgets those older than the retention.
     pub fn record(&mut self, snapshot: &Snapshot) {
@@ -65,7 +54,7 @@ fn trail_of(snapshot: &Snapshot) -> Snapshot {
     }
 }
 
-/// What tar1090's history keeps of an aircraft; none without a position.
+/// What a trail needs of an aircraft; none of one without a position.
 fn trail(aircraft: &Aircraft) -> Option<Aircraft> {
     aircraft.lat_deg.and(aircraft.lon_deg)?;
     Some(Aircraft {
@@ -283,31 +272,5 @@ mod tests {
             ..positioned
         };
         assert_eq!(history.shared()[0].aircraft, [trail]);
-    }
-
-    #[test]
-    fn history_is_seeded_in_time_order_and_as_given() {
-        // Arrange
-        let seed = [3.0, 1.0, 2.0, 12.0].map(at);
-        let mut history = History::default();
-
-        // Act
-        history.seed(seed.to_vec());
-
-        // Assert
-        assert_eq!(instants(&history.shared()), [1.0, 2.0, 3.0, 12.0]);
-    }
-
-    #[test]
-    fn seeded_history_forgets_what_is_older_than_an_hour_and_a_minute() {
-        // Arrange
-        let seed = [0.0, 100.0, 3700.0].map(at);
-        let mut history = History::default();
-
-        // Act
-        history.seed(seed.to_vec());
-
-        // Assert
-        assert_eq!(instants(&history.shared()), [100.0, 3700.0]);
     }
 }
