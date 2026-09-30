@@ -1,43 +1,44 @@
 # papaquebec
 
 A passive ADS-B scope in the visual vocabulary of a radar display rather than a map: position
-symbols, data blocks and trails on a dark screen. It is served beside
-[`docker-tar1090`](https://github.com/sdr-enthusiasts/docker-tar1090) in place of its web UI:
-[`readsb`](https://github.com/wiedehopf/readsb) decodes, a small server pushes what it hears to the
+symbols, data blocks and trails on a dark screen. It is served beside a receiver such as
+[`readsb`](https://github.com/sdr-enthusiasts/docker-readsb-protobuf): the receiver passes on the
+messages it hears, a small server makes out the aircraft they tell of and pushes them to the
 browser, and the scope draws.
 
 ![The scope over Tokyo with synthesized traffic](docs/screenshot.png)
 
 ## Deployment
 
-The scope runs in its own container beside `docker-tar1090`: one server that serves the build over
-https (browsers expose WebGPU only in secure contexts, which the tar1090 image cannot provide),
-proxies the selected aircraft's day trace to [tar1090](https://github.com/wiedehopf/tar1090), which
-stays stock on port 80, and feeds the scope its one source of traffic: it follows tar1090's
-`aircraft.json`, keeps the last hour of it, starting from tar1090's own history, and pushes each new
-snapshot over [WebTransport](https://developer.mozilla.org/docs/Web/API/WebTransport_API). At start
-the container asks tar1090 for the receiver position and generates the map data around it, so
-nothing needs configuring beyond the compose entry.
+The scope runs in its own container beside the receiver's: one server that serves the build over
+https (browsers expose WebGPU only in secure contexts) and feeds the scope its one source of
+traffic. It follows the receiver's Beast output, which is every message as it was heard, reads the
+messages itself, keeps the last hour of what they add up to, and pushes a snapshot every second over
+[WebTransport](https://developer.mozilla.org/docs/Web/API/WebTransport_API). Registrations and types
+come from the [Mictronics aircraft database](https://github.com/Mictronics/aircraft-database), which
+the server downloads and renews every week. At start the container generates the map data around the
+receiver's position.
 
-1. Clone this repository on the machine that runs tar1090.
-2. Add the service to the compose file that runs tar1090, then `docker compose up -d --build`:
+1. Clone this repository on the machine that runs the receiver.
+2. Add the service to the compose file that runs the receiver, then `docker compose up -d --build`:
 
 ```yaml
 services:
-  tar1090:
-    environment:
-      - TAR1090_ENABLE_AC_DB=true # type and registration in aircraft.json
+  readsb: # as it is set up already; its Beast output is on port 30005
+    image: ghcr.io/sdr-enthusiasts/docker-readsb-protobuf
   papaquebec:
     build: /path/to/papaquebec
     restart: unless-stopped
+    environment:
+      - PQ_SITE=<lat>,<lon> # where the receiver is
     ports:
       - 443:443
       - 4433:4433/udp # the feed
     volumes:
-      - pq_data:/data # the certificate authority
+      - pq_data:/data # the certificate authority and the aircraft database
       - map_data:/app/public/map
     depends_on:
-      - tar1090
+      - readsb
 volumes:
   pq_data:
   map_data:
@@ -50,11 +51,12 @@ volumes:
    Management, then Certificate Trust Settings on iOS; Keychain Access on macOS;
    `certutil`/`update-ca-certificates` elsewhere).
 
-Environment on the service, all optional:
+Environment on the service:
 
-- `PQ_TAR1090` (default `http://tar1090`): the tar1090 service, if it is named differently.
-- `PQ_SITE` (`lat,lon`): the center of the generated map data, when readsb is not told its
-  position; the scope itself then needs `?site=` (see Development).
+- `PQ_SITE` (`lat,lon`, required): where the receiver is. Positions are made out around it and the
+  map data is generated around it, and nothing a receiver sends tells it.
+- `PQ_BEAST` (default `readsb:30005`): the receiver's Beast output as `host:port`, when the service
+  is named differently or another decoder stands in its place, such as dump1090.
 - `PQ_FEED_PORT` (default `4433`): the UDP port of the feed. The scope connects to the same
   number, so publish it unchanged (`4500:4500/udp` with `PQ_FEED_PORT=4500`). It cannot be the
   page's port: Safari sends the page's own requests over a feed connection to the same host and
@@ -70,18 +72,16 @@ Ports can be remapped (`8443:443`) when 443 is taken. The feed needs no certific
 server makes its own for it every week and the scope accepts it by its hash, read over https. The
 feed accepts a session only from a page served by the host it addresses, so another site cannot read
 it through a visitor's browser. An update is `git pull` and `up -d --build` again; a restart
-refreshes the aeronautical data. Optionally, `READSB_ENABLE_TRACES=true` on tar1090 with a
-`/var/globe_history` volume lets the selected target show its whole day instead of the last hour.
+refreshes the aeronautical data.
 
 ## Development
 
 `mise install` pins Bun and Rust, and `mise run` starts the pieces together; `mise tasks` lists
-them. The server follows a tar1090 or flies a synthetic fleet in its place; here it speaks plain
-http on port 8080, and the dev server passes the feed's info and the traces on to it (`PQ_WEB`
-names another):
+them. The server follows a receiver or flies a synthetic fleet in its place; here it speaks plain
+http on port 8080, and the dev server passes the feed's info on to it (`PQ_WEB` names another):
 
 ```sh
-export PQ_TAR1090=http://<host>
+export PQ_BEAST=<host>:30005 PQ_SITE=<lat>,<lon>
 (cd scope && bun run map)   # map data around the receiver, see below
 mise run dev                # the scope and its server, on real traffic
 mise run sim                # the same on the synthetic fleet; PQ_SITE=lat,lon moves it
@@ -89,10 +89,10 @@ mise run check              # everything CI runs
 mise run bench              # a load test, see below
 ```
 
-The sim needs no tar1090: the server tells the scope the site it flies around, RJTT unless `PQ_SITE`
-says otherwise (with `PQ_SITE` exported, `bun run map` builds the map around the same site). The
-server flies it whenever `PQ_SIM` is set to a site; `PQ_SIM_SPEED` runs it up to 1000 times faster
-than the clock and `PQ_SIM_EXTRA` adds up to 10000 generic targets.
+The sim needs no receiver: it stands in for one, sending the messages its fleet would broadcast,
+around RJTT unless `PQ_SITE` says otherwise (with `PQ_SITE` exported, `bun run map` builds the map
+around the same site). The server flies it whenever `PQ_SIM` is set to a site; `PQ_SIM_SPEED` runs
+it up to 1000 times faster than the clock and `PQ_SIM_EXTRA` adds up to 10000 generic targets.
 
 Query parameters: `?site=<lat>,<lon>` overrides the receiver position, `?wx=<base>` reads METARs
 from your own [Aviation Weather Center](https://aviationweather.gov) proxy.
@@ -127,8 +127,8 @@ access allowed; NOAA's own Aviation Weather Center does not, hence the `?wx=` pr
   every country in range, titled with the fetch date. When the exports cannot be reached the
   previous file is kept.
 
-The site comes from `PQ_SITE` (`lat,lon`) or the tar1090 at `PQ_TAR1090`; pass `<lat> <lon>` and
-optionally a radius to either script to override it.
+The site comes from `PQ_SITE` (`lat,lon`); pass `<lat> <lon>` and optionally a radius to either
+script to override it.
 
 openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
 brought in through the Maps panel: `IMPORT JSON…` takes a file in the `aero.json` format, checked
@@ -180,8 +180,8 @@ Layout:
 
 ```mermaid
 flowchart LR
-    subgraph c["docker-tar1090"]
-        readsb -- "aircraft.json, 1 Hz" --> nginx
+    subgraph c["receiver"]
+        readsb
     end
     subgraph p["papaquebec"]
         web[("web<br/>scope build, map data, feed info")]
@@ -190,27 +190,31 @@ flowchart LR
     subgraph b["browser"]
         feed[feed worker] --> store[main thread<br/>track store] --> render[render worker<br/>WebGPU]
     end
-    nginx -- "/data/traces" --> web -- https --> store
-    nginx -- "receiver, aircraft, chunks" --> feeder -- "WebTransport, protobuf" --> feed
+    web -- https --> store
+    readsb -- "Beast: each message as heard" --> feeder -- "WebTransport, protobuf" --> feed
     feeder -. "port, certificate hash" .-> web
 ```
 
-**Data.** The contract is `readsb`'s `aircraft.json`
-([`README-json.md`](https://github.com/wiedehopf/readsb/blob/dev/README-json.md)); `lib/` types the
-subset read, every field optional. The feeder carries the same snapshot as protobuf
-(`proto/papaquebec/feed/v1/feed.proto`, named after RTCA DO-260B), which the feed worker reads back
-into that contract. Each session is one ordered stream: a hello with the receiver's position and the
-history since the snapshot the scope last took (one every eight seconds, up to an hour), then live
-snapshots. The feeder seeds that history from tar1090's own (`/chunks/`) when it starts, so a
-session after a restart, a lost connection or a sleeping phone fills the trails' gap by itself.
-Every wait on a session has a deadline, and a missed one only means connecting again; the top bar
-tells the feed's state from the age of its data.
+**Data.** The receiver passes on every Mode S message it hears, in the Beast format. The feeder
+reads what each says (`message`, by ICAO Annex 10 Volume IV, and `field`, by RTCA DO-260B), keeps
+what is said of each aircraft until it lapses (`traffic`), places the aircraft by their position
+messages (`cpr`) and adds the registration and type (`registry`). Only ADS-B and the altitude and
+identity in replies to radars are read: what the other replies carry (airspeeds, and the wind and
+temperature they give) and what the ground rebroadcasts (TIS-B, ADS-R) is not yet.
 
-Each snapshot is a full one and the track store is rebuilt from it; liveness is `readsb`'s `seen`.
-Only position history and operator state (selection, pinned corner, hidden trail) persist across
-snapshots. Selecting a target fetches its readsb day trace (`/data/traces/`) when the container
-keeps them. Live `lat/lon` draws normally, `lastPosition` draws stale, rough or absent positions
-appear only in text.
+Every second the feeder publishes a snapshot as protobuf (`proto/papaquebec/feed/v1/feed.proto`,
+named after DO-260B), which the feed worker reads into what the scope knows of an aircraft
+(`lib/aircraft.ts`), every field optional. Each session is one ordered stream: a hello with the
+receiver's position and the history since the snapshot the scope last took (one every eight seconds,
+up to an hour), then live snapshots. The history is kept in memory from when the server starts, so a
+session after a lost connection or a sleeping phone fills the trails' gap by itself, while a restart
+of the server starts the trails anew. Every wait on a session has a deadline, and a missed one only
+means connecting again; the top bar tells the feed's state from the age of its data.
+
+Each snapshot is a full one and the track store is rebuilt from it; liveness is the age of an
+aircraft's last message, `seen`. Only position history and operator state (selection, pinned
+corner, hidden trail) persist across snapshots. Live `lat/lon` draws normally, `lastPosition` draws
+stale, absent positions appear only in text.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has
 no adapter). The main thread owns all state and sends packed buffers; one draw per layer per frame,
@@ -223,12 +227,16 @@ panels and UI, design tokens. The rules: `state/` is the only shared state, `lib
 framework, worker code never imports Solid or touches the DOM, and components are styled only
 through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
 `crates/` holds the server's Rust crates. The server is the `papaquebec` binary of `crates/web/`: it
-reads the environment (`config`), answers for the scope's files, the traces and the feed's info
-(`site`) at a door that speaks https or plain http (`door`), and runs the feed. `crates/authority/`
-is the local certificate authority behind the door. `crates/feeder/src/` is the feed as a library:
-the wire contract (`proto`), readsb's JSON (`readsb`), what every session is served from (`feed`),
-the traffic sources behind one `Upstream` trait (`upstream/`: tar1090 and the sim) and the
-WebTransport endpoint (`transport`). `proto/` holds the schema both sides generate their types from.
+reads the environment (`config`), answers for the scope's files and the feed's info (`site`) at a
+door that speaks https or plain http (`door`), and runs the feed. `crates/authority/` is the local
+certificate authority behind the door. `crates/feeder/src/` is the feed as a library: the Beast
+format (`beast`), Mode S messages (`message`) with the fields of their extended squitters (`field`,
+over `bits`) and the positions in them (`cpr`), each read and written in one place; the aircraft
+they tell of (`traffic`), the aircraft database (`registry`), the following of a receiver
+(`follow`), what every session is served from (`feed`), the wire contract (`proto`) and the
+WebTransport endpoint (`transport`). `crates/sim/` stands in for a receiver: a synthetic fleet, sent
+as the messages it would broadcast, written with the same fields. `proto/` holds the schema both
+sides generate their types from.
 
 **Stack.**
 
@@ -252,5 +260,8 @@ WebTransport endpoint (`transport`). `proto/` holds the schema both sides genera
 
 The code is MIT licensed. The generated aeronautical data is openAIP's, [CC BY-NC-SA
 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): it may not be used commercially, and a
-copy of `aero.json` passed on keeps that license. The coastline is public domain and JetBrains Mono
-is under the [SIL Open Font License](https://openfontlicense.org), shipped in `public/fonts`.
+copy of `aero.json` passed on keeps that license. Registrations and types are from the [Mictronics
+aircraft database](https://github.com/Mictronics/aircraft-database), made available under the [Open
+Data Commons Attribution License](https://opendatacommons.org/licenses/by/1-0/); the server
+downloads it, and none of it is in this repository. The coastline is public domain and JetBrains
+Mono is under the [SIL Open Font License](https://openfontlicense.org), shipped in `public/fonts`.
