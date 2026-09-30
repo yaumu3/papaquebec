@@ -70,7 +70,10 @@ message Aircraft {
   optional double ground_speed_kt = 20;
   // True track over the ground.
   optional double track_deg = 21;
+  // The message carries one vertical rate and says which: barometric, or
+  // geometric, from GNSS or inertial reference.
   optional sint32 baro_vertical_rate_fpm = 22;
+  optional sint32 geometric_vertical_rate_fpm = 23;
   optional double indicated_airspeed_kt = 24;
   optional double true_airspeed_kt = 25;
   optional double mach = 28;

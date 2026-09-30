@@ -17,6 +17,8 @@ export interface AircraftJson {
   gs?: number;
   track?: number;
   baro_rate?: number;
+  /** Vertical rate from GNSS or inertial reference, which an aircraft reports in place of the barometric one. */
+  geom_rate?: number;
   seen?: number;
   seen_pos?: number;
   /** Fields whose value came from MLAT. */

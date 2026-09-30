@@ -78,6 +78,7 @@ function toAircraftJson(a: Aircraft): AircraftJson {
     gs: a.groundSpeedKt,
     track: a.trackDeg,
     baro_rate: a.baroVerticalRateFpm,
+    geom_rate: a.geometricVerticalRateFpm,
     ias: a.indicatedAirspeedKt,
     tas: a.trueAirspeedKt,
     mach: a.mach,
