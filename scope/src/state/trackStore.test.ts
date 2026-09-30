@@ -201,7 +201,7 @@ describe('createTrackStore', () => {
       category: 'A3',
       gs: 290,
       track: 235,
-      baroRate: -1200,
+      verticalRate: -1200,
       nic: 8,
       nacP: 9,
       messages: 50,

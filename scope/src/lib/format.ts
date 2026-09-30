@@ -3,15 +3,15 @@ export type ClimbState = 'climbing' | 'descending' | 'level';
 /** Five steps of the ADS-B vertical rate, whose LSB is 64 fpm (RTCA DO-260B). */
 const CLIMB_DEAD_BAND_FPM = 5 * 64;
 
-export function climbState(baroRate: number | undefined): ClimbState {
-  if (baroRate === undefined) return 'level';
-  if (baroRate > CLIMB_DEAD_BAND_FPM) return 'climbing';
-  if (baroRate < -CLIMB_DEAD_BAND_FPM) return 'descending';
+export function climbState(verticalRate: number | undefined): ClimbState {
+  if (verticalRate === undefined) return 'level';
+  if (verticalRate > CLIMB_DEAD_BAND_FPM) return 'climbing';
+  if (verticalRate < -CLIMB_DEAD_BAND_FPM) return 'descending';
   return 'level';
 }
 
-export function climbArrow(baroRate: number | undefined): string {
-  switch (climbState(baroRate)) {
+export function climbArrow(verticalRate: number | undefined): string {
+  switch (climbState(verticalRate)) {
     case 'climbing':
       return '↑';
     case 'descending':

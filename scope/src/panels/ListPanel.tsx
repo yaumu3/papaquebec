@@ -39,7 +39,7 @@ function rowTone(t: Track): string | undefined {
   if (isEmergency(t)) return s.emergency;
   if (isStale(t)) return s.stale;
   if (t.alt === 'ground') return s.ground;
-  const c = climbState(t.baroRate);
+  const c = climbState(t.verticalRate);
   return c === 'climbing' ? s.climbing : c === 'descending' ? s.descending : undefined;
 }
 
@@ -92,7 +92,7 @@ export function ListPanel() {
               <span>{t.type ?? `[${t.category ?? '--'}]`}</span>
               <span>
                 {formatAltitude(t.alt, settings.altimeter)}
-                {climbArrow(t.baroRate)}
+                {climbArrow(t.verticalRate)}
               </span>
               <span>{formatGsWake(t.gs, t.category)}</span>
               <span>{padTrack(magneticTrack(t))}</span>

@@ -36,7 +36,7 @@ export interface Track {
   alt: number | 'ground' | undefined;
   gs: number | undefined;
   track: number | undefined;
-  baroRate: number | undefined;
+  verticalRate: number | undefined;
   nic: number | undefined;
   nacP: number | undefined;
   messages: number | undefined;

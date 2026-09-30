@@ -29,9 +29,9 @@ describe('trackColor', () => {
       [track({ squawk: '7700' }), 'd00001'],
       [track(), 'd00001'],
       [track({ seenPos: 60 }), null],
-      [track({ alt: 'ground', baroRate: 1500 }), null],
-      [track({ baroRate: 1500 }), null],
-      [track({ baroRate: -1500 }), null],
+      [track({ alt: 'ground', verticalRate: 1500 }), null],
+      [track({ verticalRate: 1500 }), null],
+      [track({ verticalRate: -1500 }), null],
       [track(), null],
     ];
 

@@ -10,7 +10,7 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     alt: 11000,
     gs: 290,
     track: 235,
-    baroRate: 0,
+    verticalRate: 0,
     nic: 8,
     nacP: 9,
     messages: 1,
