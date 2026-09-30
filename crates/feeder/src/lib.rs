@@ -5,6 +5,7 @@ pub mod bits;
 pub mod cpr;
 pub mod feed;
 pub mod field;
+pub mod message;
 pub mod position;
 pub mod proto;
 pub mod readsb;
