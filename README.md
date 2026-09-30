@@ -34,12 +34,12 @@ services:
       - 443:443
       - 443:443/udp # the feed
     volumes:
-      - caddy_data:/data # the certificate authority
+      - pq_data:/data # the certificate authority
       - map_data:/app/public/map
     depends_on:
       - tar1090
 volumes:
-  caddy_data:
+  pq_data:
   map_data:
 ```
 
