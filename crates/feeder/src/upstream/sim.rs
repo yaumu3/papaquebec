@@ -6,10 +6,10 @@
 //! reserves for future use.
 
 use std::f64::consts::TAU;
-use std::str::FromStr;
 
 use super::Upstream;
 use crate::Failure;
+use crate::position::Position;
 use crate::proto::{
     Address, AddressType, AirGroundState, Aircraft, EmitterCategory, Quality, Receiver, Reception,
     Registry, Snapshot, Source, TargetState, target_state::Modes,
@@ -24,27 +24,6 @@ const HOLD_S: f64 = 60.0;
 /// What a receiver decodes each second, over all aircraft and from each.
 const MESSAGES_PER_S: f64 = 12.0;
 const MESSAGES_PER_AIRCRAFT_S: f64 = 2.0;
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Site {
-    pub lat_deg: f64,
-    pub lon_deg: f64,
-}
-
-impl FromStr for Site {
-    type Err = Failure;
-
-    /// `lat,lon` in degrees.
-    fn from_str(site: &str) -> Result<Self, Failure> {
-        let (lat, lon) = site.split_once(',').ok_or("expected lat,lon")?;
-        let (lat_deg, lon_deg) = (lat.trim().parse::<f64>()?, lon.trim().parse::<f64>()?);
-        // Asked as "within", which NaN never is.
-        if !(-90.0..=90.0).contains(&lat_deg) || !(-180.0..=180.0).contains(&lon_deg) {
-            return Err("outside the globe".into());
-        }
-        Ok(Self { lat_deg, lon_deg })
-    }
-}
 
 /// One aircraft as it starts out.
 #[derive(Clone, Copy, Default)]
@@ -226,7 +205,7 @@ impl Flying {
         }
     }
 
-    fn aircraft(&self, site: Site) -> Aircraft {
+    fn aircraft(&self, site: Position) -> Aircraft {
         let Plan { number, digits, .. } = self.plan;
         let plan = &self.plan;
         let target = TargetState {
@@ -301,7 +280,7 @@ pub fn sim_clock(speed: f64, wall: impl Fn() -> f64) -> impl Fn() -> f64 {
 }
 
 pub struct Sim {
-    site: Site,
+    site: Position,
     clock: Box<dyn Fn() -> f64 + Send>,
     last: f64,
     messages: f64,
@@ -311,7 +290,7 @@ pub struct Sim {
 impl Sim {
     /// The fleet and `extra` generic targets around `site`; `clock` gives sim
     /// seconds since the epoch.
-    pub fn new(site: Site, clock: impl Fn() -> f64 + Send + 'static, extra: u32) -> Self {
+    pub fn new(site: Position, clock: impl Fn() -> f64 + Send + 'static, extra: u32) -> Self {
         let now = clock();
         let plans = fleet().into_iter().chain(extra_fleet(extra));
         Self {
@@ -362,12 +341,13 @@ mod tests {
     use std::collections::HashSet;
     use std::sync::{Arc, Mutex};
 
-    use super::{Sim, Site, sim_clock};
+    use super::{Sim, sim_clock};
+    use crate::position::Position;
     use crate::proto::{AirGroundState, Aircraft, Receiver, Snapshot, Source};
     use crate::upstream::Upstream;
 
     /// RJFF
-    const SITE: Site = Site {
+    const SITE: Position = Position {
         lat_deg: 33.5844,
         lon_deg: 130.4517,
     };
@@ -633,42 +613,5 @@ mod tests {
             lon_deg: Some(SITE.lon_deg),
         };
         assert_eq!(receiver.ok(), Some(expected));
-    }
-
-    #[test]
-    fn site_is_read_from_lat_lon() {
-        // Arrange
-        let written = ["33.5844,130.4517", " 33.5844 , 130.4517 ", "-90,180"]; // RJFF
-
-        // Act
-        let sites = written.map(str::parse::<Site>);
-
-        // Assert
-        let poles = Site {
-            lat_deg: -90.0,
-            lon_deg: 180.0,
-        };
-        assert_eq!(sites.map(Result::ok), [Some(SITE), Some(SITE), Some(poles)]);
-    }
-
-    #[test]
-    fn site_that_is_nowhere_is_refused() {
-        // Arrange
-        let written = [
-            "33.5844",
-            "north,east",
-            "91,130",
-            "33,181",
-            "NaN,130",
-            "33,NaN",
-            "inf,130",
-            "",
-        ];
-
-        // Act
-        let sites = written.map(str::parse::<Site>);
-
-        // Assert
-        assert!(sites.iter().all(Result::is_err));
     }
 }

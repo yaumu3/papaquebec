@@ -2,6 +2,7 @@
 
 pub mod beast;
 pub mod feed;
+pub mod position;
 pub mod proto;
 pub mod readsb;
 pub mod transport;

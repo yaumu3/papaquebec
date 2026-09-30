@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 use authority::Subject;
 use feeder::Failure;
-use feeder::upstream::sim::Site;
+use feeder::position::Position;
 
 /// Where the traffic comes from.
 #[derive(Debug, PartialEq)]
@@ -16,7 +16,11 @@ pub enum Origin {
     /// `PQ_SIM` (`lat,lon`): synthesized traffic around the site, in place of
     /// tar1090. `PQ_SIM_SPEED` runs it that many times faster than the clock, up to 1000,
     /// and `PQ_SIM_EXTRA` adds that many generic targets, up to 10000.
-    Sim { site: Site, speed: f64, extra: u32 },
+    Sim {
+        site: Position,
+        speed: f64,
+        extra: u32,
+    },
 }
 
 #[derive(Debug, PartialEq)]
@@ -187,7 +191,7 @@ mod tests {
     use std::path::PathBuf;
 
     use authority::Subject;
-    use feeder::upstream::sim::Site;
+    use feeder::position::Position;
 
     use super::{Config, Door, Origin};
 
@@ -290,7 +294,7 @@ mod tests {
         let config = Config::read(lookup);
 
         // Assert
-        let site = Site {
+        let site = Position {
             lat_deg: 33.5844,
             lon_deg: 130.4517,
         };
@@ -315,7 +319,7 @@ mod tests {
         let config = Config::read(lookup);
 
         // Assert
-        let site = Site {
+        let site = Position {
             lat_deg: 33.5844,
             lon_deg: 130.4517,
         };
