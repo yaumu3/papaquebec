@@ -23,7 +23,9 @@ pub enum Origin {
 pub struct Config {
     pub origin: Origin,
     /// `PQ_FEED_PORT`: the UDP port to listen on. The scope connects to the
-    /// same number, so a container must publish it unchanged.
+    /// same number, so a container must publish it unchanged. It is never the
+    /// port the page is served on over https, since Safari would send the
+    /// page's requests over a feed connection there.
     pub port: u16,
     /// `PQ_ADDRESS`: how the scope is served.
     pub door: Door,
@@ -125,12 +127,16 @@ impl Config {
                 only: None,
             },
         };
+        let port = port.map_or(4433, NonZeroU16::get);
+        if matches!(door, Door::Secure { port: page, .. } if page == port) {
+            return Err(format!("PQ_FEED_PORT={port}: the page is served there too").into());
+        }
         let data = lookup("XDG_DATA_HOME")
             .map(PathBuf::from)
             .or_else(|| lookup("HOME").map(|home| PathBuf::from(home).join(".local/share")));
         Ok(Self {
             origin,
-            port: port.map_or(4433, NonZeroU16::get),
+            port,
             door,
             data,
         })
@@ -220,7 +226,7 @@ mod tests {
         // Arrange
         let lookup = environment(&[
             ("PQ_TAR1090", "http://localhost:8090"),
-            ("PQ_FEED_PORT", "8443"),
+            ("PQ_FEED_PORT", "4500"),
             ("PQ_ADDRESS", "https://raspberrypi.local:8443"),
             ("XDG_DATA_HOME", "/srv/data"),
             ("HOME", "/home/pq"),
@@ -232,7 +238,7 @@ mod tests {
         // Assert
         let expected = Config {
             origin: Origin::Tar1090("http://localhost:8090".into()),
-            port: 8443,
+            port: 4500,
             door: Door::Secure {
                 port: 8443,
                 only: Some(Subject::Name("raspberrypi.local".into())),
@@ -240,6 +246,23 @@ mod tests {
             data: Some(PathBuf::from("/srv/data")),
         };
         assert_eq!(config.ok(), Some(expected));
+    }
+
+    /// Safari sends the page's requests over a feed connection to the same host
+    /// and port, which answers only the feed.
+    #[test]
+    fn feed_on_the_port_the_page_is_served_on_is_refused() {
+        // Arrange
+        let environments: [&[(&str, &str)]; 2] = [
+            &[("PQ_FEED_PORT", "443")],
+            &[("PQ_FEED_PORT", "8443"), ("PQ_ADDRESS", "https://:8443")],
+        ];
+
+        // Act
+        let configs = environments.map(|pairs| Config::read(environment(pairs)));
+
+        // Assert
+        assert!(configs.iter().all(Result::is_err));
     }
 
     #[test]

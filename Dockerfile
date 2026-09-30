@@ -33,6 +33,6 @@ COPY --from=build /app/dist ./dist
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN mkdir -p public/map
 # The server keeps its certificate authority under /data, which a volume should keep.
-ENV PQ_TAR1090=http://tar1090 PQ_FEED_PORT=443 XDG_DATA_HOME=/data
-EXPOSE 443 443/udp
+ENV PQ_TAR1090=http://tar1090 XDG_DATA_HOME=/data
+EXPOSE 443 4433/udp
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
