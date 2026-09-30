@@ -56,8 +56,6 @@
       "tisb": ["lat", "lon"],
       "lat": 33.0,
       "lon": 130.0,
-      "rr_lat": 33.125,
-      "rr_lon": 130.125,
       "lastPosition": { "lat": 32.5, "lon": 129.5, "nic": 8, "rc": 186, "seen_pos": 75.5 }
     },
     { "hex": "d00004" }

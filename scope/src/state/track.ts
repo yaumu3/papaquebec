@@ -6,7 +6,6 @@ export type Corner = 'ne' | 'nw' | 'se' | 'sw';
 export type Position =
   | { kind: 'live'; lat: number; lon: number; x: number; y: number }
   | { kind: 'last'; lat: number; lon: number; x: number; y: number }
-  | { kind: 'rr'; lat: number; lon: number }
   | { kind: 'none' };
 
 export interface Fix {

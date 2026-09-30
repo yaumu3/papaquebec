@@ -101,7 +101,7 @@ describe('buildTargets', () => {
 
   it('skips targets without a drawable position', () => {
     // Arrange
-    const t = track({ position: { kind: 'rr', lat: 1, lon: 2 } });
+    const t = track({ position: { kind: 'none' } });
 
     // Act
     const { batches } = buildTargets(input([t]));

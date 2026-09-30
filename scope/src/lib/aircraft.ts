@@ -26,8 +26,6 @@ export interface AircraftJson {
   /** Fields whose value came from TIS-B. */
   tisb?: string[];
   lastPosition?: { lat: number; lon: number; nic?: number; rc?: number; seen_pos: number };
-  rr_lat?: number;
-  rr_lon?: number;
   nic?: number;
   nac_p?: number;
   messages?: number;

@@ -133,12 +133,11 @@ describe('createTrackStore', () => {
     expect(store.tracks.get('mlatalt')?.source).toBe('adsb');
   });
 
-  it('falls back from live position to lastPosition, then rr, then none', () => {
+  it('falls back from live position to lastPosition, then none', () => {
     // Arrange
     const store = createTrackStore(project);
     const aircraft: AircraftJson[] = [
       { hex: 'last', seen: 40, lastPosition: { lat: 34, lon: 131, seen_pos: 40 } }, // Yamaguchi
-      { hex: 'rr', seen: 5, rr_lat: 34, rr_lon: 131 }, // Yamaguchi
       { hex: 'none', seen: 1 },
     ];
 
@@ -153,7 +152,6 @@ describe('createTrackStore', () => {
       x: 60,
       y: 60,
     });
-    expect(store.tracks.get('rr')?.position).toEqual({ kind: 'rr', lat: 34, lon: 131 });
     expect(store.tracks.get('none')?.position).toEqual({ kind: 'none' });
     expect(store.tracks.get('last')?.history).toEqual([]);
   });

@@ -34,9 +34,6 @@ function positionOf(a: AircraftJson, project: ProjectFn): Position {
     const { lat, lon } = a.lastPosition;
     return { kind: 'last', lat, lon, ...project(lat, lon) };
   }
-  if (a.rr_lat !== undefined && a.rr_lon !== undefined) {
-    return { kind: 'rr', lat: a.rr_lat, lon: a.rr_lon };
-  }
   return { kind: 'none' };
 }
 

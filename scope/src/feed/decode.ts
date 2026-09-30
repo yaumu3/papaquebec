@@ -64,8 +64,6 @@ function toAircraftJson(a: Aircraft): AircraftJson {
     alt_geom: a.geometricAltitudeFt,
     mlat: a.positionSource === Source.MLAT ? POSITION_FIELDS : undefined,
     tisb: a.positionSource === Source.TISB ? POSITION_FIELDS : undefined,
-    rr_lat: a.roughPosition?.latDeg,
-    rr_lon: a.roughPosition?.lonDeg,
     lastPosition:
       last &&
       withoutUnknown({

@@ -44,8 +44,6 @@ function positionReadings(p: Position): [Reading, Reading] {
   switch (p.kind) {
     case 'last':
       return [lat, { v: lon, unit: 'LAST KNOWN' }];
-    case 'rr':
-      return [lat, { v: lon, unit: 'ROUGH' }];
     default:
       return [lat, { v: lon }];
   }

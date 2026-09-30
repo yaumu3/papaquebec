@@ -29,8 +29,8 @@ mod tests {
 
     use super::{
         Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Frame, LastPosition, Meteo, Quality, Reception, Registry, RoughPosition, Snapshot, Source,
-        TargetState, frame::Body, target_state::Modes,
+        Frame, LastPosition, Meteo, Quality, Reception, Registry, Snapshot, Source, TargetState,
+        frame::Body, target_state::Modes,
     };
 
     fn frame_of(aircraft: Aircraft) -> Frame {
@@ -188,7 +188,7 @@ mod tests {
             }),
             ..Aircraft::default()
         };
-        let with_other_positions = Aircraft {
+        let with_a_last_position = Aircraft {
             address: Some(address(0x00d0_0003, AddressType::Icao)),
             lat_deg: Some(33.0),
             lon_deg: Some(130.0),
@@ -201,17 +201,13 @@ mod tests {
                 rc_m: Some(186),
                 seen_pos_s: 75.5,
             }),
-            rough_position: Some(RoughPosition {
-                lat_deg: 33.125,
-                lon_deg: 130.125,
-            }),
             ..Aircraft::default()
         };
         let bare = Aircraft {
             address: Some(address(0x00d0_0004, AddressType::Icao)),
             ..Aircraft::default()
         };
-        vec![known_in_full(), on_the_ground, with_other_positions, bare]
+        vec![known_in_full(), on_the_ground, with_a_last_position, bare]
     }
 
     /// Run with `BLESS=1` to write the bytes after a deliberate change.
