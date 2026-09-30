@@ -8,7 +8,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use authority::{Authority, How};
 use feeder::Failure;
 use feeder::follow::follow;
-use feeder::registry::Registry;
+use feeder::registry::{DATABASE, Registry, keep_current};
 use feeder::transport::Server;
 use sim::Fleet;
 use tokio::net::{TcpListener, TcpStream};
@@ -68,6 +68,13 @@ async fn main() -> Result<(), Failure> {
     let (registered, registry) = watch::channel(Arc::new(Registry::default()));
     match config.origin {
         Origin::Beast { address, site } => {
+            match config.data {
+                Some(data) => {
+                    let kept = data.join("papaquebec/aircraft-database.zip");
+                    tokio::spawn(keep_current(DATABASE.into(), kept, registered));
+                }
+                None => eprintln!("aircraft database: no XDG_DATA_HOME or HOME to keep it in"),
+            }
             let connect = move || TcpStream::connect(address.clone());
             tokio::spawn(follow(connect, site, wall, PUBLISH_EVERY, registry, feed));
         }
