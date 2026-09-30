@@ -34,12 +34,12 @@ services:
       - 443:443
       - 443:443/udp # the feed
     volumes:
-      - caddy_data:/data # the certificate authority
+      - pq_data:/data # the certificate authority
       - map_data:/app/public/map
     depends_on:
       - tar1090
 volumes:
-  caddy_data:
+  pq_data:
   map_data:
 ```
 
@@ -68,10 +68,8 @@ Ports can be remapped (`8443:443`) when 443 is taken. The feed needs no certific
 server makes its own for it every week and the scope accepts it by its hash, read over https. The
 feed accepts a session only from a page served by the host it addresses, so another site cannot read
 it through a visitor's browser. An update is `git pull` and `up -d --build` again; a restart
-refreshes the aeronautical data. A container that ran Caddy before keeps its authority, adopted from
-the same volume, so trusting devices need nothing new; its `4433:4433/udp` line can go. Optionally,
-`READSB_ENABLE_TRACES=true` on tar1090 with a `/var/globe_history` volume lets the selected target
-show its whole day instead of the last hour.
+refreshes the aeronautical data. Optionally, `READSB_ENABLE_TRACES=true` on tar1090 with a
+`/var/globe_history` volume lets the selected target show its whole day instead of the last hour.
 
 ## Development
 
@@ -224,11 +222,11 @@ framework, worker code never imports Solid or touches the DOM, and components ar
 through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
 The server is the `papaquebec` binary of `web/`: it reads the environment (`config`), answers for
 the scope's files, the traces and the feed's info (`site`) at a door that speaks https or plain http
-(`door`), and runs the feed. `authority/` is the local certificate authority behind the door,
-adopting the one Caddy kept when it finds it. `feeder/src/` is the feed as a library: the wire
-contract (`proto`), readsb's JSON (`readsb`), what every session is served from (`feed`), the
-traffic sources behind one `Upstream` trait (`upstream/`: tar1090 and the sim) and the WebTransport
-endpoint (`transport`). `proto/` holds the schema both sides generate their types from.
+(`door`), and runs the feed. `authority/` is the local certificate authority behind the door.
+`feeder/src/` is the feed as a library: the wire contract (`proto`), readsb's JSON (`readsb`), what
+every session is served from (`feed`), the traffic sources behind one `Upstream` trait (`upstream/`:
+tar1090 and the sim) and the WebTransport endpoint (`transport`). `proto/` holds the schema both
+sides generate their types from.
 
 **Stack.**
 

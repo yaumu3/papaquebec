@@ -27,14 +27,12 @@ pub struct Config {
     pub port: u16,
     /// `PQ_ADDRESS`: how the scope is served.
     pub door: Door,
-    /// `XDG_DATA_HOME`, or `.local/share` in `HOME`: where the authority is kept,
-    /// and where Caddy kept its own.
+    /// `XDG_DATA_HOME`, or `.local/share` in `HOME`: where the authority is kept.
     pub data: Option<PathBuf>,
 }
 
-/// How the scope is served, read from an address in the forms Caddy took:
-/// `https://`, `https://<host>` or just `<host>`, `http://`, each with an
-/// optional `:<port>`.
+/// How the scope is served, read from an address: `https://`, `https://<host>`
+/// or just `<host>`, `http://`, each with an optional `:<port>`.
 #[derive(Debug, PartialEq)]
 pub enum Door {
     /// Over https with certificates from the local authority, for the one host
@@ -379,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn address_is_read_in_the_forms_caddy_took() {
+    fn address_is_read_in_every_form() {
         // Arrange
         let secure = |port, only| Door::Secure { port, only };
         let name = |name: &str| Some(Subject::Name(name.into()));

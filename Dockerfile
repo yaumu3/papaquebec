@@ -29,7 +29,7 @@ COPY scope/scripts/build-coast.ts scope/scripts/build-aero.ts scope/scripts/site
 COPY --from=build /app/dist ./dist
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN mkdir -p public/map
-# Caddy kept its authority under /data, and devices trust it; the server adopts it from there.
+# The server keeps its certificate authority under /data, which a volume should keep.
 ENV PQ_TAR1090=http://tar1090 PQ_FEED_PORT=443 XDG_DATA_HOME=/data
 EXPOSE 443 443/udp
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
