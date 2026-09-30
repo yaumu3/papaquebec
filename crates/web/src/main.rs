@@ -83,10 +83,11 @@ async fn main() -> Result<(), Failure> {
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
             let address = listener.local_addr()?;
             let every = PUBLISH_EVERY.div_f64(speed);
-            let fleet = Fleet::new(site, sim::clock(speed, wall), extra);
+            let clock = sim::clock(speed, wall);
+            let fleet = Fleet::new(site, clock.clone(), extra);
             registered.send_replace(Arc::new(fleet.registered().collect()));
             tokio::spawn(sim::serve(listener, fleet, every));
-            let (connect, clock) = (move || TcpStream::connect(address), sim::clock(speed, wall));
+            let connect = move || TcpStream::connect(address);
             tokio::spawn(follow(connect, site, clock, every, registry, feed));
         }
     }

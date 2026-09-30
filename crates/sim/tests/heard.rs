@@ -297,19 +297,13 @@ async fn fleet_served_to_a_connection_is_followed_into_the_feed() {
     const EVERY: Duration = Duration::from_millis(50);
     let listener = TcpListener::bind("127.0.0.1:0").await.expect("binds");
     let address = listener.local_addr().expect("bound");
-    let fleet = Fleet::new(SITE, sim::clock(20.0, wall), 0);
+    let clock = sim::clock(20.0, wall);
+    let fleet = Fleet::new(SITE, clock.clone(), 0);
     let (_kept, registry) = watch::channel(Arc::new(fleet.registered().collect::<Registry>()));
     let (sender, mut feed) = watch::channel(None);
     tokio::spawn(sim::serve(listener, fleet, EVERY));
     let connect = move || TcpStream::connect(address);
-    tokio::spawn(follow(
-        connect,
-        SITE,
-        sim::clock(20.0, wall),
-        EVERY,
-        registry,
-        sender,
-    ));
+    tokio::spawn(follow(connect, SITE, clock, EVERY, registry, sender));
 
     // Act: until every aircraft is placed
     let placed = tokio::time::timeout(Duration::from_secs(10), async {

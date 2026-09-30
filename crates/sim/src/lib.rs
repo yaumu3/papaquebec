@@ -33,7 +33,7 @@ pub async fn serve(listener: TcpListener, mut fleet: Fleet, every: Duration) {
 }
 
 /// A clock in sim seconds that runs `speed` times faster than `wall`, which is in seconds.
-pub fn clock(speed: f64, wall: impl Fn() -> f64) -> impl Fn() -> f64 {
+pub fn clock(speed: f64, wall: impl Fn() -> f64 + Clone) -> impl Fn() -> f64 + Clone {
     let start = wall();
     move || start + (wall() - start) * speed
 }
