@@ -205,23 +205,18 @@ mod tests {
         lon_deg: 130.4517,
     };
 
-    /// The variables of a receiver at the site, with the pairs set or set otherwise.
-    fn environment(pairs: &'static [(&str, &str)]) -> impl Fn(&str) -> Option<String> {
-        |name| {
-            pairs
-                .iter()
-                .chain(&[("PQ_SITE", "33.5844,130.4517")])
-                .find(|(key, _)| *key == name)
-                .map(|(_, value)| (*value).to_owned())
+    /// The variables of the pairs and no other.
+    fn variables<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            let set = pairs.iter().find(|(key, _)| *key == name);
+            set.map(|(_, value)| (*value).to_owned())
         }
     }
 
-    /// The variables of a receiver at the site, with the one variable set too.
-    fn sited<'a>(variable: &'a str, value: &'a str) -> impl Fn(&str) -> Option<String> + 'a {
-        move |name| match name {
-            "PQ_SITE" => Some("33.5844,130.4517".to_owned()),
-            name if name == variable => Some(value.to_owned()),
-            _ => None,
+    /// The variables of a receiver at the site, with the pairs set too, or set otherwise.
+    fn environment<'a>(pairs: &'a [(&'a str, &'a str)]) -> impl Fn(&str) -> Option<String> + 'a {
+        move |name| {
+            variables(pairs)(name).or_else(|| variables(&[("PQ_SITE", "33.5844,130.4517")])(name))
         }
     }
 
@@ -285,10 +280,7 @@ mod tests {
         let environments: [&[(&str, &str)]; 2] = [&[], &[("PQ_SITE", "north,east")]];
 
         // Act
-        let configs = environments.map(|pairs| {
-            let set = |name: &str| pairs.iter().find(|(key, _)| *key == name);
-            Config::read(|name| set(name).map(|(_, value)| (*value).to_owned()))
-        });
+        let configs = environments.map(|pairs| Config::read(variables(pairs)));
 
         // Assert
         let refusals = configs.map(|config| config.err().map(|refusal| refusal.to_string()));
@@ -323,7 +315,7 @@ mod tests {
         let ports = ["0", "65536", "-1", "feed", ""];
 
         // Act
-        let configs = ports.map(|port| Config::read(sited("PQ_FEED_PORT", port)));
+        let configs = ports.map(|port| Config::read(environment(&[("PQ_FEED_PORT", port)])));
 
         // Assert
         assert!(configs.iter().all(Result::is_err));
@@ -338,10 +330,7 @@ mod tests {
         ];
 
         // Act
-        let config = Config::read(|name| {
-            let set = set.iter().find(|(key, _)| *key == name);
-            set.map(|(_, value)| (*value).to_owned())
-        });
+        let config = Config::read(variables(&set));
 
         // Assert
         let expected = Origin::Sim {
@@ -473,9 +462,9 @@ mod tests {
         ];
 
         // Act
-        let read = cases
-            .each_ref()
-            .map(|(written, _)| Config::read(sited("PQ_ADDRESS", written)).map(|c| c.door));
+        let read = cases.each_ref().map(|(written, _)| {
+            Config::read(environment(&[("PQ_ADDRESS", written)])).map(|c| c.door)
+        });
 
         // Assert
         let expected = cases.map(|(_, door)| Some(door));
@@ -495,7 +484,7 @@ mod tests {
         ];
 
         // Act
-        let read = written.map(|written| Config::read(sited("PQ_ADDRESS", written)));
+        let read = written.map(|written| Config::read(environment(&[("PQ_ADDRESS", written)])));
 
         // Assert
         assert!(read.iter().all(Result::is_err));
