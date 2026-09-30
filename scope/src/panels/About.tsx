@@ -7,6 +7,9 @@ import { type Credit, CREDITS, SOFTWARE } from './credits';
 
 import s from './About.module.css';
 
+/** On a phone the dialog takes the sheet's turn; elsewhere the `i` of the top bar toggles it. */
+const shown = () => isShown(isPhone(), activeSheet(), 'about', aboutVisible());
+
 /** One line of the dialog: what, from where, and on which terms. */
 function Row(props: { credit: Credit }) {
   return (
@@ -22,7 +25,6 @@ function Row(props: { credit: Credit }) {
 
 /** What the scope is and whose data it shows, opened from the `i` beside the panel buttons. */
 export function About() {
-  const shown = () => isShown(isPhone(), activeSheet(), 'about', aboutVisible());
   return (
     <div class={cx(s.about, shown() && s.show)} role="dialog" aria-label="About">
       <div class={s.titlebar}>About</div>
