@@ -44,6 +44,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
+        id: buildx
+      # The Dockerfile's cache mounts, kept between runs so a build compiles only what changed.
+      - uses: actions/cache@v6
+        id: mounts
+        with:
+          path: cache-mount
+          key: mounts-${{ runner.os }}-${{ hashFiles('Dockerfile', 'Cargo.lock', 'scope/bun.lock') }}
+          restore-keys: mounts-${{ runner.os }}-
+      - uses: reproducible-containers/buildkit-cache-dance@v3
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          cache-dir: cache-mount
+          skip-extraction: ${{ steps.mounts.outputs.cache-hit }}
       - uses: docker/build-push-action@v7
         with:
           context: .

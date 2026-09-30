@@ -220,13 +220,13 @@ built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
 panels and UI, design tokens. The rules: `state/` is the only shared state, `lib/` imports no
 framework, worker code never imports Solid or touches the DOM, and components are styled only
 through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
-The server is the `papaquebec` binary of `web/`: it reads the environment (`config`), answers for
-the scope's files, the traces and the feed's info (`site`) at a door that speaks https or plain http
-(`door`), and runs the feed. `authority/` is the local certificate authority behind the door.
-`feeder/src/` is the feed as a library: the wire contract (`proto`), readsb's JSON (`readsb`), what
-every session is served from (`feed`), the traffic sources behind one `Upstream` trait (`upstream/`:
-tar1090 and the sim) and the WebTransport endpoint (`transport`). `proto/` holds the schema both
-sides generate their types from.
+`crates/` holds the server's Rust crates. The server is the `papaquebec` binary of `crates/web/`: it
+reads the environment (`config`), answers for the scope's files, the traces and the feed's info
+(`site`) at a door that speaks https or plain http (`door`), and runs the feed. `crates/authority/`
+is the local certificate authority behind the door. `crates/feeder/src/` is the feed as a library:
+the wire contract (`proto`), readsb's JSON (`readsb`), what every session is served from (`feed`),
+the traffic sources behind one `Upstream` trait (`upstream/`: tar1090 and the sim) and the
+WebTransport endpoint (`transport`). `proto/` holds the schema both sides generate their types from.
 
 **Stack.**
 
