@@ -171,6 +171,25 @@ describe('createTrackStore', () => {
     expect(store.stats.now).toBe(1002);
   });
 
+  it('takes the geometric vertical rate of an aircraft that reports no barometric one', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const aircraft: AircraftJson[] = [
+      { ...live('both'), baro_rate: -1200, geom_rate: -1100 },
+      { ...live('geometric'), geom_rate: 1856 },
+      live('neither'),
+    ];
+
+    // Act
+    store.ingest(snapshot(1000, aircraft));
+
+    // Assert
+    const rates = ['both', 'geometric', 'neither'].map(
+      (hex) => store.tracks.get(hex)?.verticalRate,
+    );
+    expect(rates).toEqual([-1200, 1856, undefined]);
+  });
+
   it('copies enrichment and readout fields onto the track', () => {
     // Arrange
     const store = createTrackStore(project);

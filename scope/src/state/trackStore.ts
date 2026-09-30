@@ -76,7 +76,7 @@ function toTrack(
     alt: a.alt_baro,
     gs: a.gs,
     track: a.track,
-    verticalRate: a.baro_rate,
+    verticalRate: a.baro_rate ?? a.geom_rate,
     nic: a.nic,
     nacP: a.nac_p,
     messages: a.messages,
