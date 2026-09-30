@@ -25,7 +25,7 @@ const positional = args.length >= 2 && !args[0]?.endsWith('.geojson') ? args.sli
 const radiusNm = Number(args[positional.length] ?? 300);
 const input = args.find((a) => a.endsWith('.geojson'));
 
-const site = await resolveSite(positional, process.env);
+const site = resolveSite(positional, process.env);
 if (existsSync(OUT)) {
   const existing: unknown = JSON.parse(readFileSync(OUT, 'utf8'));
   const prev = isRecord(existing) && isRecord(existing.site) ? existing : null;

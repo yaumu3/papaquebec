@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Builds the scope and its server, and serves them over https next to docker-tar1090; see
+# Builds the scope and its server, and serves them over https next to a receiver; see
 # README.md, Deployment.
 FROM oven/bun:1-alpine AS build
 WORKDIR /app
@@ -35,6 +35,6 @@ COPY docker/entrypoint.sh /entrypoint.sh
 RUN mkdir -p public/map
 # The server keeps its certificate authority and the aircraft database under /data, which a
 # volume should keep.
-ENV PQ_TAR1090=http://tar1090 XDG_DATA_HOME=/data
+ENV XDG_DATA_HOME=/data
 EXPOSE 443 4433/udp
 ENTRYPOINT ["/sbin/tini", "--", "/entrypoint.sh"]
