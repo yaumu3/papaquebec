@@ -2066,6 +2066,7 @@ dependencies = [
  "hyper-util",
  "reqwest",
  "rustls",
+ "sim",
  "tempfile",
  "tokio",
  "tokio-rustls",

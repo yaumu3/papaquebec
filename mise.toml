@@ -14,7 +14,7 @@ dir = "scope"
 run = "bun run dev"
 
 [tasks.dev]
-description = "The scope and its server, following the tar1090 at PQ_TAR1090"
+description = "The scope and its server, following the receiver at PQ_BEAST that hears at PQ_SITE"
 depends = ["dev:web", "dev:scope"]
 
 [tasks.sim]
