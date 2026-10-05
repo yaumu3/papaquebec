@@ -51,13 +51,20 @@
 
   /* Layout */
   --control-height: 20px;
-  --topbar-height: 28px;
+  --topbar-height: 32px;
   --tabbar-height: 44px;
-  /* Phone breakpoint: 720px, repeated in each module's media query (custom properties cannot be). */
-  --panel-top: 40px;
+  /* Where the top bar ends, below any notch. */
+  --topbar-bottom: calc(var(--topbar-height) + env(safe-area-inset-top));
+  --panel-top: calc(var(--topbar-bottom) + var(--edge));
   --edge: 12px;
   --z-panel: 10;
   --z-topbar: 15;
   --z-overlay: 20;
   --z-menu: 1000;
+}
+/* Phone breakpoint: 720px, repeated in each module's media query (custom properties cannot be). */
+@media (max-width: 720px) {
+  :root {
+    --topbar-height: 36px;
+  }
 }
