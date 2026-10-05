@@ -19,7 +19,6 @@ export type LayerKey =
   | 'airports';
 export type Layers = Record<LayerKey, boolean>;
 export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
-export type MapPreset = 'approach' | 'enroute' | 'minimal' | 'all';
 
 export const LAYER_KEYS: LayerKey[] = [
   'coast',
@@ -31,51 +30,7 @@ export const LAYER_KEYS: LayerKey[] = [
   'sector',
   'airports',
 ];
-export const MAP_PRESET_NAMES: MapPreset[] = ['approach', 'enroute', 'minimal', 'all'];
 export const LABEL_DENSITIES: readonly LabelDensity[] = ['off', 'sparse', 'normal', 'dense'];
-
-export const MAP_PRESETS: Record<MapPreset, Layers> = {
-  approach: {
-    coast: true,
-    airspace: true,
-    waypoints: true,
-    airways: false,
-    navaids: true,
-    rings: true,
-    sector: false,
-    airports: true,
-  },
-  enroute: {
-    coast: true,
-    airspace: false,
-    waypoints: false,
-    airways: true,
-    navaids: true,
-    rings: true,
-    sector: true,
-    airports: true,
-  },
-  minimal: {
-    coast: true,
-    airspace: false,
-    waypoints: false,
-    airways: false,
-    navaids: false,
-    rings: true,
-    sector: false,
-    airports: false,
-  },
-  all: {
-    coast: true,
-    airspace: true,
-    waypoints: true,
-    airways: true,
-    navaids: true,
-    rings: true,
-    sector: true,
-    airports: true,
-  },
-};
 
 export interface Settings {
   /** Radius shown by the shorter canvas edge, NM. */
@@ -109,7 +64,16 @@ export const DEFAULT_SETTINGS: Settings = {
   vectorMin: 2,
   trailSec: 60,
   filter: { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' },
-  layers: { ...MAP_PRESETS.approach },
+  layers: {
+    coast: true,
+    airspace: true,
+    waypoints: true,
+    airways: false,
+    navaids: true,
+    rings: true,
+    sector: false,
+    airports: true,
+  },
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },
   qnh: { auto: true, station: '' },

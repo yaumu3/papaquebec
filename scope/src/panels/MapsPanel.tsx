@@ -11,11 +11,8 @@ import {
   toggleMapSet,
 } from '../state/mapsets';
 import {
-  activePreset,
-  applyPreset,
   type LabelDensity,
   type LayerKey,
-  type MapPreset,
   setSettings,
   settings,
   toggleLayer,
@@ -141,17 +138,6 @@ function MapSetList() {
 export function MapsPanel() {
   return (
     <Window id="maps" title="Maps">
-      <SectionTitle>PRESET</SectionTitle>
-      <Pills
-        options={[
-          { value: 'approach', label: 'APP' },
-          { value: 'enroute', label: 'ENR' },
-          { value: 'minimal', label: 'MIN' },
-          { value: 'all', label: 'ALL' },
-        ]}
-        value={activePreset()}
-        onChange={(v: MapPreset) => applyPreset(v)}
-      />
       <SectionTitle>LAYERS</SectionTitle>
       <div class={s.layers}>
         <For each={LAYERS}>

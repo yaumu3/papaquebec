@@ -2,13 +2,22 @@ import { describe, expect, it } from 'bun:test';
 
 import { inverse } from '../../lib/geodesic';
 import type { AeroLayers } from '../../lib/mapdata';
-import { MAP_PRESETS } from '../../state/settingsDefaults';
+import type { Layers } from '../../state/settingsDefaults';
 import { MAP_LAYERS } from '../layers';
 import type { Batch } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildMap, buildRings, type MapInput, navaidsShownAt } from './static';
 
-const allLayers = MAP_PRESETS.all;
+const allLayers: Layers = {
+  coast: true,
+  airspace: true,
+  waypoints: true,
+  airways: true,
+  navaids: true,
+  rings: true,
+  sector: true,
+  airports: true,
+};
 
 const aero: AeroLayers = {
   waypoints: [],
