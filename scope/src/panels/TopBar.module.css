@@ -39,9 +39,6 @@
 .v {
   color: var(--text);
 }
-.good {
-  color: var(--color-level);
-}
 .warn {
   color: var(--color-descend);
 }
@@ -54,7 +51,7 @@
   height: 7px;
   margin-right: var(--space-2);
   border-radius: 50%;
-  background: var(--color-level);
+  background: var(--panel-chrome);
   vertical-align: 1px;
 }
 .dot.warn {
@@ -83,10 +80,12 @@
   width: calc(1lh + 8px);
   padding-inline: 0;
 }
-.on {
+.on,
+.on:hover {
   background: var(--control-on-bg);
-  color: var(--accent);
-  border-color: var(--accent);
+  color: var(--control-on-text);
+  border-color: var(--control-on-bg);
+  font-weight: 600;
 }
 @media (max-width: 720px) {
   .bar {

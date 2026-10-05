@@ -166,7 +166,7 @@ function GroundRow(props: { traffic: Accessor<Traffic> }) {
           class={cx(
             s.bar,
             s.gndBar,
-            groundOn() && s.gndLit,
+            groundOn() && s.lit,
             props.traffic().picked === 'ground' && s.picked,
           )}
           style={{

@@ -9,11 +9,10 @@
 .toggle:hover {
   background: var(--control-hover);
 }
-.on {
-  background: var(--control-on-bg);
-  color: var(--accent);
-  border-color: var(--control-on-border);
-}
+.on,
 .on:hover {
-  background: var(--control-on-hover);
+  background: var(--control-on-bg);
+  color: var(--control-on-text);
+  border-color: var(--control-on-bg);
+  font-weight: 600;
 }

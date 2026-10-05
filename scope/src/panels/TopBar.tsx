@@ -57,8 +57,7 @@ function messageRate(): number {
 }
 
 /** Module class for a status tone. */
-const tone = (cls: string) =>
-  cls === 'good' ? s.good : cls === 'warn' ? s.warn : cls === 'err' ? s.err : undefined;
+const tone = (cls: string) => (cls === 'warn' ? s.warn : cls === 'err' ? s.err : undefined);
 
 export function TopBar() {
   return (
@@ -76,7 +75,7 @@ export function TopBar() {
         fallback={
           <div class={s.group}>
             <span class={s.item}>
-              <span class={cx(s.dot, s.good)} />
+              <span class={s.dot} />
               TRKS <span class={s.v}>{trackCount()}</span> ·{' '}
               <span class={s.v}>{messageRate()}</span> msg/s
             </span>

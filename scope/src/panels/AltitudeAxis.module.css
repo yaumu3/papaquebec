@@ -43,7 +43,7 @@
   background: var(--text-muted);
 }
 .lit {
-  background: var(--control-on-border);
+  background: var(--text-dim);
 }
 .grid {
   position: absolute;
@@ -126,17 +126,14 @@
   background: var(--control-hover);
 }
 .gndOn .swatch {
-  background: var(--color-ground);
-  border-color: var(--color-ground);
+  background: var(--control-on-bg);
+  border-color: var(--control-on-bg);
 }
 .gndBar {
   position: static;
   max-width: calc(100% - var(--lane));
 }
-.gndLit {
-  background: var(--color-ground);
-}
-/* Last so it wins over the band and GND tones. */
+/* Last so it wins over the band's tone. */
 .picked {
   background: var(--color-selected);
 }

@@ -16,13 +16,10 @@
   background: var(--control-hover);
   color: var(--text);
 }
-.active {
-  background: var(--accent);
-  color: var(--panel-chrome-text);
-  border-color: var(--accent);
-  font-weight: 600;
-}
+.active,
 .active:hover {
-  background: var(--accent);
-  color: var(--panel-chrome-text);
+  background: var(--control-on-bg);
+  color: var(--control-on-text);
+  border-color: var(--control-on-bg);
+  font-weight: 600;
 }
