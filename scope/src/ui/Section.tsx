@@ -1,17 +1,10 @@
-import { type JSX, Show } from 'solid-js';
+import type { JSX } from 'solid-js';
 
 import s from './Section.module.css';
 
-/** Dim uppercase heading inside a panel, with an optional lit value beside it. */
-export function SectionTitle(props: { children: JSX.Element; lit?: JSX.Element }) {
-  return (
-    <div class={s.title}>
-      {props.children}
-      <Show when={props.lit !== undefined}>
-        &nbsp;&nbsp;<span class={s.lit}>{props.lit}</span>
-      </Show>
-    </div>
-  );
+/** Dim uppercase heading inside a panel. */
+export function SectionTitle(props: { children: JSX.Element }) {
+  return <div class={s.title}>{props.children}</div>;
 }
 
 /** A one-line control with its dim label in a fixed column on the left. */

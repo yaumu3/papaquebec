@@ -80,8 +80,8 @@ const [panelsSignal, setPanels] = createSignal<Record<PanelId, boolean>>({ ...pe
 export const panels = panelsSignal;
 export const [renderError, setRenderError] = createSignal<string | null>(null);
 
-export function togglePanel(id: PanelId, force?: boolean): void {
-  setPanels((p) => ({ ...p, [id]: force ?? !p[id] }));
+export function togglePanel(id: PanelId): void {
+  setPanels((p) => ({ ...p, [id]: !p[id] }));
 }
 
 export function nextRblTag(existing: readonly Rbl[]): string {
