@@ -18,6 +18,7 @@ import {
 } from '../state/scope';
 import { settings } from '../state/settings';
 import { trackStore } from '../state/tracks';
+import { Button } from '../ui/Button';
 
 import s from './TopBar.module.css';
 
@@ -102,22 +103,18 @@ export function TopBar() {
       <div class={s.spacer} />
       <div class={cx(s.group, s.desktopOnly)}>
         {PANELS.map(([id, label]) => (
-          <button
-            type="button"
-            class={cx(s.btn, panels()[id] && s.on)}
-            onClick={() => togglePanel(id)}
-          >
+          <Button on={panels()[id]} onClick={() => togglePanel(id)}>
             {label}
-          </button>
+          </Button>
         ))}
-        <button
-          type="button"
-          class={cx(s.btn, s.about, aboutVisible() && s.on)}
-          aria-label="About"
+        <Button
+          class={s.about}
+          on={aboutVisible()}
+          label="About"
           onClick={() => setAboutVisible((v) => !v)}
         >
           i
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { For } from 'solid-js';
 
-import { cx } from '../design/cx';
+import { Button } from './Button';
 
 import s from './Pills.module.css';
 
@@ -9,6 +9,7 @@ export interface PillOption<T> {
   label: string;
 }
 
+/** A row of buttons of which the one holding `value` is on. */
 export function Pills<T extends string | number>(props: {
   options: readonly PillOption<T>[];
   value: T | null;
@@ -18,13 +19,13 @@ export function Pills<T extends string | number>(props: {
     <div class={s.pills}>
       <For each={props.options}>
         {(o) => (
-          <button
-            type="button"
-            class={cx(s.pill, o.value === props.value && s.active)}
+          <Button
+            class={s.pill}
+            on={o.value === props.value}
             onClick={() => props.onChange(o.value)}
           >
             {o.label}
-          </button>
+          </Button>
         )}
       </For>
     </div>

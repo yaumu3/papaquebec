@@ -1,14 +1,18 @@
-.toggle {
-  padding: 3px var(--space-3);
+.button {
+  height: var(--control-height);
+  padding: 0 var(--space-3);
   background: var(--control-bg);
   color: var(--text-dim);
   border: 1px solid var(--panel-border);
   font-size: var(--text-sm);
-  text-align: left;
+  letter-spacing: var(--tracking);
+  white-space: nowrap;
 }
-.toggle:hover {
+.button:hover {
   background: var(--control-hover);
+  color: var(--text);
 }
+/* With :hover too: a touch leaves it behind, and it must not outrank the on state. */
 .on,
 .on:hover {
   background: var(--control-on-bg);
