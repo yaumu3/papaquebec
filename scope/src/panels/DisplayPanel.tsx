@@ -40,7 +40,7 @@ function setStation(input: string): void {
 
 export function DisplayPanel() {
   return (
-    <Window id="display" title="Display">
+    <Window id="display">
       <LabeledRow label="VECTOR">
         <Pills
           options={[

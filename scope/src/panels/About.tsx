@@ -27,7 +27,6 @@ function Row(props: { credit: Credit }) {
 export function About() {
   return (
     <div class={cx(s.about, shown() && s.show)} role="dialog" aria-label="About">
-      <div class={s.titlebar}>About</div>
       <div class={s.body}>
         <Row credit={SOFTWARE} />
         <div class={s.divider} />

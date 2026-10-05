@@ -108,9 +108,3 @@ export function formatWind(dir: number | undefined, speed: number | undefined): 
     ? '---'
     : `${padBearing(dir)}° / ${Math.round(speed)}`;
 }
-
-/** The list's head count, naming what the filter hides only while it hides something. */
-export function formatListCount(shown: number, total: number): string {
-  const hidden = total - shown;
-  return hidden > 0 ? `${shown} · ${hidden} hidden` : String(shown);
-}

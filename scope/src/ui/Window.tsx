@@ -30,7 +30,6 @@ function Grip() {
 /** A docked panel. Desktop visibility comes from the top bar toggles, phone visibility from the sheet. */
 export function Window(props: {
   id: PanelId;
-  title: JSX.Element;
   class?: string | undefined;
   bodyClass?: string | undefined;
   children: JSX.Element;
@@ -38,7 +37,6 @@ export function Window(props: {
   const shown = () => isShown(isPhone(), activeSheet(), props.id, panels()[props.id]);
   return (
     <div class={cx(s.win, props.class, !shown() && s.hidden)}>
-      <div class={s.titlebar}>{props.title}</div>
       <Grip />
       <div class={cx(s.body, props.bodyClass)}>{props.children}</div>
     </div>

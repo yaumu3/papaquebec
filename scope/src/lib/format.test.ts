@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  formatListCount,
   climbArrow,
   climbState,
   emergencyCode,
@@ -149,22 +148,5 @@ describe('formatModes', () => {
 
     // Assert
     expect(out).toEqual(['AP VNAV ALT APP LNAV TCAS', 'AP GLIDESLOPE', undefined, undefined]);
-  });
-});
-
-describe('formatListCount', () => {
-  it('names the hidden traffic only while the filter is cutting some', () => {
-    // Arrange
-    const cases: [number, number][] = [
-      [9, 9],
-      [6, 9],
-      [0, 0],
-    ];
-
-    // Act
-    const out = cases.map(([shown, total]) => formatListCount(shown, total));
-
-    // Assert
-    expect(out).toEqual(['9', '6 · 3 hidden', '0']);
   });
 });

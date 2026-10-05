@@ -16,14 +16,6 @@
 .show {
   visibility: visible;
 }
-.titlebar {
-  height: 18px;
-  padding: 1px var(--space-2) 1px var(--space-3);
-  background: var(--panel-chrome);
-  opacity: 0.92;
-  color: var(--panel-chrome-text);
-  font-weight: 600;
-}
 /* One grid for every row, so that subjects, sources and terms each line up. */
 .body {
   display: grid;

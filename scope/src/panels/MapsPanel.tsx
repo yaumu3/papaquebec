@@ -138,7 +138,7 @@ function MapSetList() {
 
 export function MapsPanel() {
   return (
-    <Window id="maps" title="Maps">
+    <Window id="maps">
       <SectionTitle>LAYERS</SectionTitle>
       <div class={s.layers}>
         <For each={LAYERS}>

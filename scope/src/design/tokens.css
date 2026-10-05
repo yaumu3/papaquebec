@@ -17,16 +17,14 @@
   --panel-glass: color-mix(in srgb, var(--panel-bg) 86%, transparent);
   --panel-border: #4a4a47;
   --panel-outline: #000;
-  --panel-chrome: #b8b8b2;
-  --panel-chrome-text: var(--panel-bg);
   --text: #f2f2ee;
   --text-dim: #96968f;
   --text-muted: #5a5a56;
   --control-bg: #2a2a29;
   --control-glass: color-mix(in srgb, var(--control-bg) 70%, transparent);
   --control-hover: #3a3a38;
-  --control-on-bg: var(--panel-chrome);
-  --control-on-text: var(--panel-chrome-text);
+  --control-on-bg: #b8b8b2;
+  --control-on-text: var(--panel-bg);
   --row-hover: #2a2a2a;
   --row-selected: #3a3a3a;
   --accent: #fff;
