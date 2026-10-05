@@ -3,26 +3,8 @@
   flex: 1;
   gap: var(--space-1);
 }
+/* Each as wide as its label, plus an equal share of what the row has left. */
 .pill {
-  flex: 1;
-  padding: var(--space-1) 0;
-  background: var(--control-bg);
-  color: var(--text-dim);
-  border: 1px solid var(--panel-border);
-  font-size: var(--text-sm);
-  text-align: center;
-}
-.pill:hover {
-  background: var(--control-hover);
-  color: var(--text);
-}
-.active {
-  background: var(--accent);
-  color: var(--panel-chrome-text);
-  border-color: var(--accent);
-  font-weight: 600;
-}
-.active:hover {
-  background: var(--accent);
-  color: var(--panel-chrome-text);
+  flex: 1 1 auto;
+  padding-inline: 0;
 }

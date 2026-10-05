@@ -8,10 +8,10 @@ import {
   STATION_RE,
   TRANSITION_ALT_MAX_FT,
 } from '../state/settings';
+import { Button } from '../ui/Button';
 import { Field, FieldRow, FieldSlot } from '../ui/Field';
 import { Pills } from '../ui/Pills';
 import { Divider, LabeledRow, SectionTitle } from '../ui/Section';
-import { Toggle } from '../ui/Toggle';
 import { Window } from '../ui/Window';
 import { AltitudeAxis } from './AltitudeAxis';
 
@@ -40,7 +40,7 @@ function setStation(input: string): void {
 
 export function DisplayPanel() {
   return (
-    <Window id="display" title="Display">
+    <Window id="display">
       <LabeledRow label="VECTOR">
         <Pills
           options={[
@@ -113,11 +113,9 @@ export function DisplayPanel() {
           />
         </Field>
         <FieldSlot label="SOURCE">
-          <Toggle
-            label={settings.qnh.auto ? 'AUTO' : 'MANUAL'}
-            on={settings.qnh.auto}
-            onToggle={() => setSettings('qnh', 'auto', (v) => !v)}
-          />
+          <Button on={settings.qnh.auto} onClick={() => setSettings('qnh', 'auto', (v) => !v)}>
+            {settings.qnh.auto ? 'AUTO' : 'MANUAL'}
+          </Button>
         </FieldSlot>
       </FieldRow>
     </Window>

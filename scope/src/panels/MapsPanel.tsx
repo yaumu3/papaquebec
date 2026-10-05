@@ -11,31 +11,29 @@ import {
   toggleMapSet,
 } from '../state/mapsets';
 import {
-  activePreset,
-  applyPreset,
   type LabelDensity,
   type LayerKey,
-  type MapPreset,
   setSettings,
   settings,
   toggleLayer,
 } from '../state/settings';
+import { Button } from '../ui/Button';
 import { Pills } from '../ui/Pills';
 import { Divider, SectionTitle } from '../ui/Section';
-import { Toggle } from '../ui/Toggle';
 import { Window } from '../ui/Window';
 
 import s from './MapsPanel.module.css';
 
+/** Two to a row: what the scope is drawn over, then areas, ground facilities and the route structure. */
 const LAYERS: [LayerKey, string][] = [
-  ['coast', 'Coast'],
-  ['airspace', 'Airspace'],
-  ['waypoints', 'Waypts'],
-  ['airways', 'Airways'],
-  ['navaids', 'Navaids'],
-  ['rings', 'Rings'],
-  ['sector', 'Sector'],
-  ['airports', 'Airports'],
+  ['coast', 'COAST'],
+  ['rings', 'RINGS'],
+  ['airspace', 'AIRSPACE'],
+  ['sector', 'SECTOR'],
+  ['airports', 'AIRPORTS'],
+  ['navaids', 'NAVAIDS'],
+  ['waypoints', 'WAYPTS'],
+  ['airways', 'AIRWAYS'],
 ];
 
 /** The chosen file goes through the strict schema; the note reports the outcome. */
@@ -57,9 +55,9 @@ function MapSetImport() {
   };
   return (
     <>
-      <button type="button" class={s.import} onClick={() => input?.click()}>
+      <Button class={s.import} onClick={() => input?.click()}>
         IMPORT JSON…
-      </button>
+      </Button>
       <input
         ref={(node) => {
           input = node;
@@ -85,12 +83,9 @@ function MapSetRow(props: {
 }) {
   return (
     <div class={s.set}>
-      <Toggle
-        class={s.setToggle}
-        label={props.set.data.title}
-        on={props.set.enabled}
-        onToggle={() => toggleMapSet(props.set.id)}
-      />
+      <Button class={s.setToggle} on={props.set.enabled} onClick={() => toggleMapSet(props.set.id)}>
+        {props.set.data.title}
+      </Button>
       <Show when={!props.set.builtin}>
         <button
           type="button"
@@ -107,9 +102,9 @@ function MapSetRow(props: {
           {props.armed ? 'REMOVE' : '×'}
         </button>
         <Show when={props.armed}>
-          <button type="button" class={s.cancel} onClick={() => props.onDisarm()}>
+          <Button class={s.cancel} onClick={() => props.onDisarm()}>
             CANCEL
-          </button>
+          </Button>
         </Show>
       </Show>
     </div>
@@ -143,23 +138,14 @@ function MapSetList() {
 
 export function MapsPanel() {
   return (
-    <Window id="maps" title="Maps">
-      <SectionTitle>PRESET</SectionTitle>
-      <Pills
-        options={[
-          { value: 'approach', label: 'APP' },
-          { value: 'enroute', label: 'ENR' },
-          { value: 'minimal', label: 'MIN' },
-          { value: 'all', label: 'ALL' },
-        ]}
-        value={activePreset()}
-        onChange={(v: MapPreset) => applyPreset(v)}
-      />
+    <Window id="maps">
       <SectionTitle>LAYERS</SectionTitle>
       <div class={s.layers}>
         <For each={LAYERS}>
           {([key, label]) => (
-            <Toggle label={label} on={settings.layers[key]} onToggle={() => toggleLayer(key)} />
+            <Button on={settings.layers[key]} onClick={() => toggleLayer(key)}>
+              {label}
+            </Button>
           )}
         </For>
       </div>

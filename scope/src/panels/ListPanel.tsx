@@ -1,13 +1,13 @@
-import { createMemo, For } from 'solid-js';
+import { createMemo, For, Index } from 'solid-js';
 
 import { targetMenu } from '../canvas/menus';
 import { cx } from '../design/cx';
 import { formatAltitude } from '../lib/altitude';
-import { climbArrow, climbState, formatGsWake, formatListCount, padTrack } from '../lib/format';
-import { isEmergency, isStale, trackLabel } from '../render/scene/rules';
-import { classify } from '../state/filter';
+import { climbArrow, climbState, formatDistance, formatGsWake, padTrack } from '../lib/format';
+import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rules';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import {
+  isFiltered,
   listSort,
   magneticTrack,
   selected,
@@ -23,85 +23,113 @@ import { Window } from '../ui/Window';
 
 import s from './ListPanel.module.css';
 
-const COLUMNS: [SortKey, string][] = [
-  ['id', 'CS/REG'],
-  ['type', 'TYPE'],
-  ['alt', 'ALT'],
-  ['gs', 'GSW'],
-  ['track', 'TRK'],
-  ['squawk', 'SQ'],
-  ['dist', 'DIST'],
-  ['source', 'SRC'],
+/** One column of the list: the key it sorts by, its heading, and what a row shows in it. */
+interface Column {
+  key: SortKey;
+  label: string;
+  /** The longest text it holds, in characters. */
+  width: number;
+  /** Figures are set to the right. */
+  figure?: true;
+  cell: (t: Track) => string;
+  /** What hangs beside the cell's text, as a trend arrow does. */
+  hang?: (t: Track) => string;
+  /** Whether the cell is set small and dim, as a bare hex is. */
+  faint?: (t: Track) => boolean;
+}
+
+const COLUMNS: Column[] = [
+  {
+    key: 'id',
+    label: 'CALLSIGN',
+    width: 8,
+    cell: trackLabel,
+    faint: (t) => !t.flight && !t.registration,
+  },
+  { key: 'type', label: 'TYPE', width: 4, cell: typeLabel },
+  {
+    key: 'alt',
+    label: 'ALT',
+    width: 3,
+    figure: true,
+    cell: (t) => formatAltitude(t.alt, settings.altimeter),
+    hang: (t) => climbArrow(t.verticalRate),
+  },
+  { key: 'gs', label: 'GSW', width: 3, figure: true, cell: (t) => formatGsWake(t.gs, t.category) },
+  { key: 'track', label: 'TRK', width: 3, figure: true, cell: (t) => padTrack(magneticTrack(t)) },
+  { key: 'squawk', label: 'SQ', width: 4, figure: true, cell: (t) => t.squawk ?? '----' },
+  {
+    key: 'dist',
+    label: 'DIST',
+    width: 4,
+    figure: true,
+    cell: (t) => formatDistance(distanceFromSite(t)),
+  },
+  { key: 'source', label: 'SRC', width: 4, figure: true, cell: (t) => t.source.toUpperCase() },
 ];
 
-/** Row tone: emergency over stale over ground over climb state, matching the scope's colors. */
+/** The grid the header and every row share: each column as wide as its text. */
+const GRID = { '--columns': COLUMNS.map((c) => `${c.width}ch`).join(' ') };
+
+/**
+ * Row tone: emergency over filtered over stale over ground over climb state. The scope's colors,
+ * but for a target the filter reduces, which the list dims.
+ */
 function rowTone(t: Track): string | undefined {
   if (isEmergency(t)) return s.emergency;
+  if (isFiltered(t)) return s.filtered;
   if (isStale(t)) return s.stale;
   if (t.alt === 'ground') return s.ground;
   const c = climbState(t.verticalRate);
   return c === 'climbing' ? s.climbing : c === 'descending' ? s.descending : undefined;
 }
 
-function formatDistance(t: Track): string {
-  const d = distanceFromSite(t);
-  return d === undefined ? '---' : d < 100 ? d.toFixed(1) : String(Math.round(d));
-}
-
 export function ListPanel() {
   const rows = createMemo(() => {
     snapshotVersion();
-    const shown = [...trackStore.tracks.values()].filter(
-      (t) => classify(t, settings.filter, settings.altimeter) === 'shown',
-    );
-    return sortTracks(shown, listSort());
+    return sortTracks([...trackStore.tracks.values()], listSort());
   });
   return (
-    <Window
-      id="list"
-      title={<>Aircraft ({formatListCount(rows().length, trackStore.tracks.size)})</>}
-      class={s.panel}
-      bodyClass={s.body}
-    >
-      <div class={s.header}>
+    <Window id="list" class={s.panel} bodyClass={s.body}>
+      <div class={s.header} style={GRID}>
         <For each={COLUMNS}>
-          {([key, label]) => (
+          {(c) => (
             <button
               type="button"
-              class={cx(s.sort, listSort().key === key && s.sortActive)}
-              onClick={() => setListSort((sort) => toggleSort(sort, key))}
+              class={cx(s.sort, c.figure && s.figure, listSort().key === c.key && s.sortActive)}
+              onClick={() => setListSort((sort) => toggleSort(sort, c.key))}
             >
-              {label}
-              {listSort().key === key ? (listSort().dir === 'asc' ? '▴' : '▾') : ''}
+              {c.label}
+              <span class={s.hang}>
+                {listSort().key === c.key ? (listSort().dir === 'asc' ? '▴' : '▾') : ''}
+              </span>
             </button>
           )}
         </For>
       </div>
-      <div class={s.rows}>
-        <For each={rows()}>
+      <div class={s.rows} style={GRID}>
+        {/* By place, not by track: a snapshot brings new track objects, and a row is kept for its successor. */}
+        <Index each={rows()}>
           {(t) => (
             <div
-              class={cx(s.row, rowTone(t), selected() === t.hex && s.selected)}
-              onClick={() => setSelected(t.hex)}
+              class={cx(s.row, rowTone(t()), selected() === t().hex && s.selected)}
+              onClick={() => setSelected(t().hex)}
               onContextMenu={(e) => {
                 e.preventDefault();
-                setMenu({ x: e.clientX, y: e.clientY, items: targetMenu(t) });
+                setMenu({ x: e.clientX, y: e.clientY, items: targetMenu(t()) });
               }}
             >
-              <span class={cx(!t.flight && !t.registration && s.hex)}>{trackLabel(t)}</span>
-              <span>{t.type ?? `[${t.category ?? '--'}]`}</span>
-              <span>
-                {formatAltitude(t.alt, settings.altimeter)}
-                {climbArrow(t.verticalRate)}
-              </span>
-              <span>{formatGsWake(t.gs, t.category)}</span>
-              <span>{padTrack(magneticTrack(t))}</span>
-              <span>{t.squawk ?? '----'}</span>
-              <span>{formatDistance(t)}</span>
-              <span>{t.source.toUpperCase()}</span>
+              <For each={COLUMNS}>
+                {(c) => (
+                  <span class={cx(c.figure && s.figure, c.faint?.(t()) && s.hex)}>
+                    {c.cell(t())}
+                    {c.hang && <span class={s.hang}>{c.hang(t())}</span>}
+                  </span>
+                )}
+              </For>
             </div>
           )}
-        </For>
+        </Index>
       </div>
     </Window>
   );

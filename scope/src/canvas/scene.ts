@@ -24,7 +24,6 @@ import {
   selected,
   site,
   setRenderError,
-  setRenderInfo,
   snapshotVersion,
 } from '../state/scope';
 import { settings } from '../state/settings';
@@ -43,7 +42,7 @@ const projected = () => projectionVersion() > 0;
 
 function reportStatus(s: RenderStatus): void {
   if (s.kind === 'ready') {
-    setRenderInfo(`GPU ${s.where === 'worker' ? 'worker' : 'main thread'} · ${s.adapter}`);
+    console.info(`GPU ${s.where === 'worker' ? 'worker' : 'main thread'} · ${s.adapter}`);
     setRenderError(null);
   } else if (s.kind === 'error') {
     setRenderError(s.message);

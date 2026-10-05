@@ -7,9 +7,6 @@
 .title:first-child {
   margin-top: 0;
 }
-.lit {
-  color: var(--text);
-}
 .row {
   display: flex;
   align-items: center;

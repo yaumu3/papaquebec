@@ -1,14 +1,14 @@
 import { For } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { activeSheet, isPhone, isShown } from '../state/layout';
+import { isPhone } from '../state/layout';
 import { aboutVisible } from '../state/scope';
 import { type Credit, CREDITS, SOFTWARE } from './credits';
 
 import s from './About.module.css';
 
-/** On a phone the dialog takes the sheet's turn; elsewhere the `i` of the top bar toggles it. */
-const shown = () => isShown(isPhone(), activeSheet(), 'about', aboutVisible());
+/** The `i` of the top bar toggles the dialog; a phone, which has no `i`, never shows it. */
+const shown = () => !isPhone() && aboutVisible();
 
 /** One line of the dialog: what, from where, and on which terms. */
 function Row(props: { credit: Credit }) {
@@ -27,7 +27,6 @@ function Row(props: { credit: Credit }) {
 export function About() {
   return (
     <div class={cx(s.about, shown() && s.show)} role="dialog" aria-label="About">
-      <div class={s.titlebar}>About</div>
       <div class={s.body}>
         <Row credit={SOFTWARE} />
         <div class={s.divider} />

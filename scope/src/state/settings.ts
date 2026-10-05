@@ -5,11 +5,7 @@ import { loadPersisted, type Persisted, savePersisted } from './persist';
 import {
   DEFAULT_PANELS,
   DEFAULT_SETTINGS,
-  LAYER_KEYS,
   type LayerKey,
-  MAP_PRESET_NAMES,
-  MAP_PRESETS,
-  type MapPreset,
   type Panels,
   RANGE_MAX_NM,
   RANGE_MIN_NM,
@@ -45,20 +41,8 @@ export function persist(panels: Panels, listSort: ListSort): void {
   savePersisted(storage, { settings: snapshot, panels, listSort });
 }
 
-export function applyPreset(preset: MapPreset): void {
-  setSettings('layers', { ...MAP_PRESETS[preset] });
-}
-
 export function toggleLayer(key: LayerKey): void {
   setSettings('layers', key, (v) => !v);
-}
-
-export function activePreset(): MapPreset | null {
-  for (const name of MAP_PRESET_NAMES) {
-    const layers = MAP_PRESETS[name];
-    if (LAYER_KEYS.every((k) => layers[k] === settings.layers[k])) return name;
-  }
-  return null;
 }
 
 /** Jump to the next preset above or below the current range. */

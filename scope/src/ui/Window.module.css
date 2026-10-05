@@ -11,26 +11,37 @@
 .hidden {
   display: none;
 }
-.titlebar {
-  display: flex;
-  flex-shrink: 0;
-  justify-content: space-between;
-  align-items: center;
-  height: 18px;
-  padding: 1px var(--space-2) 1px var(--space-3);
-  background: var(--panel-chrome);
-  opacity: 0.92;
-  color: var(--panel-chrome-text);
-  font-weight: 600;
-  letter-spacing: 0.2px;
-}
 .body {
   min-height: 0;
   overflow-y: auto;
   padding: var(--space-4);
 }
+.grip {
+  display: none;
+}
 @media (max-width: 720px) {
+  /* A sheet: edge to edge and opaque over the scope, under a grip. */
   .win {
     flex: 1;
+    background: var(--panel-bg);
+    border-width: 1px 0 0;
+    box-shadow: none;
+  }
+  .grip {
+    display: block;
+    flex-shrink: 0;
+    width: 100%;
+    padding: var(--space-3) 0 var(--space-5);
+    touch-action: none;
+  }
+  .handle {
+    display: block;
+    width: 36px;
+    height: 3px;
+    margin: 0 auto;
+    background: var(--text-muted);
+  }
+  .body {
+    padding: 0 var(--space-6) var(--space-4);
   }
 }

@@ -4,8 +4,7 @@ import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/overlays';
 import { toScreen, toWorld } from '../render/scene/view';
-import { visibility } from '../state/filter';
-import { aero, type Rbl, type RblAnchor, rbls, selected } from '../state/scope';
+import { aero, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
@@ -52,15 +51,11 @@ export interface BlockHit {
   dy: number;
 }
 
-/** A filtered target draws no block, unless it is the selected one. */
-const hidden = (t: Track) =>
-  visibility(t, selected(), settings.filter, settings.altimeter) === 'filtered';
-
 /** The data block under a screen point, if any; the selected target's block counts even when filtered, as it is drawn. */
 export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
   for (const t of trackStore.tracks.values()) {
     const s = targetScreen(view, t.hex);
-    if (!s || hidden(t)) continue;
+    if (!s || isFiltered(t)) continue;
     const corner = blockCorner(t.ops);
     const r = labelRect(s.cx, s.cy, corner, extraLines(t));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)

@@ -3,9 +3,10 @@ import { createSignal } from 'solid-js';
 import type { FeedDown } from '../feed/push';
 import type { Vec2 } from '../lib/geo';
 import type { CoastData } from '../lib/mapdata';
+import { type Filterable, visibility } from './filter';
 import type { ListSort } from './listSort';
 import { aero } from './mapsets';
-import { type PanelId, persisted } from './settings';
+import { type PanelId, persisted, settings } from './settings';
 
 export type { PanelId };
 /** The enabled map sets merged; see `mapsets`. */
@@ -63,6 +64,9 @@ export const bumpSnapshot = (): void => {
   setSnapshotVersion((v) => v + 1);
 };
 export const [selected, setSelected] = createSignal<string | null>(null);
+/** Whether the filter reduces the target on the scope, which it never does to the selected one. */
+export const isFiltered = (t: Filterable & { hex: string }): boolean =>
+  visibility(t, selected(), settings.filter, settings.altimeter) === 'filtered';
 export const [hovered, setHovered] = createSignal<string | null>(null);
 /** Pan offset from the site, in NM. */
 export const [pan, setPan] = createSignal<Vec2>({ x: 0, y: 0 });
@@ -74,11 +78,10 @@ export const [rblPending, setRblPending] = createSignal<RblPending | null>(null)
 export const [rangeCursor, setRangeCursor] = createSignal<RangeCursorOrigin | null>(null);
 const [panelsSignal, setPanels] = createSignal<Record<PanelId, boolean>>({ ...persisted.panels });
 export const panels = panelsSignal;
-export const [renderInfo, setRenderInfo] = createSignal<string>('');
 export const [renderError, setRenderError] = createSignal<string | null>(null);
 
-export function togglePanel(id: PanelId, force?: boolean): void {
-  setPanels((p) => ({ ...p, [id]: force ?? !p[id] }));
+export function togglePanel(id: PanelId): void {
+  setPanels((p) => ({ ...p, [id]: !p[id] }));
 }
 
 export function nextRblTag(existing: readonly Rbl[]): string {

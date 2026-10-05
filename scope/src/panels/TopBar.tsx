@@ -1,7 +1,7 @@
-import { Show } from 'solid-js';
+import { createMemo, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { feedNotice } from '../state/feedLine';
+import { feedNotice, type Tone } from '../state/feedLine';
 import { qnhError, qnhReport, qnhStation } from '../state/qnh';
 import { qnhStatus } from '../state/qnhStatus';
 import {
@@ -10,7 +10,6 @@ import {
   type PanelId,
   panels,
   renderError,
-  renderInfo,
   setAboutVisible,
   snapshotVersion,
   tick,
@@ -18,6 +17,7 @@ import {
 } from '../state/scope';
 import { settings } from '../state/settings';
 import { trackStore } from '../state/tracks';
+import { Button } from '../ui/Button';
 
 import s from './TopBar.module.css';
 
@@ -35,17 +35,6 @@ const PANELS: [PanelId, string][] = [
   ['detail', 'DETAIL'],
 ];
 
-function qnh(): { cls: string; text: string } {
-  return qnhStatus({
-    qnhInHg: settings.altimeter.qnhInHg,
-    auto: settings.qnh.auto,
-    station: qnhStation(),
-    report: qnhReport(),
-    error: qnhError(),
-    now: tick(),
-  });
-}
-
 function trackCount(): number {
   snapshotVersion();
   return trackStore.tracks.size;
@@ -56,69 +45,64 @@ function messageRate(): number {
   return Math.round(trackStore.stats.messageRate);
 }
 
-/** Module class for a status tone. */
-const tone = (cls: string) =>
-  cls === 'good' ? s.good : cls === 'warn' ? s.warn : cls === 'err' ? s.err : undefined;
+/** Module class of each status tone. */
+const TONES: Record<Tone, string | undefined> = { warn: s.warn, err: s.err };
+const tone = (cls: Tone | null | undefined) => cls && TONES[cls];
 
 export function TopBar() {
+  const qnh = createMemo(() =>
+    qnhStatus({
+      qnhInHg: settings.altimeter.qnhInHg,
+      auto: settings.qnh.auto,
+      station: qnhStation(),
+      report: qnhReport(),
+      error: qnhError(),
+      now: tick(),
+    }),
+  );
+  const notice = createMemo(() => feedNotice(feedStatus(), tick()));
   return (
     <div id="top-bar" class={s.bar}>
       <div class={s.clock}>{clock(tick())}</div>
-      <div class={s.sep} />
-      <div class={s.group}>
-        <span class={s.item}>
-          <span class={cx(s.v, tone(qnh().cls))}>{qnh().text}</span>
-        </span>
+      <div class={s.item}>
+        QNH <span class={cx(s.v, tone(qnh().cls))}>{qnh().value}</span>
+        <span class={cx(s.desktopOnly, tone(qnh().cls))}> {qnh().source}</span>
       </div>
-      <div class={s.sep} />
-      <Show
-        when={feedNotice(feedStatus(), tick())}
-        fallback={
-          <div class={s.group}>
-            <span class={s.item}>
-              <span class={cx(s.dot, s.good)} />
-              TRKS <span class={s.v}>{trackCount()}</span> ·{' '}
-              <span class={s.v}>{messageRate()}</span> msg/s
-            </span>
-          </div>
-        }
-      >
-        {(notice) => (
-          <div class={s.group}>
-            <span class={s.item}>
-              <span class={cx(s.dot, tone(notice().cls))} />
-              <span class={cx(s.v, tone(notice().cls))}>{notice().text}</span>
-            </span>
-          </div>
-        )}
-      </Show>
-      <div class={cx(s.sep, s.desktopOnly)} />
-      <div class={cx(s.group, s.desktopOnly)}>
-        <Show when={renderError()} fallback={<span class={s.item}>{renderInfo()}</span>}>
-          <span class={s.item}>
-            <span class={cx(s.v, s.err)}>GPU · {renderError()}</span>
-          </span>
+      <div class={cx(s.item, s.feed)}>
+        <span class={cx(s.lamp, tone(notice()?.cls))} />
+        <span class={s.desktopOnly}>FEED </span>
+        <Show
+          when={notice()}
+          fallback={
+            <>
+              <span class={s.v}>{trackCount()}</span> TRK
+              <span class={s.desktopOnly}>
+                {' · '}
+                <span class={s.v}>{messageRate()}</span> msg/s
+              </span>
+            </>
+          }
+        >
+          {(n) => <span class={cx(s.v, tone(n().cls))}>{n().text}</span>}
         </Show>
       </div>
-      <div class={s.spacer} />
-      <div class={cx(s.group, s.desktopOnly)}>
+      <Show when={renderError()}>
+        <div class={cx(s.item, s.err, s.desktopOnly)}>GPU · {renderError()}</div>
+      </Show>
+      <div class={cx(s.buttons, s.desktopOnly)}>
         {PANELS.map(([id, label]) => (
-          <button
-            type="button"
-            class={cx(s.btn, panels()[id] && s.on)}
-            onClick={() => togglePanel(id)}
-          >
+          <Button class={s.btn} on={panels()[id]} onClick={() => togglePanel(id)}>
             {label}
-          </button>
+          </Button>
         ))}
-        <button
-          type="button"
-          class={cx(s.btn, s.about, aboutVisible() && s.on)}
-          aria-label="About"
+        <Button
+          class={cx(s.btn, s.about)}
+          on={aboutVisible()}
+          label="About"
           onClick={() => setAboutVisible((v) => !v)}
         >
           i
-        </button>
+        </Button>
       </div>
     </div>
   );

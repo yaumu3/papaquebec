@@ -18,18 +18,13 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
-.remove,
-.cancel {
+.remove {
   padding: 0 var(--space-2);
   border: 1px solid transparent;
   color: var(--text-dim);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking);
-}
-.remove {
   font-size: var(--text-lg);
+  letter-spacing: var(--tracking);
   line-height: 1;
 }
 .remove:hover {
@@ -38,7 +33,7 @@
 }
 .armed:hover {
   background: var(--color-emergency);
-  color: var(--panel-chrome-text);
+  color: var(--control-on-text);
 }
 .armed {
   color: var(--color-emergency);
@@ -47,22 +42,13 @@
   line-height: inherit;
 }
 .cancel {
-  border-color: var(--panel-border);
-}
-.cancel:hover {
-  background: var(--control-hover);
-  color: var(--text);
+  padding-inline: var(--space-2);
+  background: none;
+  font-size: var(--text-xs);
 }
 .import {
-  padding: 3px var(--space-3);
-  border: 1px dashed var(--panel-border);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  text-align: left;
-}
-.import:hover {
-  background: var(--control-hover);
-  color: var(--text);
+  background: none;
+  border-style: dashed;
 }
 .file {
   display: none;

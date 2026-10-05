@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  formatListCount,
   climbArrow,
   climbState,
   emergencyCode,
+  formatAge,
+  formatDistance,
   formatGsWake,
   formatMmSs,
   formatMach,
   formatModes,
-  formatWind,
   padBearing,
   wakeLetter,
 } from './format';
@@ -103,24 +103,6 @@ describe('formatMmSs / padBearing', () => {
   });
 });
 
-describe('formatWind', () => {
-  it('renders wind as direction over speed', () => {
-    // Arrange
-    const winds: [number | undefined, number | undefined][] = [
-      [255, 14],
-      [0, 3],
-      [undefined, 5],
-      [180, undefined],
-    ];
-
-    // Act
-    const w = winds.map(([dir, speed]) => formatWind(dir, speed));
-
-    // Assert
-    expect(w).toEqual(['255° / 14', '360° / 3', '---', '---']);
-  });
-});
-
 describe('formatMach', () => {
   it('renders Mach to two decimals with the M prefix', () => {
     // Arrange
@@ -152,19 +134,28 @@ describe('formatModes', () => {
   });
 });
 
-describe('formatListCount', () => {
-  it('names the hidden traffic only while the filter is cutting some', () => {
+describe('formatAge', () => {
+  it('counts tenths of a second up to ten, whole seconds from there, and dashes the unknown', () => {
     // Arrange
-    const cases: [number, number][] = [
-      [9, 9],
-      [6, 9],
-      [0, 0],
-    ];
+    const ages = [0, 1.04, 9.94, 9.96, 12.3, 45.6, undefined];
 
     // Act
-    const out = cases.map(([shown, total]) => formatListCount(shown, total));
+    const out = ages.map(formatAge);
 
     // Assert
-    expect(out).toEqual(['9', '6 · 3 hidden', '0']);
+    expect(out).toEqual(['0.0', '1.0', '9.9', '10', '12', '46', '---']);
+  });
+});
+
+describe('formatDistance', () => {
+  it('counts tenths of a mile up to a hundred, whole miles from there, and dashes the unknown', () => {
+    // Arrange
+    const miles = [0.44, 14.5, 99.94, 99.96, 123.4, undefined];
+
+    // Act
+    const out = miles.map(formatDistance);
+
+    // Assert
+    expect(out).toEqual(['0.4', '14.5', '99.9', '100', '123', '---']);
   });
 });

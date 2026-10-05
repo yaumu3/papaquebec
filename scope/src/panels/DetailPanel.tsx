@@ -1,13 +1,13 @@
-import { createMemo, Show } from 'solid-js';
+import { createMemo, type JSX, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
 import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
 import {
   climbArrow,
   emergencyCode,
+  formatAge,
   formatMach,
   formatModes,
-  formatWind,
   padBearing,
   wakeLetter,
 } from '../lib/format';
@@ -17,7 +17,7 @@ import { magneticTrack, selected, snapshotVersion } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Position, Track } from '../state/track';
 import { trackStore } from '../state/tracks';
-import { Divider, SectionTitle } from '../ui/Section';
+import { Divider } from '../ui/Section';
 import { Window } from '../ui/Window';
 
 import s from './DetailPanel.module.css';
@@ -36,18 +36,11 @@ interface Reading {
 
 const NONE: Reading = { v: '---' };
 
-/** Latitude and longitude as two readings; a fix that is not live carries its caveat on LON. */
-function positionReadings(p: Position): [Reading, Reading] {
-  if (p.kind === 'none') return [NONE, NONE];
-  const lat = { v: p.lat.toFixed(5) };
-  const lon = p.lon.toFixed(5);
-  switch (p.kind) {
-    case 'last':
-      return [lat, { v: lon, unit: 'LAST KNOWN' }];
-    default:
-      return [lat, { v: lon }];
-  }
-}
+/** How long ago the target was last heard, and how long ago with a position. */
+const ageReading = (t: Track): Reading => ({
+  v: `${formatAge(t.seen)} / ${formatAge(t.seenPos)}`,
+  unit: 's',
+});
 
 function altitudeReading(
   alt: number | 'ground' | undefined,
@@ -89,6 +82,12 @@ function trackReading(t: Track): Reading {
   const mag = magneticTrack(t);
   if (t.track === undefined || mag === undefined) return NONE;
   return { v: `${padBearing(mag)}°`, also: `${padBearing(t.track)}°`, alsoUnit: 'T' };
+}
+
+/** Where the wind blows from, then how fast; blank unless both are known. */
+function windReading(dir: number | undefined, speed: number | undefined): Reading {
+  if (dir === undefined || speed === undefined) return NONE;
+  return { v: `${padBearing(dir)}°`, also: String(Math.round(speed)), alsoUnit: 'kt' };
 }
 
 const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
@@ -138,6 +137,28 @@ function Cell(props: {
   );
 }
 
+/** One coordinate of the position, which owns up to a fix that is no longer live. */
+function Coordinate(props: { position: Position; axis: 'lat' | 'lon' }) {
+  const name = () => props.axis.toUpperCase();
+  return (
+    <Cell
+      k={props.position.kind === 'last' ? `LAST ${name()}` : name()}
+      r={props.position.kind === 'none' ? NONE : { v: props.position[props.axis].toFixed(5) }}
+      dim={props.position.kind !== 'live'}
+    />
+  );
+}
+
+/** Readings that belong together, under the name that stands to their left. */
+function Group(props: { name: string; children: JSX.Element }) {
+  return (
+    <div class={s.group}>
+      <div class={s.name}>{props.name}</div>
+      <div class={s.grid}>{props.children}</div>
+    </div>
+  );
+}
+
 export function DetailPanel() {
   const track = createMemo(() => {
     snapshotVersion();
@@ -145,7 +166,7 @@ export function DetailPanel() {
     return hex ? (trackStore.tracks.get(hex) ?? null) : null;
   });
   return (
-    <Window id="detail" title="Target Detail">
+    <Window id="detail">
       <Show
         when={track()}
         fallback={<div class={s.empty}>{selected() ? 'NOT IN FEED' : 'NO TARGET SELECTED'}</div>}
@@ -154,84 +175,66 @@ export function DetailPanel() {
           const ecode = () => emergencyCode(t().squawk, t().emergency);
           return (
             <>
-              <div class={s.callsign}>
-                {trackLabel(t())}
-                <Show when={ecode()}>
-                  <span class={s.badge}>{ecode()}</span>
+              <div class={s.head}>
+                <div class={s.callsign}>
+                  {trackLabel(t())}
+                  <Show when={ecode()}>
+                    <span class={s.badge}>{ecode()}</span>
+                  </Show>
+                </div>
+                <Show when={t().description}>
+                  <div class={s.description}>{t().description}</div>
                 </Show>
               </div>
-              <Show when={t().description}>
-                <div class={s.description}>{t().description}</div>
-              </Show>
-              <div class={cx(s.grid, s.identity)}>
+              <Group name="ID">
                 <Cell k="HEX" r={{ v: t().hex.toUpperCase() }} />
                 <Cell k="SQUAWK" r={plain(t().squawk)} tone={ecode() ? 'alert' : undefined} />
                 <Cell
                   k="TYPE"
                   r={typeReading(t().type, t().category)}
-                  tone={t().type === undefined ? undefined : 'enriched'}
+                  tone="enriched"
                   dim={t().type === undefined}
                 />
                 <Cell k="REG" r={plain(t().registration)} tone="enriched" />
-              </div>
+              </Group>
               <Divider />
-              <SectionTitle>FLIGHT</SectionTitle>
-              <div class={s.grid}>
+              <Group name="FLT">
                 <Cell k="ALT" r={altitudeReading(t().alt, t().verticalRate)} />
                 <Cell k="VS" r={signed(t().verticalRate, 'fpm')} />
                 <Cell k="GS" r={num(t().gs, 'kt')} />
                 <Cell k="TRK" r={trackReading(t())} tone="enriched" />
-                <Cell
-                  k="LAT"
-                  r={positionReadings(t().position)[0]}
-                  dim={t().position.kind !== 'live'}
-                />
-                <Cell
-                  k="LON"
-                  r={positionReadings(t().position)[1]}
-                  dim={t().position.kind !== 'live'}
-                />
-              </div>
+              </Group>
               <Divider />
-              <SectionTitle>AIR DATA</SectionTitle>
-              <div class={s.grid}>
-                <Cell k="TAS" r={num(t().tas, 'kt')} />
-                <Cell k="IAS" r={num(t().ias, 'kt')} />
-                <Cell
-                  k="MACH"
-                  r={plain(t().mach === undefined ? undefined : formatMach(t().mach))}
-                />
-                <Cell
-                  k="WIND"
-                  r={
-                    t().windDir === undefined || t().windSpeed === undefined
-                      ? NONE
-                      : { v: formatWind(t().windDir, t().windSpeed), unit: 'kt' }
-                  }
-                />
-                <Cell k="OAT" r={signed(t().oat, '°C')} />
-                <Cell k="TAT" r={signed(t().tat, '°C')} />
-              </div>
-              <Divider />
-              <SectionTitle>NAV</SectionTitle>
-              <div class={s.grid}>
+              <Group name="NAV">
                 <Cell k="SEL ALT" r={selectedReading(t().selAlt)} />
                 <Cell k="FMS ALT" r={selectedReading(t().fmsAlt)} />
                 <Cell k="SEL HDG" r={bearing(t().selHeading)} />
                 <Cell k="QNH" r={num(inHg(t().navQnh), 'inHg', 2)} />
                 <Cell k="MODES" r={plain(formatModes(t().navModes))} wide />
-              </div>
+              </Group>
               <Divider />
-              <SectionTitle>SIGNAL</SectionTitle>
-              <div class={s.grid}>
+              <Group name="AIR">
+                <Cell k="IAS" r={num(t().ias, 'kt')} />
+                <Cell k="TAS" r={num(t().tas, 'kt')} />
+                <Cell k="MACH" r={{ v: formatMach(t().mach) }} />
+                <Cell k="WIND" r={windReading(t().windDir, t().windSpeed)} />
+                <Cell k="OAT" r={signed(t().oat, '°C')} />
+                <Cell k="TAT" r={signed(t().tat, '°C')} />
+              </Group>
+              <Divider />
+              <Group name="POS">
+                <Coordinate position={t().position} axis="lat" />
+                <Coordinate position={t().position} axis="lon" />
                 <Cell k="NIC" r={num(t().nic, '')} />
                 <Cell k="NACP" r={num(t().nacP, '')} />
-                <Cell k="MSGS" r={num(t().messages, '')} />
-                <Cell k="RSSI" r={num(t().rssi, 'dB', 1)} />
-                <Cell k="SEEN" r={num(t().seen, 's', 1)} />
-                <Cell k="POS" r={num(t().seenPos, 's', 1)} dim={isStale(t())} />
+              </Group>
+              <Divider />
+              <Group name="RX">
                 <Cell k="SRC" r={{ v: t().source.toUpperCase() }} />
-              </div>
+                <Cell k="RSSI" r={num(t().rssi, 'dB', 1)} />
+                <Cell k="MSGS" r={num(t().messages, '')} />
+                <Cell k="SEEN / POS" r={ageReading(t())} dim={isStale(t())} />
+              </Group>
             </>
           );
         }}

@@ -1,6 +1,6 @@
 .mode {
   position: fixed;
-  top: 38px;
+  top: calc(var(--topbar-bottom) + var(--space-5));
   left: 50%;
   transform: translateX(-50%);
   padding: var(--space-1) var(--space-5);
