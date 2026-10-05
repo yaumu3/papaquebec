@@ -24,7 +24,8 @@ const PAIR_WITHIN_S: f64 = 10.0;
 /// no longer heard. A fix lapses with the rest, long before the aircraft could
 /// have flown the 180 NM within which a lone position is placed by it.
 const LAPSE_S: f64 = 60.0;
-/// A callsign is kept longer: it stays true of the flight while it is not said.
+/// A callsign and a category are kept longer: they stay true of the flight
+/// while they are not said.
 const IDENTIFICATION_LAPSE_S: f64 = 15.0 * 60.0;
 /// Further than any receiver hears, so a position beyond is a wrong one; readsb's default.
 const MAX_RANGE_NM: f64 = 300.0;
@@ -319,7 +320,10 @@ impl Tracked {
         Aircraft {
             address: Some(self.address),
             identification: self.identification.within(IDENTIFICATION_LAPSE_S, now_s),
-            emitter_category: self.emitter_category.at(now_s).map(Into::into),
+            emitter_category: self
+                .emitter_category
+                .within(IDENTIFICATION_LAPSE_S, now_s)
+                .map(Into::into),
             mode_a_code: self.mode_a_code.at(now_s),
             emergency_priority_status: self.emergency_priority_status.at(now_s).map(Into::into),
             lat_deg: fix.map(|fix| fix.position.lat_deg),
@@ -1133,24 +1137,28 @@ mod tests {
     fn what_is_no_longer_said_lapses_after_a_minute_while_the_aircraft_is_heard() {
         // Arrange: only all-call replies after the first seconds
         let here = || said(Report::AllCall { on_ground: None });
+        let identity = Report::Identity {
+            mode_a_code: 0o2431,
+            on_ground: None,
+        };
         let mut traffic = hearing([
-            (said(identification("TEST01")), 100.0),
+            (said(identity), 100.0),
             (said(velocity(290.0, 235.0)), 105.0),
             (here(), 150.0),
             (here(), 164.0),
         ]);
 
-        // Act: a minute after the identification, and a minute after the velocity
+        // Act: a minute after the identity reply, and a minute after the velocity
         let snapshots = [160.0, 165.0].map(|now_s| traffic.snapshot(now_s));
 
         // Assert
         let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
-        let said = known.map(|a| (a.emitter_category, a.ground_speed_kt));
+        let said = known.map(|a| (a.mode_a_code, a.ground_speed_kt));
         assert_eq!(said, [(None, Some(290.0)), (None, None)]);
     }
 
     #[test]
-    fn callsign_is_kept_for_fifteen_minutes_while_the_aircraft_is_heard() {
+    fn callsign_and_category_are_kept_for_fifteen_minutes_while_the_aircraft_is_heard() {
         // Arrange: only an all-call reply after the identification
         let mut traffic = hearing([
             (said(identification("TEST01")), 100.0),
@@ -1161,8 +1169,10 @@ mod tests {
         let snapshots = [999.9, 1000.0].map(|now_s| traffic.snapshot(now_s));
 
         // Assert
-        let callsigns = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0).identification);
-        assert_eq!(callsigns, [Some("TEST01".into()), None]);
+        let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
+        let kept = known.map(|a| (a.identification, a.emitter_category));
+        let said = (Some("TEST01".into()), Some(EmitterCategory::A3Large.into()));
+        assert_eq!(kept, [said, (None, None)]);
     }
 
     #[test]
