@@ -5,9 +5,9 @@ import { cx } from '../design/cx';
 import { formatAltitude } from '../lib/altitude';
 import { climbArrow, climbState, formatGsWake, padTrack } from '../lib/format';
 import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rules';
-import { classify } from '../state/filter';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import {
+  isFiltered,
   listSort,
   magneticTrack,
   selected,
@@ -34,9 +34,13 @@ const COLUMNS: [SortKey, string][] = [
   ['source', 'SRC'],
 ];
 
-/** Row tone: emergency over stale over ground over climb state, matching the scope's colors. */
+/**
+ * Row tone: emergency over filtered over stale over ground over climb state. The scope's colors,
+ * but for a target the filter reduces, which the list dims.
+ */
 function rowTone(t: Track): string | undefined {
   if (isEmergency(t)) return s.emergency;
+  if (isFiltered(t)) return s.filtered;
   if (isStale(t)) return s.stale;
   if (t.alt === 'ground') return s.ground;
   const c = climbState(t.verticalRate);
@@ -51,10 +55,7 @@ function formatDistance(t: Track): string {
 export function ListPanel() {
   const rows = createMemo(() => {
     snapshotVersion();
-    const shown = [...trackStore.tracks.values()].filter(
-      (t) => classify(t, settings.filter, settings.altimeter) === 'shown',
-    );
-    return sortTracks(shown, listSort());
+    return sortTracks([...trackStore.tracks.values()], listSort());
   });
   return (
     <Window id="list" class={s.panel} bodyClass={s.body}>
