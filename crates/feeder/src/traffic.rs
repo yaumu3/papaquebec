@@ -34,6 +34,8 @@ const MAX_RANGE_NM: f64 = 300.0;
 pub struct Traffic {
     site: Position,
     aircraft: BTreeMap<(i32, u32), Tracked>,
+    /// What is still kept of the aircraft forgotten, for when they are heard again.
+    remembered: BTreeMap<(i32, u32), Remembered>,
     messages: u64,
 }
 
@@ -44,6 +46,7 @@ impl Traffic {
         Self {
             site,
             aircraft: BTreeMap::new(),
+            remembered: BTreeMap::new(),
             messages: 0,
         }
     }
@@ -54,10 +57,12 @@ impl Traffic {
     /// known; of any other, the message is taken for a damaged one.
     pub fn hear(&mut self, observation: &Observation, now_s: f64) {
         let Address { value, r#type } = observation.address;
-        let tracked = match (self.aircraft.entry((r#type, value)), observation.trust) {
+        let key = (r#type, value);
+        let tracked = match (self.aircraft.entry(key), observation.trust) {
             (Entry::Occupied(known), _) => known.into_mut(),
             (Entry::Vacant(unknown), Trust::Announced) => unknown.insert(Tracked {
                 address: observation.address,
+                remembered: self.remembered.remove(&key).unwrap_or_default(),
                 ..Tracked::default()
             }),
             (Entry::Vacant(_), Trust::Recovered) => return,
@@ -67,10 +72,16 @@ impl Traffic {
     }
 
     /// The aircraft as they are known at `now_s`, in the order of their
-    /// addresses. Those no longer heard are forgotten.
+    /// addresses. Those no longer heard are forgotten, but for what is
+    /// remembered of them.
     pub fn snapshot(&mut self, now_s: f64) -> Snapshot {
-        self.aircraft
-            .retain(|_, tracked| now_s - tracked.seen_s < LAPSE_S);
+        let forgotten = self
+            .aircraft
+            .extract_if(.., |_, tracked| now_s - tracked.seen_s >= LAPSE_S);
+        self.remembered
+            .extend(forgotten.map(|(key, tracked)| (key, tracked.remembered)));
+        self.remembered
+            .retain(|_, remembered| remembered.at(now_s) != (None, None));
         let listed = self
             .aircraft
             .values()
@@ -131,7 +142,7 @@ struct Fix {
     source: Source,
 }
 
-/// What is kept of an aircraft longer than the rest.
+/// What is kept of an aircraft longer than the rest, and when it is forgotten.
 #[derive(Default)]
 struct Remembered {
     identification: Said<String>,
@@ -1149,6 +1160,41 @@ mod tests {
         // Assert
         assert_eq!(forgetting.aircraft, vec![]);
         assert_eq!(traffic.snapshot(173.0).aircraft, vec![]);
+    }
+
+    #[test]
+    fn aircraft_forgotten_keeps_its_callsign_and_category_for_when_it_is_heard_again() {
+        // Arrange: heard again without saying either
+        let mut traffic = after([identification("TEST01"), velocity(290.0, 235.0)]);
+        let forgetting = traffic.snapshot(170.0);
+        for now_s in [400.0, 401.0] {
+            traffic.hear(&said(Report::AllCall { on_ground: None }), now_s);
+        }
+
+        // Act
+        let mut snapshot = traffic.snapshot(402.0);
+
+        // Assert: all else starts anew
+        assert_eq!(forgetting.aircraft, vec![]);
+        let known = snapshot.aircraft.remove(0);
+        assert_eq!(known.identification.as_deref(), Some("TEST01"));
+        assert_eq!(known.emitter_category(), EmitterCategory::A3Large);
+        assert_eq!(known.reception.and_then(|r| r.messages), Some(2));
+    }
+
+    #[test]
+    fn nothing_is_kept_of_an_aircraft_forgotten_once_its_callsign_and_category_lapse() {
+        // Arrange
+        let mut traffic = after([identification("TEST01"), velocity(290.0, 235.0)]);
+
+        // Act: just short of fifteen minutes after the identification, and fifteen minutes after it
+        let kept = [999.9, 1000.0].map(|now_s| {
+            traffic.snapshot(now_s);
+            traffic.remembered.len()
+        });
+
+        // Assert
+        assert_eq!(kept, [1, 0]);
     }
 
     #[test]
