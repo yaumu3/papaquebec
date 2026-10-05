@@ -24,6 +24,8 @@ const PAIR_WITHIN_S: f64 = 10.0;
 /// no longer heard. A fix lapses with the rest, long before the aircraft could
 /// have flown the 180 NM within which a lone position is placed by it.
 const LAPSE_S: f64 = 60.0;
+/// A callsign is kept longer: it stays true of the flight while it is not said.
+const IDENTIFICATION_LAPSE_S: f64 = 15.0 * 60.0;
 /// Further than any receiver hears, so a position beyond is a wrong one; readsb's default.
 const MAX_RANGE_NM: f64 = 300.0;
 
@@ -99,18 +101,24 @@ impl<T: Clone> Said<T> {
 
     /// What was said, unless it has lapsed by `now_s`.
     fn at(&self, now_s: f64) -> Option<T> {
-        self.lasting(now_s).map(|(said, _)| said.clone())
+        self.within(LAPSE_S, now_s)
+    }
+
+    /// What was said less than `lapse_s` before `now_s`.
+    fn within(&self, lapse_s: f64, now_s: f64) -> Option<T> {
+        self.lasting(lapse_s, now_s).map(|(said, _)| said.clone())
     }
 
     /// How long before `now_s` it was said, unless it has lapsed.
     fn age_s(&self, now_s: f64) -> Option<f64> {
-        self.lasting(now_s).map(|(_, said_s)| now_s - said_s)
+        self.lasting(LAPSE_S, now_s)
+            .map(|(_, said_s)| now_s - said_s)
     }
 
-    fn lasting(&self, now_s: f64) -> Option<&(T, f64)> {
+    fn lasting(&self, lapse_s: f64, now_s: f64) -> Option<&(T, f64)> {
         self.0
             .as_ref()
-            .filter(|(_, said_s)| now_s - said_s < LAPSE_S)
+            .filter(|(_, said_s)| now_s - said_s < lapse_s)
     }
 }
 
@@ -310,7 +318,7 @@ impl Tracked {
         };
         Aircraft {
             address: Some(self.address),
-            identification: self.identification.at(now_s),
+            identification: self.identification.within(IDENTIFICATION_LAPSE_S, now_s),
             emitter_category: self.emitter_category.at(now_s).map(Into::into),
             mode_a_code: self.mode_a_code.at(now_s),
             emergency_priority_status: self.emergency_priority_status.at(now_s).map(Into::into),
@@ -1137,8 +1145,24 @@ mod tests {
 
         // Assert
         let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
-        let said = known.map(|a| (a.identification, a.emitter_category, a.ground_speed_kt));
-        assert_eq!(said, [(None, None, Some(290.0)), (None, None, None)]);
+        let said = known.map(|a| (a.emitter_category, a.ground_speed_kt));
+        assert_eq!(said, [(None, Some(290.0)), (None, None)]);
+    }
+
+    #[test]
+    fn callsign_is_kept_for_fifteen_minutes_while_the_aircraft_is_heard() {
+        // Arrange: only an all-call reply after the identification
+        let mut traffic = hearing([
+            (said(identification("TEST01")), 100.0),
+            (said(Report::AllCall { on_ground: None }), 999.0),
+        ]);
+
+        // Act: just short of fifteen minutes after the identification, and fifteen minutes after it
+        let snapshots = [999.9, 1000.0].map(|now_s| traffic.snapshot(now_s));
+
+        // Assert
+        let callsigns = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0).identification);
+        assert_eq!(callsigns, [Some("TEST01".into()), None]);
     }
 
     #[test]
