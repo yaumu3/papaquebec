@@ -38,18 +38,15 @@ export function keepUnscrolled(win: ScrollHost): () => void {
   return () => win.removeEventListener('resize', onResize);
 }
 
-/** What takes a turn on a phone: a panel in the sheet, or the about dialog. */
-export type SheetId = PanelId | 'about';
-
-/** What has the turn on a phone; null when the sheet is closed and the dialog too. Not persisted. */
-export const [activeSheet, setActiveSheet] = createSignal<SheetId | null>(null);
+/** The panel that holds the sheet on a phone; null when the sheet is closed. Not persisted. */
+export const [activeSheet, setActiveSheet] = createSignal<PanelId | null>(null);
 
 /** Tapping the open panel's tab closes the sheet; any other tab swaps to that panel. */
 export function nextSheet<T extends string>(current: T | null, tapped: T): T | null {
   return current === tapped ? null : tapped;
 }
 
-export function toggleSheet(id: SheetId): void {
+export function toggleSheet(id: PanelId): void {
   setActiveSheet((cur) => nextSheet(cur, id));
 }
 

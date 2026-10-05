@@ -52,7 +52,7 @@
   /* Layout */
   --control-height: 20px;
   --topbar-height: 32px;
-  --tabbar-height: 44px;
+  --tabbar-height: 48px;
   /* Where the top bar ends, below any notch. */
   --topbar-bottom: calc(var(--topbar-height) + env(safe-area-inset-top));
   --panel-top: calc(var(--topbar-bottom) + var(--edge));

@@ -53,19 +53,3 @@
   grid-column: 1 / -1;
   border-top: 1px solid var(--panel-border);
 }
-@media (max-width: 720px) {
-  /* Each subject above its source, with the terms at the other end of the line. */
-  .body {
-    grid-template-columns: 1fr auto;
-    gap: var(--space-1) var(--space-6);
-  }
-  .subject {
-    grid-column: 1 / -1;
-  }
-  .subject:not(:first-child) {
-    margin-top: var(--space-3);
-  }
-  .divider {
-    margin-top: var(--space-3);
-  }
-}

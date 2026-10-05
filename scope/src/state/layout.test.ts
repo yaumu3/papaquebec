@@ -89,9 +89,9 @@ describe('nextSheet', () => {
 });
 
 describe('toggleSheet', () => {
-  it('takes the turn from the about dialog for the panel whose tab is tapped', () => {
+  it('takes the sheet from the open panel for the one whose tab is tapped', () => {
     // Arrange
-    setActiveSheet('about');
+    setActiveSheet('list');
 
     // Act
     toggleSheet('maps');
