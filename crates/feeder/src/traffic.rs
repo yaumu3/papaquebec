@@ -4,7 +4,7 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 
 use crate::cpr::{self, Cpr};
-use crate::field::Airspeed;
+use crate::field::{Airspeed, Identification};
 use crate::message::{Observation, Report, Trust};
 use crate::position::Position;
 use crate::proto::{
@@ -24,6 +24,9 @@ const PAIR_WITHIN_S: f64 = 10.0;
 /// no longer heard. A fix lapses with the rest, long before the aircraft could
 /// have flown the 180 NM within which a lone position is placed by it.
 const LAPSE_S: f64 = 60.0;
+/// A callsign and a category are kept longer: they stay true of the flight
+/// while they are not said.
+const IDENTIFICATION_LAPSE_S: f64 = 15.0 * 60.0;
 /// Further than any receiver hears, so a position beyond is a wrong one; readsb's default.
 const MAX_RANGE_NM: f64 = 300.0;
 
@@ -31,6 +34,8 @@ const MAX_RANGE_NM: f64 = 300.0;
 pub struct Traffic {
     site: Position,
     aircraft: BTreeMap<(i32, u32), Tracked>,
+    /// What is still kept of the aircraft forgotten, for when they are heard again.
+    remembered: BTreeMap<(i32, u32), Remembered>,
     messages: u64,
 }
 
@@ -41,6 +46,7 @@ impl Traffic {
         Self {
             site,
             aircraft: BTreeMap::new(),
+            remembered: BTreeMap::new(),
             messages: 0,
         }
     }
@@ -51,10 +57,12 @@ impl Traffic {
     /// known; of any other, the message is taken for a damaged one.
     pub fn hear(&mut self, observation: &Observation, now_s: f64) {
         let Address { value, r#type } = observation.address;
-        let tracked = match (self.aircraft.entry((r#type, value)), observation.trust) {
+        let key = (r#type, value);
+        let tracked = match (self.aircraft.entry(key), observation.trust) {
             (Entry::Occupied(known), _) => known.into_mut(),
             (Entry::Vacant(unknown), Trust::Announced) => unknown.insert(Tracked {
                 address: observation.address,
+                remembered: self.remembered.remove(&key).unwrap_or_default(),
                 ..Tracked::default()
             }),
             (Entry::Vacant(_), Trust::Recovered) => return,
@@ -64,10 +72,16 @@ impl Traffic {
     }
 
     /// The aircraft as they are known at `now_s`, in the order of their
-    /// addresses. Those no longer heard are forgotten.
+    /// addresses. Those no longer heard are forgotten, but for what is
+    /// remembered of them.
     pub fn snapshot(&mut self, now_s: f64) -> Snapshot {
-        self.aircraft
-            .retain(|_, tracked| now_s - tracked.seen_s < LAPSE_S);
+        let forgotten = self
+            .aircraft
+            .extract_if(.., |_, tracked| now_s - tracked.seen_s >= LAPSE_S);
+        self.remembered
+            .extend(forgotten.map(|(key, tracked)| (key, tracked.remembered)));
+        self.remembered
+            .retain(|_, remembered| remembered.at(now_s) != (None, None));
         let listed = self
             .aircraft
             .values()
@@ -99,18 +113,24 @@ impl<T: Clone> Said<T> {
 
     /// What was said, unless it has lapsed by `now_s`.
     fn at(&self, now_s: f64) -> Option<T> {
-        self.lasting(now_s).map(|(said, _)| said.clone())
+        self.within(LAPSE_S, now_s)
+    }
+
+    /// What was said less than `lapse_s` before `now_s`.
+    fn within(&self, lapse_s: f64, now_s: f64) -> Option<T> {
+        self.lasting(lapse_s, now_s).map(|(said, _)| said.clone())
     }
 
     /// How long before `now_s` it was said, unless it has lapsed.
     fn age_s(&self, now_s: f64) -> Option<f64> {
-        self.lasting(now_s).map(|(_, said_s)| now_s - said_s)
+        self.lasting(LAPSE_S, now_s)
+            .map(|(_, said_s)| now_s - said_s)
     }
 
-    fn lasting(&self, now_s: f64) -> Option<&(T, f64)> {
+    fn lasting(&self, lapse_s: f64, now_s: f64) -> Option<&(T, f64)> {
         self.0
             .as_ref()
-            .filter(|(_, said_s)| now_s - said_s < LAPSE_S)
+            .filter(|(_, said_s)| now_s - said_s < lapse_s)
     }
 }
 
@@ -122,6 +142,31 @@ struct Fix {
     source: Source,
 }
 
+/// What is kept of an aircraft longer than the rest, and when it is forgotten.
+#[derive(Default)]
+struct Remembered {
+    identification: Said<String>,
+    emitter_category: Said<EmitterCategory>,
+}
+
+impl Remembered {
+    /// Takes what an identification message heard at `now_s` says.
+    fn keep(&mut self, said: &Identification, now_s: f64) {
+        self.identification.keep(said.identification.clone(), now_s);
+        self.emitter_category
+            .keep(Some(said.emitter_category), now_s);
+    }
+
+    /// The callsign and the category, each unless it has lapsed by `now_s`.
+    fn at(&self, now_s: f64) -> (Option<String>, Option<EmitterCategory>) {
+        let lapse_s = IDENTIFICATION_LAPSE_S;
+        (
+            self.identification.within(lapse_s, now_s),
+            self.emitter_category.within(lapse_s, now_s),
+        )
+    }
+}
+
 /// One aircraft, as its messages have told of it so far.
 #[derive(Default)]
 struct Tracked {
@@ -130,8 +175,7 @@ struct Tracked {
     seen_s: f64,
     /// The power of each of the last messages, against full scale.
     powers: VecDeque<f64>,
-    identification: Said<String>,
-    emitter_category: Said<EmitterCategory>,
+    remembered: Remembered,
     mode_a_code: Said<u32>,
     emergency_priority_status: Said<EmergencyPriorityStatus>,
     on_ground: Said<bool>,
@@ -198,11 +242,7 @@ impl Tracked {
     /// Takes what a message says other than where the aircraft is.
     fn note(&mut self, report: &Report, now_s: f64) {
         match report {
-            Report::Identification(said) => {
-                self.identification.keep(said.identification.clone(), now_s);
-                self.emitter_category
-                    .keep(Some(said.emitter_category), now_s);
-            }
+            Report::Identification(said) => self.remembered.keep(said, now_s),
             Report::Velocity(said) => {
                 self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
                 self.track_deg.keep(said.track_deg, now_s);
@@ -308,10 +348,11 @@ impl Tracked {
         } else {
             AirGroundState::Unspecified
         };
+        let (identification, emitter_category) = self.remembered.at(now_s);
         Aircraft {
             address: Some(self.address),
-            identification: self.identification.at(now_s),
-            emitter_category: self.emitter_category.at(now_s).map(Into::into),
+            identification,
+            emitter_category: emitter_category.map(Into::into),
             mode_a_code: self.mode_a_code.at(now_s),
             emergency_priority_status: self.emergency_priority_status.at(now_s).map(Into::into),
             lat_deg: fix.map(|fix| fix.position.lat_deg),
@@ -1122,23 +1163,80 @@ mod tests {
     }
 
     #[test]
+    fn aircraft_forgotten_keeps_its_callsign_and_category_for_when_it_is_heard_again() {
+        // Arrange: heard again without saying either
+        let mut traffic = after([identification("TEST01"), velocity(290.0, 235.0)]);
+        let forgetting = traffic.snapshot(170.0);
+        for now_s in [400.0, 401.0] {
+            traffic.hear(&said(Report::AllCall { on_ground: None }), now_s);
+        }
+
+        // Act
+        let mut snapshot = traffic.snapshot(402.0);
+
+        // Assert: all else starts anew
+        assert_eq!(forgetting.aircraft, vec![]);
+        let known = snapshot.aircraft.remove(0);
+        assert_eq!(known.identification.as_deref(), Some("TEST01"));
+        assert_eq!(known.emitter_category(), EmitterCategory::A3Large);
+        assert_eq!(known.reception.and_then(|r| r.messages), Some(2));
+    }
+
+    #[test]
+    fn nothing_is_kept_of_an_aircraft_forgotten_once_its_callsign_and_category_lapse() {
+        // Arrange
+        let mut traffic = after([identification("TEST01"), velocity(290.0, 235.0)]);
+
+        // Act: just short of fifteen minutes after the identification, and fifteen minutes after it
+        let kept = [999.9, 1000.0].map(|now_s| {
+            traffic.snapshot(now_s);
+            traffic.remembered.len()
+        });
+
+        // Assert
+        assert_eq!(kept, [1, 0]);
+    }
+
+    #[test]
     fn what_is_no_longer_said_lapses_after_a_minute_while_the_aircraft_is_heard() {
         // Arrange: only all-call replies after the first seconds
         let here = || said(Report::AllCall { on_ground: None });
+        let identity = Report::Identity {
+            mode_a_code: 0o2431,
+            on_ground: None,
+        };
         let mut traffic = hearing([
-            (said(identification("TEST01")), 100.0),
+            (said(identity), 100.0),
             (said(velocity(290.0, 235.0)), 105.0),
             (here(), 150.0),
             (here(), 164.0),
         ]);
 
-        // Act: a minute after the identification, and a minute after the velocity
+        // Act: a minute after the identity reply, and a minute after the velocity
         let snapshots = [160.0, 165.0].map(|now_s| traffic.snapshot(now_s));
 
         // Assert
         let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
-        let said = known.map(|a| (a.identification, a.emitter_category, a.ground_speed_kt));
-        assert_eq!(said, [(None, None, Some(290.0)), (None, None, None)]);
+        let said = known.map(|a| (a.mode_a_code, a.ground_speed_kt));
+        assert_eq!(said, [(None, Some(290.0)), (None, None)]);
+    }
+
+    #[test]
+    fn callsign_and_category_are_kept_for_fifteen_minutes_while_the_aircraft_is_heard() {
+        // Arrange: only an all-call reply after the identification
+        let mut traffic = hearing([
+            (said(identification("TEST01")), 100.0),
+            (said(Report::AllCall { on_ground: None }), 999.0),
+        ]);
+
+        // Act: just short of fifteen minutes after the identification, and fifteen minutes after it
+        let snapshots = [999.9, 1000.0].map(|now_s| traffic.snapshot(now_s));
+
+        // Assert
+        let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
+        let kept = known.map(|a| (a.identification, a.emitter_category));
+        let said = (Some("TEST01".into()), Some(EmitterCategory::A3Large.into()));
+        assert_eq!(kept, [said, (None, None)]);
     }
 
     #[test]
