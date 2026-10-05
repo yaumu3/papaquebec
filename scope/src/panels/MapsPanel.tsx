@@ -24,15 +24,16 @@ import { Window } from '../ui/Window';
 
 import s from './MapsPanel.module.css';
 
+/** Two to a row: what the scope is drawn over, then areas, ground facilities and the route structure. */
 const LAYERS: [LayerKey, string][] = [
   ['coast', 'COAST'],
-  ['airspace', 'AIRSPACE'],
-  ['waypoints', 'WAYPTS'],
-  ['airways', 'AIRWAYS'],
-  ['navaids', 'NAVAIDS'],
   ['rings', 'RINGS'],
+  ['airspace', 'AIRSPACE'],
   ['sector', 'SECTOR'],
   ['airports', 'AIRPORTS'],
+  ['navaids', 'NAVAIDS'],
+  ['waypoints', 'WAYPTS'],
+  ['airways', 'AIRWAYS'],
 ];
 
 /** The chosen file goes through the strict schema; the note reports the outcome. */
