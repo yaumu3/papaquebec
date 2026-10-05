@@ -2,7 +2,15 @@ import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
 import { Shape } from '../protocol';
-import { airspaceColor, isStale, targetShape, THEME, trackColor, trackLabel } from './rules';
+import {
+  airspaceColor,
+  isStale,
+  targetShape,
+  THEME,
+  trackColor,
+  trackLabel,
+  typeLabel,
+} from './rules';
 import { makeTrack as track } from './trackFixture';
 
 describe('isStale', () => {
@@ -97,5 +105,22 @@ describe('airspaceColor', () => {
     // Assert
     expect(colors.slice(0, 5)).toEqual(Array(5).fill(THEME.airspace));
     expect(colors.slice(5)).toEqual(Array(6).fill(THEME.airspaceDim));
+  });
+});
+
+describe('typeLabel', () => {
+  it('names the type, else brackets the category, else brackets dashes', () => {
+    // Arrange
+    const cases = [
+      track({ type: 'B789', category: 'A3' }),
+      track({ type: undefined, category: 'A3' }),
+      track({ type: undefined, category: undefined }),
+    ];
+
+    // Act
+    const labels = cases.map(typeLabel);
+
+    // Assert
+    expect(labels).toEqual(['B789', '[A3]', '[--]']);
   });
 });

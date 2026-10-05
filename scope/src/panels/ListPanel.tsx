@@ -4,7 +4,7 @@ import { targetMenu } from '../canvas/menus';
 import { cx } from '../design/cx';
 import { formatAltitude } from '../lib/altitude';
 import { climbArrow, climbState, formatGsWake, padTrack } from '../lib/format';
-import { isEmergency, isStale, trackLabel } from '../render/scene/rules';
+import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rules';
 import { classify } from '../state/filter';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import {
@@ -84,7 +84,7 @@ export function ListPanel() {
               }}
             >
               <span class={cx(!t.flight && !t.registration && s.hex)}>{trackLabel(t)}</span>
-              <span>{t.type ?? `[${t.category ?? '--'}]`}</span>
+              <span>{typeLabel(t)}</span>
               <span>
                 {formatAltitude(t.alt, settings.altimeter)}
                 {climbArrow(t.verticalRate)}

@@ -4,7 +4,7 @@ import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/f
 import type { Track } from '../../state/track';
 import { DB_FONT_PX, DB_HEIGHT, DB_LINE } from '../layout/labels';
 import type { Anchor, LineBatch, TextBatch } from './pack';
-import { isEmergency, THEME, trackLabel } from './rules';
+import { isEmergency, THEME, trackLabel, typeLabel } from './rules';
 
 const DATA_BLOCK_PERIOD_SEC = 8;
 
@@ -57,8 +57,7 @@ function levelRuns(t: Track, altimeter: Altimeter): Run[] {
  */
 export function dataBlock(t: Track, nowSec: number, altimeter: Altimeter): DataBlock {
   const showType = Math.floor(nowSec / DATA_BLOCK_PERIOD_SEC) % 2 === 0;
-  const typeLabel = t.type ?? `[${t.category ?? '--'}]`;
-  const second = showType ? typeLabel : formatGsWake(t.gs, t.category);
+  const second = showType ? typeLabel(t) : formatGsWake(t.gs, t.category);
   return {
     prefix: emergencyCode(t.squawk, t.emergency),
     line1: trackLabel(t),

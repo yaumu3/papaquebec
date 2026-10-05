@@ -88,3 +88,8 @@ export function targetShape(t: Track, visibility: Visibility): Shape {
 export function trackLabel(t: Track): string {
   return t.flight ?? t.registration ?? t.hex.toUpperCase();
 }
+
+/** The type designator, else the emitter category in brackets. */
+export function typeLabel(t: Track): string {
+  return t.type ?? `[${t.category ?? '--'}]`;
+}
