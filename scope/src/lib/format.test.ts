@@ -4,6 +4,8 @@ import {
   climbArrow,
   climbState,
   emergencyCode,
+  formatAge,
+  formatDistance,
   formatGsWake,
   formatMmSs,
   formatMach,
@@ -148,5 +150,31 @@ describe('formatModes', () => {
 
     // Assert
     expect(out).toEqual(['AP VNAV ALT APP LNAV TCAS', 'AP GLIDESLOPE', undefined, undefined]);
+  });
+});
+
+describe('formatAge', () => {
+  it('counts tenths of a second up to ten, whole seconds from there, and dashes the unknown', () => {
+    // Arrange
+    const ages = [0, 1.04, 9.94, 9.96, 12.3, 45.6, undefined];
+
+    // Act
+    const out = ages.map(formatAge);
+
+    // Assert
+    expect(out).toEqual(['0.0', '1.0', '9.9', '10', '12', '46', '---']);
+  });
+});
+
+describe('formatDistance', () => {
+  it('counts tenths of a mile up to a hundred, whole miles from there, and dashes the unknown', () => {
+    // Arrange
+    const miles = [0.44, 14.5, 99.94, 99.96, 123.4, undefined];
+
+    // Act
+    const out = miles.map(formatDistance);
+
+    // Assert
+    expect(out).toEqual(['0.4', '14.5', '99.9', '100', '123', '---']);
   });
 });

@@ -108,3 +108,16 @@ export function formatWind(dir: number | undefined, speed: number | undefined): 
     ? '---'
     : `${padBearing(dir)}° / ${Math.round(speed)}`;
 }
+
+/** A quantity in tenths while those read below `wholeFrom`, whole from there on. */
+function formatTenthsBelow(value: number | undefined, wholeFrom: number): string {
+  if (value === undefined) return '---';
+  const tenths = Math.round(value * 10) / 10;
+  return tenths < wholeFrom ? tenths.toFixed(1) : String(Math.round(value));
+}
+
+/** Seconds since something was last heard: in tenths up to ten seconds. */
+export const formatAge = (seconds: number | undefined): string => formatTenthsBelow(seconds, 10);
+
+/** A distance in nautical miles: in tenths up to a hundred miles. */
+export const formatDistance = (nm: number | undefined): string => formatTenthsBelow(nm, 100);

@@ -3,7 +3,7 @@ import { createMemo, For } from 'solid-js';
 import { targetMenu } from '../canvas/menus';
 import { cx } from '../design/cx';
 import { formatAltitude } from '../lib/altitude';
-import { climbArrow, climbState, formatGsWake, padTrack } from '../lib/format';
+import { climbArrow, climbState, formatDistance, formatGsWake, padTrack } from '../lib/format';
 import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rules';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import {
@@ -47,11 +47,6 @@ function rowTone(t: Track): string | undefined {
   return c === 'climbing' ? s.climbing : c === 'descending' ? s.descending : undefined;
 }
 
-function formatDistance(t: Track): string {
-  const d = distanceFromSite(t);
-  return d === undefined ? '---' : d < 100 ? d.toFixed(1) : String(Math.round(d));
-}
-
 export function ListPanel() {
   const rows = createMemo(() => {
     snapshotVersion();
@@ -93,7 +88,7 @@ export function ListPanel() {
               <span>{formatGsWake(t.gs, t.category)}</span>
               <span>{padTrack(magneticTrack(t))}</span>
               <span>{t.squawk ?? '----'}</span>
-              <span>{formatDistance(t)}</span>
+              <span>{formatDistance(distanceFromSite(t))}</span>
               <span>{t.source.toUpperCase()}</span>
             </div>
           )}
