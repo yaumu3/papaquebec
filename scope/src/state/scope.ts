@@ -74,7 +74,6 @@ export const [rblPending, setRblPending] = createSignal<RblPending | null>(null)
 export const [rangeCursor, setRangeCursor] = createSignal<RangeCursorOrigin | null>(null);
 const [panelsSignal, setPanels] = createSignal<Record<PanelId, boolean>>({ ...persisted.panels });
 export const panels = panelsSignal;
-export const [renderInfo, setRenderInfo] = createSignal<string>('');
 export const [renderError, setRenderError] = createSignal<string | null>(null);
 
 export function togglePanel(id: PanelId, force?: boolean): void {

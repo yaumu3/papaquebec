@@ -10,7 +10,6 @@ import {
   type PanelId,
   panels,
   renderError,
-  renderInfo,
   setAboutVisible,
   snapshotVersion,
   tick,
@@ -87,11 +86,9 @@ export function TopBar() {
           {(n) => <span class={cx(s.v, tone(n().cls))}>{n().text}</span>}
         </Show>
       </div>
-      <div class={cx(s.item, s.desktopOnly)}>
-        <Show when={renderError()} fallback={renderInfo()}>
-          <span class={cx(s.v, s.err)}>GPU · {renderError()}</span>
-        </Show>
-      </div>
+      <Show when={renderError()}>
+        <div class={cx(s.item, s.err, s.desktopOnly)}>GPU · {renderError()}</div>
+      </Show>
       <div class={cx(s.buttons, s.desktopOnly)}>
         {PANELS.map(([id, label]) => (
           <Button class={s.btn} on={panels()[id]} onClick={() => togglePanel(id)}>
