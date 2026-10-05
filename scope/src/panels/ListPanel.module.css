@@ -1,4 +1,4 @@
-/* Gives way to Target Detail first, down to a few rows. */
+/* Gives way to the detail panel first, down to a few rows. */
 .panel {
   flex: 0 1000 auto;
   min-height: 120px;
@@ -8,29 +8,36 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-2);
 }
+/* Each column is as wide as its text, and they share out what the panel has left. */
 .header,
 .row {
   display: grid;
-  grid-template-columns: 62px 40px 36px 32px 30px 32px 36px 34px;
+  grid-template-columns: var(--columns);
+  justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-1);
+  padding: 3px var(--space-2);
   font-size: var(--text-sm);
   white-space: nowrap;
 }
+/* An arrow hangs beside its text, so that a label and its figures keep one edge. */
+.hang {
+  position: absolute;
+}
 .header {
   flex-shrink: 0;
-  padding-bottom: 3px;
   color: var(--text-dim);
   border-bottom: 1px solid var(--panel-border);
 }
 .sort {
+  position: relative;
   padding: 0;
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  letter-spacing: 0.3px;
   text-align: left;
+}
+/* After `.sort`, whose left it overrules. */
+.figure {
+  text-align: right;
 }
 .sort:hover {
   color: var(--text);
@@ -40,6 +47,7 @@
 }
 .rows {
   flex: 1;
+  padding-top: var(--space-1);
   overflow-y: auto;
 }
 @media (max-width: 720px) {
@@ -49,10 +57,8 @@
   .body {
     padding: 0 var(--space-5) var(--space-1);
   }
-  /* The columns keep their widths and share out what the sheet has left. */
   .header,
   .row {
-    justify-content: space-between;
     padding: var(--space-2) var(--space-1);
   }
 }
@@ -63,6 +69,7 @@
   background: var(--panel-border);
 }
 .row {
+  position: relative;
   color: var(--color-level);
   cursor: pointer;
 }
@@ -91,6 +98,7 @@
 .selected {
   background: var(--row-selected);
   color: var(--color-selected);
+  font-weight: 600;
 }
 .hex {
   color: var(--text-dim);
