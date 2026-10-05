@@ -3,7 +3,7 @@ import { Show } from 'solid-js';
 import { cx } from '../design/cx';
 import { feedNotice } from '../state/feedLine';
 import { qnhError, qnhReport, qnhStation } from '../state/qnh';
-import { qnhStatus } from '../state/qnhStatus';
+import { type QnhStatus, qnhStatus } from '../state/qnhStatus';
 import {
   aboutVisible,
   feedStatus,
@@ -36,7 +36,7 @@ const PANELS: [PanelId, string][] = [
   ['detail', 'DETAIL'],
 ];
 
-function qnh(): { cls: string; text: string } {
+function qnh(): QnhStatus {
   return qnhStatus({
     qnhInHg: settings.altimeter.qnhInHg,
     auto: settings.qnh.auto,
@@ -58,7 +58,8 @@ function messageRate(): number {
 }
 
 /** Module class for a status tone. */
-const tone = (cls: string) => (cls === 'warn' ? s.warn : cls === 'err' ? s.err : undefined);
+const tone = (cls: 'warn' | 'err' | null) =>
+  cls === 'warn' ? s.warn : cls === 'err' ? s.err : undefined;
 
 export function TopBar() {
   return (
@@ -67,7 +68,8 @@ export function TopBar() {
       <div class={s.sep} />
       <div class={s.group}>
         <span class={s.item}>
-          <span class={cx(s.v, tone(qnh().cls))}>{qnh().text}</span>
+          QNH <span class={cx(s.v, tone(qnh().cls))}>{qnh().value}</span>{' '}
+          <span class={tone(qnh().cls)}>{qnh().source}</span>
         </span>
       </div>
       <div class={s.sep} />

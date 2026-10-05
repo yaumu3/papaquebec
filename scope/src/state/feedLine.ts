@@ -42,8 +42,11 @@ export function deadReason(status: FeedStatus): string {
   return status.reason ? describeDown(status.reason) : 'no data';
 }
 
+/** How bad a status is; a good one has none. */
+export type Tone = 'warn' | 'err';
+
 export interface Notice {
-  cls: 'warn' | 'err';
+  cls: Tone;
   text: string;
 }
 

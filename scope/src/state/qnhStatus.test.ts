@@ -6,7 +6,7 @@ const now = Date.parse('2026-09-22T11:30:00Z');
 const report = { station: 'RJAA', observedAt: Date.parse('2026-09-22T11:00:00Z'), qnhInHg: 29.94 };
 
 describe('qnhStatus', () => {
-  it('shows the set value with the station and observation time when automatic', () => {
+  it('tells the set value apart from the station and observation time it came from', () => {
     // Arrange
     const input = { qnhInHg: 29.94, auto: true, station: 'RJAA', report, error: null, now };
 
@@ -14,7 +14,7 @@ describe('qnhStatus', () => {
     const out = qnhStatus(input);
 
     // Assert
-    expect(out).toEqual({ text: 'QNH 29.94 RJAA 1100Z', cls: 'good' });
+    expect(out).toEqual({ value: '29.94', source: 'RJAA 1100Z', cls: null });
   });
 
   it('marks a manual setting and a pending fetch', () => {
@@ -28,9 +28,9 @@ describe('qnhStatus', () => {
 
     // Assert
     expect(out).toEqual([
-      { text: 'QNH 29.92 MAN', cls: '' },
-      { text: 'QNH 29.92 RJAA ····', cls: 'warn' },
-      { text: 'QNH 29.92 ····', cls: 'warn' },
+      { value: '29.92', source: 'MAN', cls: null },
+      { value: '29.92', source: 'RJAA ····', cls: 'warn' },
+      { value: '29.92', source: '····', cls: 'warn' },
     ]);
   });
 
@@ -45,8 +45,8 @@ describe('qnhStatus', () => {
 
     // Assert
     expect(out).toEqual([
-      { text: 'QNH 29.94 RJAA 1100Z', cls: 'warn' },
-      { text: 'QNH 29.94 RJAA ERR', cls: 'err' },
+      { value: '29.94', source: 'RJAA 1100Z', cls: 'warn' },
+      { value: '29.94', source: 'RJAA ERR', cls: 'err' },
     ]);
   });
 });
