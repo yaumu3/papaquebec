@@ -102,13 +102,6 @@ export function formatMach(m: number | undefined): string {
   return m === undefined ? '---' : `M${m.toFixed(2)}`;
 }
 
-/** Wind as direction over speed in knots; blank unless both are known. */
-export function formatWind(dir: number | undefined, speed: number | undefined): string {
-  return dir === undefined || speed === undefined
-    ? '---'
-    : `${padBearing(dir)}° / ${Math.round(speed)}`;
-}
-
 /** A quantity in tenths while those read below `wholeFrom`, whole from there on. */
 function formatTenthsBelow(value: number | undefined, wholeFrom: number): string {
   if (value === undefined) return '---';

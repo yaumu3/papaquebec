@@ -10,7 +10,6 @@ import {
   formatMmSs,
   formatMach,
   formatModes,
-  formatWind,
   padBearing,
   wakeLetter,
 } from './format';
@@ -101,24 +100,6 @@ describe('formatMmSs / padBearing', () => {
     // Assert
     expect(t).toEqual(['0:00', '1:05', '59:59', '>1h', '--:--', '--:--']);
     expect(b).toEqual(['360', '360', '005', '359', '360', '360', '360']);
-  });
-});
-
-describe('formatWind', () => {
-  it('renders wind as direction over speed', () => {
-    // Arrange
-    const winds: [number | undefined, number | undefined][] = [
-      [255, 14],
-      [0, 3],
-      [undefined, 5],
-      [180, undefined],
-    ];
-
-    // Act
-    const w = winds.map(([dir, speed]) => formatWind(dir, speed));
-
-    // Assert
-    expect(w).toEqual(['255° / 14', '360° / 3', '---', '---']);
   });
 });
 

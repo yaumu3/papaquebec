@@ -17,18 +17,36 @@
   font-size: var(--text-sm);
   vertical-align: 2px;
 }
+/* Who it is at one end of the line, what it is at the other. */
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
 .description {
-  margin-top: var(--space-1);
+  overflow: hidden;
   color: var(--color-enriched);
   font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  column-gap: var(--space-3);
+}
+.name {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking);
 }
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-3) var(--space-4);
-}
-.identity {
-  margin-top: var(--space-3);
+  gap: var(--space-3);
 }
 .cell {
   min-width: 0;
@@ -56,8 +74,9 @@
 .tail {
   margin-left: var(--space-2);
 }
+/* Set tight: the dot's own width is room enough between two values. */
 .sep {
-  margin: 0 var(--space-2);
+  margin: 0 1px;
   color: var(--text-muted);
 }
 .also {
