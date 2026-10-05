@@ -1,10 +1,31 @@
 import type { JSX } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { activeSheet, isPhone, isShown } from '../state/layout';
+import { activeSheet, closeSheet, isPhone, isShown } from '../state/layout';
 import { type PanelId, panels } from '../state/scope';
+import { trackGrip } from './grip';
 
 import s from './Window.module.css';
+
+/** The handle of a phone's sheet: a tap or a pull down closes the sheet. */
+function Grip() {
+  const grip = trackGrip(closeSheet);
+  return (
+    <button
+      type="button"
+      class={s.grip}
+      aria-label="Close the sheet"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId);
+        grip.down(e.clientY);
+      }}
+      onPointerUp={(e) => grip.up(e.clientY)}
+      onClick={() => grip.click()}
+    >
+      <span class={s.handle} />
+    </button>
+  );
+}
 
 /** A docked panel. Desktop visibility comes from the top bar toggles, phone visibility from the sheet. */
 export function Window(props: {
@@ -18,6 +39,7 @@ export function Window(props: {
   return (
     <div class={cx(s.win, props.class, !shown() && s.hidden)}>
       <div class={s.titlebar}>{props.title}</div>
+      <Grip />
       <div class={cx(s.body, props.bodyClass)}>{props.children}</div>
     </div>
   );

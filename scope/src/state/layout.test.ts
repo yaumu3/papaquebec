@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   activeSheet,
+  closeSheet,
   isShown,
   keepUnscrolled,
   nextSheet,
@@ -98,6 +99,19 @@ describe('toggleSheet', () => {
 
     // Assert
     expect(activeSheet()).toBe('maps');
+  });
+});
+
+describe('closeSheet', () => {
+  it('takes the sheet from the panel that holds it', () => {
+    // Arrange
+    setActiveSheet('list');
+
+    // Act
+    closeSheet();
+
+    // Assert
+    expect(activeSheet()).toBeNull();
   });
 });
 

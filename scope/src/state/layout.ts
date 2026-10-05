@@ -50,6 +50,10 @@ export function toggleSheet(id: PanelId): void {
   setActiveSheet((cur) => nextSheet(cur, id));
 }
 
+export function closeSheet(): void {
+  setActiveSheet(null);
+}
+
 /** On a phone a panel shows while it holds the sheet; elsewhere while its own toggle is on. */
 export function isShown<T extends string>(
   phone: boolean,

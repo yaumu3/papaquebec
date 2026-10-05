@@ -46,8 +46,13 @@
   .panel {
     overflow-x: auto;
   }
+  .body {
+    padding: 0 var(--space-5) var(--space-1);
+  }
+  /* The columns keep their widths and share out what the sheet has left. */
   .header,
   .row {
+    justify-content: space-between;
     padding: var(--space-2) var(--space-1);
   }
 }
