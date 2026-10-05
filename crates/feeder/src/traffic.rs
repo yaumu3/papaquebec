@@ -4,7 +4,7 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 
 use crate::cpr::{self, Cpr};
-use crate::field::Airspeed;
+use crate::field::{Airspeed, Identification};
 use crate::message::{Observation, Report, Trust};
 use crate::position::Position;
 use crate::proto::{
@@ -131,6 +131,31 @@ struct Fix {
     source: Source,
 }
 
+/// What is kept of an aircraft longer than the rest.
+#[derive(Default)]
+struct Remembered {
+    identification: Said<String>,
+    emitter_category: Said<EmitterCategory>,
+}
+
+impl Remembered {
+    /// Takes what an identification message heard at `now_s` says.
+    fn keep(&mut self, said: &Identification, now_s: f64) {
+        self.identification.keep(said.identification.clone(), now_s);
+        self.emitter_category
+            .keep(Some(said.emitter_category), now_s);
+    }
+
+    /// The callsign and the category, each unless it has lapsed by `now_s`.
+    fn at(&self, now_s: f64) -> (Option<String>, Option<EmitterCategory>) {
+        let lapse_s = IDENTIFICATION_LAPSE_S;
+        (
+            self.identification.within(lapse_s, now_s),
+            self.emitter_category.within(lapse_s, now_s),
+        )
+    }
+}
+
 /// One aircraft, as its messages have told of it so far.
 #[derive(Default)]
 struct Tracked {
@@ -139,8 +164,7 @@ struct Tracked {
     seen_s: f64,
     /// The power of each of the last messages, against full scale.
     powers: VecDeque<f64>,
-    identification: Said<String>,
-    emitter_category: Said<EmitterCategory>,
+    remembered: Remembered,
     mode_a_code: Said<u32>,
     emergency_priority_status: Said<EmergencyPriorityStatus>,
     on_ground: Said<bool>,
@@ -207,11 +231,7 @@ impl Tracked {
     /// Takes what a message says other than where the aircraft is.
     fn note(&mut self, report: &Report, now_s: f64) {
         match report {
-            Report::Identification(said) => {
-                self.identification.keep(said.identification.clone(), now_s);
-                self.emitter_category
-                    .keep(Some(said.emitter_category), now_s);
-            }
+            Report::Identification(said) => self.remembered.keep(said, now_s),
             Report::Velocity(said) => {
                 self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
                 self.track_deg.keep(said.track_deg, now_s);
@@ -317,13 +337,11 @@ impl Tracked {
         } else {
             AirGroundState::Unspecified
         };
+        let (identification, emitter_category) = self.remembered.at(now_s);
         Aircraft {
             address: Some(self.address),
-            identification: self.identification.within(IDENTIFICATION_LAPSE_S, now_s),
-            emitter_category: self
-                .emitter_category
-                .within(IDENTIFICATION_LAPSE_S, now_s)
-                .map(Into::into),
+            identification,
+            emitter_category: emitter_category.map(Into::into),
             mode_a_code: self.mode_a_code.at(now_s),
             emergency_priority_status: self.emergency_priority_status.at(now_s).map(Into::into),
             lat_deg: fix.map(|fix| fix.position.lat_deg),
