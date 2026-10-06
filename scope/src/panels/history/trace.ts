@@ -86,17 +86,30 @@ export function alignTo(runs: readonly Point[][], reference: readonly Point[][])
 /** Degrees made continuous: each point moved by whole turns to within half a turn of the one before it. */
 export const unwrap = (runs: readonly Point[][]): Point[][] => alignTo(runs, []);
 
-/** The lowest and highest value inside the interval over every trace; null without any. */
+/** The value at time `t` along the segment from `a` to `b`. */
+const crossing = (a: Point, b: Point, t: number): number =>
+  a.v + ((b.v - a.v) * (t - a.t)) / (b.t - a.t);
+
+/**
+ * The lowest and highest value over every trace inside the interval, the values at its edges
+ * counted where a segment crosses them, so a trace entering steeply stays within the lane; null
+ * without any.
+ */
 export function rangeOf(traces: readonly Point[][][], i: Interval): Range | null {
   let lo = Infinity;
   let hi = -Infinity;
+  const take = (v: number) => {
+    lo = Math.min(lo, v);
+    hi = Math.max(hi, v);
+  };
   for (const runs of traces) {
     for (const run of runs) {
-      for (const p of run) {
-        if (p.t < i.from || p.t > i.to) continue;
-        lo = Math.min(lo, p.v);
-        hi = Math.max(hi, p.v);
-      }
+      run.forEach((p, k) => {
+        if (p.t >= i.from && p.t <= i.to) take(p.v);
+        const q = run[k + 1];
+        if (!q) return;
+        for (const edge of [i.from, i.to]) if (p.t < edge && q.t > edge) take(crossing(p, q, edge));
+      });
     }
   }
   return lo <= hi ? { lo, hi } : null;

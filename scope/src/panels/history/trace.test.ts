@@ -138,7 +138,7 @@ describe('rangeOf', () => {
       [
         [
           { t: 2, v: 50 },
-          { t: 9, v: 999 },
+          { t: 3, v: 60 },
         ],
       ],
     ];
@@ -148,6 +148,45 @@ describe('rangeOf', () => {
 
     // Assert
     expect(range).toEqual([{ lo: 50, hi: 300 }, null]);
+  });
+});
+
+describe('rangeOf at the edges', () => {
+  it('counts the values a trace crosses the edges of the interval with', () => {
+    // Arrange
+    const traces: Point[][][] = [
+      [
+        [
+          { t: 0, v: 0 },
+          { t: 10, v: 100 },
+          { t: 30, v: 300 },
+        ],
+      ],
+    ];
+
+    // Act
+    const range = rangeOf(traces, { from: 5, to: 20 });
+
+    // Assert
+    expect(range).toEqual({ lo: 50, hi: 200 });
+  });
+
+  it('ranges a trace that crosses the interval with no sample inside', () => {
+    // Arrange
+    const traces: Point[][][] = [
+      [
+        [
+          { t: 0, v: 0 },
+          { t: 30, v: 300 },
+        ],
+      ],
+    ];
+
+    // Act
+    const range = rangeOf(traces, { from: 10, to: 20 });
+
+    // Assert
+    expect(range).toEqual({ lo: 100, hi: 200 });
   });
 });
 
