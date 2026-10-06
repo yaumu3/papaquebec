@@ -1,0 +1,24 @@
+.v {
+  color: var(--value, inherit);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.unit {
+  margin-left: var(--space-2);
+  color: var(--value-quiet, var(--text-dim));
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: var(--tracking);
+}
+.tail {
+  margin-left: var(--space-2);
+}
+/* Set tight: the dot's own width is room enough between two values. */
+.sep {
+  margin: 0 1px;
+  color: var(--value-quiet, var(--text-muted));
+}
+.also {
+  color: var(--value-quiet, var(--text));
+}

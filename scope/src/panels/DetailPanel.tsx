@@ -10,6 +10,7 @@ import { trackStore } from '../state/tracks';
 import { Divider } from '../ui/Section';
 import { Window } from '../ui/Window';
 import { NONE, plain, type Reading, READINGS } from './readings';
+import { Value } from './Value';
 
 import s from './DetailPanel.module.css';
 
@@ -39,22 +40,7 @@ function Cell(props: {
       )}
     >
       <div class={s.k}>{props.k}</div>
-      <div class={s.v}>
-        {props.r.v}
-        <Show when={props.r.unit}>
-          <span class={s.unit}>{props.r.unit}</span>
-        </Show>
-        <Show when={props.r.tail}>
-          <span class={s.tail}>{props.r.tail}</span>
-        </Show>
-        <Show when={props.r.also}>
-          <span class={s.sep}>·</span>
-          <span class={s.also}>{props.r.also}</span>
-          <Show when={props.r.alsoUnit}>
-            <span class={s.unit}>{props.r.alsoUnit}</span>
-          </Show>
-        </Show>
-      </div>
+      <Value r={props.r} />
     </div>
   );
 }

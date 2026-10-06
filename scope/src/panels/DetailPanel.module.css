@@ -59,36 +59,13 @@
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-wide);
 }
-.v {
-  font-size: var(--text-md);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.enriched {
+  --value: var(--color-enriched);
 }
-.unit {
-  margin-left: var(--space-2);
-  color: var(--text-dim);
-  font-size: var(--text-xs);
-  font-weight: 400;
-  letter-spacing: var(--tracking);
-}
-.tail {
-  margin-left: var(--space-2);
-}
-/* Set tight: the dot's own width is room enough between two values. */
-.sep {
-  margin: 0 1px;
-  color: var(--text-muted);
-}
-.also {
-  color: var(--text);
-}
-.enriched .v {
-  color: var(--color-enriched);
-}
-.alert .v {
-  color: var(--color-emergency);
+.alert {
+  --value: var(--color-emergency);
 }
 /* Last so a missing value reads dim whatever its tone. */
-.dim .v {
-  color: var(--text-dim);
+.dim {
+  --value: var(--text-dim);
 }
