@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
@@ -52,6 +52,11 @@ export function History(props: { track: Track }) {
       { defer: true },
     ),
   );
+  // The lanes leave without a pointer-leave when the group folds or goes, so the hover is cleared here.
+  createEffect(() => {
+    if (!historyOpen()) setHoverInstant(null);
+  });
+  onCleanup(() => setHoverInstant(null));
 
   /** The samples, told apart from the last snapshot's though the store appends to one array. */
   const samples = createMemo(
