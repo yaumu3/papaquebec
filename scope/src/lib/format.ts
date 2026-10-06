@@ -105,10 +105,14 @@ const MODE_ABBREVIATIONS: Readonly<Record<string, string>> = {
   approach: 'APP',
 };
 
-/** The names of the engaged modes, abbreviated as a panel shows them; undefined when none are engaged. */
+/** The names of the engaged modes, abbreviated as a panel shows them. */
+export function modeNames(modes: readonly string[]): string[] {
+  return modes.map((m) => MODE_ABBREVIATIONS[m] ?? m.toUpperCase());
+}
+
+/** The mode names in one line; undefined when none are engaged. */
 export function formatModes(modes: string[] | undefined): string | undefined {
-  if (!modes?.length) return undefined;
-  return modes.map((m) => MODE_ABBREVIATIONS[m] ?? m.toUpperCase()).join(' ');
+  return modes?.length ? modeNames(modes).join(' ') : undefined;
 }
 
 export function formatMach(m: number | undefined): string {

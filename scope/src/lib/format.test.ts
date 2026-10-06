@@ -11,6 +11,7 @@ import {
   formatMach,
   clockTime,
   formatModes,
+  modeNames,
   padBearing,
   sourceName,
   wakeLetter,
@@ -133,6 +134,19 @@ describe('formatModes', () => {
 
     // Assert
     expect(out).toEqual(['AP VNAV ALT APP LNAV TCAS', 'AP GLIDESLOPE', undefined, undefined]);
+  });
+});
+
+describe('modeNames', () => {
+  it('abbreviates each engaged mode as the panel shows it', () => {
+    // Arrange
+    const modes = ['autopilot', 'althold', 'glideslope'];
+
+    // Act
+    const names = modeNames(modes);
+
+    // Assert
+    expect(names).toEqual(['AP', 'ALT', 'GLIDESLOPE']);
   });
 });
 
