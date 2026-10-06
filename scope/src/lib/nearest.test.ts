@@ -13,4 +13,15 @@ describe('nearestInTime', () => {
     // Assert
     expect(found.map((i) => i?.t)).toEqual([110, 110, undefined]);
   });
+
+  it('takes the earlier of two as near whatever order they come in', () => {
+    // Arrange
+    const items = [{ t: 120 }, { t: 100 }];
+
+    // Act
+    const found = nearestInTime(items, 110);
+
+    // Assert
+    expect(found?.t).toBe(100);
+  });
 });
