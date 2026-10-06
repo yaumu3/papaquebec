@@ -91,6 +91,26 @@ describe('laneTraces', () => {
   });
 });
 
+describe('laneTraces on the ground', () => {
+  it('draws the stretch on the ground along the floor, apart from the altitudes', () => {
+    // Arrange
+    const samples = [
+      sample(1, { alt: 'ground' }),
+      sample(2, { alt: 'ground' }),
+      sample(3, { alt: 500 }),
+    ];
+
+    // Act
+    const traces = laneTraces(samples, ['alt'], ALL);
+
+    // Assert
+    expect(traces.map((tr) => [tr.floor ?? false, tr.runs.flat().map((p) => p.t)])).toEqual([
+      [false, [3]],
+      [true, [1, 2]],
+    ]);
+  });
+});
+
 describe('valueAt', () => {
   it('reads the value of a trace at a sample time, undefined where it has none', () => {
     // Arrange

@@ -18,7 +18,13 @@ export type Dash = 'dashed' | 'dotted';
  * barbs; or an intent, a dashed line in its parent's lane on that lane's scale.
  */
 export type PlotSpec =
-  | { kind: 'line'; y: Read; angular?: true }
+  | {
+      kind: 'line';
+      y: Read;
+      angular?: true;
+      /** Whether a sample has no value yet a state to show, drawn along the lane's floor. */
+      floor?: (s: Sample) => boolean;
+    }
   | { kind: 'pair'; y: Read; y2: Read }
   | { kind: 'gantt'; names: (s: Sample) => readonly string[] | undefined }
   | { kind: 'barbs'; barb: (s: Sample) => Wind | undefined }
@@ -32,7 +38,11 @@ const wind = (s: Sample): Wind | undefined =>
 /** How each reading is drawn; `laneOf` in `state/plotted.ts` says which lane an intent goes in. */
 export const PLOTS: Record<ReadingKey, PlotSpec> = {
   // As the crew reads it, so that an aircraft holding its selected altitude sits on that line.
-  alt: { kind: 'line', y: (s) => crewAltitudeFt(s, settings.altimeter) },
+  alt: {
+    kind: 'line',
+    y: (s) => crewAltitudeFt(s, settings.altimeter),
+    floor: (s) => s.alt === 'ground',
+  },
   selAlt: { kind: 'intent', y: (s) => s.selAlt, dash: 'dashed' },
   fmsAlt: { kind: 'intent', y: (s) => s.fmsAlt, dash: 'dotted' },
   vs: { kind: 'line', y: (s) => s.verticalRate },

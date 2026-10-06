@@ -36,6 +36,18 @@ describe('PLOTS', () => {
     expect(ys).toEqual([qnhAltitudeFt(4750, 1023.2 / HPA_PER_INHG), 11000, undefined, undefined]);
   });
 
+  it('keeps a target on the ground on the floor of the altitude lane', () => {
+    // Arrange
+    const samples = [makeSample(1, { alt: 'ground' }), makeSample(2, { alt: 500 }), makeSample(3)];
+    const alt = PLOTS.alt;
+
+    // Act
+    const floored = samples.map((s) => alt.kind === 'line' && alt.floor?.(s));
+
+    // Assert
+    expect(floored).toEqual([true, false, false]);
+  });
+
   it('plots the track in magnetic, as the table reads it', () => {
     // Arrange
     setDeclination(7);

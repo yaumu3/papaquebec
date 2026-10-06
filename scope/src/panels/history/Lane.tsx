@@ -5,7 +5,7 @@ import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
-import { barbPath, barbsAt, fixed, laneTraces, pathOf, valueAt } from './plot';
+import { barbPath, barbsAt, fixed, type LaneTrace, laneTraces, pathOf, valueAt } from './plot';
 import { type Dash, PLOTS } from './plots';
 import { type Interval, xOf } from './span';
 import { barsOf, gapsIn, rangeOf, yOf } from './trace';
@@ -52,10 +52,14 @@ export function Lane(props: {
   const traces = createMemo(() => laneTraces(props.samples, props.keys, props.visible));
   const range = createMemo(() =>
     rangeOf(
-      traces().map((tr) => tr.runs),
+      traces()
+        .filter((tr) => !tr.floor)
+        .map((tr) => tr.runs),
       props.visible,
     ),
   );
+  /** Where a trace's values fall: on the lane's scale, or all of them along its floor. */
+  const yFor = (tr: LaneTrace) => (tr.floor ? () => props.height - PAD_BOTTOM_PX : y);
   const y = (v: number) => {
     const r = range();
     return r ? yOf(v, r, props.height, PAD_TOP_PX, PAD_BOTTOM_PX) : props.height / 2;
@@ -71,7 +75,7 @@ export function Lane(props: {
     if (!h) return [];
     return traces().flatMap((tr) => {
       const v = valueAt(tr.runs, h.t);
-      return v === undefined ? [] : [{ cx: x(h.t), cy: y(v) }];
+      return v === undefined ? [] : [{ cx: x(h.t), cy: yFor(tr)(v) }];
     });
   };
 
@@ -125,7 +129,12 @@ export function Lane(props: {
             d={props.ticks.map((t) => `M${fixed(x(t))} 0 V${props.height}`).join(' ')}
           />
           <Index each={traces()}>
-            {(tr) => <path class={cx(s.trace, dashClass(tr().dash))} d={pathOf(tr().runs, x, y)} />}
+            {(tr) => (
+              <path
+                class={cx(s.trace, dashClass(tr().dash))}
+                d={pathOf(tr().runs, x, yFor(tr()))}
+              />
+            )}
           </Index>
           <Index each={barbs()}>
             {(b) => (
