@@ -9,6 +9,7 @@ import type { Position, Track } from '../state/track';
 import { trackStore } from '../state/tracks';
 import { Divider } from '../ui/Section';
 import { Window } from '../ui/Window';
+import { History } from './history/History';
 import { NONE, plain, type Reading, READINGS } from './readings';
 import { Value } from './Value';
 
@@ -114,6 +115,9 @@ export function DetailPanel() {
                   <div class={s.description}>{t().description}</div>
                 </Show>
               </div>
+              <Divider />
+              <History track={t()} />
+              <Divider />
               <Group name="ID">
                 <Cell k="HEX" r={{ v: t().hex.toUpperCase() }} />
                 <Cell k="SQUAWK" r={plain(t().squawk)} tone={ecode() ? 'alert' : undefined} />
