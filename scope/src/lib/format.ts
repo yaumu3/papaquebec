@@ -1,3 +1,5 @@
+import type { PositionSource } from './aircraft';
+
 export type ClimbState = 'climbing' | 'descending' | 'level';
 
 /** Five steps of the ADS-B vertical rate, whose LSB is 64 fpm (RTCA DO-260B). */
@@ -67,6 +69,17 @@ export function emergencyCode(
   if (emergency !== undefined && emergency !== 'none' && emergency !== 'reserved') return 'EM';
   return null;
 }
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Hours, minutes and seconds of the UTC clock, from seconds since the epoch. */
+export function clockTime(seconds: number): string {
+  const d = new Date(seconds * 1000);
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+/** A position source as the panels name it. */
+export const sourceName = (source: PositionSource): string => source.toUpperCase();
 
 export function formatMmSs(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '--:--';

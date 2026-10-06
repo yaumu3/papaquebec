@@ -9,8 +9,10 @@ import {
   formatGsWake,
   formatMmSs,
   formatMach,
+  clockTime,
   formatModes,
   padBearing,
+  sourceName,
   wakeLetter,
 } from './format';
 
@@ -131,6 +133,32 @@ describe('formatModes', () => {
 
     // Assert
     expect(out).toEqual(['AP VNAV ALT APP LNAV TCAS', 'AP GLIDESLOPE', undefined, undefined]);
+  });
+});
+
+describe('clockTime', () => {
+  it('reads hours, minutes and seconds of the UTC clock from seconds since the epoch', () => {
+    // Arrange
+    const t = 12 * 3600 + 36 * 60 + 10;
+
+    // Act
+    const label = clockTime(t);
+
+    // Assert
+    expect(label).toBe('12:36:10');
+  });
+});
+
+describe('sourceName', () => {
+  it('prints a source as the panels name it', () => {
+    // Arrange
+    const sources = ['adsb', 'mlat', 'tisb'] as const;
+
+    // Act
+    const names = sources.map(sourceName);
+
+    // Assert
+    expect(names).toEqual(['ADSB', 'MLAT', 'TISB']);
   });
 });
 

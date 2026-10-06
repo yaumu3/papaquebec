@@ -1,6 +1,7 @@
 import { createMemo, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
+import { clockTime } from '../lib/format';
 import { feedNotice, type Tone } from '../state/feedLine';
 import { qnhError, qnhReport, qnhStation } from '../state/qnh';
 import { qnhStatus } from '../state/qnhStatus';
@@ -20,13 +21,6 @@ import { trackStore } from '../state/tracks';
 import { Button } from '../ui/Button';
 
 import s from './TopBar.module.css';
-
-const pad = (n: number) => String(n).padStart(2, '0');
-
-function clock(ms: number): string {
-  const d = new Date(ms);
-  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}Z`;
-}
 
 const PANELS: [PanelId, string][] = [
   ['display', 'DISP'],
@@ -63,7 +57,7 @@ export function TopBar() {
   const notice = createMemo(() => feedNotice(feedStatus(), tick()));
   return (
     <div id="top-bar" class={s.bar}>
-      <div class={s.clock}>{clock(tick())}</div>
+      <div class={s.clock}>{clockTime(tick() / 1000)}Z</div>
       <div class={s.item}>
         QNH <span class={cx(s.v, tone(qnh().cls))}>{qnh().value}</span>
         <span class={cx(s.desktopOnly, tone(qnh().cls))}> {qnh().source}</span>
