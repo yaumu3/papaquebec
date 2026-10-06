@@ -12,6 +12,7 @@ import {
   type Grab,
   grabAt,
   type Interval,
+  nudgeSpan,
   type Span,
   spanOf,
   timeAt,
@@ -129,7 +130,14 @@ export function Timeline(props: {
       onPointerCancel={up}
       onPointerLeave={() => setZone(null)}
       onDblClick={() => props.onSpan(WHOLE)}
-      aria-label="Whole contact. Drag the window to move it, drag its edges to resize it, double-click to show everything."
+      tabindex="0"
+      onKeyDown={(e) => {
+        const span = nudgeSpan(e.key, props.visible, props.contact);
+        if (!span) return;
+        e.preventDefault();
+        props.onSpan(span);
+      }}
+      aria-label="Whole contact. Drag the window to move it, an edge to resize it, the rest to select; the left and right arrows move it, the up and down arrows narrow and widen it; double-click or Home shows everything."
     >
       <rect
         class={s.frame}

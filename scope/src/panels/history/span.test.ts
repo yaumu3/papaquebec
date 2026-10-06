@@ -6,6 +6,7 @@ import {
   grabAt,
   type Interval,
   MIN_SPAN_SEC,
+  nudgeSpan,
   resolveSpan,
   type Span,
   spanOf,
@@ -216,5 +217,59 @@ describe('dragBase', () => {
 
     // Assert
     expect(bases).toEqual([{ from: 1200, to: 1403 }, pressed]);
+  });
+});
+
+describe('nudgeSpan', () => {
+  const visible: Interval = { from: 1200, to: 1400 };
+
+  it('moves the window a tenth of its width with the left and right arrows', () => {
+    // Arrange
+    const keys = ['ArrowLeft', 'ArrowRight'];
+
+    // Act
+    const spans = keys.map((k) => nudgeSpan(k, visible, CONTACT));
+
+    // Assert
+    expect(spans).toEqual([
+      { kind: 'fixed', from: 1180, to: 1380 },
+      { kind: 'fixed', from: 1220, to: 1420 },
+    ]);
+  });
+
+  it('narrows and widens the window about its middle with the up and down arrows', () => {
+    // Arrange
+    const keys = ['ArrowUp', 'ArrowDown'];
+
+    // Act
+    const spans = keys.map((k) => nudgeSpan(k, visible, CONTACT));
+
+    // Assert
+    expect(spans).toEqual([
+      { kind: 'fixed', from: 1210, to: 1390 },
+      { kind: 'fixed', from: 1190, to: 1410 },
+    ]);
+  });
+
+  it('keeps a window at the end of the contact there, as a tail, and shows everything on Home', () => {
+    // Arrange
+    const tail: Interval = { from: 1400, to: 1600 };
+
+    // Act
+    const spans = [nudgeSpan('ArrowRight', tail, CONTACT), nudgeSpan('Home', visible, CONTACT)];
+
+    // Assert
+    expect(spans).toEqual([{ kind: 'tail', sec: 200 }, WHOLE]);
+  });
+
+  it('asks nothing of any other key', () => {
+    // Arrange
+    const keys = ['Enter', ' ', 'a'];
+
+    // Act
+    const spans = keys.map((k) => nudgeSpan(k, visible, CONTACT));
+
+    // Assert
+    expect(spans).toEqual([null, null, null]);
   });
 });

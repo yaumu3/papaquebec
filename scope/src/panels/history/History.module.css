@@ -193,6 +193,10 @@
   overflow: visible;
   touch-action: none;
 }
+.timeline:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: 2px;
+}
 /* The cursor tells what a press would take hold of. */
 .resize {
   cursor: ew-resize;

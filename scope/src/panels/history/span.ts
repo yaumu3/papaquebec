@@ -98,3 +98,30 @@ export const xOf = (t: number, i: Interval, width: number): number =>
 /** The time at a point across `width`. */
 export const timeAt = (x: number, i: Interval, width: number): number =>
   i.from + (x / width) * (i.to - i.from);
+
+/** The share of the window's width an arrow key moves it by, or narrows or widens it by. */
+const NUDGE = 0.1;
+
+/**
+ * The span an arrow key asks for: the left and right arrows move the window a tenth of its width,
+ * the up and down arrows narrow and widen it about its middle; Home shows everything. Null for
+ * any other key.
+ */
+export function nudgeSpan(key: string, visible: Interval, contact: Interval): Span | null {
+  const step = (visible.to - visible.from) * NUDGE;
+  const slid = (by: number) => dragInterval('body', visible, 0, by, contact);
+  switch (key) {
+    case 'ArrowLeft':
+      return spanOf(slid(-step), contact);
+    case 'ArrowRight':
+      return spanOf(slid(step), contact);
+    case 'ArrowUp':
+      return spanOf({ from: visible.from + step / 2, to: visible.to - step / 2 }, contact);
+    case 'ArrowDown':
+      return spanOf({ from: visible.from - step / 2, to: visible.to + step / 2 }, contact);
+    case 'Home':
+      return WHOLE;
+    default:
+      return null;
+  }
+}
