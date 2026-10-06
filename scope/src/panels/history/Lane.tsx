@@ -18,6 +18,8 @@ const PAD_TOP_PX = 14;
 const PAD_BOTTOM_PX = 5;
 /** Kept clear above and below a gantt bar, within its row. */
 const BAR_INSET_PX = 2;
+/** A row thinner than this cannot hold its tab's text, and tabs would run into each other. */
+const TAB_MIN_PX = 11;
 const DOT_PX = 3;
 const BARB_PX = 16;
 /** How far apart barbs stand at the least, on round clock times of their own. */
@@ -185,20 +187,22 @@ export function Lane(props: {
         <Show when={spec.kind !== 'gantt'}>
           <span class={s.name}>{label}</span>
         </Show>
-        <Index each={bars()}>
-          {(bar, row) => (
-            <span
-              class={s.tab}
-              style={{
-                top: `${row * rowHeight()}px`,
-                height: `${rowHeight()}px`,
-                'line-height': `${rowHeight()}px`,
-              }}
-            >
-              {bar().name}
-            </span>
-          )}
-        </Index>
+        <Show when={rowHeight() >= TAB_MIN_PX}>
+          <Index each={bars()}>
+            {(bar, row) => (
+              <span
+                class={s.tab}
+                style={{
+                  top: `${row * rowHeight()}px`,
+                  height: `${rowHeight()}px`,
+                  'line-height': `${rowHeight()}px`,
+                }}
+              >
+                {bar().name}
+              </span>
+            )}
+          </Index>
+        </Show>
       </div>
       <button
         type="button"
