@@ -22,5 +22,12 @@ export function resetPlotted(): void {
   setPlotted(DEFAULT_PLOTTED);
 }
 
+/** Whether the history group is unfolded in the detail panel. */
+export const [historyOpen, setHistoryOpen] = createSignal(persisted.historyOpen);
+
+export function toggleHistory(): void {
+  setHistoryOpen((open) => !open);
+}
+
 /** The sample time under the pointer on the lanes, which the scope rings on the trail; null off them. */
 export const [hoverInstant, setHoverInstant] = createSignal<number | null>(null);

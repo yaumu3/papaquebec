@@ -1,13 +1,16 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
 
+import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
 import {
   closePlotLane,
+  historyOpen,
   hoverInstant,
   movePlotLane,
   plotted,
   resetPlotted,
   setHoverInstant,
+  toggleHistory,
 } from '../../state/history';
 import { lanesOf, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
@@ -69,11 +72,12 @@ export function History(props: { track: Track }) {
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
-  let bay: HTMLDivElement | undefined;
-  let labels: HTMLDivElement | undefined;
-  const width = trackWidth(() => bay);
+  // Signals, as the elements come and go with the group folding and unfolding.
+  const [bay, setBay] = createSignal<HTMLDivElement>();
+  const [labels, setLabels] = createSignal<HTMLDivElement>();
+  const width = trackWidth(bay);
   /** The axis labels line up with the plots, so their width is the plots'. */
-  const plotWidth = trackWidth(() => labels);
+  const plotWidth = trackWidth(labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
 
   const hover = createMemo(() => {
@@ -100,85 +104,87 @@ export function History(props: { track: Track }) {
   };
 
   return (
-    <div class={s.history}>
+    <div class={cx(s.history, !historyOpen() && s.folded)}>
       <div class={s.title}>
-        <span>
-          HISTORY: {clockTime(visible().from)} – {clockTime(visible().to)}Z
-        </span>
-        <Button onClick={reset}>RESET</Button>
-      </div>
-      <div
-        ref={(node) => {
-          bay = node;
-        }}
-        class={s.bay}
-        style={{ height: `${BAY_PX}px` }}
-      >
-        <Show
-          when={lanes().length > 0}
-          fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
+        <button
+          type="button"
+          class={s.toggle}
+          aria-expanded={historyOpen()}
+          onClick={toggleHistory}
         >
-          <For each={lanes()}>
-            {(lane, i) => (
-              <Lane
-                lane={lane}
-                keys={readingsIn(plotted(), lane)}
-                samples={samples()}
-                visible={visible()}
-                ticks={tickTimes()}
-                width={plotWidth()}
-                height={height()}
-                hover={hover()}
-                onHover={hoverAt}
-                onClose={() => closePlotLane(lane)}
-                onGripDown={(y) => reorder.down(i(), y, height() + 1, lanes().length)}
-                onGripMove={(y) => reorder.move(y)}
-              />
-            )}
-          </For>
-        </Show>
-        <div class={s.overlay}>
-          <Show when={hover()}>
-            {(h) => (
-              <div class={s.box} style={boxStyle(h())}>
-                <div class={s.time}>{clockTime(h().t)}Z</div>
-                <For each={lanes().flatMap((lane) => readingsIn(plotted(), lane))}>
-                  {(key) => (
-                    <div class={s.row}>
-                      <span class={s.rowLabel}>{READINGS[key].label}</span>
-                      <Value r={READINGS[key].format(h())} />
-                    </div>
-                  )}
-                </For>
-              </div>
-            )}
+          <span class={s.chevron}>{historyOpen() ? '▾' : '▸'}</span>
+          HISTORY
+          <Show when={historyOpen()}>
+            : {clockTime(visible().from)} – {clockTime(visible().to)}Z
           </Show>
-        </div>
+        </button>
+        <Show when={historyOpen()}>
+          <Button onClick={reset}>RESET</Button>
+        </Show>
       </div>
-      <div class={s.axis}>
-        <div
-          ref={(node) => {
-            labels = node;
-          }}
-          class={s.labels}
-        >
-          <For each={tickTimes()}>
-            {(t) => (
-              <span class={s.label} style={{ left: `${x(t)}px` }}>
-                {clockLabel(t, step())}
-              </span>
-            )}
-          </For>
+      <Show when={historyOpen()}>
+        <div ref={setBay} class={s.bay} style={{ height: `${BAY_PX}px` }}>
+          <Show
+            when={lanes().length > 0}
+            fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
+          >
+            <For each={lanes()}>
+              {(lane, i) => (
+                <Lane
+                  lane={lane}
+                  keys={readingsIn(plotted(), lane)}
+                  samples={samples()}
+                  visible={visible()}
+                  ticks={tickTimes()}
+                  width={plotWidth()}
+                  height={height()}
+                  hover={hover()}
+                  onHover={hoverAt}
+                  onClose={() => closePlotLane(lane)}
+                  onGripDown={(y) => reorder.down(i(), y, height() + 1, lanes().length)}
+                  onGripMove={(y) => reorder.move(y)}
+                />
+              )}
+            </For>
+          </Show>
+          <div class={s.overlay}>
+            <Show when={hover()}>
+              {(h) => (
+                <div class={s.box} style={boxStyle(h())}>
+                  <div class={s.time}>{clockTime(h().t)}Z</div>
+                  <For each={lanes().flatMap((lane) => readingsIn(plotted(), lane))}>
+                    {(key) => (
+                      <div class={s.row}>
+                        <span class={s.rowLabel}>{READINGS[key].label}</span>
+                        <Value r={READINGS[key].format(h())} />
+                      </div>
+                    )}
+                  </For>
+                </div>
+              )}
+            </Show>
+          </div>
         </div>
-      </div>
-      <Timeline
-        samples={samples()}
-        lanes={lanes().map((lane) => readingsIn(plotted(), lane))}
-        contact={contact()}
-        visible={visible()}
-        width={width()}
-        onSpan={setSpan}
-      />
+        <div class={s.axis}>
+          <div ref={setLabels} class={s.labels}>
+            <For each={tickTimes()}>
+              {(t) => (
+                <span class={s.label} style={{ left: `${x(t)}px` }}>
+                  {clockLabel(t, step())}
+                </span>
+              )}
+            </For>
+          </div>
+        </div>
+        <Timeline
+          samples={samples()}
+          lanes={lanes().map((lane) => readingsIn(plotted(), lane))}
+          contact={contact()}
+          visible={visible()}
+          width={width()}
+          onSpan={setSpan}
+        />
+      </Show>
     </div>
   );
 }

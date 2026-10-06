@@ -2,11 +2,13 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   closePlotLane,
+  historyOpen,
   hoverInstant,
   movePlotLane,
   plotted,
   resetPlotted,
   setHoverInstant,
+  toggleHistory,
   togglePlot,
 } from './history';
 import { DEFAULT_PLOTTED } from './plotted';
@@ -34,6 +36,17 @@ describe('history state', () => {
 
     // Assert
     expect(plotted()).toEqual(['vs', 'gs']);
+  });
+
+  it('starts with the history group open and folds it on a toggle', () => {
+    // Arrange
+    const before = historyOpen();
+
+    // Act
+    toggleHistory();
+
+    // Assert
+    expect([before, historyOpen()]).toEqual([true, false]);
   });
 
   it('starts with no instant under the pointer and takes one', () => {

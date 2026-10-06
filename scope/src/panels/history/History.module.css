@@ -1,7 +1,8 @@
 /*
  * Beside each plot: the grip, the close button, and a gutter between each and the plot. Padding
  * below, not a margin, so the room under the timeline does not collapse into the next rule's;
- * as much as the title's ink stands from the rule above.
+ * as much as the title's ink stands from the rule above, which is less once the group is folded
+ * and the title's line is all that is left.
  */
 .history {
   --lane-grip: 24px;
@@ -11,19 +12,36 @@
   --plot-right: calc(var(--lane-close) + var(--lane-gutter));
   padding-bottom: var(--space-5);
 }
+.folded {
+  padding-bottom: var(--space-2);
+}
+/* The line's leading leaves the ink a pixel nearer the rule above than the one below. */
+.folded .title {
+  padding-top: 1px;
+}
 .title {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-4);
+}
+/* The title folds the group; the chevron tells which way. */
+.toggle {
   color: var(--text-dim);
   font-size: var(--text-sm);
   letter-spacing: var(--tracking);
+}
+.toggle:hover {
+  color: var(--text);
+}
+.chevron {
+  display: inline-block;
+  width: 1.5ch;
 }
 .bay {
   position: relative;
   display: flex;
   flex-direction: column;
+  margin-top: var(--space-4);
 }
 .empty {
   display: flex;

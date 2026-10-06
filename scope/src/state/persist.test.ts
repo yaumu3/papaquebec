@@ -13,6 +13,7 @@ const DEFAULTS: Persisted = {
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_SORT,
   plotted: ['alt', 'gs'],
+  historyOpen: true,
 };
 
 describe('loadPersisted', () => {
@@ -72,6 +73,7 @@ describe('savePersisted', () => {
       panels: { ...DEFAULT_PANELS, maps: false },
       listSort: { key: 'alt', dir: 'desc' },
       plotted: ['trk', 'selHdg'],
+      historyOpen: false,
     };
 
     // Act
@@ -159,5 +161,20 @@ describe('loadPersisted plotted', () => {
 
     // Assert
     expect(plotted).toEqual([['gs', 'alt'], [], ['alt', 'gs']]);
+  });
+});
+
+describe('loadPersisted historyOpen', () => {
+  it('keeps whether the history group is open, and falls back when that is no boolean', () => {
+    // Arrange
+    const stores = [false, 'closed'].map((historyOpen) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ historyOpen }) }),
+    );
+
+    // Act
+    const open = stores.map((st) => loadPersisted(st, DEFAULTS).historyOpen);
+
+    // Assert
+    expect(open).toEqual([false, true]);
   });
 });

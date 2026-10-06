@@ -30,6 +30,8 @@ export interface Persisted {
   listSort: ListSort;
   /** The readings the history lanes plot, in lane order. */
   plotted: readonly ReadingKey[];
+  /** Whether the detail panel's history group is unfolded. */
+  historyOpen: boolean;
 }
 
 const oneOf = <T>(steps: readonly T[], v: unknown, fallback: T): T =>
@@ -132,6 +134,7 @@ export function loadPersisted(storage: Storage, defaults: Persisted): Persisted 
     panels: panelsFrom(r.panels, defaults.panels),
     listSort: sortFrom(r.listSort, defaults.listSort),
     plotted: plottedFrom(r.plotted, defaults.plotted),
+    historyOpen: bool(r.historyOpen, defaults.historyOpen),
   };
 }
 

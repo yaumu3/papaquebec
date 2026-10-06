@@ -1,9 +1,9 @@
-import { createSignal, onCleanup, onMount } from 'solid-js';
+import { createEffect, createSignal, onCleanup } from 'solid-js';
 
-/** The laid-out width of the element `el` gives once mounted, followed through resizes. */
+/** The laid-out width of the element `el` gives, from when it gives one, followed through resizes. */
 export function trackWidth(el: () => Element | undefined): () => number {
   const [width, setWidth] = createSignal(0);
-  onMount(() => {
+  createEffect(() => {
     const target = el();
     if (!target) return;
     setWidth(target.getBoundingClientRect().width);

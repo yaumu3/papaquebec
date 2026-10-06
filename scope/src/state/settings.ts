@@ -22,6 +22,7 @@ const DEFAULTS: Persisted = {
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_LIST_SORT,
   plotted: DEFAULT_PLOTTED,
+  historyOpen: true,
 };
 
 /** Settings and panel visibility as last saved in this browser, or the defaults. */
