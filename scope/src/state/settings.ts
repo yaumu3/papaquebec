@@ -1,12 +1,11 @@
 import { createStore } from 'solid-js/store';
 
-import { DEFAULT_LIST_SORT, type ListSort } from './listSort';
+import { DEFAULT_LIST_SORT } from './listSort';
 import { loadPersisted, type Persisted, savePersisted } from './persist';
 import {
   DEFAULT_PANELS,
   DEFAULT_SETTINGS,
   type LayerKey,
-  type Panels,
   RANGE_MAX_NM,
   RANGE_MIN_NM,
   RANGE_STEPS,
@@ -17,19 +16,19 @@ export * from './settingsDefaults';
 
 const storage = typeof localStorage === 'undefined' ? null : localStorage;
 
+const DEFAULTS: Persisted = {
+  settings: DEFAULT_SETTINGS,
+  panels: DEFAULT_PANELS,
+  listSort: DEFAULT_LIST_SORT,
+};
+
 /** Settings and panel visibility as last saved in this browser, or the defaults. */
-export const persisted: Persisted = storage
-  ? loadPersisted(storage, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_LIST_SORT)
-  : {
-      settings: DEFAULT_SETTINGS,
-      panels: DEFAULT_PANELS,
-      listSort: DEFAULT_LIST_SORT,
-    };
+export const persisted: Persisted = storage ? loadPersisted(storage, DEFAULTS) : DEFAULTS;
 
 export const [settings, setSettings] = createStore<Settings>(structuredClone(persisted.settings));
 
-/** Writes the current settings and panel state to local storage. */
-export function persist(panels: Panels, listSort: ListSort): void {
+/** Writes the current settings and the rest of the persisted state to local storage. */
+export function persist(rest: Omit<Persisted, 'settings'>): void {
   if (!storage) return;
   const snapshot: Settings = {
     ...settings,
@@ -38,7 +37,7 @@ export function persist(panels: Panels, listSort: ListSort): void {
     altimeter: { ...settings.altimeter },
     qnh: { ...settings.qnh },
   };
-  savePersisted(storage, { settings: snapshot, panels, listSort });
+  savePersisted(storage, { settings: snapshot, ...rest });
 }
 
 export function toggleLayer(key: LayerKey): void {

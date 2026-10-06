@@ -114,18 +114,13 @@ function sortFrom(raw: unknown, fallback: ListSort): ListSort {
 }
 
 /** Field-by-field validation: anything unexpected falls back to the default for that field. */
-export function loadPersisted(
-  storage: Storage,
-  settings: Settings,
-  panels: Panels,
-  listSort: ListSort,
-): Persisted {
+export function loadPersisted(storage: Storage, defaults: Persisted): Persisted {
   const raw = readJson(storage, PERSIST_KEY);
   const r = isRecord(raw) ? raw : {};
   return {
-    settings: settingsFrom(r.settings, settings),
-    panels: panelsFrom(r.panels, panels),
-    listSort: sortFrom(r.listSort, listSort),
+    settings: settingsFrom(r.settings, defaults.settings),
+    panels: panelsFrom(r.panels, defaults.panels),
+    listSort: sortFrom(r.listSort, defaults.listSort),
   };
 }
 

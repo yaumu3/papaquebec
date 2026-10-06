@@ -47,7 +47,7 @@ export function App() {
       .catch((err: unknown) => console.warn('aero.json unavailable', err));
   });
 
-  createEffect(() => persist(panels(), listSort()));
+  createEffect(() => persist({ panels: panels(), listSort: listSort() }));
 
   // METAR polling over the candidate stations; answers for a superseded list are dropped.
   createEffect(() => {
