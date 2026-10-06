@@ -45,7 +45,8 @@ export function airspaceColor(kind: string | undefined): string {
   return kind !== undefined && BRIGHT_AIRSPACE.has(kind) ? THEME.airspace : THEME.airspaceDim;
 }
 
-const STALE_SECONDS = 30;
+/** A position this old makes the target stale. */
+export const STALE_SECONDS = 30;
 
 export function isStale(t: Track): boolean {
   return t.position.kind === 'last' || (t.seenPos ?? 0) > STALE_SECONDS;

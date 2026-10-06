@@ -28,6 +28,9 @@
   --row-hover: #2a2a2a;
   --row-selected: #3a3a3a;
   --accent: #fff;
+  /* Hairlines inside a plot, and the shade of a stretch with no report. */
+  --plot-grid: #2c2c2a;
+  --plot-gap: #262624;
 
   /* Type */
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;

@@ -10,6 +10,7 @@ import {
   setSelected,
 } from '../state/scope';
 import type { Track } from '../state/track';
+import { copyText } from '../ui/clipboard';
 
 export function targetMenu(t: Track): MenuItem[] {
   return [
@@ -17,7 +18,7 @@ export function targetMenu(t: Track): MenuItem[] {
     { label: 'Select', onSelect: () => setSelected(t.hex) },
     {
       label: 'Copy hex',
-      onSelect: () => void navigator.clipboard?.writeText(t.hex).catch(() => undefined),
+      onSelect: () => copyText(t.hex),
     },
     {
       label: 'Start RBL from here',

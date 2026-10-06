@@ -1,6 +1,6 @@
 import type { AircraftReport, AircraftSnapshot } from '../lib/aircraft';
 import type { ProjectFn } from '../lib/geo';
-import type { Fix, OperatorState, Position, Track } from './track';
+import type { Fix, OperatorState, Position, Readings, Sample, Track } from './track';
 
 export const HISTORY_RETENTION_SEC = 3600;
 
@@ -34,35 +34,8 @@ function freshOps(): OperatorState {
   return { hideTrail: false, pinnedCorner: null, autoCorner: 'ne' };
 }
 
-function appendFix(history: Fix[], position: Position, t: number, alt: Track['alt']): void {
-  if (position.kind !== 'live') return;
-  const last = history[history.length - 1];
-  if (last && last.x === position.x && last.y === position.y) return;
-  history.push({ lat: position.lat, lon: position.lon, x: position.x, y: position.y, t, alt });
-}
-
-function trimHistory(history: Fix[], now: number): void {
-  const cutoff = now - HISTORY_RETENTION_SEC;
-  let drop = 0;
-  while (drop < history.length && (history[drop]?.t ?? now) < cutoff) drop++;
-  if (drop > 0) history.splice(0, drop);
-}
-
-function toTrack(
-  a: AircraftReport,
-  previous: Track | undefined,
-  now: number,
-  project: ProjectFn,
-): Track {
-  const position = positionOf(a, project);
-  const history = previous?.history ?? [];
-  appendFix(history, position, now, a.alt);
-  trimHistory(history, now);
+function readingsOf(a: AircraftReport): Readings {
   return {
-    hex: a.hex,
-    flight: a.flight,
-    squawk: a.squawk,
-    category: a.category,
     alt: a.alt,
     gs: a.gs,
     track: a.track,
@@ -71,10 +44,6 @@ function toTrack(
     nacP: a.nacP,
     messages: a.messages,
     rssi: a.rssi,
-    type: a.type,
-    registration: a.registration,
-    description: a.description,
-    emergency: a.emergency,
     tas: a.tas,
     ias: a.ias,
     mach: a.mach,
@@ -90,15 +59,83 @@ function toTrack(
     source: a.source ?? 'adsb',
     seen: a.seen ?? 0,
     seenPos: a.seenPos,
+  };
+}
+
+function appendFix(history: Fix[], position: Position, t: number, alt: Track['alt']): void {
+  if (position.kind !== 'live') return;
+  const last = history[history.length - 1];
+  if (last && last.x === position.x && last.y === position.y) return;
+  history.push({ lat: position.lat, lon: position.lon, x: position.x, y: position.y, t, alt });
+}
+
+/**
+ * Whether the target was heard since its last sample: its message count changed, up or, after a
+ * receiver restart, down; or, from a feed that counts none, its last message is younger than
+ * that sample. Never twice at one snapshot time.
+ */
+function heardSince(last: Sample | undefined, r: Readings, now: number): boolean {
+  if (!last) return true;
+  if (now <= last.t) return false;
+  if (r.messages !== undefined && last.messages !== undefined) return r.messages !== last.messages;
+  return r.seen < now - last.t;
+}
+
+/** Messages per second between the last sample and this one, when both count them and the count has not been reset. */
+function rateSince(last: Sample | undefined, r: Readings, now: number): number | undefined {
+  if (!last || r.messages === undefined || last.messages === undefined) return undefined;
+  if (r.messages < last.messages) return undefined;
+  return (r.messages - last.messages) / (now - last.t);
+}
+
+function appendSample(samples: Sample[], r: Readings, now: number): void {
+  const last = samples[samples.length - 1];
+  if (!heardSince(last, r, now)) return;
+  samples.push({ ...r, t: now, messageRate: rateSince(last, r, now) });
+}
+
+function trimOld(items: { t: number }[], now: number): void {
+  const cutoff = now - HISTORY_RETENTION_SEC;
+  let drop = 0;
+  while (drop < items.length && (items[drop]?.t ?? now) < cutoff) drop++;
+  if (drop > 0) items.splice(0, drop);
+}
+
+function toTrack(
+  a: AircraftReport,
+  previous: Track | undefined,
+  now: number,
+  project: ProjectFn,
+): Track {
+  const readings = readingsOf(a);
+  const position = positionOf(a, project);
+  const history = previous?.history ?? [];
+  appendFix(history, position, now, a.alt);
+  trimOld(history, now);
+  const samples = previous?.samples ?? [];
+  appendSample(samples, readings, now);
+  trimOld(samples, now);
+  return {
+    ...readings,
+    messageRate: samples.at(-1)?.messageRate,
+    hex: a.hex,
+    flight: a.flight,
+    squawk: a.squawk,
+    category: a.category,
+    type: a.type,
+    registration: a.registration,
+    description: a.description,
+    emergency: a.emergency,
     position,
     history,
+    samples,
     ops: previous?.ops ?? freshOps(),
   };
 }
 
 /**
- * The track store is rebuilt from every snapshot. Only position history and
- * operator state carry over, because the feed does not carry them.
+ * The track store is rebuilt from every snapshot. Only position history, samples and operator
+ * state carry over, because the feed does not carry them.
  */
 export function createTrackStore(initialProject: ProjectFn): TrackStore {
   let project = initialProject;

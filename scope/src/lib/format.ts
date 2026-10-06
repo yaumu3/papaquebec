@@ -1,3 +1,5 @@
+import type { PositionSource } from './aircraft';
+
 export type ClimbState = 'climbing' | 'descending' | 'level';
 
 /** Five steps of the ADS-B vertical rate, whose LSB is 64 fpm (RTCA DO-260B). */
@@ -68,6 +70,17 @@ export function emergencyCode(
   return null;
 }
 
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Hours, minutes and seconds of the UTC clock, from seconds since the epoch. */
+export function clockTime(seconds: number): string {
+  const d = new Date(seconds * 1000);
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+/** A position source as the panels name it. */
+export const sourceName = (source: PositionSource): string => source.toUpperCase();
+
 export function formatMmSs(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
   if (seconds >= 3600) return '>1h';
@@ -92,10 +105,14 @@ const MODE_ABBREVIATIONS: Readonly<Record<string, string>> = {
   approach: 'APP',
 };
 
-/** The names of the engaged modes, abbreviated as a panel shows them; undefined when none are engaged. */
+/** The names of the engaged modes, abbreviated as a panel shows them. */
+export function modeNames(modes: readonly string[]): string[] {
+  return modes.map((m) => MODE_ABBREVIATIONS[m] ?? m.toUpperCase());
+}
+
+/** The mode names in one line; undefined when none are engaged. */
 export function formatModes(modes: string[] | undefined): string | undefined {
-  if (!modes?.length) return undefined;
-  return modes.map((m) => MODE_ABBREVIATIONS[m] ?? m.toUpperCase()).join(' ');
+  return modes?.length ? modeNames(modes).join(' ') : undefined;
 }
 
 export function formatMach(m: number | undefined): string {

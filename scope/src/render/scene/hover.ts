@@ -15,12 +15,17 @@ export interface HoverInput {
   filter: Filter;
   altimeter: Altimeter;
   labelDrag: LabelDrag | null;
+  /** Where the selected target was at the instant hovered on the history lanes, if it was anywhere. */
+  instant: { x: number; y: number } | null;
 }
+
+const RING_PX = 14;
 
 /**
  * The hover highlight, drawn over the targets layer so a hover never rebuilds it: a box round
- * the target and its leader again at full brightness. The selected target is highlighted
- * already, and a filtered one has no block to lead to.
+ * the target and its leader again at full brightness, and a ring on the trail at the instant
+ * hovered on the history lanes. The selected target is highlighted already, and a filtered one
+ * has no block to lead to.
  */
 export function buildHover(input: HoverInput): Batch[] {
   const lines = new LineBatch(1);
@@ -43,5 +48,6 @@ export function buildHover(input: HoverInput): Batch[] {
       emphasised: true,
     });
   }
+  if (input.instant) markers.marker(input.instant, Shape.Ring, RING_PX, THEME.selbox);
   return [lines.finish(), markers.finish()];
 }

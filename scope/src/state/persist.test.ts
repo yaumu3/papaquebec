@@ -8,6 +8,13 @@ import { DEFAULT_SETTINGS } from './settings';
 
 const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
 const DEFAULT_SORT: ListSort = { key: 'id', dir: 'asc' };
+const DEFAULTS: Persisted = {
+  settings: DEFAULT_SETTINGS,
+  panels: DEFAULT_PANELS,
+  listSort: DEFAULT_SORT,
+  plotted: ['alt', 'gs'],
+  historyOpen: true,
+};
 
 describe('loadPersisted', () => {
   it('returns defaults when nothing is stored or the entry is unreadable', () => {
@@ -16,20 +23,12 @@ describe('loadPersisted', () => {
     const broken = memoryStorage({ [PERSIST_KEY]: '{not json' });
 
     // Act
-    const a = loadPersisted(empty, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
-    const b = loadPersisted(broken, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
+    const a = loadPersisted(empty, DEFAULTS);
+    const b = loadPersisted(broken, DEFAULTS);
 
     // Assert
-    expect(a).toEqual({
-      settings: DEFAULT_SETTINGS,
-      panels: DEFAULT_PANELS,
-      listSort: DEFAULT_SORT,
-    });
-    expect(b).toEqual({
-      settings: DEFAULT_SETTINGS,
-      panels: DEFAULT_PANELS,
-      listSort: DEFAULT_SORT,
-    });
+    expect(a).toEqual(DEFAULTS);
+    expect(b).toEqual(DEFAULTS);
   });
 
   it('accepts valid fields and falls back per field on invalid ones', () => {
@@ -50,12 +49,7 @@ describe('loadPersisted', () => {
     const storage = memoryStorage({ [PERSIST_KEY]: JSON.stringify(stored) });
 
     // Act
-    const { settings, panels, listSort } = loadPersisted(
-      storage,
-      DEFAULT_SETTINGS,
-      DEFAULT_PANELS,
-      DEFAULT_SORT,
-    );
+    const { settings, panels, listSort } = loadPersisted(storage, DEFAULTS);
 
     // Assert
     expect(settings.rangeNm).toBe(55);
@@ -78,11 +72,13 @@ describe('savePersisted', () => {
       settings: { ...DEFAULT_SETTINGS, rangeNm: 20, labelDensity: 'dense' },
       panels: { ...DEFAULT_PANELS, maps: false },
       listSort: { key: 'alt', dir: 'desc' },
+      plotted: ['trk', 'selHdg'],
+      historyOpen: false,
     };
 
     // Act
     savePersisted(storage, state);
-    const back = loadPersisted(storage, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
+    const back = loadPersisted(storage, DEFAULTS);
 
     // Assert
     expect(back).toEqual(state);
@@ -95,7 +91,7 @@ describe('savePersisted', () => {
     });
 
     // Act
-    const { settings } = loadPersisted(storage, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT);
+    const { settings } = loadPersisted(storage, DEFAULTS);
 
     // Assert
     expect(settings.rangeNm).toBe(DEFAULT_SETTINGS.rangeNm);
@@ -113,8 +109,8 @@ describe('loadPersisted qnh', () => {
     });
 
     // Act
-    const a = loadPersisted(good, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT).settings.qnh;
-    const b = loadPersisted(bad, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT).settings.qnh;
+    const a = loadPersisted(good, DEFAULTS).settings.qnh;
+    const b = loadPersisted(bad, DEFAULTS).settings.qnh;
 
     // Assert
     expect(a).toEqual({ auto: false, station: 'RJAA' });
@@ -130,10 +126,7 @@ describe('loadPersisted filter', () => {
     );
 
     // Act
-    const grounds = stores.map(
-      (s) =>
-        loadPersisted(s, DEFAULT_SETTINGS, DEFAULT_PANELS, DEFAULT_SORT).settings.filter.ground,
-    );
+    const grounds = stores.map((s) => loadPersisted(s, DEFAULTS).settings.filter.ground);
 
     // Assert
     expect(grounds).toEqual([false, true, true]);
@@ -148,15 +141,55 @@ describe('loadPersisted band', () => {
     });
 
     // Act
-    const { filter } = loadPersisted(
-      storage,
-      DEFAULT_SETTINGS,
-      DEFAULT_PANELS,
-      DEFAULT_SORT,
-    ).settings;
+    const { filter } = loadPersisted(storage, DEFAULTS).settings;
 
     // Assert
     expect(filter.lowerFl).toBe(100);
     expect(filter.upperFl).toBe(FL_MAX);
+  });
+});
+
+describe('loadPersisted plotted', () => {
+  it('keeps the readings it knows, each once, and falls back when the entry is no list', () => {
+    // Arrange
+    const stores = [['gs', 'bogus', 'alt', 'gs'], [], 'alt'].map((plotted) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted }) }),
+    );
+
+    // Act
+    const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
+
+    // Assert
+    expect(plotted).toEqual([['gs', 'alt'], [], ['alt', 'gs']]);
+  });
+});
+
+describe('loadPersisted plotted lanes', () => {
+  it('keeps a stored plot within the lanes allowed', () => {
+    // Arrange
+    const storage = memoryStorage({
+      [PERSIST_KEY]: JSON.stringify({ plotted: ['alt', 'gs', 'trk', 'ias', 'vs'] }),
+    });
+
+    // Act
+    const { plotted } = loadPersisted(storage, DEFAULTS);
+
+    // Assert
+    expect(plotted).toEqual(['alt', 'gs', 'trk', 'ias']);
+  });
+});
+
+describe('loadPersisted historyOpen', () => {
+  it('keeps whether the history group is open, and falls back when that is no boolean', () => {
+    // Arrange
+    const stores = [false, 'closed'].map((historyOpen) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ historyOpen }) }),
+    );
+
+    // Act
+    const open = stores.map((st) => loadPersisted(st, DEFAULTS).historyOpen);
+
+    // Assert
+    expect(open).toEqual([false, true]);
   });
 });

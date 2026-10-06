@@ -3,7 +3,14 @@ import { createMemo, For, Index } from 'solid-js';
 import { targetMenu } from '../canvas/menus';
 import { cx } from '../design/cx';
 import { formatAltitude } from '../lib/altitude';
-import { climbArrow, climbState, formatDistance, formatGsWake, padTrack } from '../lib/format';
+import {
+  climbArrow,
+  climbState,
+  formatDistance,
+  formatGsWake,
+  padTrack,
+  sourceName,
+} from '../lib/format';
 import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rules';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import {
@@ -65,7 +72,7 @@ const COLUMNS: Column[] = [
     figure: true,
     cell: (t) => formatDistance(distanceFromSite(t)),
   },
-  { key: 'source', label: 'SRC', width: 4, figure: true, cell: (t) => t.source.toUpperCase() },
+  { key: 'source', label: 'SRC', width: 4, figure: true, cell: (t) => sourceName(t.source) },
 ];
 
 /** The grid the header and every row share: each column as wide as its text. */

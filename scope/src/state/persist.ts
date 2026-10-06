@@ -2,6 +2,7 @@ import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
+import { canonical, READING_KEYS, type ReadingKey } from './plotted';
 import {
   LABEL_DENSITIES,
   LAYER_KEYS,
@@ -27,6 +28,10 @@ export interface Persisted {
   settings: Settings;
   panels: Panels;
   listSort: ListSort;
+  /** The readings the history lanes plot, in lane order. */
+  plotted: readonly ReadingKey[];
+  /** Whether the detail panel's history group is unfolded. */
+  historyOpen: boolean;
 }
 
 const oneOf = <T>(steps: readonly T[], v: unknown, fallback: T): T =>
@@ -113,19 +118,22 @@ function sortFrom(raw: unknown, fallback: ListSort): ListSort {
   };
 }
 
+/** The readings known, within the lanes allowed; an empty list is a choice to plot nothing. */
+function plottedFrom(raw: unknown, fallback: readonly ReadingKey[]): readonly ReadingKey[] {
+  if (!Array.isArray(raw)) return fallback;
+  return canonical(raw.filter((k: unknown): k is ReadingKey => READING_KEYS.some((r) => r === k)));
+}
+
 /** Field-by-field validation: anything unexpected falls back to the default for that field. */
-export function loadPersisted(
-  storage: Storage,
-  settings: Settings,
-  panels: Panels,
-  listSort: ListSort,
-): Persisted {
+export function loadPersisted(storage: Storage, defaults: Persisted): Persisted {
   const raw = readJson(storage, PERSIST_KEY);
   const r = isRecord(raw) ? raw : {};
   return {
-    settings: settingsFrom(r.settings, settings),
-    panels: panelsFrom(r.panels, panels),
-    listSort: sortFrom(r.listSort, listSort),
+    settings: settingsFrom(r.settings, defaults.settings),
+    panels: panelsFrom(r.panels, defaults.panels),
+    listSort: sortFrom(r.listSort, defaults.listSort),
+    plotted: plottedFrom(r.plotted, defaults.plotted),
+    historyOpen: bool(r.historyOpen, defaults.historyOpen),
   };
 }
 

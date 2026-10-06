@@ -16,6 +16,7 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     verticalRate: undefined,
     nic: undefined,
     nacP: undefined,
+    messageRate: undefined,
     messages: undefined,
     rssi: undefined,
     type: undefined,
@@ -39,6 +40,7 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     seenPos: 0,
     position: { kind: 'none' },
     history: [],
+    samples: [],
     ops: { hideTrail: false, pinnedCorner: null, autoCorner: 'ne' },
     ...over,
   };

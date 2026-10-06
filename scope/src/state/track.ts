@@ -29,11 +29,8 @@ export interface OperatorState {
   autoCorner: Corner;
 }
 
-export interface Track {
-  hex: string;
-  flight: string | undefined;
-  squawk: string | undefined;
-  category: string | undefined;
+/** What the feed reports of the aircraft's state at one instant, as the detail panel reads it. */
+export interface Readings {
   alt: number | 'ground' | undefined;
   gs: number | undefined;
   track: number | undefined;
@@ -41,12 +38,9 @@ export interface Track {
   verticalRate: number | undefined;
   nic: number | undefined;
   nacP: number | undefined;
+  /** Messages heard from it since the receiver started. */
   messages: number | undefined;
   rssi: number | undefined;
-  type: string | undefined;
-  registration: string | undefined;
-  description: string | undefined;
-  emergency: string | undefined;
   /** Air data speeds: true and indicated airspeed in knots, Mach number. */
   tas: number | undefined;
   ias: number | undefined;
@@ -67,7 +61,33 @@ export interface Track {
   source: Source;
   seen: number;
   seenPos: number | undefined;
+}
+
+/** The readings as they stood when the target was heard, kept for the history lanes. */
+export interface Sample extends Readings {
+  /** Snapshot time, seconds since epoch. */
+  t: number;
+  /** Messages per second since the sample before; unknown for the first. */
+  messageRate: number | undefined;
+}
+
+/** What the detail table prints of a target or of a sample: the readings and the message rate. */
+export type Readout = Omit<Sample, 't'>;
+
+export interface Track extends Readings {
+  hex: string;
+  /** Messages per second as of its latest sample. */
+  messageRate: number | undefined;
+  flight: string | undefined;
+  squawk: string | undefined;
+  category: string | undefined;
+  type: string | undefined;
+  registration: string | undefined;
+  description: string | undefined;
+  emergency: string | undefined;
   position: Position;
   history: Fix[];
+  /** One sample per snapshot in which the target was heard, oldest first. */
+  samples: Sample[];
   ops: OperatorState;
 }

@@ -3,12 +3,14 @@ import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from '
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer, type RenderStatus } from '../render/facade';
 import { LAYER_ORDER, type LayerName } from '../render/layers';
+import { fixNearest } from '../render/layout/trails';
 import type { AtlasInfo, Batch, View } from '../render/protocol';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
 import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
 import { buildTargets } from '../render/scene/targets';
+import { hoverInstant } from '../state/history';
 import {
   aero,
   canvasSize,
@@ -148,6 +150,16 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     return { targets: batches };
   });
 
+  /** Where the selected target was at the instant hovered on the history lanes. */
+  const instant = createMemo(() => {
+    snapshotVersion();
+    const t = hoverInstant();
+    const hex = selected();
+    if (t === null || !hex) return null;
+    const fix = fixNearest(trackStore.tracks.get(hex)?.history ?? [], t);
+    return fix ? { x: fix.x, y: fix.y } : null;
+  });
+
   show(() => {
     blocksPlaced();
     const hex = hovered();
@@ -158,6 +170,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         filter: { ...settings.filter },
         altimeter: { ...settings.altimeter },
         labelDrag: labelDrag(),
+        instant: instant(),
       }),
     };
   });
