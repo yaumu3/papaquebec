@@ -114,6 +114,7 @@ function toTrack(
   trimOld(samples, now);
   return {
     ...readings,
+    messageRate: samples.at(-1)?.messageRate,
     hex: a.hex,
     flight: a.flight,
     squawk: a.squawk,

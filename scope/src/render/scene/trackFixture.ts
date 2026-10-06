@@ -14,6 +14,7 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     nic: 8,
     nacP: 9,
     messages: 1,
+    messageRate: undefined,
     rssi: -10,
     type: 'B789',
     registration: 'TEST-01',

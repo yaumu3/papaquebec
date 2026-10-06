@@ -324,6 +324,19 @@ describe('createTrackStore samples', () => {
     expect(store.tracks.get('a')?.samples.map((s) => s.messageRate)).toEqual([undefined, 10]);
   });
 
+  it('tells the track the message rate of its latest sample', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 10)]));
+    store.ingest(snapshot(1002, [heard('a', 30)]));
+
+    // Act
+    store.ingest(snapshot(1003, [heard('a', 30, { seen: 1.2 })]));
+
+    // Assert
+    expect(store.tracks.get('a')?.messageRate).toBe(10);
+  });
+
   it('goes by the age of the last message when the feed counts none', () => {
     // Arrange
     const store = createTrackStore(project);

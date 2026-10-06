@@ -11,7 +11,7 @@ import { hpaToInHg } from '../lib/metar';
 import { magneticTrack } from '../state/magnetic';
 import type { ReadingKey } from '../state/plotted';
 import { settings } from '../state/settings';
-import type { Readings } from '../state/track';
+import type { Position, Readout } from '../state/track';
 
 /** A value with its unit kept apart so the unit can be set quieter than the number. */
 export interface Reading {
@@ -29,6 +29,15 @@ export interface Reading {
 export const NONE: Reading = { v: '---' };
 
 export const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
+
+/** The position as one cell, which owns up to a fix that is no longer live. */
+export function positionReading(p: Position): { k: string; r: Reading } {
+  if (p.kind === 'none') return { k: 'POSITION', r: NONE };
+  return {
+    k: p.kind === 'last' ? 'LAST POSITION' : 'POSITION',
+    r: { v: `${p.lat.toFixed(5)} ${p.lon.toFixed(5)}` },
+  };
+}
 
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>
   v === undefined ? NONE : { v: v.toFixed(digits), unit };
@@ -52,21 +61,21 @@ function levelReading(d: DisplayAltitude, tail = ''): Reading {
   }
 }
 
-const altitudeReading = (r: Readings): Reading =>
+const altitudeReading = (r: Readout): Reading =>
   levelReading(displayAltitude(r.alt, settings.altimeter), climbArrow(r.verticalRate).trim());
 
 const selectedReading = (ft: number | undefined): Reading =>
   levelReading(displayAltitude(ft, uncorrected(settings.altimeter)));
 
 /** Magnetic track the scope derives, then the transmitted true one. */
-function trackReading(r: Readings): Reading {
+function trackReading(r: Readout): Reading {
   const mag = magneticTrack(r);
   if (r.track === undefined || mag === undefined) return NONE;
   return { v: `${padBearing(mag)}°`, also: `${padBearing(r.track)}°`, alsoUnit: 'T' };
 }
 
 /** Where the wind blows from, then how fast; blank unless both are known. */
-function windReading(r: Readings): Reading {
+function windReading(r: Readout): Reading {
   if (r.windDir === undefined || r.windSpeed === undefined) return NONE;
   return { v: `${padBearing(r.windDir)}°`, also: String(Math.round(r.windSpeed)), alsoUnit: 'kt' };
 }
@@ -74,14 +83,14 @@ function windReading(r: Readings): Reading {
 const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
 
 /** How long ago the target was last heard, and how long ago with a position. */
-const ageReading = (r: Readings): Reading => ({
+const ageReading = (r: Readout): Reading => ({
   v: `${formatAge(r.seen)} / ${formatAge(r.seenPos)}`,
   unit: 's',
 });
 
 export interface ReadingSpec {
   label: string;
-  format: (r: Readings) => Reading;
+  format: (r: Readout) => Reading;
 }
 
 /** Every reading the detail table shows of a target, as it is labeled and printed. */
@@ -105,6 +114,6 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   nacp: { label: 'NACP', format: (r) => num(r.nacP, '') },
   src: { label: 'SRC', format: (r) => ({ v: sourceName(r.source) }) },
   rssi: { label: 'RSSI', format: (r) => num(r.rssi, 'dB', 1) },
-  msgs: { label: 'MSGS', format: (r) => num(r.messages, '') },
+  msgs: { label: 'MSGS', format: (r) => num(r.messageRate, '/s', 1) },
   age: { label: 'SEEN / POS', format: ageReading },
 };

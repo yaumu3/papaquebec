@@ -71,8 +71,13 @@ export interface Sample extends Readings {
   messageRate: number | undefined;
 }
 
+/** What the detail table prints of a target or of a sample: the readings and the message rate. */
+export type Readout = Omit<Sample, 't'>;
+
 export interface Track extends Readings {
   hex: string;
+  /** Messages per second as of its latest sample. */
+  messageRate: number | undefined;
   flight: string | undefined;
   squawk: string | undefined;
   category: string | undefined;
