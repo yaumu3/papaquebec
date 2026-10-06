@@ -26,3 +26,15 @@ export function trackReorder(move: (from: number, to: number) => void) {
     },
   };
 }
+
+/** The step an arrow key asks of a reorderable item: up or down a place; null for any other key. */
+export function stepFromKey(key: string): -1 | 1 | null {
+  switch (key) {
+    case 'ArrowUp':
+      return -1;
+    case 'ArrowDown':
+      return 1;
+    default:
+      return null;
+  }
+}

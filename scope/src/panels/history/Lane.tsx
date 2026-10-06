@@ -3,6 +3,7 @@ import { createMemo, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
+import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
 import { barbPath, barbsAt, fixed, laneTraces, pathOf, valueAt } from './plot';
 import { type Dash, PLOTS } from './plots';
@@ -25,6 +26,9 @@ export const dashClass = (dash: Dash | undefined): string | undefined => dash &&
 /** One lane of the bay: its grip, its plot over the visible span, and its close button. */
 export function Lane(props: {
   lane: ReadingKey;
+  /** Its place among the lanes, and how many there are. */
+  index: number;
+  count: number;
   /** The lane's own reading, then the intents drawn in it. */
   keys: readonly ReadingKey[];
   samples: readonly Sample[];
@@ -38,6 +42,8 @@ export function Lane(props: {
   onClose: () => void;
   onGripDown: (y: number) => void;
   onGripMove: (y: number) => void;
+  /** The arrow keys move the lane a place up or down. */
+  onGripStep: (step: -1 | 1) => void;
 }) {
   const spec = PLOTS[props.lane];
   const label = READINGS[props.lane].label;
@@ -74,7 +80,15 @@ export function Lane(props: {
       <button
         type="button"
         class={s.grip}
-        aria-label={`Drag to reorder ${label}`}
+        aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag or press an arrow key to move it.`}
+        onKeyDown={(e) => {
+          const step = stepFromKey(e.key);
+          if (step === null) return;
+          e.preventDefault();
+          props.onGripStep(step);
+          // The lane moved in the DOM, which blurs its grip.
+          e.currentTarget.focus();
+        }}
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           props.onGripDown(e.clientY);

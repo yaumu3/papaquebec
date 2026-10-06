@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from
 
 import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
+import { clamp } from '../../lib/math';
 import {
   closePlotLane,
   historyOpen,
@@ -137,6 +138,8 @@ export function History(props: { track: Track }) {
               {(lane, i) => (
                 <Lane
                   lane={lane}
+                  index={i()}
+                  count={lanes().length}
                   keys={readingsIn(plotted(), lane)}
                   samples={samples()}
                   visible={visible()}
@@ -148,6 +151,7 @@ export function History(props: { track: Track }) {
                   onClose={() => closePlotLane(lane)}
                   onGripDown={(y) => reorder.down(i(), y, height() + 1, lanes().length)}
                   onGripMove={(y) => reorder.move(y)}
+                  onGripStep={(by) => movePlotLane(i(), clamp(i() + by, 0, lanes().length - 1))}
                 />
               )}
             </For>
