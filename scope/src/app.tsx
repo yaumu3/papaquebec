@@ -14,6 +14,7 @@ import { MapsPanel } from './panels/MapsPanel';
 import { Overlays } from './panels/Overlays';
 import { TabBar } from './panels/TabBar';
 import { TopBar } from './panels/TopBar';
+import { plotted } from './state/history';
 import { keepUnscrolled } from './state/layout';
 import { setBuiltinAero } from './state/mapsets';
 import { QNH_POLL_MS, qnhReport, setQnhError, setQnhReport, stationCandidates } from './state/qnh';
@@ -47,7 +48,7 @@ export function App() {
       .catch((err: unknown) => console.warn('aero.json unavailable', err));
   });
 
-  createEffect(() => persist({ panels: panels(), listSort: listSort() }));
+  createEffect(() => persist({ panels: panels(), listSort: listSort(), plotted: plotted() }));
 
   // METAR polling over the candidate stations; answers for a superseded list are dropped.
   createEffect(() => {

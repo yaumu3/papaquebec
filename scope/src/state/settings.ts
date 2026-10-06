@@ -2,6 +2,7 @@ import { createStore } from 'solid-js/store';
 
 import { DEFAULT_LIST_SORT } from './listSort';
 import { loadPersisted, type Persisted, savePersisted } from './persist';
+import { DEFAULT_PLOTTED } from './plotted';
 import {
   DEFAULT_PANELS,
   DEFAULT_SETTINGS,
@@ -20,6 +21,7 @@ const DEFAULTS: Persisted = {
   settings: DEFAULT_SETTINGS,
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_LIST_SORT,
+  plotted: DEFAULT_PLOTTED,
 };
 
 /** Settings and panel visibility as last saved in this browser, or the defaults. */

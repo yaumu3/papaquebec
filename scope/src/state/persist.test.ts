@@ -12,6 +12,7 @@ const DEFAULTS: Persisted = {
   settings: DEFAULT_SETTINGS,
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_SORT,
+  plotted: ['alt', 'gs'],
 };
 
 describe('loadPersisted', () => {
@@ -70,6 +71,7 @@ describe('savePersisted', () => {
       settings: { ...DEFAULT_SETTINGS, rangeNm: 20, labelDensity: 'dense' },
       panels: { ...DEFAULT_PANELS, maps: false },
       listSort: { key: 'alt', dir: 'desc' },
+      plotted: ['trk', 'selHdg'],
     };
 
     // Act
@@ -142,5 +144,20 @@ describe('loadPersisted band', () => {
     // Assert
     expect(filter.lowerFl).toBe(100);
     expect(filter.upperFl).toBe(FL_MAX);
+  });
+});
+
+describe('loadPersisted plotted', () => {
+  it('keeps the readings it knows, each once, and falls back when the entry is no list', () => {
+    // Arrange
+    const stores = [['gs', 'bogus', 'alt', 'gs'], [], 'alt'].map((plotted) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted }) }),
+    );
+
+    // Act
+    const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
+
+    // Assert
+    expect(plotted).toEqual([['gs', 'alt'], [], ['alt', 'gs']]);
   });
 });
