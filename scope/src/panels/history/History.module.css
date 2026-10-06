@@ -1,6 +1,7 @@
 /*
  * Beside each plot: the grip, the close button, and a gutter between each and the plot. Padding
- * below, not a margin, so the room under the timeline does not collapse into the next rule's.
+ * below, not a margin, so the room under the timeline does not collapse into the next rule's;
+ * as much as the title's ink stands from the rule above.
  */
 .history {
   --lane-grip: 24px;
@@ -8,7 +9,7 @@
   --lane-gutter: 8px;
   --plot-left: calc(var(--lane-grip) + var(--lane-gutter));
   --plot-right: calc(var(--lane-close) + var(--lane-gutter));
-  padding-bottom: var(--space-4);
+  padding-bottom: var(--space-5);
 }
 .title {
   display: flex;
@@ -165,4 +166,48 @@
   color: var(--text-dim);
   font-size: var(--text-sm);
   letter-spacing: var(--tracking);
+}
+/* Sized by the panel; its own width is read back for the coordinates. */
+.timeline {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-4);
+  overflow: visible;
+  touch-action: none;
+}
+/* The cursor tells what a press would take hold of. */
+.resize {
+  cursor: ew-resize;
+}
+.move {
+  cursor: grab;
+}
+.select {
+  cursor: crosshair;
+}
+.frame {
+  fill: none;
+  stroke: var(--control-hover);
+}
+.mini {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 1;
+}
+.dim {
+  fill: var(--panel-bg);
+  fill-opacity: 0.6;
+}
+.window {
+  fill: var(--text);
+  fill-opacity: 0.06;
+  stroke: var(--text);
+}
+.handle {
+  fill: var(--text);
+}
+.selection {
+  fill: var(--color-selbox);
+  fill-opacity: 0.18;
+  stroke: var(--color-selbox);
 }

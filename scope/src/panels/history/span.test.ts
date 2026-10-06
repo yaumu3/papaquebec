@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  dragBase,
   dragInterval,
   grabAt,
   type Interval,
@@ -201,5 +202,19 @@ describe('xOf and timeAt', () => {
     // Assert
     expect(x).toBe(75);
     expect(t).toBe(1050);
+  });
+});
+
+describe('dragBase', () => {
+  it('keeps the window ending where it ends now while its left edge is dragged, so a tail goes on following', () => {
+    // Arrange
+    const pressed: Interval = { from: 1200, to: 1400 };
+    const visible: Interval = { from: 1200, to: 1403 };
+
+    // Act
+    const bases = [dragBase('left', pressed, visible), dragBase('right', pressed, visible)];
+
+    // Assert
+    expect(bases).toEqual([{ from: 1200, to: 1403 }, pressed]);
   });
 });

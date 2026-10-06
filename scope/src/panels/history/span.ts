@@ -57,6 +57,14 @@ export function grabAt(t: number, visible: Interval, tolerance: number): Grab {
   return t > visible.from && t < visible.to ? 'body' : 'outside';
 }
 
+/**
+ * The interval a drag works from: as pressed, but for the left edge ending where the window
+ * ends now, so a window that follows the present goes on doing so.
+ */
+export function dragBase(grab: Grab, pressed: Interval, visible: Interval): Interval {
+  return grab === 'left' ? { from: pressed.from, to: visible.to } : pressed;
+}
+
 /** The interval once a pointer that pressed at `t0` on `grab` has moved to `t`. */
 export function dragInterval(
   grab: Grab,

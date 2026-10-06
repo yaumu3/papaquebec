@@ -21,6 +21,7 @@ import { Value } from '../Value';
 import { axisStep, clockLabel, ticks } from './axis';
 import { Lane } from './Lane';
 import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
+import { Timeline } from './Timeline';
 import { nearestSample } from './trace';
 
 import s from './History.module.css';
@@ -68,7 +69,9 @@ export function History(props: { track: Track }) {
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
+  let bay: HTMLDivElement | undefined;
   let labels: HTMLDivElement | undefined;
+  const width = trackWidth(() => bay);
   /** The axis labels line up with the plots, so their width is the plots'. */
   const plotWidth = trackWidth(() => labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
@@ -104,7 +107,13 @@ export function History(props: { track: Track }) {
         </span>
         <Button onClick={reset}>RESET</Button>
       </div>
-      <div class={s.bay} style={{ height: `${BAY_PX}px` }}>
+      <div
+        ref={(node) => {
+          bay = node;
+        }}
+        class={s.bay}
+        style={{ height: `${BAY_PX}px` }}
+      >
         <Show
           when={lanes().length > 0}
           fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
@@ -162,6 +171,14 @@ export function History(props: { track: Track }) {
           </For>
         </div>
       </div>
+      <Timeline
+        samples={samples()}
+        lanes={lanes().map((lane) => readingsIn(plotted(), lane))}
+        contact={contact()}
+        visible={visible()}
+        width={width()}
+        onSpan={setSpan}
+      />
     </div>
   );
 }
