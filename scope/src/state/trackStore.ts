@@ -70,18 +70,21 @@ function appendFix(history: Fix[], position: Position, t: number, alt: Track['al
 }
 
 /**
- * Whether the target was heard since its last sample: its message count grew, or, from a feed
- * that counts none, its last message is younger than that sample.
+ * Whether the target was heard since its last sample: its message count changed, up or, after a
+ * receiver restart, down; or, from a feed that counts none, its last message is younger than
+ * that sample. Never twice at one snapshot time.
  */
 function heardSince(last: Sample | undefined, r: Readings, now: number): boolean {
   if (!last) return true;
-  if (r.messages !== undefined && last.messages !== undefined) return r.messages > last.messages;
+  if (now <= last.t) return false;
+  if (r.messages !== undefined && last.messages !== undefined) return r.messages !== last.messages;
   return r.seen < now - last.t;
 }
 
-/** Messages per second between the last sample and this one, when both count them. */
+/** Messages per second between the last sample and this one, when both count them and the count has not been reset. */
 function rateSince(last: Sample | undefined, r: Readings, now: number): number | undefined {
   if (!last || r.messages === undefined || last.messages === undefined) return undefined;
+  if (r.messages < last.messages) return undefined;
   return (r.messages - last.messages) / (now - last.t);
 }
 

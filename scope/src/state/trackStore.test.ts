@@ -337,6 +337,34 @@ describe('createTrackStore samples', () => {
     expect(store.tracks.get('a')?.messageRate).toBe(10);
   });
 
+  it('takes a sample when the count falls back, as after a receiver restart, with no rate', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 500)]));
+
+    // Act
+    store.ingest(snapshot(1001, [heard('a', 3)]));
+
+    // Assert
+    const samples = store.tracks.get('a')?.samples;
+    expect(samples?.map((s) => [s.t, s.messageRate])).toEqual([
+      [1000, undefined],
+      [1001, undefined],
+    ]);
+  });
+
+  it('takes one sample at most per snapshot time', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 10)]));
+
+    // Act
+    store.ingest(snapshot(1000, [heard('a', 14)]));
+
+    // Assert
+    expect(store.tracks.get('a')?.samples.map((s) => s.t)).toEqual([1000]);
+  });
+
   it('goes by the age of the last message when the feed counts none', () => {
     // Arrange
     const store = createTrackStore(project);
