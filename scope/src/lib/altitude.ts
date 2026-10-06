@@ -48,15 +48,27 @@ export interface Selection {
 }
 
 /**
- * Whether the aircraft occupies its selected altitude, compared on the altimeter the crew set it
- * against: its own downlinked setting when known, else the operator's. The dwell PANS-ATM
- * 8.5.5.2.5 asks before a level counts as reached is not applied.
+ * The altitude as the crew reads it, the reference their selected altitude is set on: on their
+ * own downlinked altimeter setting when known, else the operator's, below the transition
+ * altitude; the flight level from there up. Undefined on the ground or when unknown.
  */
-export function holdsSelected(s: Selection, a: Altimeter): boolean {
-  if (typeof s.alt !== 'number' || s.selAlt === undefined) return false;
+export function crewAltitudeFt(
+  s: Pick<Selection, 'alt' | 'navQnh'>,
+  a: Altimeter,
+): number | undefined {
   const crew = s.navQnh === undefined ? a : { ...a, qnhInHg: s.navQnh / HPA_PER_INHG };
   const d = displayAltitude(s.alt, crew);
-  return 'feet' in d && Math.abs(d.feet - s.selAlt) <= LEVEL_TOLERANCE_FT;
+  return 'feet' in d ? d.feet : undefined;
+}
+
+/**
+ * Whether the aircraft occupies its selected altitude, compared as the crew reads it. The dwell
+ * PANS-ATM 8.5.5.2.5 asks before a level counts as reached is not applied.
+ */
+export function holdsSelected(s: Selection, a: Altimeter): boolean {
+  const feet = crewAltitudeFt(s, a);
+  if (feet === undefined || s.selAlt === undefined) return false;
+  return Math.abs(feet - s.selAlt) <= LEVEL_TOLERANCE_FT;
 }
 
 /** The same regimes without the QNH correction, for altitudes the crew set on their own altimeter. */

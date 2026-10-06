@@ -1,7 +1,9 @@
+import { crewAltitudeFt } from '../../lib/altitude';
 import { modeNames, sourceName } from '../../lib/format';
 import { magneticTrack } from '../../state/magnetic';
 import type { ReadingKey } from '../../state/plotted';
-import type { Readings, Sample } from '../../state/track';
+import { settings } from '../../state/settings';
+import type { Sample } from '../../state/track';
 import type { Read } from './trace';
 
 export interface Wind {
@@ -22,8 +24,6 @@ export type PlotSpec =
   | { kind: 'barbs'; barb: (s: Sample) => Wind | undefined }
   | { kind: 'intent'; y: Read; dash: Dash; angular?: true };
 
-const feet = (alt: Readings['alt']): number | undefined => (alt === 'ground' ? undefined : alt);
-
 const wind = (s: Sample): Wind | undefined =>
   s.windDir === undefined || s.windSpeed === undefined
     ? undefined
@@ -31,7 +31,8 @@ const wind = (s: Sample): Wind | undefined =>
 
 /** How each reading is drawn; `laneOf` in `state/plotted.ts` says which lane an intent goes in. */
 export const PLOTS: Record<ReadingKey, PlotSpec> = {
-  alt: { kind: 'line', y: (s) => feet(s.alt) },
+  // As the crew reads it, so that an aircraft holding its selected altitude sits on that line.
+  alt: { kind: 'line', y: (s) => crewAltitudeFt(s, settings.altimeter) },
   selAlt: { kind: 'intent', y: (s) => s.selAlt, dash: 'dashed' },
   fmsAlt: { kind: 'intent', y: (s) => s.fmsAlt, dash: 'dotted' },
   vs: { kind: 'line', y: (s) => s.verticalRate },
