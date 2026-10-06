@@ -63,8 +63,11 @@ export function Timeline(props: {
     props.lanes
       .flatMap((keys) => laneTraces(props.samples, keys, props.contact))
       .map((tr) => {
-        const r = rangeOf([tr.runs], props.contact);
-        const y = (v: number) => (r ? yOf(v, r, HEIGHT_PX, PAD_PX, PAD_PX) : HEIGHT_PX / 2);
+        const r = tr.floor ? null : rangeOf([tr.runs], props.contact);
+        const y = (v: number) => {
+          if (tr.floor) return HEIGHT_PX - PAD_PX;
+          return r ? yOf(v, r, HEIGHT_PX, PAD_PX, PAD_PX) : HEIGHT_PX / 2;
+        };
         return { d: pathOf(tr.runs, x, y), dash: tr.dash };
       }),
   );

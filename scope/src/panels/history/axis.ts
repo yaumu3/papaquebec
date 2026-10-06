@@ -1,16 +1,19 @@
 import { clockTime } from '../../lib/format';
 import type { Interval } from './span';
 
-/** Steps between labels, seconds: each a round part of the clock, up to the hour. */
+/** Steps along the clock, seconds: each a round part of it, up to the hour. */
 const STEPS_SEC = [10, 15, 30, 60, 120, 300, 600, 900, 1800];
 const HOUR_SEC = 3600;
 /** How many labels at most an axis carries. */
 const MAX_LABELS = 5;
 
-/** The shortest step that labels a span of `spanSec` at most `MAX_LABELS` times. */
-export function axisStep(spanSec: number): number {
-  return STEPS_SEC.find((s) => spanSec / s <= MAX_LABELS) ?? HOUR_SEC;
+/** The shortest round step that falls at most `most` times across a span of `spanSec`. */
+export function clockStep(spanSec: number, most: number): number {
+  return STEPS_SEC.find((s) => spanSec / s <= most) ?? HOUR_SEC;
 }
+
+/** The step between the labels of an axis over a span of `spanSec`. */
+export const axisStep = (spanSec: number): number => clockStep(spanSec, MAX_LABELS);
 
 /** The multiples of `step` inside the interval, its ends included. */
 export function ticks(i: Interval, step: number): number[] {

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import { qnhAltitudeFt } from '../../lib/altitude';
+import { HPA_PER_INHG } from '../../lib/units';
 import { setDeclination } from '../../state/magnetic';
 import { laneOf, READING_KEYS } from '../../state/plotted';
 import { makeSample } from '../../state/sampleFixture';
@@ -17,12 +19,13 @@ describe('PLOTS', () => {
     expect(agree).toEqual(keys.map(() => true));
   });
 
-  it('plots altitude in feet, and not at all on the ground', () => {
+  it('plots altitude as the crew reads it, the reference their selected altitude is set on', () => {
     // Arrange
     const samples = [
-      makeSample(1, { alt: 11000 }),
-      makeSample(2, { alt: 'ground' }),
-      makeSample(3),
+      makeSample(1, { alt: 4750, navQnh: 1023.2 }),
+      makeSample(2, { alt: 11000 }),
+      makeSample(3, { alt: 'ground' }),
+      makeSample(4),
     ];
     const alt = PLOTS.alt;
 
@@ -30,7 +33,19 @@ describe('PLOTS', () => {
     const ys = samples.map((s) => (alt.kind === 'line' ? alt.y(s) : null));
 
     // Assert
-    expect(ys).toEqual([11000, undefined, undefined]);
+    expect(ys).toEqual([qnhAltitudeFt(4750, 1023.2 / HPA_PER_INHG), 11000, undefined, undefined]);
+  });
+
+  it('keeps a target on the ground on the floor of the altitude lane', () => {
+    // Arrange
+    const samples = [makeSample(1, { alt: 'ground' }), makeSample(2, { alt: 500 }), makeSample(3)];
+    const alt = PLOTS.alt;
+
+    // Act
+    const floored = samples.map((s) => alt.kind === 'line' && alt.floor?.(s));
+
+    // Assert
+    expect(floored).toEqual([true, false, false]);
   });
 
   it('plots the track in magnetic, as the table reads it', () => {

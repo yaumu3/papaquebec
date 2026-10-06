@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   type Altimeter,
+  crewAltitudeFt,
   displayAltitude,
   displayLevel,
   formatAltitude,
@@ -10,6 +11,7 @@ import {
   type Selection,
   STANDARD_ALTIMETER,
 } from './altitude';
+import { HPA_PER_INHG } from './units';
 
 describe('qnhAltitudeFt', () => {
   it('corrects pressure altitude by about 925 ft per inHg', () => {
@@ -85,6 +87,42 @@ describe('displayLevel', () => {
 
     // Assert
     expect(out).toEqual([47, 330, 'ground', undefined]);
+  });
+});
+
+describe('crewAltitudeFt', () => {
+  it("reads below the transition altitude on the crew's own setting, or the operator's when theirs is unknown", () => {
+    // Arrange
+    const operator = { transitionAltFt: 14000, qnhInHg: 29.62 };
+    const cases = [
+      { alt: 4750, navQnh: 1023.2 },
+      { alt: 4750, navQnh: undefined },
+    ];
+
+    // Act
+    const feet = cases.map((c) => crewAltitudeFt(c, operator));
+
+    // Assert
+    expect(feet).toEqual([
+      qnhAltitudeFt(4750, 1023.2 / HPA_PER_INHG),
+      qnhAltitudeFt(4750, operator.qnhInHg),
+    ]);
+  });
+
+  it('reads a flight level as it is, and nothing on the ground or when the altitude is unknown', () => {
+    // Arrange
+    const operator = { transitionAltFt: 14000, qnhInHg: 29.62 };
+    const cases = [
+      { alt: 35000, navQnh: 1023.2 },
+      { alt: 'ground' as const, navQnh: 1023.2 },
+      { alt: undefined, navQnh: undefined },
+    ];
+
+    // Act
+    const feet = cases.map((c) => crewAltitudeFt(c, operator));
+
+    // Assert
+    expect(feet).toEqual([35000, undefined, undefined]);
   });
 });
 

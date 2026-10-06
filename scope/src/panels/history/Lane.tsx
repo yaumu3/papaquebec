@@ -5,7 +5,8 @@ import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
-import { barbPath, barbsAt, fixed, laneTraces, pathOf, valueAt } from './plot';
+import { clockStep, ticks } from './axis';
+import { barbPath, barbsAt, fixed, type LaneTrace, laneTraces, pathOf, valueAt } from './plot';
 import { type Dash, PLOTS } from './plots';
 import { type Interval, xOf } from './span';
 import { barsOf, gapsIn, rangeOf, yOf } from './trace';
@@ -17,8 +18,12 @@ const PAD_TOP_PX = 14;
 const PAD_BOTTOM_PX = 5;
 /** Kept clear above and below a gantt bar, within its row. */
 const BAR_INSET_PX = 2;
+/** A row thinner than this cannot hold its tab's text, and tabs would run into each other. */
+const TAB_MIN_PX = 11;
 const DOT_PX = 3;
 const BARB_PX = 16;
+/** How far apart barbs stand at the least, on round clock times of their own. */
+const BARB_PITCH_PX = 32;
 
 /** The class that dashes a trace, if any. */
 export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
@@ -52,10 +57,14 @@ export function Lane(props: {
   const traces = createMemo(() => laneTraces(props.samples, props.keys, props.visible));
   const range = createMemo(() =>
     rangeOf(
-      traces().map((tr) => tr.runs),
+      traces()
+        .filter((tr) => !tr.floor)
+        .map((tr) => tr.runs),
       props.visible,
     ),
   );
+  /** Where a trace's values fall: on the lane's scale, or all of them along its floor. */
+  const yFor = (tr: LaneTrace) => (tr.floor ? () => props.height - PAD_BOTTOM_PX : y);
   const y = (v: number) => {
     const r = range();
     return r ? yOf(v, r, props.height, PAD_TOP_PX, PAD_BOTTOM_PX) : props.height / 2;
@@ -63,15 +72,18 @@ export function Lane(props: {
   const gaps = createMemo(() => gapsIn(props.samples, props.visible));
   const bars = createMemo(() => (spec.kind === 'gantt' ? barsOf(props.samples, spec.names) : []));
   const rowHeight = () => props.height / Math.max(1, bars().length);
-  const barbs = createMemo(() =>
-    spec.kind === 'barbs' ? barbsAt(props.samples, props.ticks, spec.barb) : [],
-  );
+  const barbs = createMemo(() => {
+    if (spec.kind !== 'barbs') return [];
+    const most = Math.max(1, Math.floor(props.width / BARB_PITCH_PX));
+    const step = clockStep(props.visible.to - props.visible.from, most);
+    return barbsAt(props.samples, ticks(props.visible, step), spec.barb);
+  });
   const dots = () => {
     const h = props.hover;
     if (!h) return [];
     return traces().flatMap((tr) => {
       const v = valueAt(tr.runs, h.t);
-      return v === undefined ? [] : [{ cx: x(h.t), cy: y(v) }];
+      return v === undefined ? [] : [{ cx: x(h.t), cy: yFor(tr)(v) }];
     });
   };
 
@@ -125,7 +137,12 @@ export function Lane(props: {
             d={props.ticks.map((t) => `M${fixed(x(t))} 0 V${props.height}`).join(' ')}
           />
           <Index each={traces()}>
-            {(tr) => <path class={cx(s.trace, dashClass(tr().dash))} d={pathOf(tr().runs, x, y)} />}
+            {(tr) => (
+              <path
+                class={cx(s.trace, dashClass(tr().dash))}
+                d={pathOf(tr().runs, x, yFor(tr()))}
+              />
+            )}
           </Index>
           <Index each={barbs()}>
             {(b) => (
@@ -170,20 +187,22 @@ export function Lane(props: {
         <Show when={spec.kind !== 'gantt'}>
           <span class={s.name}>{label}</span>
         </Show>
-        <Index each={bars()}>
-          {(bar, row) => (
-            <span
-              class={s.tab}
-              style={{
-                top: `${row * rowHeight()}px`,
-                height: `${rowHeight()}px`,
-                'line-height': `${rowHeight()}px`,
-              }}
-            >
-              {bar().name}
-            </span>
-          )}
-        </Index>
+        <Show when={rowHeight() >= TAB_MIN_PX}>
+          <Index each={bars()}>
+            {(bar, row) => (
+              <span
+                class={s.tab}
+                style={{
+                  top: `${row * rowHeight()}px`,
+                  height: `${rowHeight()}px`,
+                  'line-height': `${rowHeight()}px`,
+                }}
+              >
+                {bar().name}
+              </span>
+            )}
+          </Index>
+        </Show>
       </div>
       <button
         type="button"
