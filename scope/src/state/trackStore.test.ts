@@ -275,3 +275,142 @@ describe('createTrackStore readouts', () => {
     );
   });
 });
+
+/** A target heard, its message count at `messages`. */
+const heard = (hex: string, messages: number, over: Partial<AircraftReport> = {}) => ({
+  ...live(hex),
+  messages,
+  ...over,
+});
+
+describe('createTrackStore samples', () => {
+  it('takes a sample of every reading each time the target is heard', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 10, { alt: 11000, gs: 290 })]));
+
+    // Act
+    store.ingest(snapshot(1001, [heard('a', 14, { alt: 10900, gs: 288 })]));
+
+    // Assert
+    const samples = store.tracks.get('a')?.samples;
+    expect(samples?.map((s) => [s.t, s.alt, s.gs])).toEqual([
+      [1000, 11000, 290],
+      [1001, 10900, 288],
+    ]);
+  });
+
+  it('takes no sample while nothing new is heard', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 10)]));
+
+    // Act
+    store.ingest(snapshot(1001, [heard('a', 10, { seen: 1.2 })]));
+
+    // Assert
+    expect(store.tracks.get('a')?.samples.map((s) => s.t)).toEqual([1000]);
+  });
+
+  it('tells the message rate from the count since the sample before', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 10)]));
+
+    // Act
+    store.ingest(snapshot(1002, [heard('a', 30)]));
+
+    // Assert
+    expect(store.tracks.get('a')?.samples.map((s) => s.messageRate)).toEqual([undefined, 10]);
+  });
+
+  it('goes by the age of the last message when the feed counts none', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [{ ...live('a'), seen: 0.2 }]));
+    store.ingest(snapshot(1001, [{ ...live('a'), seen: 1.2 }]));
+
+    // Act
+    store.ingest(snapshot(1002, [{ ...live('a'), seen: 0.4 }]));
+
+    // Assert
+    expect(store.tracks.get('a')?.samples.map((s) => s.t)).toEqual([1000, 1002]);
+  });
+
+  it('trims samples older than the retention window', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 1)]));
+    store.ingest(snapshot(1000 + HISTORY_RETENTION_SEC / 2, [heard('a', 2)]));
+
+    // Act
+    store.ingest(snapshot(1000 + HISTORY_RETENTION_SEC + 1, [heard('a', 3)]));
+
+    // Assert
+    expect(store.tracks.get('a')?.samples.map((s) => s.t)).toEqual([
+      1000 + HISTORY_RETENTION_SEC / 2,
+      1000 + HISTORY_RETENTION_SEC + 1,
+    ]);
+  });
+
+  it('carries every reading the detail panel plots', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const reported: AircraftReport = {
+      ...heard('a', 50),
+      alt: 'ground',
+      track: 235,
+      verticalRate: -1200,
+      ias: 229,
+      tas: 282,
+      mach: 0.428,
+      oat: 13,
+      tat: 23,
+      navQnh: 1013.6,
+      nic: 8,
+      nacP: 9,
+      rssi: -12.3,
+      selAlt: 35008,
+      fmsAlt: 35000,
+      selHeading: 270.7,
+      windDir: 255,
+      windSpeed: 14,
+      navModes: ['autopilot', 'lnav'],
+      source: 'mlat',
+      seen: 0.3,
+      seenPos: 2.5,
+    };
+
+    // Act
+    store.ingest(snapshot(1000, [reported]));
+
+    // Assert
+    expect(store.tracks.get('a')?.samples[0]).toEqual({
+      t: 1000,
+      messageRate: undefined,
+      messages: 50,
+      alt: 'ground',
+      gs: undefined,
+      track: 235,
+      verticalRate: -1200,
+      ias: 229,
+      tas: 282,
+      mach: 0.428,
+      oat: 13,
+      tat: 23,
+      navQnh: 1013.6,
+      nic: 8,
+      nacP: 9,
+      rssi: -12.3,
+      selAlt: 35008,
+      fmsAlt: 35000,
+      selHeading: 270.7,
+      windDir: 255,
+      windSpeed: 14,
+      navModes: ['autopilot', 'lnav'],
+      source: 'mlat',
+      seen: 0.3,
+      seenPos: 2.5,
+    });
+  });
+});

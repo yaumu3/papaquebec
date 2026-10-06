@@ -39,6 +39,7 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     seenPos: 0,
     position: { kind: 'none' },
     history: [],
+    samples: [],
     ops: { hideTrail: false, pinnedCorner: null, autoCorner: 'ne' },
     ...over,
   };

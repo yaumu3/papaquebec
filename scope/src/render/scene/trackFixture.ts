@@ -36,6 +36,7 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     seenPos: 0.2,
     position: { kind: 'live', lat: 33.6, lon: 130.5, x: 1, y: 2 }, // RJFF
     history: [],
+    samples: [],
     ops: { hideTrail: false, pinnedCorner: null, autoCorner: 'ne' },
     ...over,
   };
