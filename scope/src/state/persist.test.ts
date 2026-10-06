@@ -164,6 +164,21 @@ describe('loadPersisted plotted', () => {
   });
 });
 
+describe('loadPersisted plotted lanes', () => {
+  it('keeps a stored plot within the lanes allowed', () => {
+    // Arrange
+    const storage = memoryStorage({
+      [PERSIST_KEY]: JSON.stringify({ plotted: ['alt', 'gs', 'trk', 'ias', 'vs'] }),
+    });
+
+    // Act
+    const { plotted } = loadPersisted(storage, DEFAULTS);
+
+    // Assert
+    expect(plotted).toEqual(['alt', 'gs', 'trk', 'ias']);
+  });
+});
+
 describe('loadPersisted historyOpen', () => {
   it('keeps whether the history group is open, and falls back when that is no boolean', () => {
     // Arrange

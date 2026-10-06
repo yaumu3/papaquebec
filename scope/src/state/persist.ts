@@ -2,7 +2,7 @@ import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
-import { READING_KEYS, type ReadingKey } from './plotted';
+import { canonical, READING_KEYS, type ReadingKey } from './plotted';
 import {
   LABEL_DENSITIES,
   LAYER_KEYS,
@@ -118,11 +118,10 @@ function sortFrom(raw: unknown, fallback: ListSort): ListSort {
   };
 }
 
-/** The readings known, each once; an empty list is a choice to plot nothing. */
+/** The readings known, within the lanes allowed; an empty list is a choice to plot nothing. */
 function plottedFrom(raw: unknown, fallback: readonly ReadingKey[]): readonly ReadingKey[] {
   if (!Array.isArray(raw)) return fallback;
-  const known = raw.filter((k: unknown): k is ReadingKey => READING_KEYS.some((r) => r === k));
-  return [...new Set(known)];
+  return canonical(raw.filter((k: unknown): k is ReadingKey => READING_KEYS.some((r) => r === k)));
 }
 
 /** Field-by-field validation: anything unexpected falls back to the default for that field. */

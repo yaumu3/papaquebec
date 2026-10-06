@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  canonical,
   closeLane,
   DEFAULT_PLOTTED,
   lanesOf,
@@ -129,6 +130,30 @@ describe('moveLane', () => {
 
     // Assert
     expect(next).toEqual(['alt', 'gs']);
+  });
+});
+
+describe('canonical', () => {
+  it('keeps the first lanes allowed with their intents, and drops the rest with theirs', () => {
+    // Arrange
+    const plotted: ReadingKey[] = ['alt', 'selAlt', 'gs', 'trk', 'selHdg', 'ias', 'vs', 'fmsAlt'];
+
+    // Act
+    const kept = canonical(plotted);
+
+    // Assert
+    expect(kept).toEqual(['alt', 'selAlt', 'fmsAlt', 'gs', 'trk', 'selHdg', 'ias']);
+  });
+
+  it('opens the lane an intent is drawn in when that was left out, and lists nothing twice', () => {
+    // Arrange
+    const plotted: ReadingKey[] = ['selAlt', 'gs', 'gs', 'selAlt'];
+
+    // Act
+    const kept = canonical(plotted);
+
+    // Assert
+    expect(kept).toEqual(['alt', 'selAlt', 'gs']);
   });
 });
 

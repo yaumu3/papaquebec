@@ -67,10 +67,23 @@ export function togglePlotted(plotted: readonly ReadingKey[], key: ReadingKey): 
   return lane === key ? [...plotted, key] : [...plotted, lane, key];
 }
 
+/** The plotted readings lane by lane in the order given, each lane's own reading first, nothing twice. */
+const byLanes = (lanes: readonly ReadingKey[], plotted: readonly ReadingKey[]): ReadingKey[] => [
+  ...new Set(lanes.flatMap((lane) => readingsIn(plotted, lane))),
+];
+
 /** Moves the lane at `from` to `to`, the readings drawn in each lane travelling together. */
 export function moveLane(plotted: readonly ReadingKey[], from: number, to: number): ReadingKey[] {
   const lanes = lanesOf(plotted);
   const [moved] = lanes.splice(from, 1);
   if (moved !== undefined) lanes.splice(to, 0, moved);
-  return lanes.flatMap((lane) => readingsIn(plotted, lane));
+  return byLanes(lanes, plotted);
+}
+
+/**
+ * A plot as the lanes can show it: the first lanes within the limit, each with the readings drawn
+ * in it and its own reading opening it, the rest dropped with their intents.
+ */
+export function canonical(plotted: readonly ReadingKey[]): ReadingKey[] {
+  return byLanes(lanesOf(plotted).slice(0, MAX_LANES), plotted);
 }
