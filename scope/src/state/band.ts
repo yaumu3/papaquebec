@@ -1,3 +1,5 @@
+import { clamp } from '../lib/math';
+
 /** A closed range of slider positions; the two edges never cross. */
 export interface Band {
   lower: number;
@@ -10,8 +12,6 @@ export interface BandLimits {
   /** Least distance kept between the edges. */
   gap: number;
 }
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** Moves the lower edge, pushing the upper edge ahead of it when they would get too close. */
 export function withLower(b: Band, lower: number, l: BandLimits): Band {
