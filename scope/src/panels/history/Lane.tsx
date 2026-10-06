@@ -5,6 +5,7 @@ import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
+import { clockStep, ticks } from './axis';
 import { barbPath, barbsAt, fixed, type LaneTrace, laneTraces, pathOf, valueAt } from './plot';
 import { type Dash, PLOTS } from './plots';
 import { type Interval, xOf } from './span';
@@ -19,6 +20,8 @@ const PAD_BOTTOM_PX = 5;
 const BAR_INSET_PX = 2;
 const DOT_PX = 3;
 const BARB_PX = 16;
+/** How far apart barbs stand at the least, on round clock times of their own. */
+const BARB_PITCH_PX = 32;
 
 /** The class that dashes a trace, if any. */
 export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
@@ -67,9 +70,12 @@ export function Lane(props: {
   const gaps = createMemo(() => gapsIn(props.samples, props.visible));
   const bars = createMemo(() => (spec.kind === 'gantt' ? barsOf(props.samples, spec.names) : []));
   const rowHeight = () => props.height / Math.max(1, bars().length);
-  const barbs = createMemo(() =>
-    spec.kind === 'barbs' ? barbsAt(props.samples, props.ticks, spec.barb) : [],
-  );
+  const barbs = createMemo(() => {
+    if (spec.kind !== 'barbs') return [];
+    const most = Math.max(1, Math.floor(props.width / BARB_PITCH_PX));
+    const step = clockStep(props.visible.to - props.visible.from, most);
+    return barbsAt(props.samples, ticks(props.visible, step), spec.barb);
+  });
   const dots = () => {
     const h = props.hover;
     if (!h) return [];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { axisStep, clockLabel, ticks } from './axis';
+import { axisStep, clockLabel, clockStep, ticks } from './axis';
 
 /** 12:36:10Z on the first day of the epoch. */
 const T = 12 * 3600 + 36 * 60 + 10;
@@ -15,6 +15,23 @@ describe('axisStep', () => {
 
     // Assert
     expect(steps).toEqual([15, 120, 300, 900]);
+  });
+});
+
+describe('clockStep', () => {
+  it('takes the shortest round step that falls at most so many times across the span', () => {
+    // Arrange
+    const cases: [number, number][] = [
+      [3600, 5],
+      [3600, 9],
+      [60, 9],
+    ];
+
+    // Act
+    const steps = cases.map(([span, most]) => clockStep(span, most));
+
+    // Assert
+    expect(steps).toEqual([900, 600, 10]);
   });
 });
 
