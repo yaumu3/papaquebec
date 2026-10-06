@@ -6,15 +6,15 @@ use std::sync::Arc;
 use bytes::Bytes;
 use prost::Message;
 
-use crate::proto::{Aircraft, Frame, Hello, Receiver, Reception, Snapshot};
+use crate::proto::{Frame, Hello, Receiver, Snapshot};
 
-/// How far apart the snapshots of a trail are kept.
+/// How far apart the snapshots of the history are kept.
 const CADENCE_S: f64 = 8.0;
-/// The scope keeps an hour of trail; a minute more fills its oldest slot.
+/// The scope keeps an hour of trail and readings; a minute more fills its oldest slot.
 const RETENTION_S: f64 = 3660.0;
 
-/// One snapshot every eight seconds for the last hour, each aircraft reduced to
-/// what a trail needs.
+/// One snapshot every eight seconds for the last hour, each aircraft whole, so a
+/// session that joins gets the hour of trail and readings the scope shows.
 #[derive(Default)]
 pub struct History {
     kept: VecDeque<Snapshot>,
@@ -33,7 +33,7 @@ impl History {
         if snapshot.now_s - last < CADENCE_S {
             return;
         }
-        self.kept.push_back(trail_of(snapshot));
+        self.kept.push_back(snapshot.clone());
         let oldest = snapshot.now_s - RETENTION_S;
         while self.kept.front().is_some_and(|kept| kept.now_s < oldest) {
             self.kept.pop_front();
@@ -45,34 +45,6 @@ impl History {
     pub fn shared(&self) -> Arc<[Snapshot]> {
         Arc::clone(&self.shared)
     }
-}
-
-fn trail_of(snapshot: &Snapshot) -> Snapshot {
-    Snapshot {
-        aircraft: snapshot.aircraft.iter().filter_map(trail).collect(),
-        ..*snapshot
-    }
-}
-
-/// What a trail needs of an aircraft; none of one without a position.
-fn trail(aircraft: &Aircraft) -> Option<Aircraft> {
-    aircraft.lat_deg.and(aircraft.lon_deg)?;
-    Some(Aircraft {
-        address: aircraft.address,
-        identification: aircraft.identification.clone(),
-        lat_deg: aircraft.lat_deg,
-        lon_deg: aircraft.lon_deg,
-        position_source: aircraft.position_source,
-        air_ground_state: aircraft.air_ground_state,
-        baro_altitude_ft: aircraft.baro_altitude_ft,
-        ground_speed_kt: aircraft.ground_speed_kt,
-        track_deg: aircraft.track_deg,
-        reception: aircraft.reception.map(|reception| Reception {
-            rssi_dbfs: None,
-            ..reception
-        }),
-        ..Aircraft::default()
-    })
 }
 
 /// The feed as it stands, cheap to clone into every session.
@@ -125,7 +97,7 @@ mod tests {
     use super::{History, Published};
     use crate::proto::{
         Address, AirGroundState, Aircraft, Frame, Hello, Receiver, Reception, Registry, Snapshot,
-        Source, frame::Body,
+        Source, TargetState, frame::Body,
     };
 
     const RECEIVER: Receiver = Receiver {
@@ -225,7 +197,7 @@ mod tests {
     }
 
     #[test]
-    fn history_keeps_only_what_a_trail_needs() {
+    fn history_keeps_every_aircraft_whole() {
         // Arrange
         let address = Some(Address::default());
         let positioned = Aircraft {
@@ -239,6 +211,10 @@ mod tests {
             ground_speed_kt: Some(12.0),
             track_deg: Some(90.0),
             mach: Some(0.1),
+            target_state: Some(TargetState {
+                selected_altitude_mcp_ft: Some(4000),
+                ..TargetState::default()
+            }),
             registry: Some(Registry::default()),
             reception: Some(Reception {
                 messages: Some(12),
@@ -250,10 +226,11 @@ mod tests {
         };
         let positionless = Aircraft {
             address,
+            baro_altitude_ft: Some(35000),
             ..Aircraft::default()
         };
         let snapshot = Snapshot {
-            aircraft: vec![positioned.clone(), positionless],
+            aircraft: vec![positioned.clone(), positionless.clone()],
             ..at(10.0)
         };
         let mut history = History::default();
@@ -262,15 +239,6 @@ mod tests {
         history.record(&snapshot);
 
         // Assert
-        let trail = Aircraft {
-            mach: None,
-            registry: None,
-            reception: Some(Reception {
-                rssi_dbfs: None,
-                ..positioned.reception.unwrap_or_default()
-            }),
-            ..positioned
-        };
-        assert_eq!(history.shared()[0].aircraft, [trail]);
+        assert_eq!(history.shared()[0].aircraft, [positioned, positionless]);
     }
 }
