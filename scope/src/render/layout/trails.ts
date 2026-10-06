@@ -1,3 +1,4 @@
+import { nearestInTime } from '../../lib/nearest';
 import type { Fix } from '../../state/track';
 
 /** NATS-style slash spacing: wide enough that gaps in the history show. */
@@ -26,4 +27,10 @@ export function decimateTrail(history: readonly Fix[], now: number, windowSec: n
   }
   if (out.length > 0 && (out[out.length - 1]?.t ?? 0) < cutoff) out.pop();
   return out;
+}
+
+/** The fix nearest an instant, unless the nearest lies more than a decimation slot from it. */
+export function fixNearest(history: readonly Fix[], t: number): Fix | null {
+  const best = nearestInTime(history, t);
+  return best && Math.abs(best.t - t) <= TRAIL_DECIMATION_SEC ? best : null;
 }

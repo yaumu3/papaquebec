@@ -13,6 +13,7 @@ function input(over: Partial<HoverInput> = {}): HoverInput {
     filter: { ground: true, lowerFl: 0, upperFl: 500, squawk: 'all' },
     altimeter: { transitionAltFt: 14000, qnhInHg: 29.92 },
     labelDrag: null,
+    instant: null,
     ...over,
   };
 }
@@ -69,5 +70,21 @@ describe('buildHover', () => {
     // Assert
     expect(lines?.count).toBe(1);
     expect(lines?.data[LINE_B_PX]).toBe(60 - 3);
+  });
+});
+
+describe('buildHover instant', () => {
+  it('rings the instant hovered on the history lanes, with no target under the pointer', () => {
+    // Arrange
+    const at = { x: 3, y: 4 };
+
+    // Act
+    const batches = buildHover(input({ track: null, instant: at }));
+
+    // Assert
+    const markers = batch(batches, 'markers');
+    expect(markers?.count).toBe(1);
+    expect(Array.from(markers?.data.slice(0, 2) ?? [])).toEqual([3, 4]);
+    expect(markers?.data[5]).toBe(Shape.Ring);
   });
 });

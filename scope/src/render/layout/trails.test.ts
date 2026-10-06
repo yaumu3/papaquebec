@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Fix } from '../../state/track';
-import { decimateTrail, TRAIL_DECIMATION_SEC, TRAIL_TARGET_GAP_SEC } from './trails';
+import { decimateTrail, fixNearest, TRAIL_DECIMATION_SEC, TRAIL_TARGET_GAP_SEC } from './trails';
 
 function fixes(times: number[]): Fix[] {
   return times.map((t) => ({ lat: 0, lon: 0, x: t, y: 0, t, alt: undefined }));
@@ -72,5 +72,18 @@ describe('decimateTrail', () => {
 
     // Assert
     expect(out).toEqual([]);
+  });
+});
+
+describe('fixNearest', () => {
+  it('finds the fix nearest an instant, unless the nearest lies more than a slot away', () => {
+    // Arrange
+    const history = fixes([100, 110, 120]);
+
+    // Act
+    const found = [fixNearest(history, 113), fixNearest(history, 120 + TRAIL_DECIMATION_SEC + 1)];
+
+    // Assert
+    expect(found.map((f) => f?.t)).toEqual([110, undefined]);
   });
 });
