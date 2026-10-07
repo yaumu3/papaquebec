@@ -1,10 +1,12 @@
 //! Stands in for a receiver: synthesized traffic, sent as a receiver would send it.
 
 mod fleet;
+mod scenario;
 
 use std::time::Duration;
 
-pub use fleet::Fleet;
+pub use fleet::{Fleet, State};
+pub use scenario::{Runway, Scenario};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::MissedTickBehavior;

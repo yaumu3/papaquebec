@@ -78,13 +78,21 @@ async fn main() -> Result<(), Failure> {
             let connect = move || TcpStream::connect(address.clone());
             tokio::spawn(follow(connect, site, wall, PUBLISH_EVERY, registry, feed));
         }
-        Origin::Sim { site, speed, extra } => {
+        Origin::Sim {
+            site,
+            speed,
+            extra,
+            scenario,
+        } => {
             // The sim stands in for the receiver, on a port of its own.
             let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await?;
             let address = listener.local_addr()?;
             let every = PUBLISH_EVERY.div_f64(speed);
             let clock = sim::clock(speed, wall);
-            let fleet = Fleet::new(site, clock.clone(), extra);
+            let fleet = match scenario {
+                Some(scenario) => Fleet::scenario(site, clock.clone(), scenario, 1, extra),
+                None => Fleet::new(site, clock.clone(), extra),
+            };
             registered.send_replace(Arc::new(fleet.registered().collect()));
             tokio::spawn(sim::serve(listener, fleet, every));
             let connect = move || TcpStream::connect(address);

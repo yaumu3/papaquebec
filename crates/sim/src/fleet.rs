@@ -7,6 +7,7 @@
 
 use std::f64::consts::TAU;
 use std::ops::Range;
+use std::sync::Arc;
 
 use feeder::beast::Frame;
 use feeder::bits::Bits;
@@ -18,6 +19,9 @@ use feeder::field::{
 use feeder::message::squitter;
 use feeder::position::Position;
 use feeder::proto::{EmergencyPriorityStatus, EmitterCategory, TargetState, target_state::Modes};
+use placer::rng::mulberry32;
+
+use crate::Scenario;
 
 /// Beyond this the aircraft is put back across the site, so the sim never empties.
 const BOUNDS_NM: f64 = 55.0;
@@ -32,6 +36,47 @@ const SIGNAL: u8 = 100;
 const AIRBORNE_TYPE_CODE: u32 = 11;
 const SURFACE_TYPE_CODE: u32 = 7;
 const NAC_P: u32 = 9;
+/// Standard rate of turn, degrees per second.
+const TURN_DEG_PER_S: f64 = 3.0;
+/// Within this of a waypoint the next leg begins, NM.
+const AT_NM: f64 = 0.15;
+const STEEPEST_FPM: f64 = 2500.0;
+/// No route takes longer than this to fly; a probe of one gives up here.
+const LONGEST_ROUTE_S: f64 = 7200.0;
+
+/// A waypoint of a route: where to pass, and the level and speed to be at there.
+#[derive(Debug)]
+pub struct Leg {
+    /// NM east and north of the site.
+    pub x: f64,
+    pub y: f64,
+    pub alt: f64,
+    pub gs: f64,
+}
+
+/// The waypoints an arrival flies in turn, landing at the last and starting over.
+pub type Route = Arc<[Leg]>;
+
+/// Where an aircraft is and how it moves, as the sim knows it.
+#[derive(Debug)]
+pub struct State {
+    pub address: u32,
+    /// NM east and north of the site.
+    pub x: f64,
+    pub y: f64,
+    pub alt_ft: f64,
+    pub gs_kt: f64,
+    pub track_deg: f64,
+    pub turn_deg_per_s: f64,
+}
+
+/// True bearing from one point to another, degrees.
+fn bearing(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> f64 {
+    (to_x - from_x)
+        .atan2(to_y - from_y)
+        .to_degrees()
+        .rem_euclid(360.0)
+}
 
 /// One aircraft as it starts out.
 #[derive(Clone, Copy, Default)]
@@ -59,6 +104,8 @@ struct Plan {
     sel_heading: Option<f64>,
     modes: Option<Modes>,
     kind: &'static str,
+    /// Beyond this it is put back across the site; the fleet's bounds when 0.
+    bounds: f64,
 }
 
 const AUTOPILOT: Modes = Modes {
@@ -110,16 +157,44 @@ fn fleet() -> Vec<Plan> {
     ]
 }
 
-/// Deterministic random numbers in 0 to 1 (mulberry32), so a load test sees
-/// the same traffic every run.
-fn mulberry32(seed: u32) -> impl FnMut() -> f64 {
-    let mut state = seed;
-    move || {
-        state = state.wrapping_add(0x6d2b_79f5);
-        let mut t = (state ^ (state >> 15)).wrapping_mul(1 | state);
-        t = t.wrapping_add((t ^ (t >> 7)).wrapping_mul(0x3d | t)) ^ t;
-        f64::from(t ^ (t >> 14)) / 4_294_967_296.0
+/// An arrival of a scenario, numbered on from the streams before it.
+fn arrival(number: u32) -> Plan {
+    Plan {
+        address: 0x00d2_0000 + number,
+        number,
+        digits: 4,
+        callsign: true,
+        category: EmitterCategory::A3Large,
+        squawk: 0o1000 + number % 0o6000,
+        kind: if number.is_multiple_of(2) {
+            "A320"
+        } else {
+            "B738"
+        },
+        ..Plan::default()
     }
+}
+
+/// `count` aircraft crossing within `radius_nm` of the site on straight tracks between FL050
+/// and FL250, placed by `random`, and kept within half again the radius.
+fn background(
+    random: &mut impl FnMut() -> f64,
+    from: u32,
+    count: u32,
+    radius_nm: f64,
+) -> Vec<Plan> {
+    let plan = |number| Plan {
+        bounds: 1.5 * radius_nm,
+        ..arrival(number)
+    };
+    scattered(
+        random,
+        from..from + count,
+        radius_nm,
+        (5.0, 20.0),
+        (250.0, 200.0),
+        plan,
+    )
 }
 
 /// Aircraft `numbers`, scattered by `random` within `radius_nm` of the site on straight tracks,
@@ -185,6 +260,13 @@ struct Flying {
     rate: f64,
     /// When the selected level was set or reached.
     since: f64,
+    /// The route an arrival flies, and the leg it is on.
+    route: Option<Route>,
+    leg: usize,
+    /// Degrees per second, as it last turned.
+    turning: f64,
+    /// How many times it has reached the end of its route.
+    landed: bool,
 }
 
 impl Flying {
@@ -200,6 +282,67 @@ impl Flying {
             from: plan.alt,
             rate: if rate > 0.0 { rate } else { 1000.0 },
             since: now,
+            route: None,
+            leg: 0,
+            turning: 0.0,
+            landed: false,
+        }
+    }
+
+    /// One aircraft flying a route from its start, as a scenario's arrivals do.
+    fn routed(plan: Plan, route: Route, now: f64) -> Self {
+        let mut flying = Self::new(plan, now);
+        flying.route = Some(route);
+        flying.restart();
+        flying
+    }
+
+    /// Back to the start of the route, heading for its second waypoint.
+    fn restart(&mut self) {
+        let Some(route) = self.route.clone() else {
+            return;
+        };
+        let (Some(first), Some(next)) = (route.first(), route.get(1)) else {
+            return;
+        };
+        self.x = first.x;
+        self.y = first.y;
+        self.alt = first.alt;
+        self.plan.gs = first.gs;
+        self.plan.track = bearing(first.x, first.y, next.x, next.y);
+        self.leg = 1;
+    }
+
+    /// Turns toward the leg's waypoint at the standard rate, flies at the speed of the one it
+    /// left, and climbs or descends so as to be at its level there; past the last waypoint it
+    /// starts over.
+    fn follow(&mut self, route: &Route, elapsed: f64) {
+        let Some(target) = route.get(self.leg) else {
+            return;
+        };
+        let to_go = (target.x - self.x).hypot(target.y - self.y);
+        let wanted = bearing(self.x, self.y, target.x, target.y);
+        let off = (wanted - self.plan.track + 540.0).rem_euclid(360.0) - 180.0;
+        let most = TURN_DEG_PER_S * elapsed;
+        let turn = off.clamp(-most, most);
+        self.plan.track = (self.plan.track + turn).rem_euclid(360.0);
+        self.turning = if elapsed > 0.0 { turn / elapsed } else { 0.0 };
+        self.plan.gs = route.get(self.leg - 1).map_or(target.gs, |from| from.gs);
+        let distance = self.fly_straight(elapsed);
+        let minutes = (to_go / self.plan.gs.max(1.0) * 60.0).max(elapsed / 60.0);
+        self.baro_rate = ((target.alt - self.alt) / minutes).clamp(-STEEPEST_FPM, STEEPEST_FPM);
+        let climbed = self.baro_rate * elapsed / 60.0;
+        self.alt = if climbed.abs() >= (target.alt - self.alt).abs() {
+            target.alt
+        } else {
+            self.alt + climbed
+        };
+        if to_go <= AT_NM.max(distance) {
+            self.leg += 1;
+            if self.leg >= route.len() {
+                self.landed = true;
+                self.restart();
+            }
         }
     }
 
@@ -213,8 +356,17 @@ impl Flying {
     }
 
     fn advance(&mut self, now: f64, elapsed: f64) {
+        if let Some(route) = self.route.clone() {
+            self.follow(&route, elapsed);
+            return;
+        }
         self.fly_straight(elapsed);
-        if self.x.hypot(self.y) > BOUNDS_NM {
+        let bounds = if self.plan.bounds > 0.0 {
+            self.plan.bounds
+        } else {
+            BOUNDS_NM
+        };
+        if self.x.hypot(self.y) > bounds {
             self.x *= -0.9;
             self.y *= -0.9;
         }
@@ -387,6 +539,54 @@ impl Fleet {
         }
     }
 
+    /// A scenario's streams and its background traffic around `site`, the same for a `seed`
+    /// and different between seeds, with `extra` background aircraft besides; `clock` gives sim seconds since the epoch.
+    pub fn scenario(
+        site: Position,
+        clock: impl Fn() -> f64 + Send + 'static,
+        scenario: Scenario,
+        seed: u32,
+        extra: u32,
+    ) -> Self {
+        let now = clock();
+        let mut random = mulberry32(seed);
+        let mut flying = Vec::new();
+        let mut number = 0;
+        for stream in scenario.streams(&mut random) {
+            let route: Route = stream.route.into();
+            let route_s = route_seconds(&route);
+            let count = (route_s / stream.interval_s).round().max(1.0);
+            let interval = route_s / count;
+            let phase = stream.phase + random() * 0.2;
+            for k in 0..whole(count) {
+                let mut arrival = Flying::routed(arrival(number), Arc::clone(&route), now);
+                number += 1;
+                for _ in 0..whole((f64::from(k) + phase) * interval) {
+                    arrival.advance(now, 1.0);
+                }
+                flying.push(arrival);
+            }
+        }
+        let density = 0.6 + 0.8 * random();
+        let count = whole(f64::from(scenario.background()) * density).unsigned_abs() + extra;
+        let plans = background(&mut random, number, count, scenario.range_nm());
+        flying.extend(plans.into_iter().map(|plan| Flying::new(plan, now)));
+        Self::starting(site, clock, now, flying)
+    }
+
+    /// Where every aircraft is and how it moves, as of the last flight.
+    pub fn states(&self) -> impl Iterator<Item = State> + '_ {
+        self.flying.iter().map(|f| State {
+            address: f.plan.address,
+            x: f.x,
+            y: f.y,
+            alt_ft: f.alt,
+            gs_kt: f.plan.gs,
+            track_deg: f.plan.track,
+            turn_deg_per_s: f.turning,
+        })
+    }
+
     /// Flies the aircraft on to now, and gives what they broadcast then, as
     /// the Beast frames of a receiver that hears every message. It is meant
     /// to be flown once a sim second.
@@ -425,6 +625,17 @@ impl Fleet {
             )
         })
     }
+}
+
+/// How long a route takes to fly, by flying it.
+fn route_seconds(route: &Route) -> f64 {
+    let mut probe = Flying::routed(Plan::default(), Arc::clone(route), 0.0);
+    let mut seconds = 0.0;
+    while !probe.landed && seconds < LONGEST_ROUTE_S {
+        probe.advance(0.0, 1.0);
+        seconds += 1.0;
+    }
+    seconds
 }
 
 /// The count of a receiver's 12 MHz clock after the seconds.

@@ -92,7 +92,9 @@ mise run bench              # a load test, see below
 The sim needs no receiver: it stands in for one, sending the messages its fleet would broadcast,
 around RJTT unless `PQ_SITE` says otherwise (with `PQ_SITE` exported, `bun run map` builds the map
 around the same site). The server flies it whenever `PQ_SIM` is set to a site; `PQ_SIM_SPEED` runs
-it up to 1000 times faster than the clock and `PQ_SIM_EXTRA` adds up to 10000 generic targets.
+it up to 1000 times faster than the clock, `PQ_SIM_EXTRA` adds up to 10000 generic targets, and
+`PQ_SIM_SCENARIO` (`merge`, `parallel`, `cross`, `converging` or `random`) flies a traffic scenario
+around RJTT in place of the fleet.
 
 Query parameters: `?site=<lat>,<lon>` overrides the receiver position, `?wx=<base>` reads METARs
 from your own [Aviation Weather Center](https://aviationweather.gov) proxy.

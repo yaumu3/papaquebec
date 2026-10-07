@@ -7,6 +7,7 @@ use std::str::FromStr;
 use authority::Subject;
 use feeder::Failure;
 use feeder::position::Position;
+use sim::Scenario;
 
 /// Where the traffic comes from.
 #[derive(Debug, PartialEq)]
@@ -16,11 +17,13 @@ pub enum Origin {
     Beast { address: String, site: Position },
     /// `PQ_SIM` (`lat,lon`): synthesized traffic around the site, in place of
     /// a receiver. `PQ_SIM_SPEED` runs it that many times faster than the clock, up to 1000,
-    /// and `PQ_SIM_EXTRA` adds that many generic targets, up to 10000.
+    /// `PQ_SIM_EXTRA` adds that many generic targets, up to 10000, and `PQ_SIM_SCENARIO`
+    /// (`merge`, `parallel`, `cross`, `converging` or `random`) flies arrival streams in place of the fleet.
     Sim {
         site: Position,
         speed: f64,
         extra: u32,
+        scenario: Option<Scenario>,
     },
 }
 
@@ -117,6 +120,7 @@ impl Config {
                     .map_err(|error| format!("PQ_SIM={site}: {error}"))?,
                 speed: parsed(&lookup, "PQ_SIM_SPEED")?.map_or(Ok(1.0), sim_speed)?,
                 extra: parsed(&lookup, "PQ_SIM_EXTRA")?.map_or(Ok(0), sim_extra)?,
+                scenario: parsed(&lookup, "PQ_SIM_SCENARIO")?,
             },
             None => Origin::Beast {
                 address: lookup("PQ_BEAST").unwrap_or_else(|| "readsb:30005".into()),
@@ -196,6 +200,7 @@ mod tests {
 
     use authority::Subject;
     use feeder::position::Position;
+    use sim::Scenario;
 
     use super::{Config, Door, Origin};
 
@@ -337,6 +342,7 @@ mod tests {
             site: SITE,
             speed: 1.0,
             extra: 0,
+            scenario: None,
         };
         assert_eq!(config.ok().map(|config| config.origin), Some(expected));
     }
@@ -358,6 +364,25 @@ mod tests {
             site: SITE,
             speed: 10.0,
             extra: 500,
+            scenario: None,
+        };
+        assert_eq!(config.ok().map(|config| config.origin), Some(expected));
+    }
+
+    #[test]
+    fn sim_takes_a_scenario() {
+        // Arrange
+        let lookup = environment(&[("PQ_SIM", "33.5844,130.4517"), ("PQ_SIM_SCENARIO", "cross")]);
+
+        // Act
+        let config = Config::read(lookup);
+
+        // Assert
+        let expected = Origin::Sim {
+            site: SITE,
+            speed: 1.0,
+            extra: 0,
+            scenario: Some(Scenario::Cross),
         };
         assert_eq!(config.ok().map(|config| config.origin), Some(expected));
     }
