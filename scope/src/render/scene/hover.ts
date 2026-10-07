@@ -1,7 +1,7 @@
 import type { Altimeter } from '../../lib/altitude';
+import { blockDir, blockHeight } from '../../lib/datablock';
 import { type Filter, visibility } from '../../state/filter';
 import type { Track } from '../../state/track';
-import { blockDir, blockHeight } from '../layout/labels';
 import { type Batch, Shape } from '../protocol';
 import { drawLeader, extraLines } from './datablock';
 import { LineBatch, MarkerBatch } from './pack';
@@ -45,7 +45,7 @@ export function buildHover(input: HoverInput): Batch[] {
       lines,
       {
         at,
-        ...drawnOffset(t, blockDir(t.ops), input.labelDrag),
+        ...drawnOffset(t, blockDir(t.ops.dir), input.labelDrag),
         color: trackColor(t, input.selected),
         emphasised: true,
       },

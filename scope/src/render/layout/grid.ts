@@ -1,16 +1,4 @@
-export interface Rect {
-  x0: number;
-  y0: number;
-  x1: number;
-  y1: number;
-}
-
-/** Shared area of two rectangles; edges that only touch share none. */
-export function overlap(a: Rect, b: Rect): number {
-  const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
-  const h = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
-  return w > 0 && h > 0 ? w * h : 0;
-}
+import { overlap, type Rect } from '../../lib/datablock';
 
 /** Cell edge in CSS px: about a data block's width, so a block spans few cells. */
 const CELL = 64;

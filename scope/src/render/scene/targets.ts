@@ -1,8 +1,9 @@
 import type { Altimeter } from '../../lib/altitude';
+import { blockOffset, NE } from '../../lib/datablock';
 import { velocityNm } from '../../lib/geo';
 import { type Filter, visibility, type Visibility } from '../../state/filter';
 import type { Track } from '../../state/track';
-import { blockOffset, type LabelSubject, NE, placeLabels } from '../layout/labels';
+import { type LabelSubject, placeLabels } from '../layout/labels';
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { dataBlock, drawDataBlock, extraLines } from './datablock';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import { NE } from '../../lib/datablock';
 import type { Track } from '../../state/track';
-import { NE } from '../layout/labels';
 import { type Batch, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildTargets, type TargetInput } from './targets';

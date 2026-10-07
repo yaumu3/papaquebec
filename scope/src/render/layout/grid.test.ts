@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { overlap, type Rect, RectGrid } from './grid';
+import { overlap, type Rect } from '../../lib/datablock';
+import { RectGrid } from './grid';
 
 /** Deterministic rectangles across a wide span, crowded enough that many overlap. */
 function scatter(count: number, seed: number): Rect[] {
@@ -15,23 +16,6 @@ function scatter(count: number, seed: number): Rect[] {
     return { x0, y0, x1: x0 + 4 + rand() * 120, y1: y0 + 4 + rand() * 40 };
   });
 }
-
-describe('overlap', () => {
-  it('is the shared area, and nothing for rectangles that only touch', () => {
-    // Arrange
-    const a = { x0: 0, y0: 0, x1: 10, y1: 10 };
-    const pairs: Rect[] = [
-      { x0: 5, y0: 5, x1: 20, y1: 20 },
-      { x0: 10, y0: 0, x1: 20, y1: 10 },
-    ];
-
-    // Act
-    const areas = pairs.map((b) => overlap(a, b));
-
-    // Assert
-    expect(areas).toEqual([25, 0]);
-  });
-});
 
 describe('RectGrid', () => {
   it('sums the overlap with every rectangle added exactly as a scan in insertion order would', () => {

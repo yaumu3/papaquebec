@@ -1,4 +1,4 @@
-import { leaderDir } from '../../render/layout/labels';
+import { leaderDir } from '../../lib/datablock';
 import type { View } from '../../render/protocol';
 import { extraLines } from '../../render/scene/datablock';
 import {

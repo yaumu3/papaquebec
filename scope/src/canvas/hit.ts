@@ -1,5 +1,5 @@
+import { blockDir, blockRect } from '../lib/datablock';
 import { distanceToSegment, type ProjectFn, type UnprojectFn } from '../lib/geo';
-import { blockDir, blockRect } from '../render/layout/labels';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/overlays';
@@ -56,7 +56,7 @@ export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
   for (const t of trackStore.tracks.values()) {
     const s = targetScreen(view, t.hex);
     if (!s || isFiltered(t)) continue;
-    const r = blockRect(s.cx, s.cy, blockDir(t.ops), extraLines(t));
+    const r = blockRect(s.cx, s.cy, blockDir(t.ops.dir), extraLines(t));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)
       return { hex: t.hex, dx: r.x0 - s.cx, dy: r.y0 - s.cy };
   }
