@@ -6,6 +6,7 @@
 //! reserves for future use.
 
 use std::f64::consts::TAU;
+use std::ops::Range;
 
 use feeder::beast::Frame;
 use feeder::bits::Bits;
@@ -121,30 +122,53 @@ fn mulberry32(seed: u32) -> impl FnMut() -> f64 {
     }
 }
 
+/// Aircraft `numbers`, scattered by `random` within `radius_nm` of the site on straight tracks,
+/// at levels and speeds drawn from `(lowest, spread)` in thousands of feet and knots; the rest
+/// of each from `plan`.
+fn scattered(
+    random: &mut impl FnMut() -> f64,
+    numbers: Range<u32>,
+    radius_nm: f64,
+    levels: (f64, f64),
+    speeds: (f64, f64),
+    plan: impl Fn(u32) -> Plan,
+) -> Vec<Plan> {
+    numbers
+        .map(|number| {
+            let range = radius_nm * random().sqrt();
+            let bearing = random() * TAU;
+            Plan {
+                x: range * bearing.sin(),
+                y: range * bearing.cos(),
+                alt: 1000.0 * (levels.0 + random() * levels.1).round(),
+                gs: (speeds.0 + random() * speeds.1).round(),
+                track: (random() * 360.0).round(),
+                ..plan(number)
+            }
+        })
+        .collect()
+}
+
 /// `count` generic en-route targets spread over the area, for load testing.
 fn extra_fleet(count: u32) -> Vec<Plan> {
-    const RADIUS_NM: f64 = 50.0;
-    let mut random = mulberry32(count);
-    let plans = (0..count).map(|number| {
-        let range = RADIUS_NM * random().sqrt();
-        let bearing = random() * TAU;
-        Plan {
-            address: 0x00d1_0000 + number,
-            number,
-            digits: 4,
-            callsign: true,
-            category: EmitterCategory::A3Large,
-            squawk: 0o1000 + number % 0o6000,
-            x: range * bearing.sin(),
-            y: range * bearing.cos(),
-            alt: 1000.0 * (3.0 + random() * 35.0).round(),
-            gs: (180.0 + random() * 300.0).round(),
-            track: (random() * 360.0).round(),
-            kind: "A320",
-            ..Plan::default()
-        }
-    });
-    plans.collect()
+    let plan = |number| Plan {
+        address: 0x00d1_0000 + number,
+        number,
+        digits: 4,
+        callsign: true,
+        category: EmitterCategory::A3Large,
+        squawk: 0o1000 + number % 0o6000,
+        kind: "A320",
+        ..Plan::default()
+    };
+    scattered(
+        &mut mulberry32(count),
+        0..count,
+        50.0,
+        (3.0, 35.0),
+        (180.0, 300.0),
+        plan,
+    )
 }
 
 /// One aircraft under way.
@@ -179,11 +203,17 @@ impl Flying {
         }
     }
 
-    fn advance(&mut self, now: f64, elapsed: f64) {
+    /// Flies on along its track at its speed for `elapsed` seconds; returns how far, NM.
+    fn fly_straight(&mut self, elapsed: f64) -> f64 {
         let distance = self.plan.gs * elapsed / 3600.0;
         let track = self.plan.track.to_radians();
         self.x += distance * track.sin();
         self.y += distance * track.cos();
+        distance
+    }
+
+    fn advance(&mut self, now: f64, elapsed: f64) {
+        self.fly_straight(elapsed);
         if self.x.hypot(self.y) > BOUNDS_NM {
             self.x *= -0.9;
             self.y *= -0.9;
@@ -332,13 +362,28 @@ impl Fleet {
     pub fn new(site: Position, clock: impl Fn() -> f64 + Send + 'static, extra: u32) -> Self {
         let now = clock();
         let plans = fleet().into_iter().chain(extra_fleet(extra));
+        Self::starting(
+            site,
+            clock,
+            now,
+            plans.map(|plan| Flying::new(plan, now)).collect(),
+        )
+    }
+
+    /// The fleet around `site` with `flying` under way as of `now` by `clock`.
+    fn starting(
+        site: Position,
+        clock: impl Fn() -> f64 + Send + 'static,
+        now: f64,
+        flying: Vec<Flying>,
+    ) -> Self {
         Self {
             site,
             clock: Box::new(clock),
             started: now,
             last: now,
             flown: 0,
-            flying: plans.map(|plan| Flying::new(plan, now)).collect(),
+            flying,
         }
     }
 
