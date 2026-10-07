@@ -11,28 +11,9 @@ import {
   LEADER_PX,
   leaderDir,
   NE,
-  overlap,
-  type Rect,
 } from './datablock';
 
 const dirs = Array.from({ length: DIRECTIONS }, (_, d) => d);
-
-describe('overlap', () => {
-  it('is the shared area, and nothing for rectangles that only touch', () => {
-    // Arrange
-    const a = { x0: 0, y0: 0, x1: 10, y1: 10 };
-    const pairs: Rect[] = [
-      { x0: 5, y0: 5, x1: 20, y1: 20 },
-      { x0: 10, y0: 0, x1: 20, y1: 10 },
-    ];
-
-    // Act
-    const areas = pairs.map((b) => overlap(a, b));
-
-    // Assert
-    expect(areas).toEqual([25, 0]);
-  });
-});
 
 describe('blockRect', () => {
   it('puts the block on the side of the target the direction names, starting at the leader', () => {

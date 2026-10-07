@@ -127,6 +127,8 @@ describe('trackDrags', () => {
     // Assert
     expect(swallow).toBe(true);
     expect(trackStore.tracks.get('d00123')?.ops.dir).toBe(6); // north
+    expect(trackStore.tracks.get('d00123')?.ops.movedAt).toBe(1000);
+    expect(trackStore.tracks.get('d00123')?.ops.manual).toBe(true);
   });
 
   it('drops a pending RBL when the drag is cancelled', () => {

@@ -8,20 +8,11 @@ export interface Rect {
   y1: number;
 }
 
-/** Shared area of two rectangles; edges that only touch share none. */
-export function overlap(a: Rect, b: Rect): number {
-  const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0);
-  const h = Math.min(a.y1, b.y1) - Math.max(a.y0, b.y0);
-  return w > 0 && h > 0 ? w * h : 0;
-}
-
 /** Data block type size and footprint in CSS pixels: two lines of mono, twelve glyphs wide. */
 export const DB_FONT_PX = 11;
 export const DB_WIDTH = 80;
 export const DB_HEIGHT = 26;
 export const DB_LINE = 12;
-/** Half the box round a target glyph that blocks keep clear of. */
-export const GLYPH_HALF = 8;
 /** Half the drawn glyph, where a leader starts. */
 const SYMBOL_HALF = 3;
 /** A leader's length, glyph edge to block, the same in every direction. */

@@ -1,7 +1,8 @@
 import type { Altimeter } from '../../lib/altitude';
-import { blockDir, blockHeight } from '../../lib/datablock';
+import { blockHeight } from '../../lib/datablock';
 import { type Filter, visibility } from '../../state/filter';
 import type { Track } from '../../state/track';
+import type { Move } from '../layout/moves';
 import { type Batch, Shape } from '../protocol';
 import { drawLeader, extraLines } from './datablock';
 import { LineBatch, MarkerBatch } from './pack';
@@ -15,6 +16,9 @@ export interface HoverInput {
   filter: Filter;
   altimeter: Altimeter;
   labelDrag: LabelDrag | null;
+  /** Blocks sliding to a new bearing, by hex, and the moment they are drawn at on their clock. */
+  moves: ReadonlyMap<string, Move>;
+  drawAt: number;
   /** Where the selected target was at the instant hovered on the history lanes, if it was anywhere. */
   instant: { x: number; y: number } | null;
 }
@@ -45,7 +49,7 @@ export function buildHover(input: HoverInput): Batch[] {
       lines,
       {
         at,
-        ...drawnOffset(t, blockDir(t.ops.dir), input.labelDrag),
+        ...drawnOffset(t, input.labelDrag, input.moves, input.drawAt),
         color: trackColor(t, input.selected),
         emphasised: true,
       },

@@ -1,10 +1,12 @@
-import { blockDir, blockRect } from '../lib/datablock';
+import { blockHeight, DB_WIDTH, type Rect } from '../lib/datablock';
 import { distanceToSegment, type ProjectFn, type UnprojectFn } from '../lib/geo';
+import type { Offset } from '../render/layout/moves';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/overlays';
+import { restingOffset } from '../render/scene/targets';
 import { toScreen, toWorld } from '../render/scene/view';
-import { aero, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
+import { aero, drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
@@ -44,6 +46,17 @@ export function targetScreen(view: View, hex: string): { cx: number; cy: number 
   return toScreen(view, p.x, p.y);
 }
 
+/** A block's rectangle for its target at `cx, cy`: where it was last drawn, else at its bearing. */
+export function drawnBlockRect(t: Track, cx: number, cy: number, drawn: Offset | undefined): Rect {
+  const { dx, dy } = drawn ?? restingOffset(t);
+  return {
+    x0: cx + dx,
+    y0: cy + dy,
+    x1: cx + dx + DB_WIDTH,
+    y1: cy + dy + blockHeight(extraLines(t)),
+  };
+}
+
 export interface BlockHit {
   hex: string;
   /** Offset from the target to the block's top-left corner, CSS px. */
@@ -56,7 +69,7 @@ export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
   for (const t of trackStore.tracks.values()) {
     const s = targetScreen(view, t.hex);
     if (!s || isFiltered(t)) continue;
-    const r = blockRect(s.cx, s.cy, blockDir(t.ops.dir), extraLines(t));
+    const r = drawnBlockRect(t, s.cx, s.cy, drawnBlocks.get(t.hex));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)
       return { hex: t.hex, dx: r.x0 - s.cx, dy: r.y0 - s.cy };
   }

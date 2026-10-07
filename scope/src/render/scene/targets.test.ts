@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import { NE } from '../../lib/datablock';
+import { blockDir, blockOffset } from '../../lib/datablock';
 import type { Track } from '../../state/track';
+import { MOVE_MS } from '../layout/moves';
 import { type Batch, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildTargets, type TargetInput } from './targets';
@@ -19,10 +20,6 @@ function track(over: Partial<Track> = {}): Track {
   });
 }
 
-/** A live target at world `x`, `y` NM. */
-const trackAt = (hex: string, x: number, y: number) =>
-  track({ hex, position: { kind: 'live', lat: 0, lon: 0, x, y } });
-
 function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
   return {
     tracks,
@@ -31,9 +28,10 @@ function input(tracks: Track[], over: Partial<TargetInput> = {}): TargetInput {
     vectorMin: 2,
     trailSec: 60,
     selected: null,
-    pxPerNm: 10,
     atlas,
     labelDrag: null,
+    moves: new Map(),
+    drawAt: 0,
     altimeter: { transitionAltFt: 14000, qnhInHg: 29.92 },
     ...over,
   };
@@ -53,7 +51,7 @@ describe('buildTargets', () => {
     const t = track();
 
     // Act
-    const { batches } = buildTargets(input([t]));
+    const batches = buildTargets(input([t]));
 
     // Assert
     expect(shapes(batches)).toEqual([Shape.Square]);
@@ -66,7 +64,7 @@ describe('buildTargets', () => {
     const t = track({ alt: 45000 });
 
     // Act
-    const { batches } = buildTargets(
+    const batches = buildTargets(
       input([t], { filter: { ground: true, lowerFl: 0, upperFl: 200, squawk: 'all' } }),
     );
 
@@ -82,7 +80,7 @@ describe('buildTargets', () => {
     const band = { ground: true, lowerFl: 0, upperFl: 200, squawk: 'all' as const };
 
     // Act
-    const { batches } = buildTargets(input([t], { filter: band, selected: 'd00001' }));
+    const batches = buildTargets(input([t], { filter: band, selected: 'd00001' }));
 
     // Assert
     expect(shapes(batches).filter((s) => s !== Shape.Dot)).toEqual([Shape.Square]);
@@ -91,10 +89,10 @@ describe('buildTargets', () => {
 
   it('omits the trail when the operator hid it and the vector when it is off', () => {
     // Arrange
-    const t = track({ ops: { hideTrail: true, dir: null } });
+    const t = track({ ops: { hideTrail: true, dir: null, movedAt: null, manual: false } });
 
     // Act
-    const { batches } = buildTargets(input([t], { vectorMin: 0 }));
+    const batches = buildTargets(input([t], { vectorMin: 0 }));
 
     // Assert
     expect(count(batches, 'lines')).toBe(1); // leader only
@@ -105,7 +103,7 @@ describe('buildTargets', () => {
     const t = track({ position: { kind: 'none' } });
 
     // Act
-    const { batches } = buildTargets(input([t]));
+    const batches = buildTargets(input([t]));
 
     // Assert
     expect(count(batches, 'markers')).toBe(0);
@@ -118,7 +116,7 @@ describe('buildTargets', () => {
     const drag = { hex: 'd00001', dx: -100, dy: 30 };
 
     // Act
-    const { batches } = buildTargets(input([t], { labelDrag: drag }));
+    const batches = buildTargets(input([t], { labelDrag: drag }));
 
     // Assert
     const text = byKind(batches, 'text')[0];
@@ -135,34 +133,30 @@ describe('buildTargets', () => {
     const other = track({ hex: 'd00002', flight: 'TEST02' });
 
     // Act
-    const all = shapes(buildTargets(input([t, other], { selected: 'd00001' })).batches);
-    const none = shapes(buildTargets(input([t, other])).batches);
+    const all = shapes(buildTargets(input([t, other], { selected: 'd00001' })));
+    const none = shapes(buildTargets(input([t, other])));
 
     // Assert
     expect(all.filter((s) => s === Shape.Dot)).toHaveLength(t.history.length);
     expect(none.filter((s) => s === Shape.Dot)).toHaveLength(0);
   });
+});
 
-  it('returns the direction chosen for each data block so the store can remember it', () => {
+describe('buildTargets while a block moves', () => {
+  it('draws the block between where it was and where it goes', () => {
     // Arrange
     const t = track();
+    const from = { dx: -200, dy: 100 };
+    const to = blockOffset(blockDir(t.ops.dir), 0);
+    const moves = new Map([[t.hex, { from, to, startedAt: 1000 }]]);
 
     // Act
-    const { dirs } = buildTargets(input([t]));
+    const batches = buildTargets(input([t], { moves, drawAt: 1000 + MOVE_MS / 2 }));
 
     // Assert
-    expect(dirs.get('d00001')).toBe(NE);
-  });
-
-  it('lays blocks out at the given scale, moving one aside only where the targets crowd', () => {
-    // Arrange
-    const tracks = [trackAt('d0000a', 0, 0), trackAt('d0000b', 0.3, 0.15)];
-    const scales = [100, 1000];
-
-    // Act
-    const dirs = scales.map((pxPerNm) => buildTargets(input(tracks, { pxPerNm })).dirs);
-
-    // Assert
-    expect(dirs.map((d) => d.get('d0000a') === NE)).toEqual([false, true]);
+    const text = byKind(batches, 'text')[0];
+    const firstGlyphX = text?.data[2] ?? 0;
+    expect(firstGlyphX).toBeGreaterThan(from.dx);
+    expect(firstGlyphX).toBeLessThan(to.dx);
   });
 });

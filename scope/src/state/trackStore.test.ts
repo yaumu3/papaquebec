@@ -108,6 +108,8 @@ describe('createTrackStore', () => {
     expect(store.tracks.get('a')?.ops).toEqual({
       hideTrail: true,
       dir: 3,
+      movedAt: null,
+      manual: false,
     });
   });
 

@@ -1,4 +1,5 @@
 import type { Track } from '../../state/track';
+import { freshOps } from '../../state/trackStore';
 
 /** A live, level airliner over RJFF with every optional readout unknown; tests override what they exercise. */
 export function makeTrack(over: Partial<Track> = {}): Track {
@@ -38,7 +39,7 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     position: { kind: 'live', lat: 33.6, lon: 130.5, x: 1, y: 2 }, // RJFF
     history: [],
     samples: [],
-    ops: { hideTrail: false, dir: null },
+    ops: freshOps(),
     ...over,
   };
 }

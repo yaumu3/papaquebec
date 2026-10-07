@@ -1,9 +1,9 @@
 import type { Altimeter } from '../../lib/altitude';
-import { blockOffset, NE } from '../../lib/datablock';
+import { blockDir, blockOffset } from '../../lib/datablock';
 import { velocityNm } from '../../lib/geo';
 import { type Filter, visibility, type Visibility } from '../../state/filter';
 import type { Track } from '../../state/track';
-import { type LabelSubject, placeLabels } from '../layout/labels';
+import { type Move, moved, type Offset } from '../layout/moves';
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { dataBlock, drawDataBlock, extraLines } from './datablock';
@@ -20,12 +20,10 @@ export interface TargetInput {
   selected: string | null;
   /** A block being dragged: its top-left corner drawn at this offset from its target, CSS px. */
   labelDrag: LabelDrag | null;
+  /** Blocks sliding to a new bearing, by hex, and the moment they are drawn at on their clock. */
+  moves: ReadonlyMap<string, Move>;
+  drawAt: number;
   altimeter: Altimeter;
-  /**
-   * Scale the blocks are laid out at. Only the scale matters: panning moves every target alike,
-   * so the layout, and the whole layer, stays valid.
-   */
-  pxPerNm: number;
   atlas: AtlasInfo;
 }
 
@@ -35,21 +33,24 @@ export interface LabelDrag {
   dy: number;
 }
 
-/** Where a block is drawn from its target: with the drag while one is under way, else at `dir`. */
-export function drawnOffset(
-  t: Track,
-  dir: number,
-  drag: LabelDrag | null,
-): { dx: number; dy: number } {
-  return drag && drag.hex === t.hex
-    ? { dx: drag.dx, dy: drag.dy }
-    : blockOffset(dir, extraLines(t));
+/** Where a block rests from its target, at its bearing. */
+export function restingOffset(t: Track): Offset {
+  return blockOffset(blockDir(t.ops.dir), extraLines(t));
 }
 
-export interface TargetScene {
-  batches: Batch[];
-  /** Direction each data block ended up at. */
-  dirs: Map<string, number>;
+/**
+ * Where a block is drawn from its target: with the drag while one is under way, along its
+ * move while one is, else at its bearing.
+ */
+export function drawnOffset(
+  t: Track,
+  drag: LabelDrag | null,
+  moves: ReadonlyMap<string, Move>,
+  drawAt: number,
+): Offset {
+  if (drag && drag.hex === t.hex) return { dx: drag.dx, dy: drag.dy };
+  const move = moves.get(t.hex);
+  return move ? moved(move, drawAt) : restingOffset(t);
 }
 
 const GLYPH_PX = 6;
@@ -61,9 +62,6 @@ interface Drawable {
   t: Track;
   x: number;
   y: number;
-  /** CSS px from the world origin, y down. */
-  cx: number;
-  cy: number;
   visibility: Visibility;
   color: string;
 }
@@ -77,8 +75,6 @@ function drawables(input: TargetInput): Drawable[] {
       t,
       x: p.x,
       y: p.y,
-      cx: p.x * input.pxPerNm,
-      cy: -p.y * input.pxPerNm,
       visibility: visibility(t, input.selected, input.filter, input.altimeter),
       color: trackColor(t, input.selected),
     });
@@ -128,22 +124,12 @@ function drawSelection(lines: LineBatch, d: Drawable): void {
   }
 }
 
-export function buildTargets(input: TargetInput): TargetScene {
+/** The targets layer: glyphs, trails, vectors and data blocks at the bearings the placer set. */
+export function buildTargets(input: TargetInput): Batch[] {
   const lines = new LineBatch();
   const markers = new MarkerBatch();
   const text = new TextBatch(input.atlas);
   const items = drawables(input);
-
-  const subjects: LabelSubject[] = items
-    .filter((d) => d.visibility === 'shown')
-    .map((d) => ({
-      hex: d.t.hex,
-      cx: d.cx,
-      cy: d.cy,
-      extraLines: extraLines(d.t),
-      dir: d.t.ops.dir,
-    }));
-  const dirs = placeLabels(subjects);
 
   for (const d of items) drawHistory(markers, d, input);
   for (const d of items) drawTrails(lines, d, input);
@@ -158,11 +144,11 @@ export function buildTargets(input: TargetInput): TargetScene {
     if (d.t.hex === input.selected) drawSelection(lines, d);
     drawDataBlock(lines, text, dataBlock(d.t, input.now, input.altimeter), {
       at,
-      ...drawnOffset(d.t, dirs.get(d.t.hex) ?? NE, input.labelDrag),
+      ...drawnOffset(d.t, input.labelDrag, input.moves, input.drawAt),
       color: d.color,
       emphasised: d.t.hex === input.selected,
     });
   }
 
-  return { batches: [lines.finish(), markers.finish(), text.finish()], dirs };
+  return [lines.finish(), markers.finish(), text.finish()];
 }

@@ -23,6 +23,13 @@ export interface OperatorState {
   hideTrail: boolean;
   /** Direction the data block sits at, set by the placer or by a drag; null until placed. */
   dir: number | null;
+  /** Snapshot time the block last moved, seconds; null until placed. */
+  movedAt: number | null;
+  /**
+   * The block sits where the operator dragged it: the placer moves it only to clear a hard
+   * conflict, and once it has, the block is the placer's again.
+   */
+  manual: boolean;
 }
 
 /** What the feed reports of the aircraft's state at one instant, as the detail panel reads it. */

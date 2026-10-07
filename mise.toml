@@ -16,6 +16,7 @@ run = "cargo run"
 
 [tasks."dev:scope"]
 description = "The scope's dev server"
+depends = ["wasm"]
 dir = "scope"
 run = "bun run dev"
 
@@ -37,6 +38,7 @@ run = [
 
 [tasks."check:scope"]
 description = "The scope's checks, as CI runs them"
+depends = ["wasm"]
 dir = "scope"
 run = ["bun run format:check", "bun run lint", "bun run test", "bun run build"]
 
@@ -49,3 +51,15 @@ description = "Load test the scope with the sim's extra traffic; flags follow"
 dir = "scope"
 run = "bun run bench"
 
+[tasks.wasm]
+description = "The placer as WebAssembly for the scope, with its bindings, into scope/src/render/layout/wasm"
+sources = ["crates/placer/**/*", "Cargo.lock"]
+outputs = ["scope/src/render/layout/wasm/placer_bg.wasm"]
+run = [
+  '''
+  lock=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}' Cargo.lock)
+  [ "$(wasm-bindgen --version)" = "wasm-bindgen $lock" ] || { echo "wasm-bindgen-cli must be $lock, as Cargo.lock has it; pin that in mise.toml" >&2; exit 1; }
+  ''',
+  "cargo build -q --profile wasm -p placer --target wasm32-unknown-unknown",
+  "wasm-bindgen --target web --out-dir scope/src/render/layout/wasm target/wasm32-unknown-unknown/wasm/placer.wasm",
+]
