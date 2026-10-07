@@ -53,7 +53,7 @@ function reportStatus(s: RenderStatus): void {
 
 /**
  * The scale data blocks are laid out at. Pans leave it alone, and a zoom moves it only once it
- * settles; until then the blocks keep their corners, drawn at the live scale.
+ * settles; until then the blocks keep their directions, drawn at the live scale.
  */
 function settledScale(view: () => View): () => number {
   const scale = createMemo(() => view().pxPerNm);
@@ -130,7 +130,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   const [blocksPlaced, setBlocksPlaced] = createSignal(0);
   show((a) => {
     snapshotVersion();
-    const { batches, corners } = buildTargets({
+    const { batches, dirs } = buildTargets({
       tracks: trackStore.tracks.values(),
       now: trackStore.stats.now,
       filter: { ...settings.filter },
@@ -142,9 +142,9 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       pxPerNm: layoutScale(),
       atlas: a,
     });
-    for (const [hex, corner] of corners) {
+    for (const [hex, dir] of dirs) {
       const t = trackStore.tracks.get(hex);
-      if (t) t.ops.autoCorner = corner;
+      if (t) t.ops.dir = dir;
     }
     setBlocksPlaced((n) => n + 1);
     return { targets: batches };

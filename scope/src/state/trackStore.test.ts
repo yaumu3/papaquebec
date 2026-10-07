@@ -98,7 +98,7 @@ describe('createTrackStore', () => {
     const before = store.tracks.get('a');
     if (before) {
       before.ops.hideTrail = true;
-      before.ops.autoCorner = 'sw';
+      before.ops.dir = 3;
     }
 
     // Act
@@ -107,7 +107,7 @@ describe('createTrackStore', () => {
     // Assert
     expect(store.tracks.get('a')?.ops).toEqual({
       hideTrail: true,
-      autoCorner: 'sw',
+      dir: 3,
     });
   });
 

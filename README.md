@@ -154,9 +154,10 @@ Conventions:
 - **Shape** is source: ADS-B filled square, MLAT square with ring, TIS-B diamond. Filtered-out
   targets persist as bare hollow diamonds.
 - **Emergency** is additive: red plus a two-letter prefix (`HJ` `RF` `EM`), never hidden by filters.
-- **Data blocks** are two lines: callsign; then altitude with climb arrow and, flipping every eight
-  seconds in step across all blocks, type or ground speed with wake letter. Each sits in the first
-  free of four corners and is left alone until it collides; dragging one moves it.
+- **Data blocks** put the callsign over the altitude with climb arrow and, flipping every eight
+  seconds in step across all blocks, the type or ground speed with wake letter. Each hangs on a
+  short leader at one of eight bearings round its target, reading away from the leader, and can
+  be dragged to another.
 - **Downlinked intent** is set in a dimmed tone of the block's color: the selected altitude
   follows the altitude (`240↑350`), or a `✓` replaces the arrow while the aircraft holds it within
   200 ft on its own altimeter, and a selected heading (`270°`) adds a third line while it steers the
@@ -215,7 +216,7 @@ means connecting again; the top bar tells the feed's state from the age of its d
 
 Each snapshot is a full one and the track store is rebuilt from it; liveness is the age of an
 aircraft's last message, `seen`. Only position history and operator state (selection, block
-corner, hidden trail) persist across snapshots. Live `lat/lon` draws normally, `lastPosition` draws
+bearing, hidden trail) persist across snapshots. Live `lat/lon` draws normally, `lastPosition` draws
 stale, absent positions appear only in text.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has

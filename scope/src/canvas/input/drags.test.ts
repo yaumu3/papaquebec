@@ -114,6 +114,21 @@ describe('trackDrags', () => {
     expect([rblPending(), modeText()]).toEqual([null, null]);
   });
 
+  it('moves a dragged block where its leader points when released', () => {
+    // Arrange
+    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
+    const { d } = subject();
+    d.start({ x: 440, y: 265 }, precise); // inside the north-east block of the target at 400, 300
+    d.move({ x: 410, y: 215 }); // the target under the block, leader straight up
+
+    // Act
+    const swallow = d.end({ x: 410, y: 215 });
+
+    // Assert
+    expect(swallow).toBe(true);
+    expect(trackStore.tracks.get('d00123')?.ops.dir).toBe(6); // north
+  });
+
   it('drops a pending RBL when the drag is cancelled', () => {
     // Arrange
     trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });

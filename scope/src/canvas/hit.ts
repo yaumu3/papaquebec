@@ -1,5 +1,5 @@
 import { distanceToSegment, type ProjectFn, type UnprojectFn } from '../lib/geo';
-import { blockCorner, labelOffset, labelRect } from '../render/layout/labels';
+import { blockDir, blockRect } from '../render/layout/labels';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/overlays';
@@ -46,7 +46,7 @@ export function targetScreen(view: View, hex: string): { cx: number; cy: number 
 
 export interface BlockHit {
   hex: string;
-  /** Current block offset from its target, CSS px. */
+  /** Offset from the target to the block's top-left corner, CSS px. */
   dx: number;
   dy: number;
 }
@@ -56,10 +56,9 @@ export function blockAt(view: View, cx: number, cy: number): BlockHit | null {
   for (const t of trackStore.tracks.values()) {
     const s = targetScreen(view, t.hex);
     if (!s || isFiltered(t)) continue;
-    const corner = blockCorner(t.ops);
-    const r = labelRect(s.cx, s.cy, corner, extraLines(t));
+    const r = blockRect(s.cx, s.cy, blockDir(t.ops), extraLines(t));
     if (cx >= r.x0 && cx <= r.x1 && cy >= r.y0 && cy <= r.y1)
-      return { hex: t.hex, ...labelOffset(corner) };
+      return { hex: t.hex, dx: r.x0 - s.cx, dy: r.y0 - s.cy };
   }
   return null;
 }

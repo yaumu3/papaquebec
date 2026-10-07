@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
+import { NE } from '../layout/labels';
 import { type Batch, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildTargets, type TargetInput } from './targets';
@@ -90,7 +91,7 @@ describe('buildTargets', () => {
 
   it('omits the trail when the operator hid it and the vector when it is off', () => {
     // Arrange
-    const t = track({ ops: { hideTrail: true, autoCorner: 'ne' } });
+    const t = track({ ops: { hideTrail: true, dir: null } });
 
     // Act
     const { batches } = buildTargets(input([t], { vectorMin: 0 }));
@@ -111,10 +112,10 @@ describe('buildTargets', () => {
     expect(count(batches, 'text')).toBe(0);
   });
 
-  it('draws a dragged block at the drag offset instead of a corner', () => {
+  it('draws a dragged block at the drag offset instead of at its direction', () => {
     // Arrange
     const t = track();
-    const drag = { hex: 'd00001', dx: -40, dy: 30 };
+    const drag = { hex: 'd00001', dx: -100, dy: 30 };
 
     // Act
     const { batches } = buildTargets(input([t], { labelDrag: drag }));
@@ -142,15 +143,15 @@ describe('buildTargets', () => {
     expect(none.filter((s) => s === Shape.Dot)).toHaveLength(0);
   });
 
-  it('returns the corner chosen for each data block so the store can remember it', () => {
+  it('returns the direction chosen for each data block so the store can remember it', () => {
     // Arrange
     const t = track();
 
     // Act
-    const { corners } = buildTargets(input([t]));
+    const { dirs } = buildTargets(input([t]));
 
     // Assert
-    expect(corners.get('d00001')).toBe('ne');
+    expect(dirs.get('d00001')).toBe(NE);
   });
 
   it('lays blocks out at the given scale, moving one aside only where the targets crowd', () => {
@@ -159,9 +160,9 @@ describe('buildTargets', () => {
     const scales = [100, 1000];
 
     // Act
-    const corners = scales.map((pxPerNm) => buildTargets(input(tracks, { pxPerNm })).corners);
+    const dirs = scales.map((pxPerNm) => buildTargets(input(tracks, { pxPerNm })).dirs);
 
     // Assert
-    expect(corners.map((c) => c.get('d0000a'))).toEqual(['nw', 'ne']);
+    expect(dirs.map((d) => d.get('d0000a') === NE)).toEqual([false, true]);
   });
 });

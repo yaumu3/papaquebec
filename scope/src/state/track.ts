@@ -2,8 +2,6 @@ import type { PositionSource } from '../lib/aircraft';
 
 export type Source = PositionSource;
 
-export type Corner = 'ne' | 'nw' | 'se' | 'sw';
-
 /** Where a track's position came from, in decreasing order of trust. */
 export type Position =
   | { kind: 'live'; lat: number; lon: number; x: number; y: number }
@@ -23,8 +21,8 @@ export interface Fix {
 /** Per-track state the operator sets; survives snapshot rebuilds. */
 export interface OperatorState {
   hideTrail: boolean;
-  /** Corner the data block sits in, set by the placer or by a drag; it stays until it collides. */
-  autoCorner: Corner;
+  /** Direction the data block sits at, set by the placer or by a drag; null until placed. */
+  dir: number | null;
 }
 
 /** What the feed reports of the aircraft's state at one instant, as the detail panel reads it. */

@@ -1,8 +1,8 @@
 import type { Altimeter } from '../../lib/altitude';
 import { velocityNm } from '../../lib/geo';
 import { type Filter, visibility, type Visibility } from '../../state/filter';
-import type { Corner, Track } from '../../state/track';
-import { labelOffset, type LabelSubject, placeLabels } from '../layout/labels';
+import type { Track } from '../../state/track';
+import { blockOffset, type LabelSubject, NE, placeLabels } from '../layout/labels';
 import { decimateTrail } from '../layout/trails';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { dataBlock, drawDataBlock, extraLines } from './datablock';
@@ -17,7 +17,7 @@ export interface TargetInput {
   vectorMin: number;
   trailSec: number;
   selected: string | null;
-  /** A block being dragged: drawn at this offset from its target, in CSS px. */
+  /** A block being dragged: its top-left corner drawn at this offset from its target, CSS px. */
   labelDrag: LabelDrag | null;
   altimeter: Altimeter;
   /**
@@ -34,19 +34,21 @@ export interface LabelDrag {
   dy: number;
 }
 
-/** Where a block sits from its target: with the drag while one is under way, else in its corner. */
-export function blockOffset(
-  hex: string,
-  corner: Corner,
+/** Where a block is drawn from its target: with the drag while one is under way, else at `dir`. */
+export function drawnOffset(
+  t: Track,
+  dir: number,
   drag: LabelDrag | null,
 ): { dx: number; dy: number } {
-  return drag && drag.hex === hex ? { dx: drag.dx, dy: drag.dy } : labelOffset(corner);
+  return drag && drag.hex === t.hex
+    ? { dx: drag.dx, dy: drag.dy }
+    : blockOffset(dir, extraLines(t));
 }
 
 export interface TargetScene {
   batches: Batch[];
-  /** Corner each automatic data block ended up in. */
-  corners: Map<string, Corner>;
+  /** Direction each data block ended up at. */
+  dirs: Map<string, number>;
 }
 
 const GLYPH_PX = 6;
@@ -138,9 +140,9 @@ export function buildTargets(input: TargetInput): TargetScene {
       cx: d.cx,
       cy: d.cy,
       extraLines: extraLines(d.t),
-      autoCorner: d.t.ops.autoCorner,
+      dir: d.t.ops.dir,
     }));
-  const corners = placeLabels(subjects);
+  const dirs = placeLabels(subjects);
 
   for (const d of items) drawHistory(markers, d, input);
   for (const d of items) drawTrails(lines, d, input);
@@ -155,11 +157,11 @@ export function buildTargets(input: TargetInput): TargetScene {
     if (d.t.hex === input.selected) drawSelection(lines, d);
     drawDataBlock(lines, text, dataBlock(d.t, input.now, input.altimeter), {
       at,
-      ...blockOffset(d.t.hex, corners.get(d.t.hex) ?? 'ne', input.labelDrag),
+      ...drawnOffset(d.t, dirs.get(d.t.hex) ?? NE, input.labelDrag),
       color: d.color,
       emphasised: d.t.hex === input.selected,
     });
   }
 
-  return { batches: [lines.finish(), markers.finish(), text.finish()], corners };
+  return { batches: [lines.finish(), markers.finish(), text.finish()], dirs };
 }

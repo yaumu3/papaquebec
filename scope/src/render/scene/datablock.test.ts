@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER } from '../../lib/altitude';
 import type { Track } from '../../state/track';
-import { DB_FONT_PX } from '../layout/labels';
+import { blockOffset, DB_FONT_PX, DB_LINE, DB_WIDTH, NE } from '../layout/labels';
 import { atlas } from './atlasFixture';
 import {
   blockExtraLines,
@@ -165,8 +165,7 @@ describe('extraLines', () => {
 describe('drawDataBlock', () => {
   const ne: BlockPlacement = {
     at: { x: 0, y: 0 },
-    dx: 22,
-    dy: -18,
+    ...blockOffset(NE, 0),
     color: '#ffffff',
     emphasised: false,
   };
@@ -182,7 +181,7 @@ describe('drawDataBlock', () => {
     }));
   };
 
-  it('grows a block above its target upward, keeping the standard lines in place', () => {
+  it('puts the emergency prefix on a line of its own above the standard two', () => {
     // Arrange
     const plain = track();
     const emergency = track({ squawk: '7600' });
@@ -191,8 +190,10 @@ describe('drawDataBlock', () => {
     const [a, b] = [plain, emergency].map((t) => glyphs(t).map((g) => g.py));
 
     // Assert
-    expect(b?.slice('RF'.length)).toEqual(a ?? []);
-    expect(b?.[0]).toBeLessThan(a?.[0] ?? 0);
+    expect(b?.slice('RF'.length).map(Math.round)).toEqual(
+      (a ?? []).map((py) => Math.round(py + DB_LINE)),
+    );
+    expect(b?.[0]).toBe(a?.[0] ?? -1);
   });
 
   it('sets the selected level and a third heading line in the dimmed intent tone', () => {
@@ -210,14 +211,47 @@ describe('drawDataBlock', () => {
     expect(tones.join('')).toBe(['pppppp', 'pppp', 'iii', 'pppp', 'iiii'].join(''));
   });
 
-  it('keeps the runs of a right-aligned line contiguous', () => {
+  it('ends the text at the right edge of a block west of its target', () => {
     // Arrange
-    const t = track({ verticalRate: 1500, selAlt: 16000 });
-    const nw = { ...ne, dx: -22 };
+    const t = track();
+    const w = { ...ne, ...blockOffset(4, 0) };
     const advance = (atlas.advance * DB_FONT_PX) / atlas.fontSize;
 
     // Act
-    const g = glyphs(t, nw);
+    const g = glyphs(t, w);
+
+    // Assert
+    const line1 = g.slice(0, 'TEST01'.length).map((x) => x.px);
+    const line2 = g.slice('TEST01'.length).map((x) => x.px);
+    expect(Math.max(...line1)).toBeCloseTo(Math.max(...line2));
+    expect(Math.max(...line1) + advance).toBeGreaterThan(w.dx + DB_WIDTH - 2);
+    expect(Math.min(...line1)).toBeGreaterThan(w.dx + 2);
+  });
+
+  it('starts each line at the leader tip while a dragged block straddles the target', () => {
+    // Arrange
+    const t = track();
+    const straddling = { ...ne, dx: -30, dy: -60 }; // the tip at the target's x, 30 px in
+    const bufPx = (atlas.buffer * DB_FONT_PX) / atlas.fontSize;
+
+    // Act
+    const g = glyphs(t, straddling);
+
+    // Assert
+    const line1 = g.slice(0, 'TEST01'.length).map((x) => x.px);
+    const line2 = g.slice('TEST01'.length).map((x) => x.px);
+    expect(Math.min(...line1)).toBeCloseTo(-bufPx); // short enough to start at the tip
+    expect(Math.min(...line2)).toBeLessThan(-bufPx); // pushed left to end within the block
+  });
+
+  it('keeps the runs of a right-aligned line contiguous', () => {
+    // Arrange
+    const t = track({ verticalRate: 1500, selAlt: 16000 });
+    const w = { ...ne, ...blockOffset(4, 0) };
+    const advance = (atlas.advance * DB_FONT_PX) / atlas.fontSize;
+
+    // Act
+    const g = glyphs(t, w);
 
     // Assert
     const line2 = g.slice('TEST01'.length).map((x) => x.px);
