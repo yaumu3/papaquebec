@@ -30,8 +30,9 @@ function positionOf(a: AircraftReport, project: ProjectFn): Position {
   return { kind: 'none' };
 }
 
-function freshOps(): OperatorState {
-  return { hideTrail: false, dir: null };
+/** What the operator has set on a new track: nothing yet. */
+export function freshOps(): OperatorState {
+  return { hideTrail: false, dir: null, movedAt: null, manual: false };
 }
 
 function readingsOf(a: AircraftReport): Readings {

@@ -67,6 +67,9 @@ export const [selected, setSelected] = createSignal<string | null>(null);
 /** Whether the filter reduces the target on the scope, which it never does to the selected one. */
 export const isFiltered = (t: Filterable & { hex: string }): boolean =>
   visibility(t, selected(), settings.filter, settings.altimeter) === 'filtered';
+/** Where each block was last drawn from its target, CSS px, mid-slide included: where the pointer finds it. */
+export const drawnBlocks = new Map<string, { dx: number; dy: number }>();
+
 export const [hovered, setHovered] = createSignal<string | null>(null);
 /** Pan offset from the site, in NM. */
 export const [pan, setPan] = createSignal<Vec2>({ x: 0, y: 0 });

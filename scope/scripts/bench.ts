@@ -23,7 +23,7 @@ const { values: opt } = parseArgs({
     warmup: { type: 'string', default: '6000' },
     fn: {
       type: 'string',
-      default: 'buildRings,buildMap,buildTargets,placeLabels,buildHover,buildOverlays,setLayer',
+      default: 'buildRings,buildMap,blockSubjects,buildTargets,buildHover,buildOverlays,setLayer',
     },
     json: { type: 'string' },
   },

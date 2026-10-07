@@ -11,5 +11,5 @@
     "typescript/no-explicit-any": "error",
     "unicorn/require-post-message-target-origin": "off"
   },
-  "ignorePatterns": ["dist", "node_modules", "public/map", "src/feed/gen"]
+  "ignorePatterns": ["dist", "node_modules", "public/map", "src/feed/gen", "src/render/layout/wasm"]
 }

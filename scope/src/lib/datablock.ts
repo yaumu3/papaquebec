@@ -1,14 +1,18 @@
-import type { Vec2 } from '../../lib/geo';
-import type { OperatorState } from '../../state/track';
-import { type Rect, RectGrid } from './grid';
+import type { Vec2 } from './geo';
+
+/** An axis-aligned rectangle in CSS px, y down. */
+export interface Rect {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
 
 /** Data block type size and footprint in CSS pixels: two lines of mono, twelve glyphs wide. */
 export const DB_FONT_PX = 11;
 export const DB_WIDTH = 80;
 export const DB_HEIGHT = 26;
 export const DB_LINE = 12;
-/** Half the box round a target glyph that blocks keep clear of. */
-const GLYPH_HALF = 8;
 /** Half the drawn glyph, where a leader starts. */
 const SYMBOL_HALF = 3;
 /** A leader's length, glyph edge to block, the same in every direction. */
@@ -31,18 +35,9 @@ function step(dir: number): Vec2 {
   return s;
 }
 
-export interface LabelSubject {
-  hex: string;
-  cx: number;
-  cy: number;
-  /** Lines beyond the standard two, such as the emergency prefix. */
-  extraLines: number;
-  dir: number | null;
-}
-
 /** The direction a block sits at, north-east until it has been placed. */
-export function blockDir(ops: Pick<OperatorState, 'dir'>): number {
-  return ops.dir ?? NE;
+export function blockDir(dir: number | null): number {
+  return dir ?? NE;
 }
 
 export function blockHeight(extraLines: number): number {
@@ -112,42 +107,4 @@ export function leaderDir(dx: number, dy: number, extraLines: number): number {
   const p = leaderTip(dx, dy, blockHeight(extraLines));
   const dir = STEPS.findIndex((s) => s.x === Math.sign(p.x) && s.y === Math.sign(p.y));
   return dir === -1 ? NE : dir;
-}
-
-/**
- * Greedy assignment. Each block tries its current direction first, so an uncontested block
- * stays put, where the placer or a drag left it. Upper targets pick first, as the eye reads the
- * scope top-down. When every direction collides, the least-overlapping one wins.
- */
-export function placeLabels(subjects: readonly LabelSubject[]): Map<string, number> {
-  const result = new Map<string, number>();
-  const claimed = new RectGrid();
-  for (const s of subjects) {
-    claimed.add({
-      x0: s.cx - GLYPH_HALF,
-      y0: s.cy - GLYPH_HALF,
-      x1: s.cx + GLYPH_HALF,
-      y1: s.cy + GLYPH_HALF,
-    });
-  }
-  for (const s of subjects.toSorted((a, b) => a.cy - b.cy)) {
-    const current = s.dir ?? NE;
-    const order = [current, ...[...STEPS.keys()].filter((d) => d !== current)];
-    let best = current;
-    let bestRect = blockRect(s.cx, s.cy, best, s.extraLines);
-    let bestCost = Number.POSITIVE_INFINITY;
-    for (const dir of order) {
-      const r = blockRect(s.cx, s.cy, dir, s.extraLines);
-      const cost = claimed.overlapWith(r);
-      if (cost < bestCost) {
-        bestCost = cost;
-        best = dir;
-        bestRect = r;
-      }
-      if (cost === 0) break;
-    }
-    claimed.add(bestRect);
-    result.set(s.hex, best);
-  }
-  return result;
 }

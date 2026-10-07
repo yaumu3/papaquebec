@@ -1,4 +1,4 @@
-import { leaderDir } from '../../render/layout/labels';
+import { leaderDir } from '../../lib/datablock';
 import type { View } from '../../render/protocol';
 import { extraLines } from '../../render/scene/datablock';
 import {
@@ -134,6 +134,8 @@ export function trackDrags(host: DragHost) {
       const t = trackStore.tracks.get(drag.hex);
       if (drag.moved && s && t) {
         t.ops.dir = leaderDir(at.x - drag.grabX - s.cx, at.y - drag.grabY - s.cy, extraLines(t));
+        t.ops.movedAt = trackStore.stats.now;
+        t.ops.manual = true;
         swallow = true;
         bumpSnapshot();
       }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER } from '../../lib/altitude';
+import { blockOffset, DB_FONT_PX, DB_LINE, DB_WIDTH, NE } from '../../lib/datablock';
 import type { Track } from '../../state/track';
-import { blockOffset, DB_FONT_PX, DB_LINE, DB_WIDTH, NE } from '../layout/labels';
 import { atlas } from './atlasFixture';
 import {
   blockExtraLines,

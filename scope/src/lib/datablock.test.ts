@@ -7,24 +7,13 @@ import {
   DB_HEIGHT,
   DB_WIDTH,
   DIRECTIONS,
-  type LabelSubject,
   leader,
   LEADER_PX,
-  NE,
   leaderDir,
-  placeLabels,
-} from './labels';
+  NE,
+} from './datablock';
 
 const dirs = Array.from({ length: DIRECTIONS }, (_, d) => d);
-
-function subject(
-  hex: string,
-  cx: number,
-  cy: number,
-  extra: Partial<LabelSubject> = {},
-): LabelSubject {
-  return { hex, cx, cy, extraLines: 0, dir: null, ...extra };
-}
 
 describe('blockRect', () => {
   it('puts the block on the side of the target the direction names, starting at the leader', () => {
@@ -119,49 +108,12 @@ describe('leaderDir', () => {
 describe('blockDir', () => {
   it('is the placed direction, else north-east', () => {
     // Arrange
-    const ops = [{ dir: 2 }, { dir: null }];
+    const placed = [2, null];
 
     // Act
-    const picked = ops.map(blockDir);
+    const picked = placed.map(blockDir);
 
     // Assert
     expect(picked).toEqual([2, NE]);
-  });
-});
-
-describe('placeLabels', () => {
-  it('leaves an uncontested block in its current direction', () => {
-    // Arrange
-    const subjects = [subject('a', 100, 100, { dir: 3 })];
-
-    // Act
-    const placed = placeLabels(subjects);
-
-    // Assert
-    expect(placed.get('a')).toBe(3);
-  });
-
-  it('moves the lower of two colliding blocks to a free direction', () => {
-    // Arrange
-    const subjects = [subject('upper', 100, 100), subject('lower', 100, 110)];
-
-    // Act
-    const placed = placeLabels(subjects);
-
-    // Assert
-    expect(placed.get('upper')).toBe(NE);
-    expect(placed.get('lower')).not.toBe(NE);
-  });
-
-  it('leaves a block where a drag put it until it collides', () => {
-    // Arrange
-    const subjects = [subject('upper', 100, 100, { dir: 2 }), subject('lower', 100, 110)];
-
-    // Act
-    const placed = placeLabels(subjects);
-
-    // Assert
-    expect(placed.get('upper')).toBe(2);
-    expect(placed.get('lower')).not.toBe(2);
   });
 });

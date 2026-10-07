@@ -1,6 +1,8 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
+# What `cargo run` and the image build: the server, not the sim's benchmark.
+default-members = ["crates/web"]
 
 [workspace.package]
 version = "0.1.0"
@@ -14,3 +16,10 @@ unsafe_code = "forbid"
 [workspace.lints.clippy]
 all = { level = "deny", priority = -1 }
 pedantic = { level = "warn", priority = -1 }
+
+# The placer for the scope: small and abort on panic, which the server must not do.
+[profile.wasm]
+inherits = "release"
+lto = true
+codegen-units = 1
+panic = "abort"

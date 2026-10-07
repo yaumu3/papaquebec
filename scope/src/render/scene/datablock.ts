@@ -1,8 +1,8 @@
 import { type Altimeter, formatAltitude, holdsSelected, uncorrected } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
+import { blockHeight, DB_FONT_PX, DB_LINE, DB_WIDTH, leader, leaderTip } from '../../lib/datablock';
 import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
 import type { Track } from '../../state/track';
-import { blockHeight, DB_FONT_PX, DB_LINE, DB_WIDTH, leader, leaderTip } from '../layout/labels';
 import type { Anchor, LineBatch, TextBatch } from './pack';
 import { isEmergency, THEME, trackLabel, typeLabel } from './rules';
 

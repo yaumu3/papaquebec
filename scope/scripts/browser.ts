@@ -10,6 +10,8 @@ export interface Sim {
   /** Generic targets the sim adds to its fleet. */
   extra: number;
   site: string;
+  /** A traffic scenario flown in place of the fleet: merge, parallel, cross, converging or random. */
+  scenario?: string | undefined;
 }
 
 /** Where the page comes from: the sim, or a URL with `vite preview` started on its port if asked. */
@@ -18,6 +20,8 @@ export type Source = { sim: Sim } | { url: string; preview: boolean };
 export interface ScopeBrowserOptions {
   from: Source;
   scale: number;
+  /** Settings stored before the page loads, as if saved by an earlier visit; the rest default. */
+  settings?: Record<string, unknown> | undefined;
 }
 
 export interface ScopeBrowser {
@@ -92,6 +96,7 @@ async function startSimServer(sim: Sim): Promise<Served> {
     PQ_SIM: sim.site,
     PQ_SIM_SPEED: String(sim.speed),
     PQ_SIM_EXTRA: String(sim.extra),
+    ...(sim.scenario ? { PQ_SIM_SCENARIO: sim.scenario } : {}),
   });
   // Long enough for a first build of the server.
   await stoppedOnFailure(server.stop, () => untilUp(`${url}feed/info.json`, 1500, server.running));
@@ -124,6 +129,11 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
       viewport: { width: 1600, height: 1000 },
       deviceScaleFactor: opt.scale,
     });
+    if (opt.settings) {
+      await context.addInitScript((settings: Record<string, unknown>) => {
+        localStorage.setItem('papaquebec.settings', JSON.stringify({ settings }));
+      }, opt.settings);
+    }
     const page = await context.newPage();
     const log: string[] = [];
     page.on('console', (m) => log.push(`[${m.type()}] ${m.text()}`));

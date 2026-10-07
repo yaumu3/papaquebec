@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 feeder = { path = "../feeder" }
+placer = { path = "../placer" }
 tokio = { version = "1.53.1", features = ["net", "time", "io-util", "macros"] }
 
 [dev-dependencies]

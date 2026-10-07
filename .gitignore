@@ -12,3 +12,4 @@ scope/public/favicon.ico
 scope/public/icon-192.png
 scope/public/apple-touch-icon.png
 target/
+scope/src/render/layout/wasm/

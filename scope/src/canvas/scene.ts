@@ -3,19 +3,23 @@ import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from '
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer, type RenderStatus } from '../render/facade';
 import { LAYER_ORDER, type LayerName } from '../render/layers';
+import { type Move, retarget, settleMoves } from '../render/layout/moves';
+import { applyPlacement, blockSubjects, viewportRect } from '../render/layout/placement';
+import { workerPlacer } from '../render/layout/placer';
 import { fixNearest } from '../render/layout/trails';
 import type { AtlasInfo, Batch, View } from '../render/protocol';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
 import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
-import { buildTargets } from '../render/scene/targets';
+import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
 import { hoverInstant } from '../state/history';
 import {
   aero,
   canvasSize,
   coast,
   declination,
+  drawnBlocks,
   hovered,
   labelDrag,
   pointer,
@@ -64,7 +68,8 @@ function settledScale(view: () => View): () => number {
 
 /**
  * Connects state to the renderer. Each layer is rebuilt when what its builder reads changes;
- * the only timer is the one that settles a zoom.
+ * the only timers are the one that settles a zoom and the frames of a block sliding to a new
+ * bearing.
  */
 export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   const renderer = createRenderer(canvas, view(), reportStatus);
@@ -126,27 +131,88 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   );
 
   const layoutScale = settledScale(view);
-  /** Bumped once blocks are placed, which moves targets and their blocks under the hover. */
-  const [blocksPlaced, setBlocksPlaced] = createSignal(0);
-  show((a) => {
+  /**
+   * Bumped once the blocks are placed: on each snapshot, a drop, a settled zoom or a change in
+   * what is shown, never on a pan. The targets and the hover over them follow it.
+   */
+  const [placed, setPlaced] = createSignal(0);
+  const placer = workerPlacer();
+  onCleanup(() => placer.destroy());
+  createEffect(() => {
     snapshotVersion();
-    const { batches, dirs } = buildTargets({
+    const pxPerNm = layoutScale();
+    const now = trackStore.stats.now;
+    const viewport = viewportRect(untrack(view), pxPerNm);
+    const subjects = blockSubjects({
+      tracks: trackStore.tracks.values(),
+      now,
+      pxPerNm,
+      filter: { ...settings.filter },
+      altimeter: { ...settings.altimeter },
+      selected: selected(),
+      viewport,
+    });
+    placer.place({ subjects, pxPerNm }, (dirs) => {
+      applyPlacement(trackStore.tracks.values(), dirs, now, subjects);
+      setPlaced((n) => n + 1);
+    });
+  });
+  /**
+   * Blocks sliding to a new bearing, each from where it was last drawn. Frames run only while a
+   * move is under way.
+   */
+  const moves = new Map<string, Move>();
+  const [frame, setFrame] = createSignal(0);
+  let framing = false;
+  const nextFrame = () => {
+    const now = performance.now();
+    settleMoves(moves, drawnBlocks, now);
+    framing = moves.size > 0;
+    if (framing) requestAnimationFrame(nextFrame);
+    setFrame((n) => n + 1);
+  };
+  /** Starts a move for every drawn block whose bearing is not where it was last drawn. */
+  const startMoves = (drag: LabelDrag | null, now: number) => {
+    for (const t of trackStore.tracks.values()) {
+      const was = drawnBlocks.get(t.hex);
+      if (!was || drag?.hex === t.hex) continue;
+      const to = restingOffset(t);
+      const current = moves.get(t.hex);
+      const heading = current?.to ?? was;
+      if (heading.dx === to.dx && heading.dy === to.dy) continue;
+      moves.set(t.hex, retarget(current, was, to, now));
+    }
+    if (moves.size > 0 && !framing) {
+      framing = true;
+      requestAnimationFrame(nextFrame);
+    }
+  };
+  show((a) => {
+    placed();
+    frame();
+    const drag = labelDrag();
+    const now = performance.now();
+    startMoves(drag, now);
+    const batches = buildTargets({
       tracks: trackStore.tracks.values(),
       now: trackStore.stats.now,
       filter: { ...settings.filter },
       vectorMin: settings.vectorMin,
       trailSec: settings.trailSec,
       selected: selected(),
-      labelDrag: labelDrag(),
+      labelDrag: drag,
+      moves,
+      drawAt: now,
       altimeter: { ...settings.altimeter },
-      pxPerNm: layoutScale(),
       atlas: a,
     });
-    for (const [hex, dir] of dirs) {
-      const t = trackStore.tracks.get(hex);
-      if (t) t.ops.dir = dir;
+    drawnBlocks.clear();
+    for (const t of trackStore.tracks.values()) {
+      const p = t.position;
+      if (p.kind === 'live' || p.kind === 'last') {
+        drawnBlocks.set(t.hex, drawnOffset(t, drag, moves, now));
+      }
     }
-    setBlocksPlaced((n) => n + 1);
     return { targets: batches };
   });
 
@@ -161,7 +227,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   });
 
   show(() => {
-    blocksPlaced();
+    placed();
+    frame();
     const hex = hovered();
     return {
       hover: buildHover({
@@ -170,6 +237,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         filter: { ...settings.filter },
         altimeter: { ...settings.altimeter },
         labelDrag: labelDrag(),
+        moves,
+        drawAt: performance.now(),
         instant: instant(),
       }),
     };

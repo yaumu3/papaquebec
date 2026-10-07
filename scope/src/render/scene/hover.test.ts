@@ -13,6 +13,8 @@ function input(over: Partial<HoverInput> = {}): HoverInput {
     filter: { ground: true, lowerFl: 0, upperFl: 500, squawk: 'all' },
     altimeter: { transitionAltFt: 14000, qnhInHg: 29.92 },
     labelDrag: null,
+    moves: new Map(),
+    drawAt: 0,
     instant: null,
     ...over,
   };
@@ -61,7 +63,7 @@ describe('buildHover', () => {
 
   it('runs the leader to a block being dragged rather than to its direction', () => {
     // Arrange
-    const t = makeTrack({ ops: { hideTrail: false, dir: null } });
+    const t = makeTrack();
     const labelDrag = { hex: t.hex, dx: 60, dy: 30 };
 
     // Act
