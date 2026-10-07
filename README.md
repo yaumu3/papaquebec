@@ -257,7 +257,8 @@ sides generate their types from.
   - [wtransport](https://github.com/BiagioFesta/wtransport) for WebTransport and
     [prost](https://github.com/tokio-rs/prost) for protobuf
   - clippy and rustfmt
-- **Toolchains**: [Bun](https://bun.sh) and Rust, pinned by [`mise`](https://mise.jdx.dev)
+- **Toolchains**: [Bun](https://bun.sh) and Rust with its wasm32 target and wasm-bindgen-cli, pinned
+  by [`mise`](https://mise.jdx.dev)
 
 ## License
 
