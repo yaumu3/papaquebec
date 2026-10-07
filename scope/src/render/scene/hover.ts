@@ -1,12 +1,12 @@
 import type { Altimeter } from '../../lib/altitude';
 import { type Filter, visibility } from '../../state/filter';
 import type { Track } from '../../state/track';
-import { blockCorner } from '../layout/labels';
+import { blockDir, blockHeight } from '../layout/labels';
 import { type Batch, Shape } from '../protocol';
-import { drawLeader } from './datablock';
+import { drawLeader, extraLines } from './datablock';
 import { LineBatch, MarkerBatch } from './pack';
 import { THEME, trackColor } from './rules';
-import { blockOffset, type LabelDrag } from './targets';
+import { drawnOffset, type LabelDrag } from './targets';
 
 export interface HoverInput {
   /** The target under the pointer, if any. */
@@ -41,12 +41,16 @@ export function buildHover(input: HoverInput): Batch[] {
   ) {
     const at = { x: p.x, y: p.y };
     markers.marker(at, Shape.HollowSquare, 14, THEME.hover);
-    drawLeader(lines, {
-      at,
-      ...blockOffset(t.hex, blockCorner(t.ops), input.labelDrag),
-      color: trackColor(t, input.selected),
-      emphasised: true,
-    });
+    drawLeader(
+      lines,
+      {
+        at,
+        ...drawnOffset(t, blockDir(t.ops), input.labelDrag),
+        color: trackColor(t, input.selected),
+        emphasised: true,
+      },
+      blockHeight(extraLines(t)),
+    );
   }
   if (input.instant) markers.marker(input.instant, Shape.Ring, RING_PX, THEME.selbox);
   return [lines.finish(), markers.finish()];

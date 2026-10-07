@@ -1,5 +1,6 @@
-import { nearestCorner } from '../../render/layout/labels';
+import { leaderDir } from '../../render/layout/labels';
 import type { View } from '../../render/protocol';
+import { extraLines } from '../../render/scene/datablock';
 import {
   bumpSnapshot,
   pan,
@@ -132,7 +133,7 @@ export function trackDrags(host: DragHost) {
       const s = targetScreen(host.view(), drag.hex);
       const t = trackStore.tracks.get(drag.hex);
       if (drag.moved && s && t) {
-        t.ops.pinnedCorner = nearestCorner(at.x - drag.grabX - s.cx, at.y - drag.grabY - s.cy);
+        t.ops.dir = leaderDir(at.x - drag.grabX - s.cx, at.y - drag.grabY - s.cy, extraLines(t));
         swallow = true;
         bumpSnapshot();
       }

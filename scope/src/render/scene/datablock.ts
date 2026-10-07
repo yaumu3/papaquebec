@@ -2,7 +2,7 @@ import { type Altimeter, formatAltitude, holdsSelected, uncorrected } from '../.
 import { steeringHeading } from '../../lib/autopilot';
 import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
 import type { Track } from '../../state/track';
-import { DB_FONT_PX, DB_HEIGHT, DB_LINE } from '../layout/labels';
+import { blockHeight, DB_FONT_PX, DB_LINE, DB_WIDTH, leader, leaderTip } from '../layout/labels';
 import type { Anchor, LineBatch, TextBatch } from './pack';
 import { isEmergency, THEME, trackLabel, typeLabel } from './rules';
 
@@ -70,8 +70,6 @@ export function dataBlock(t: Track, nowSec: number, altimeter: Altimeter): DataB
 export const INTENT_TONE = 0.65;
 /** Brightness of a leader against the block's color, unless emphasised. */
 const LEADER_TONE = 0.5;
-/** The leader starts at the target glyph's corner and stops this far short of the block, CSS px. */
-const LEADER_INSET = 3;
 
 function dim(hex: string, f: number): string {
   const n = Number.parseInt(hex.slice(1, 7), 16);
@@ -86,7 +84,7 @@ function dim(hex: string, f: number): string {
 export interface BlockPlacement {
   /** The target's world position. */
   at: Anchor;
-  /** Offset from the target to the block's near corner, CSS px. */
+  /** Offset from the target to the block's top-left corner, CSS px. */
   dx: number;
   dy: number;
   color: string;
@@ -94,36 +92,39 @@ export interface BlockPlacement {
   emphasised: boolean;
 }
 
-/** One line of runs, laid out as a single string would be under `align`. */
+/**
+ * Where a line of `width` starts in a block whose top-left corner is at `dx`: at the leader's
+ * tip, or as near it as keeps the line within the block. So a block east of its target reads
+ * from the tip, one west of it ends at the tip, and a dragged block slides between the two.
+ */
+function lineStart(tipX: number, dx: number, width: number): number {
+  return Math.max(dx, Math.min(tipX, dx + DB_WIDTH - width));
+}
+
+/** One line of runs, laid out as a single string would be. */
 function drawRuns(
   text: TextBatch,
   runs: Run[],
   at: Anchor,
-  align: 'left' | 'right',
   colors: { plain: string; intent: string },
 ): void {
-  const width = text.measure(runs.map((r) => r.text).join(''), DB_FONT_PX);
-  let px = (at.px ?? 0) - (align === 'right' ? width : 0);
+  let px = at.px ?? 0;
   for (const r of runs) {
     text.text(r.text, { ...at, px }, DB_FONT_PX, r.intent ? colors.intent : colors.plain);
     px += text.measure(r.text, DB_FONT_PX);
   }
 }
 
-/** The leader from the target glyph's corner to the block edge that faces the target. */
+/** The leader from the glyph's edge to a block `heightPx` tall. */
 export function drawLeader(
   lines: LineBatch,
   { at, dx, dy, color, emphasised }: BlockPlacement,
+  heightPx: number,
 ): void {
-  const sx = dx > 0 ? 1 : -1;
-  const above = dy < 0;
+  const { a, b } = leader(dx, dy, heightPx);
   lines.segment(
-    { ...at, px: sx * LEADER_INSET, py: (above ? -1 : 1) * LEADER_INSET },
-    {
-      ...at,
-      px: dx - sx * LEADER_INSET,
-      py: above ? dy + DB_HEIGHT / 2 : dy - LEADER_INSET,
-    },
+    { ...at, px: a.x, py: a.y },
+    { ...at, px: b.x, py: b.y },
     emphasised ? color : dim(color, LEADER_TONE),
   );
 }
@@ -135,24 +136,18 @@ export function drawDataBlock(
   placement: BlockPlacement,
 ): void {
   const { at, dx, dy, color } = placement;
-  const above = dy < 0;
-  const blockY = dy - (above ? blockExtraLines(block) * DB_LINE : 0);
-  const align = dx > 0 ? 'left' : 'right';
-  drawLeader(lines, placement);
-  let lineY = blockY;
-  if (block.prefix) {
-    text.text(block.prefix, { ...at, px: dx, py: lineY }, DB_FONT_PX, THEME.emergency, { align });
-    lineY += DB_LINE;
-  }
-  const intentColor = dim(color, INTENT_TONE);
-  text.text(block.line1, { ...at, px: dx, py: lineY }, DB_FONT_PX, color, { align });
-  drawRuns(text, block.line2, { ...at, px: dx, py: lineY + DB_LINE }, align, {
-    plain: color,
-    intent: intentColor,
+  const h = blockHeight(blockExtraLines(block));
+  drawLeader(lines, placement, h);
+  const tipX = leaderTip(dx, dy, h).x;
+  const anchor = (s: string, row: number): Anchor => ({
+    ...at,
+    px: lineStart(tipX, dx, text.measure(s, DB_FONT_PX)),
+    py: dy + row * DB_LINE,
   });
-  if (block.line3) {
-    text.text(block.line3, { ...at, px: dx, py: lineY + 2 * DB_LINE }, DB_FONT_PX, intentColor, {
-      align,
-    });
-  }
+  const top = block.prefix ? 1 : 0;
+  if (block.prefix) text.text(block.prefix, anchor(block.prefix, 0), DB_FONT_PX, THEME.emergency);
+  const colors = { plain: color, intent: dim(color, INTENT_TONE) };
+  text.text(block.line1, anchor(block.line1, top), DB_FONT_PX, color);
+  drawRuns(text, block.line2, anchor(block.line2.map((r) => r.text).join(''), top + 1), colors);
+  if (block.line3) text.text(block.line3, anchor(block.line3, top + 2), DB_FONT_PX, colors.intent);
 }
