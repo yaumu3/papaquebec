@@ -34,13 +34,6 @@ export function targetMenu(t: Track): MenuItem[] {
         t.ops.hideTrail = !t.ops.hideTrail;
       },
     },
-    {
-      label: 'Unpin label',
-      disabled: t.ops.pinnedCorner === null,
-      onSelect: () => {
-        t.ops.pinnedCorner = null;
-      },
-    },
   ];
 }
 

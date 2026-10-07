@@ -61,7 +61,7 @@ describe('buildHover', () => {
 
   it('runs the leader to a block being dragged rather than to its corner', () => {
     // Arrange
-    const t = makeTrack({ ops: { hideTrail: false, pinnedCorner: null, autoCorner: 'ne' } });
+    const t = makeTrack({ ops: { hideTrail: false, autoCorner: 'ne' } });
     const labelDrag = { hex: t.hex, dx: 60, dy: 30 };
 
     // Act

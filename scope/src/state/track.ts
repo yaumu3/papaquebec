@@ -23,9 +23,7 @@ export interface Fix {
 /** Per-track state the operator sets; survives snapshot rebuilds. */
 export interface OperatorState {
   hideTrail: boolean;
-  /** Corner the operator pinned, or null for automatic placement. */
-  pinnedCorner: Corner | null;
-  /** Corner the automatic placer last chose; kept so blocks stay put until they collide. */
+  /** Corner the data block sits in, set by the placer or by a drag; it stays until it collides. */
   autoCorner: Corner;
 }
 

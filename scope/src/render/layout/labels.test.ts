@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Corner } from '../../state/track';
-import { blockCorner, DB_HEIGHT, labelRect, type LabelSubject, placeLabels } from './labels';
+import { DB_HEIGHT, labelRect, type LabelSubject, placeLabels } from './labels';
 
 function subject(
   hex: string,
@@ -9,7 +9,7 @@ function subject(
   cy: number,
   extra: Partial<LabelSubject> = {},
 ): LabelSubject {
-  return { hex, cx, cy, extraLines: 0, pinnedCorner: null, autoCorner: 'ne', ...extra };
+  return { hex, cx, cy, extraLines: 0, autoCorner: 'ne', ...extra };
 }
 
 describe('labelRect', () => {
@@ -68,48 +68,15 @@ describe('placeLabels', () => {
     expect(placed.get('lower')).not.toBe('ne');
   });
 
-  it('never moves a pinned block, even when it collides', () => {
+  it('leaves a block where a drag put it until it collides', () => {
     // Arrange
-    const subjects = [
-      subject('auto', 100, 100),
-      subject('pinned', 100, 110, { pinnedCorner: 'ne' }),
-    ];
+    const subjects = [subject('upper', 100, 100, { autoCorner: 'se' }), subject('lower', 100, 110)];
 
     // Act
     const placed = placeLabels(subjects);
 
     // Assert
-    expect(placed.get('pinned')).toBe('ne');
-    expect(placed.get('auto')).not.toBe('ne');
-  });
-
-  it('picks the least-overlapping corner when every corner collides', () => {
-    // Arrange
-    const crowd = (['ne', 'nw', 'se', 'sw'] as Corner[]).map((c, i) =>
-      subject(`p${i}`, 100, 100, { pinnedCorner: c }),
-    );
-    const subjects = [...crowd, subject('auto', 100, 100)];
-
-    // Act
-    const placed = placeLabels(subjects);
-
-    // Assert
-    expect(['ne', 'nw', 'se', 'sw']).toContain(placed.get('auto') ?? 'none');
-  });
-});
-
-describe('blockCorner', () => {
-  it('is the pinned corner when there is one, else the one the placer last chose', () => {
-    // Arrange
-    const ops = [
-      { pinnedCorner: 'sw', autoCorner: 'ne' },
-      { pinnedCorner: null, autoCorner: 'se' },
-    ] as const;
-
-    // Act
-    const corners = ops.map(blockCorner);
-
-    // Assert
-    expect(corners).toEqual(['sw', 'se']);
+    expect(placed.get('upper')).toBe('se');
+    expect(placed.get('lower')).not.toBe('se');
   });
 });

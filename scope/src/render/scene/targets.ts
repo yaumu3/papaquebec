@@ -138,7 +138,6 @@ export function buildTargets(input: TargetInput): TargetScene {
       cx: d.cx,
       cy: d.cy,
       extraLines: extraLines(d.t),
-      pinnedCorner: d.t.ops.pinnedCorner,
       autoCorner: d.t.ops.autoCorner,
     }));
   const corners = placeLabels(subjects);

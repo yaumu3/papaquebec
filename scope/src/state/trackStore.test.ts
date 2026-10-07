@@ -98,7 +98,7 @@ describe('createTrackStore', () => {
     const before = store.tracks.get('a');
     if (before) {
       before.ops.hideTrail = true;
-      before.ops.pinnedCorner = 'sw';
+      before.ops.autoCorner = 'sw';
     }
 
     // Act
@@ -107,8 +107,7 @@ describe('createTrackStore', () => {
     // Assert
     expect(store.tracks.get('a')?.ops).toEqual({
       hideTrail: true,
-      pinnedCorner: 'sw',
-      autoCorner: 'ne',
+      autoCorner: 'sw',
     });
   });
 

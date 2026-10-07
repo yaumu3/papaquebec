@@ -17,7 +17,6 @@ export interface LabelSubject {
   cy: number;
   /** Lines beyond the standard two, such as the emergency prefix. */
   extraLines: number;
-  pinnedCorner: Corner | null;
   autoCorner: Corner;
 }
 
@@ -28,9 +27,9 @@ const OFFSETS: Record<Corner, { dx: number; dy: number }> = {
   sw: { dx: -22, dy: 14 },
 };
 
-/** The corner a block sits in: the operator's pin, else where the placer last put it. */
-export function blockCorner(ops: Pick<OperatorState, 'pinnedCorner' | 'autoCorner'>): Corner {
-  return ops.pinnedCorner ?? ops.autoCorner;
+/** The corner a block sits in. */
+export function blockCorner(ops: Pick<OperatorState, 'autoCorner'>): Corner {
+  return ops.autoCorner;
 }
 
 /** Offset from the target to the block's near corner, in CSS pixels. */
@@ -56,10 +55,10 @@ export function labelRect(cx: number, cy: number, corner: Corner, extraLines: nu
 }
 
 /**
- * Greedy corner assignment. Pinned blocks are placed first and never moved.
- * Automatic blocks try their current corner first, so an uncontested block
- * stays put. Upper targets pick first, as the eye reads the scope top-down.
- * When every corner collides, the least-overlapping one wins.
+ * Greedy corner assignment. Each block tries its current corner first, so an
+ * uncontested block stays put, where the placer or a drag left it. Upper
+ * targets pick first, as the eye reads the scope top-down. When every corner
+ * collides, the least-overlapping one wins.
  */
 export function placeLabels(subjects: readonly LabelSubject[]): Map<string, Corner> {
   const result = new Map<string, Corner>();
@@ -72,17 +71,7 @@ export function placeLabels(subjects: readonly LabelSubject[]): Map<string, Corn
       y1: s.cy + GLYPH_HALF,
     });
   }
-  const auto: LabelSubject[] = [];
-  for (const s of subjects) {
-    if (s.pinnedCorner) {
-      claimed.add(labelRect(s.cx, s.cy, s.pinnedCorner, s.extraLines));
-      result.set(s.hex, s.pinnedCorner);
-    } else {
-      auto.push(s);
-    }
-  }
-  auto.sort((a, b) => a.cy - b.cy);
-  for (const s of auto) {
+  for (const s of subjects.toSorted((a, b) => a.cy - b.cy)) {
     const order = [s.autoCorner, ...CORNERS.filter((c) => c !== s.autoCorner)];
     let best: Corner = s.autoCorner;
     let bestRect = labelRect(s.cx, s.cy, best, s.extraLines);

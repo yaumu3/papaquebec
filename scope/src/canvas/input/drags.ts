@@ -132,7 +132,7 @@ export function trackDrags(host: DragHost) {
       const s = targetScreen(host.view(), drag.hex);
       const t = trackStore.tracks.get(drag.hex);
       if (drag.moved && s && t) {
-        t.ops.pinnedCorner = nearestCorner(at.x - drag.grabX - s.cx, at.y - drag.grabY - s.cy);
+        t.ops.autoCorner = nearestCorner(at.x - drag.grabX - s.cx, at.y - drag.grabY - s.cy);
         swallow = true;
         bumpSnapshot();
       }

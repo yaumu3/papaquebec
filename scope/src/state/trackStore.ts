@@ -31,7 +31,7 @@ function positionOf(a: AircraftReport, project: ProjectFn): Position {
 }
 
 function freshOps(): OperatorState {
-  return { hideTrail: false, pinnedCorner: null, autoCorner: 'ne' };
+  return { hideTrail: false, autoCorner: 'ne' };
 }
 
 function readingsOf(a: AircraftReport): Readings {

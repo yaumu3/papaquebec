@@ -90,7 +90,7 @@ describe('buildTargets', () => {
 
   it('omits the trail when the operator hid it and the vector when it is off', () => {
     // Arrange
-    const t = track({ ops: { hideTrail: true, pinnedCorner: null, autoCorner: 'ne' } });
+    const t = track({ ops: { hideTrail: true, autoCorner: 'ne' } });
 
     // Act
     const { batches } = buildTargets(input([t], { vectorMin: 0 }));
