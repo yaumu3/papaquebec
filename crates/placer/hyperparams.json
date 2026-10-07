@@ -1,6 +1,13 @@
 {
   "meta": {
-    "note": "scoring is the hand-set objective and is never tuned; search is what the annealer minimises, tuned against it"
+    "note": "scoring is the hand-set objective and is never tuned; search is what the annealer minimises, tuned against it",
+    "bench": {
+      "merge": 63982,
+      "parallel": 3799,
+      "cross": 7249,
+      "converging": 4721,
+      "random": 36453
+    }
   },
   "scoring": {
     "weights": {

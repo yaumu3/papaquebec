@@ -87,6 +87,7 @@ mise run dev                # the scope and its server, on real traffic
 mise run sim                # the same on the synthetic fleet; PQ_SITE=lat,lon moves it
 mise run check              # everything CI runs
 mise run bench              # a load test, see below
+mise run bench:blocks       # score the data block placer on the sim's scenarios
 ```
 
 The sim needs no receiver: it stands in for one, sending the messages its fleet would broadcast,
@@ -243,7 +244,7 @@ they tell of (`traffic`), the aircraft database (`registry`), the following of a
 WebTransport endpoint (`transport`). `crates/sim/` stands in for a receiver: a synthetic fleet, sent
 as the messages it would broadcast, written with the same fields. `crates/placer/` places the data
 blocks, annealing over the cost of every bearing each could take; the scope runs it as WebAssembly
-in a worker. `proto/` holds the schema both
+in a worker, the benchmark natively on the sim's scenarios. `proto/` holds the schema both
 sides generate their types from.
 
 **Stack.**

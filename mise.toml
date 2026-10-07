@@ -51,6 +51,10 @@ description = "Load test the scope with the sim's extra traffic; flags follow"
 dir = "scope"
 run = "bun run bench"
 
+[tasks."bench:blocks"]
+description = "Score the data block placer on the sim's scenarios against the greedy baseline; --check for the thresholds"
+run = "cargo run -q --release -p sim --bin bench --"
+
 [tasks.wasm]
 description = "The placer as WebAssembly for the scope, with its bindings, into scope/src/render/layout/wasm"
 sources = ["crates/placer/**/*", "Cargo.lock"]

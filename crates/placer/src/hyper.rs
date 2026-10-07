@@ -1,5 +1,6 @@
 //! The placer's numbers, from `hyperparams.json`: two energies and how the annealer searches.
 
+use std::collections::BTreeMap;
 use std::sync::LazyLock;
 
 use serde::Deserialize;
@@ -156,12 +157,20 @@ pub struct Temperature {
     pub end: f64,
 }
 
+/// What the placer last scored on the scenarios; the file's note is for its readers.
+#[derive(Clone, Debug, Deserialize)]
+pub struct Meta {
+    /// The annealer's mean scoring energy a frame, by scenario, as the benchmark last found.
+    pub bench: BTreeMap<String, f64>,
+}
+
 /// Two energies and how the annealer searches. `scoring` is the hand-set objective, what a
 /// good layout is, and is never tuned; `search` is what the annealer minimises, tuned against
 /// it and starting equal to it. The rest steers the search.
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Hyperparams {
+    pub meta: Meta,
     pub scoring: Energy,
     pub search: Energy,
     /// The annealer cools geometrically from `start` to `end` over a run.
