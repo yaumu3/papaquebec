@@ -1,5 +1,6 @@
 //! Feeds the scope with aircraft data over WebTransport.
 
+pub mod air;
 pub mod beast;
 pub mod bits;
 pub mod cpr;
