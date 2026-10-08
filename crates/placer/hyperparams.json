@@ -1,6 +1,5 @@
 {
   "meta": {
-    "note": "scoring is the hand-set objective and is never tuned; search is what the annealer minimises, tuned against it",
     "bench": {
       "merge": 64109,
       "parallel": 3851,
@@ -9,33 +8,7 @@
       "random": 36698
     }
   },
-  "scoring": {
-    "weights": {
-      "overlap": 400,
-      "overlapArea": 1000,
-      "leaderThrough": 250,
-      "leaderCross": 200,
-      "foreignGlyph": 600,
-      "ambiguity": 250,
-      "ownPath": 300,
-      "foreignPath": 150,
-      "angle": 20,
-      "defaultDir": 6,
-      "move": 100,
-      "flowSide": 110,
-      "converging": 120,
-      "history": 40
-    },
-    "move": { "dwellSec": 30, "dwell": 3, "turning": 5, "manual": 5 },
-    "lookahead": {
-      "weight": 0.35,
-      "horizons": [
-        { "sec": 30, "weight": 1 },
-        { "sec": 70, "weight": 0.6 }
-      ]
-    }
-  },
-  "search": {
+  "energy": {
     "weights": {
       "overlap": 400,
       "overlapArea": 1000,
