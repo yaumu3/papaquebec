@@ -2,11 +2,11 @@
   "meta": {
     "note": "scoring is the hand-set objective and is never tuned; search is what the annealer minimises, tuned against it",
     "bench": {
-      "merge": 63982,
-      "parallel": 3799,
-      "cross": 7249,
-      "converging": 4721,
-      "random": 36453
+      "merge": 64109,
+      "parallel": 3851,
+      "cross": 7238,
+      "converging": 4792,
+      "random": 36698
     }
   },
   "scoring": {
@@ -62,6 +62,6 @@
     }
   },
   "temperature": { "start": 60, "end": 2 },
-  "budgetMs": 2,
+  "budgetMs": 0.5,
   "chainFlip": 0.1
 }
