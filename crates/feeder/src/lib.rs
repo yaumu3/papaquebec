@@ -13,6 +13,7 @@ pub mod proto;
 pub mod registry;
 pub mod traffic;
 pub mod transport;
+pub mod wmm;
 
 /// What went wrong, for the log.
 pub type Failure = Box<dyn std::error::Error + Send + Sync>;
