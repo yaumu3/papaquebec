@@ -5,6 +5,7 @@ import { cx } from './design/cx';
 import { connectFeed, feedOptionsFromUrl } from './feed/connect';
 import { fetchQnhFrom, qnhSourceFromUrl } from './feed/qnh';
 import { parseAero, parseCoast } from './lib/mapdata';
+import { loadDeclination } from './lib/wmm';
 import { About } from './panels/About';
 import { ContextMenu } from './panels/ContextMenu';
 import { DetailPanel } from './panels/DetailPanel';
@@ -16,6 +17,7 @@ import { TabBar } from './panels/TabBar';
 import { TopBar } from './panels/TopBar';
 import { historyOpen, plotted } from './state/history';
 import { keepUnscrolled } from './state/layout';
+import { setDeclinationAt } from './state/magnetic';
 import { setBuiltinAero } from './state/mapsets';
 import { QNH_POLL_MS, qnhReport, setQnhError, setQnhReport, stationCandidates } from './state/qnh';
 import { listSort, panels, setCoast, setTick } from './state/scope';
@@ -46,6 +48,9 @@ export function App() {
     void loadJson('./map/aero.json')
       .then((raw) => setBuiltinAero(parseAero(raw)))
       .catch((err: unknown) => console.warn('aero.json unavailable', err));
+    void loadDeclination()
+      .then((declination) => setDeclinationAt(() => declination))
+      .catch((err: unknown) => console.warn('magnetic model unavailable', err));
   });
 
   createEffect(() =>

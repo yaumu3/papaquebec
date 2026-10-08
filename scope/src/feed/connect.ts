@@ -1,7 +1,5 @@
-import { loadDeclination } from '../lib/wmm';
 import {
   bumpSnapshot,
-  setDeclination,
   setFeedStatus,
   setReceiverAnswered,
   setSite,
@@ -33,9 +31,6 @@ export function feedOptionsFromUrl(search: string): FeedOptions {
 
 function adoptSite(position: Site): void {
   configureProjection(position);
-  void loadDeclination()
-    .then((declination) => setDeclination(declination(position.lat, position.lon)))
-    .catch((err: unknown) => console.warn('magnetic model unavailable', err));
   setSite(position);
 }
 

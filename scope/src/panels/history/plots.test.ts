@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { qnhAltitudeFt } from '../../lib/altitude';
 import { HPA_PER_INHG } from '../../lib/units';
-import { setDeclination } from '../../state/magnetic';
+import { setDeclinationAt } from '../../state/magnetic';
 import { laneOf, READING_KEYS } from '../../state/plotted';
 import { makeSample } from '../../state/sampleFixture';
 import { PLOTS } from './plots';
@@ -50,8 +50,8 @@ describe('PLOTS', () => {
 
   it('pairs the track in magnetic, as the table reads it, with the heading as sent', () => {
     // Arrange
-    setDeclination(7);
-    const s = makeSample(1, { track: 235, heading: 240 });
+    setDeclinationAt(() => () => 7);
+    const s = makeSample(1, { track: 235, heading: 240, at: { lat: 33.6, lon: 130.5 } });
     const trk = PLOTS.trk;
 
     // Act
@@ -59,7 +59,7 @@ describe('PLOTS', () => {
 
     // Assert
     expect(ys).toEqual([228, 240]);
-    setDeclination(0);
+    setDeclinationAt(() => () => 0);
   });
 
   it('names the engaged modes as the table abbreviates them, and the source as one name', () => {

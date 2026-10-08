@@ -61,6 +61,7 @@ function readingsOf(a: AircraftReport): Readings {
     source: a.source ?? 'adsb',
     seen: a.seen ?? 0,
     seenPos: a.seenPos,
+    at: a.position ?? a.lastPosition,
   };
 }
 

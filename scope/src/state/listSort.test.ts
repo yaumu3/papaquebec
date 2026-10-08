@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { distanceFromSite, sortTracks } from './listSort';
-import { setDeclination } from './magnetic';
+import { setDeclinationAt } from './magnetic';
 import type { Track } from './track';
 
 function track(hex: string, over: Partial<Track> = {}): Track {
@@ -41,6 +41,7 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     source: 'adsb',
     seen: 0,
     seenPos: 0,
+    at: undefined,
     position: { kind: 'none' },
     history: [],
     samples: [],
@@ -67,7 +68,7 @@ describe('distanceFromSite', () => {
 });
 
 describe('sortTracks', () => {
-  afterEach(() => setDeclination(0));
+  afterEach(() => setDeclinationAt(() => () => 0));
 
   it('sorts by identity label, registration counting as identity', () => {
     // Arrange
@@ -121,8 +122,9 @@ describe('sortTracks', () => {
 
   it('sorts by magnetic track, as the column reads', () => {
     // Arrange
-    setDeclination(-8);
-    const tracks = [track('east', { track: 10 }), track('north', { track: 355 })];
+    setDeclinationAt(() => () => -8);
+    const at = { lat: 33.6, lon: 130.5 };
+    const tracks = [track('east', { track: 10, at }), track('north', { track: 355, at })];
 
     // Act
     const out = sortTracks(tracks, { key: 'track', dir: 'asc' }).map((t) => t.hex);

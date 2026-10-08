@@ -29,6 +29,7 @@ export function makeSample(t: number, over: Partial<Sample> = {}): Sample {
     source: 'adsb',
     seen: 0,
     seenPos: undefined,
+    at: undefined,
     ...over,
   };
 }

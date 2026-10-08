@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { setDeclination } from '../state/magnetic';
+import { setDeclinationAt } from '../state/magnetic';
 import { makeSample } from '../state/sampleFixture';
 import { NONE, positionReading, READINGS } from './readings';
 
@@ -18,9 +18,9 @@ describe('READINGS', () => {
 
   it('pairs the magnetic track with the heading as sent, each blank when unknown', () => {
     // Arrange
-    setDeclination(7);
+    setDeclinationAt(() => () => 7);
     const samples = [
-      makeSample(1000, { track: 235, heading: 240 }),
+      makeSample(1000, { track: 235, heading: 240, at: { lat: 33.6, lon: 130.5 } }),
       makeSample(1000, { heading: 240 }),
     ];
 
@@ -29,7 +29,7 @@ describe('READINGS', () => {
 
     // Assert
     expect(readings).toEqual([{ v: '228° / 240°' }, { v: '--- / 240°' }]);
-    setDeclination(0);
+    setDeclinationAt(() => () => 0);
   });
 
   it('reads the wind as where from, then how fast', () => {

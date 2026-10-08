@@ -1,5 +1,6 @@
 import type { ResolutionAdvisory } from '../lib/acas';
 import type { PositionSource } from '../lib/aircraft';
+import type { GeoPoint } from '../lib/geo';
 
 export type Source = PositionSource;
 
@@ -67,6 +68,8 @@ export interface Readings {
   source: Source;
   seen: number;
   seenPos: number | undefined;
+  /** Where it was when heard: its position, or else the last one it reported. */
+  at: GeoPoint | undefined;
 }
 
 /** The readings as they stood when the target was heard, kept for the history lanes. */
