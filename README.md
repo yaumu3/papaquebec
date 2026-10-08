@@ -195,7 +195,8 @@ Conventions:
   - A selected heading (`270°`) adds a third line while it steers the aircraft, not LNAV or an
     approach.
 - **Trails** are slashes decimated to eight-second slots.
-- **Bearings** shown to the operator are magnetic, 001 to 360.
+- **Bearings** shown to the operator are magnetic, 001 to 360, each by the declination where it is
+  measured: a track where the aircraft is, a cursor or an RBL at its origin.
 - **The top bar** carries only runtime state.
 - **The `i`** beside the panel buttons opens the credits: whose data the scope shows, and on which
   terms.
@@ -285,14 +286,16 @@ crates:
   - The Beast format (`beast`); Mode S messages (`message`) with the fields of their extended
     squitters (`field`) and the Comm-B registers (`register`), over `bits`, and the positions in
     them (`cpr`), each read and written in one place.
-  - The aircraft they tell of (`traffic`), with the standard atmosphere (`air`) and the magnetic
-    model (`wmm`) they are read by, and the aircraft database (`registry`).
+  - The aircraft they tell of (`traffic`), with the standard atmosphere (`air`) they are read by,
+    and the aircraft database (`registry`).
   - The following of a receiver (`follow`), what every session is served from (`feed`), the wire
     contract (`proto`) and the WebTransport endpoint (`transport`).
 - `sim/`: a receiver stood in for: a synthetic fleet, sent as the messages it would broadcast and
   answer, written with the same fields.
 - `placer/`: places the data blocks, annealing over the cost of every bearing each could take; the
   scope runs it as WebAssembly in a worker, the benchmark natively on the sim's scenarios.
+- `wmm/`: the World Magnetic Model, WMM2025. The feeder reads it to make headings true; the scope
+  runs it as WebAssembly to make bearings magnetic where each is measured.
 
 **Stack.**
 
