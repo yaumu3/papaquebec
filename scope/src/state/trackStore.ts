@@ -104,6 +104,10 @@ function trimOld(items: { t: number }[], now: number): void {
   if (drop > 0) items.splice(0, drop);
 }
 
+function reprojectFixes(history: Fix[], project: ProjectFn): void {
+  for (const f of history) Object.assign(f, project(f.lat, f.lon));
+}
+
 function toTrack(
   a: AircraftReport,
   previous: Track | undefined,
@@ -169,7 +173,7 @@ export function createTrackStore(initialProject: ProjectFn): TrackStore {
       for (const t of tracks.values()) {
         const p = t.position;
         if (p.kind === 'live' || p.kind === 'last') Object.assign(p, project(p.lat, p.lon));
-        for (const f of t.history) Object.assign(f, project(f.lat, f.lon));
+        reprojectFixes(t.history, project);
       }
     },
   };
