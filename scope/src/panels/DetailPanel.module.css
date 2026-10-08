@@ -9,13 +9,19 @@
   font-weight: 600;
   letter-spacing: var(--tracking);
 }
-.badge {
+/* A badge is an alert; a tag says only that something is on, in the tone of a control that is. */
+.badge,
+.tag {
   margin-left: var(--space-4);
   padding: 0 5px;
   background: var(--color-emergency);
   color: var(--panel-bg);
   font-size: var(--text-sm);
   vertical-align: 2px;
+}
+.tag {
+  background: var(--control-on-bg);
+  color: var(--control-on-text);
 }
 /* Who it is, then what it is, on one baseline. */
 .head {

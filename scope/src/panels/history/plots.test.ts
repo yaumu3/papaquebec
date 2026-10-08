@@ -48,17 +48,17 @@ describe('PLOTS', () => {
     expect(floored).toEqual([true, false, false]);
   });
 
-  it('plots the track in magnetic, as the table reads it', () => {
+  it('pairs the track in magnetic, as the table reads it, with the heading as sent', () => {
     // Arrange
     setDeclination(7);
-    const s = makeSample(1, { track: 235 });
+    const s = makeSample(1, { track: 235, heading: 240 });
     const trk = PLOTS.trk;
 
     // Act
-    const y = trk.kind === 'line' ? trk.y(s) : null;
+    const ys = trk.kind === 'pair' ? [trk.y(s), trk.y2(s)] : null;
 
     // Assert
-    expect(y).toBe(228);
+    expect(ys).toEqual([228, 240]);
     setDeclination(0);
   });
 

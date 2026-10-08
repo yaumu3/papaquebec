@@ -45,8 +45,12 @@ const num = (v: number | undefined, unit: string, digits = 0): Reading =>
 const signed = (v: number | undefined, unit: string): Reading =>
   v === undefined ? NONE : { v: `${v > 0 ? '+' : ''}${Math.round(v)}`, unit };
 
+/** A bearing with its degree mark, or the blank of the unknown. */
+const degrees = (deg: number | undefined): string =>
+  deg === undefined ? '---' : `${padBearing(deg)}°`;
+
 const bearing = (deg: number | undefined): Reading =>
-  deg === undefined ? NONE : { v: `${padBearing(deg)}°` };
+  deg === undefined ? NONE : { v: degrees(deg) };
 
 function levelReading(d: DisplayAltitude, tail = ''): Reading {
   switch (d.kind) {
@@ -67,17 +71,17 @@ const altitudeReading = (r: Readout): Reading =>
 const selectedReading = (ft: number | undefined): Reading =>
   levelReading(displayAltitude(ft, uncorrected(settings.altimeter)));
 
-/** Magnetic track the scope derives, then the transmitted true one. */
+/** Magnetic track the scope derives, then the magnetic heading as sent; blank unless one is known. */
 function trackReading(r: Readout): Reading {
   const mag = magneticTrack(r);
-  if (r.track === undefined || mag === undefined) return NONE;
-  return { v: `${padBearing(mag)}°`, also: `${padBearing(r.track)}°`, alsoUnit: 'T' };
+  if (mag === undefined && r.heading === undefined) return NONE;
+  return { v: `${degrees(mag)} / ${degrees(r.heading)}` };
 }
 
 /** Where the wind blows from, then how fast; blank unless both are known. */
 function windReading(r: Readout): Reading {
   if (r.windDir === undefined || r.windSpeed === undefined) return NONE;
-  return { v: `${padBearing(r.windDir)}°`, also: String(Math.round(r.windSpeed)), alsoUnit: 'kt' };
+  return { v: `${degrees(r.windDir)} / ${Math.round(r.windSpeed)}`, unit: 'kt' };
 }
 
 const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
@@ -99,7 +103,7 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   selAlt: { label: 'SEL ALT', format: (r) => selectedReading(r.selAlt) },
   fmsAlt: { label: 'FMS ALT', format: (r) => selectedReading(r.fmsAlt) },
   vs: { label: 'VS', format: (r) => signed(r.verticalRate, 'fpm') },
-  trk: { label: 'TRK', format: trackReading },
+  trk: { label: 'TRK / HDG', format: trackReading },
   selHdg: { label: 'SEL HDG', format: (r) => bearing(r.selHeading) },
   gs: { label: 'GS', format: (r) => num(r.gs, 'kt') },
   qnh: { label: 'QNH', format: (r) => num(inHg(r.navQnh), 'inHg', 2) },

@@ -4,35 +4,54 @@ import { blockHeight, DB_FONT_PX, DB_LINE, DB_WIDTH, leader, leaderTip } from '.
 import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
 import type { Track } from '../../state/track';
 import type { Anchor, LineBatch, TextBatch } from './pack';
-import { isEmergency, THEME, trackLabel, typeLabel } from './rules';
+import { THEME, trackLabel, typeLabel } from './rules';
 
 const DATA_BLOCK_PERIOD_SEC = 8;
 
-/** A stretch of block text; `intent` sets it in the dimmed tone of downlinked intent. */
+/** The tone of a stretch of block text: the block's own, the dimmed one of downlinked intent, or an alert. */
+export type Tone = 'plain' | 'intent' | 'alert';
+
+/** A stretch of block text in one tone. */
 export interface Run {
   text: string;
-  intent: boolean;
+  tone: Tone;
 }
 
 export interface DataBlock {
-  prefix: 'HJ' | 'RF' | 'EM' | null;
+  /** The line above the identity: the emergency, an advisory and the ident, when any. */
+  tags: Run[];
   line1: string;
   line2: Run[];
   /** Selected heading, all intent; null when there is none to show. */
   line3: string | null;
 }
 
-const plain = (text: string): Run => ({ text, intent: false });
-const intent = (text: string): Run => ({ text, intent: true });
+const plain = (text: string): Run => ({ text, tone: 'plain' });
+const intent = (text: string): Run => ({ text, tone: 'intent' });
+const alert = (text: string): Run => ({ text, tone: 'alert' });
+
+/**
+ * The tags above the block in order of precedence: the emergency, then an active advisory,
+ * then the ident; alerts but the last.
+ */
+function tagsOf(t: Track): Run[] {
+  const code = emergencyCode(t.squawk, t.emergency);
+  const tags = [
+    ...(code ? [alert(code)] : []),
+    ...(t.ra && !t.ra.terminated ? [alert('RA')] : []),
+    ...(t.ident ? [plain('ID')] : []),
+  ];
+  return tags.flatMap((tag, i) => (i === 0 ? [tag] : [plain(' '), tag]));
+}
 
 /** Data block lines beyond the standard two. */
 export function extraLines(t: Track): number {
-  return (isEmergency(t) ? 1 : 0) + (headingLine(t) === null ? 0 : 1);
+  return (tagsOf(t).length > 0 ? 1 : 0) + (headingLine(t) === null ? 0 : 1);
 }
 
 /** Lines of a built block beyond the standard two; always `extraLines` of its track. */
 export function blockExtraLines(block: DataBlock): number {
-  return (block.prefix ? 1 : 0) + (block.line3 === null ? 0 : 1);
+  return (block.tags.length > 0 ? 1 : 0) + (block.line3 === null ? 0 : 1);
 }
 
 function headingLine(t: Track): string | null {
@@ -59,7 +78,7 @@ export function dataBlock(t: Track, nowSec: number, altimeter: Altimeter): DataB
   const showType = Math.floor(nowSec / DATA_BLOCK_PERIOD_SEC) % 2 === 0;
   const second = showType ? typeLabel(t) : formatGsWake(t.gs, t.category);
   return {
-    prefix: emergencyCode(t.squawk, t.emergency),
+    tags: tagsOf(t),
     line1: trackLabel(t),
     line2: [...levelRuns(t, altimeter), plain(` ${second}`)],
     line3: headingLine(t),
@@ -102,15 +121,10 @@ function lineStart(tipX: number, dx: number, width: number): number {
 }
 
 /** One line of runs, laid out as a single string would be. */
-function drawRuns(
-  text: TextBatch,
-  runs: Run[],
-  at: Anchor,
-  colors: { plain: string; intent: string },
-): void {
+function drawRuns(text: TextBatch, runs: Run[], at: Anchor, colors: Record<Tone, string>): void {
   let px = at.px ?? 0;
   for (const r of runs) {
-    text.text(r.text, { ...at, px }, DB_FONT_PX, r.intent ? colors.intent : colors.plain);
+    text.text(r.text, { ...at, px }, DB_FONT_PX, colors[r.tone]);
     px += text.measure(r.text, DB_FONT_PX);
   }
 }
@@ -144,9 +158,9 @@ export function drawDataBlock(
     px: lineStart(tipX, dx, text.measure(s, DB_FONT_PX)),
     py: dy + row * DB_LINE,
   });
-  const top = block.prefix ? 1 : 0;
-  if (block.prefix) text.text(block.prefix, anchor(block.prefix, 0), DB_FONT_PX, THEME.emergency);
-  const colors = { plain: color, intent: dim(color, INTENT_TONE) };
+  const colors = { plain: color, intent: dim(color, INTENT_TONE), alert: THEME.emergency };
+  const top = block.tags.length > 0 ? 1 : 0;
+  if (top) drawRuns(text, block.tags, anchor(block.tags.map((r) => r.text).join(''), 0), colors);
   text.text(block.line1, anchor(block.line1, top), DB_FONT_PX, color);
   drawRuns(text, block.line2, anchor(block.line2.map((r) => r.text).join(''), top + 1), colors);
   if (block.line3) text.text(block.line3, anchor(block.line3, top + 2), DB_FONT_PX, colors.intent);

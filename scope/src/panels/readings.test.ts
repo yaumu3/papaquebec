@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { setDeclination } from '../state/magnetic';
 import { makeSample } from '../state/sampleFixture';
 import { NONE, positionReading, READINGS } from './readings';
 
@@ -13,6 +14,33 @@ describe('READINGS', () => {
 
     // Assert
     expect(r).toEqual({ v: '1.3', unit: '/s' });
+  });
+
+  it('pairs the magnetic track with the heading as sent, each blank when unknown', () => {
+    // Arrange
+    setDeclination(7);
+    const samples = [
+      makeSample(1000, { track: 235, heading: 240 }),
+      makeSample(1000, { heading: 240 }),
+    ];
+
+    // Act
+    const readings = samples.map((s) => READINGS.trk.format(s));
+
+    // Assert
+    expect(readings).toEqual([{ v: '228° / 240°' }, { v: '--- / 240°' }]);
+    setDeclination(0);
+  });
+
+  it('reads the wind as where from, then how fast', () => {
+    // Arrange
+    const s = makeSample(1000, { windDir: 269.4, windSpeed: 35.6 });
+
+    // Act
+    const r = READINGS.wind.format(s);
+
+    // Assert
+    expect(r).toEqual({ v: '269° / 36', unit: 'kt' });
   });
 
   it('reads the one reading of the unknown for whatever a sample lacks', () => {

@@ -1,6 +1,7 @@
 import { createMemo, type JSX, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
+import { advisoryWord } from '../lib/acas';
 import { emergencyCode, wakeLetter } from '../lib/format';
 import { isStale, trackLabel } from '../render/scene/rules';
 import { plotted, togglePlot } from '../state/history';
@@ -156,6 +157,12 @@ export function DetailPanel() {
                   {trackLabel(t())}
                   <Show when={ecode()}>
                     <span class={s.badge}>{ecode()}</span>
+                  </Show>
+                  <Show when={t().ra}>
+                    {(ra) => <span class={s.badge}>RA {advisoryWord(ra())}</span>}
+                  </Show>
+                  <Show when={t().ident}>
+                    <span class={s.tag}>ID</span>
                   </Show>
                 </div>
                 <Show when={t().description}>
