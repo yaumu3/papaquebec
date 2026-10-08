@@ -454,6 +454,7 @@ describe('createTrackStore samples', () => {
       source: 'mlat',
       seen: 0.3,
       seenPos: 2.5,
+      at: { lat: 33.5, lon: 130.5 },
     });
   });
 });

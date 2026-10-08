@@ -13,11 +13,11 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --locked && cp target/release/papaquebec /papaquebec
 
 # Apart from the server, so the scope builds while the server compiles.
-FROM rust:1.98-alpine AS placer
+FROM rust:1.98-alpine AS wasm
 RUN apk add --no-cache musl-dev && rustup target add wasm32-unknown-unknown
 WORKDIR /src
 COPY Cargo.lock ./
-# The released wasm-bindgen CLI of the version the placer crate is locked to: compiling it took a
+# The released wasm-bindgen CLI of the version the crates are locked to: compiling it took a
 # Raspberry Pi most of an hour.
 RUN version="$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}' Cargo.lock)" \
     && name="wasm-bindgen-$version-$(uname -m)-unknown-linux-musl" \
@@ -29,9 +29,10 @@ RUN version="$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}
 COPY Cargo.toml ./
 COPY crates/ crates/
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,id=placer-target,target=/src/target \
-    cargo build --profile wasm -p placer --target wasm32-unknown-unknown --locked \
-    && wasm-bindgen --target web --out-dir /wasm target/wasm32-unknown-unknown/wasm/placer.wasm
+    --mount=type=cache,id=wasm-target,target=/src/target \
+    cargo build --profile wasm -p placer -p wmm --target wasm32-unknown-unknown --locked \
+    && wasm-bindgen --target web --out-dir /wasm/placer target/wasm32-unknown-unknown/wasm/placer.wasm \
+    && wasm-bindgen --target web --out-dir /wasm/wmm target/wasm32-unknown-unknown/wasm/wmm.wasm
 
 FROM oven/bun:1-alpine AS build
 WORKDIR /app
@@ -41,7 +42,8 @@ RUN --mount=type=cache,target=/cache/bun \
     BUN_INSTALL_CACHE_DIR=/cache/bun bun install --frozen-lockfile
 COPY proto/ /proto/
 COPY scope/ ./
-COPY --from=placer /wasm ./src/render/layout/wasm
+COPY --from=wasm /wasm/placer ./src/render/layout/wasm
+COPY --from=wasm /wasm/wmm ./src/lib/wasm
 RUN bun run build
 
 FROM oven/bun:1-alpine

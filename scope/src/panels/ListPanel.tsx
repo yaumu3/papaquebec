@@ -13,10 +13,10 @@ import {
 } from '../lib/format';
 import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rules';
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
+import { magneticTrack } from '../state/magnetic';
 import {
   isFiltered,
   listSort,
-  magneticTrack,
   selected,
   setListSort,
   setMenu,

@@ -39,7 +39,8 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     source: 'adsb',
     seen: 0.2,
     seenPos: 0.2,
-    position: { kind: 'live', lat: 33.6, lon: 130.5, x: 1, y: 2 }, // RJFF
+    at: { lat: 33.6, lon: 130.5 }, // RJFF
+    position: { kind: 'live', lat: 33.6, lon: 130.5, x: 1, y: 2 },
     history: [],
     samples: [],
     ops: freshOps(),

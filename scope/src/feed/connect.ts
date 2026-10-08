@@ -1,7 +1,5 @@
-import { decimalYear, magneticDeclination } from '../lib/wmm';
 import {
   bumpSnapshot,
-  setDeclination,
   setFeedStatus,
   setReceiverAnswered,
   setSite,
@@ -33,7 +31,6 @@ export function feedOptionsFromUrl(search: string): FeedOptions {
 
 function adoptSite(position: Site): void {
   configureProjection(position);
-  setDeclination(magneticDeclination(position.lat, position.lon, 0, decimalYear(new Date())));
   setSite(position);
 }
 

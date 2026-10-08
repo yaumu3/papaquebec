@@ -11,7 +11,6 @@ import { type PanelId, persisted, settings } from './settings';
 export type { PanelId };
 /** The enabled map sets merged; see `mapsets`. */
 export { aero };
-export { declination, magneticTrack, setDeclination } from './magnetic';
 
 /** What the scope knows of the feed; `feedState` tells its state from this and the clock. */
 export interface FeedStatus {

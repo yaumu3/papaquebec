@@ -56,14 +56,15 @@ description = "Score the data block placer on the sim's scenarios against the gr
 run = "cargo run -q --release -p sim --bin bench --"
 
 [tasks.wasm]
-description = "The placer as WebAssembly for the scope, with its bindings, into scope/src/render/layout/wasm"
-sources = ["crates/placer/**/*", "Cargo.lock"]
-outputs = ["scope/src/render/layout/wasm/placer_bg.wasm"]
+description = "The placer and the magnetic model as WebAssembly for the scope, with their bindings, into scope/src/render/layout/wasm and scope/src/lib/wasm"
+sources = ["crates/placer/**/*", "crates/wmm/**/*", "Cargo.lock"]
+outputs = ["scope/src/render/layout/wasm/placer_bg.wasm", "scope/src/lib/wasm/wmm_bg.wasm"]
 run = [
   '''
   lock=$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}' Cargo.lock)
   [ "$(wasm-bindgen --version)" = "wasm-bindgen $lock" ] || { echo "wasm-bindgen-cli must be $lock, as Cargo.lock has it; pin that in mise.toml" >&2; exit 1; }
   ''',
-  "cargo build -q --profile wasm -p placer --target wasm32-unknown-unknown",
+  "cargo build -q --profile wasm -p placer -p wmm --target wasm32-unknown-unknown",
   "wasm-bindgen --target web --out-dir scope/src/render/layout/wasm target/wasm32-unknown-unknown/wasm/placer.wasm",
+  "wasm-bindgen --target web --out-dir scope/src/lib/wasm target/wasm32-unknown-unknown/wasm/wmm.wasm",
 ]
