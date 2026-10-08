@@ -3,6 +3,11 @@ import type { ProjectFn } from '../lib/geo';
 import type { Fix, OperatorState, Position, Readings, Sample, Track } from './track';
 
 export const HISTORY_RETENTION_SEC = 3600;
+/**
+ * What a dropped target left is kept this long after it was last heard, as long as the feeder
+ * keeps its callsign.
+ */
+export const REMEMBERED_SEC = 15 * 60;
 
 export interface FeedStats {
   /** Snapshot time, seconds since epoch. */
@@ -104,13 +109,26 @@ function trimOld(items: { t: number }[], now: number): void {
   if (drop > 0) items.splice(0, drop);
 }
 
+/** What carries over from one snapshot to the next, because the feed does not carry it. */
+type Carried = Pick<Track, 'history' | 'samples' | 'ops'>;
+
+const carriedOf = ({ history, samples, ops }: Track): Carried => ({ history, samples, ops });
+
 function reprojectFixes(history: Fix[], project: ProjectFn): void {
   for (const f of history) Object.assign(f, project(f.lat, f.lon));
 }
 
+/** Drops what is remembered of a target once it has gone unheard for as long as it is kept. */
+function forgetLapsed(remembered: Map<string, Carried>, now: number): void {
+  for (const [hex, c] of remembered) {
+    const last = c.samples.at(-1);
+    if (!last || now - last.t >= REMEMBERED_SEC) remembered.delete(hex);
+  }
+}
+
 function toTrack(
   a: AircraftReport,
-  previous: Track | undefined,
+  previous: Carried | undefined,
   now: number,
   project: ProjectFn,
 ): Track {
@@ -144,11 +162,15 @@ function toTrack(
 
 /**
  * The track store is rebuilt from every snapshot. Only position history, samples and operator
- * state carry over, because the feed does not carry them.
+ * state carry over, because the feed does not carry them; of a target the feed drops they are
+ * kept for when it is heard again, as long as the feeder keeps its callsign: any longer, and the
+ * airframe's next flight would carry on from its last.
  */
 export function createTrackStore(initialProject: ProjectFn): TrackStore {
   let project = initialProject;
   const tracks = new Map<string, Track>();
+  /** What the targets no longer listed left behind, for when they are heard again. */
+  const remembered = new Map<string, Carried>();
   const stats: FeedStats = { now: 0, messageRate: 0, messages: 0 };
 
   return {
@@ -156,11 +178,15 @@ export function createTrackStore(initialProject: ProjectFn): TrackStore {
     stats,
     ingest(snapshot) {
       if (snapshot.now < stats.now) return;
+      forgetLapsed(remembered, snapshot.now);
       const previous = new Map(tracks);
       tracks.clear();
       for (const a of snapshot.aircraft) {
-        tracks.set(a.hex, toTrack(a, previous.get(a.hex), snapshot.now, project));
+        const carried = previous.get(a.hex) ?? remembered.get(a.hex);
+        tracks.set(a.hex, toTrack(a, carried, snapshot.now, project));
       }
+      for (const hex of tracks.keys()) remembered.delete(hex);
+      for (const [hex, t] of previous) if (!tracks.has(hex)) remembered.set(hex, carriedOf(t));
       const dt = snapshot.now - stats.now;
       if (stats.now > 0 && dt > 0) {
         stats.messageRate = Math.max(0, (snapshot.messages - stats.messages) / dt);
@@ -175,6 +201,7 @@ export function createTrackStore(initialProject: ProjectFn): TrackStore {
         if (p.kind === 'live' || p.kind === 'last') Object.assign(p, project(p.lat, p.lon));
         reprojectFixes(t.history, project);
       }
+      for (const c of remembered.values()) reprojectFixes(c.history, project);
     },
   };
 }

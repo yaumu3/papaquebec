@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { AircraftReport, AircraftSnapshot } from '../lib/aircraft';
-import { createTrackStore, HISTORY_RETENTION_SEC } from './trackStore';
+import { createTrackStore, HISTORY_RETENTION_SEC, REMEMBERED_SEC } from './trackStore';
 
 /** Equirectangular stub: 1° = 60 NM, good enough to check that projection is applied. */
 const project = (lat: number, lon: number) => ({ x: (lon - 130) * 60, y: (lat - 33) * 60 });
@@ -456,5 +456,87 @@ describe('createTrackStore samples', () => {
       seenPos: 2.5,
       at: { lat: 33.5, lon: 130.5 },
     });
+  });
+});
+
+describe('createTrackStore remembering', () => {
+  it('keeps the history of a target that drops out, for when it is heard again', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [heard('a', 10)]));
+    store.ingest(snapshot(1001, []));
+
+    // Act
+    store.ingest(snapshot(1600, [heard('a', 30, { position: { lat: 33.6, lon: 130.5 } })])); // RJFF
+
+    // Assert
+    const t = store.tracks.get('a');
+    expect(t?.history.map((f) => f.t)).toEqual([1000, 1600]);
+    expect(t?.samples.map((s) => s.t)).toEqual([1000, 1600]);
+  });
+
+  it('keeps the operator state of a target that drops out, for when it is heard again', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [live('a')]));
+    const before = store.tracks.get('a');
+    if (before) before.ops.hideTrail = true;
+    store.ingest(snapshot(1001, []));
+
+    // Act
+    store.ingest(snapshot(1600, [live('a')]));
+
+    // Assert
+    expect(store.tracks.get('a')?.ops.hideTrail).toBe(true);
+  });
+
+  it('keeps what a target left until fifteen minutes after it was last heard', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [live('a')]));
+    store.ingest(snapshot(1001, []));
+
+    // Act
+    store.ingest(snapshot(1000 + REMEMBERED_SEC - 1, [live('a', 33.6, 130.5)])); // RJFF
+
+    // Assert
+    expect(store.tracks.get('a')?.history.map((f) => f.t)).toEqual([
+      1000,
+      1000 + REMEMBERED_SEC - 1,
+    ]);
+  });
+
+  it('starts a target anew fifteen minutes after it was last heard, as the feeder does', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [live('a')]));
+    const before = store.tracks.get('a');
+    if (before) before.ops.hideTrail = true;
+    store.ingest(snapshot(1001, []));
+
+    // Act
+    store.ingest(snapshot(1000 + REMEMBERED_SEC, [live('a', 33.6, 130.5)])); // RJFF
+
+    // Assert
+    const t = store.tracks.get('a');
+    expect(t?.history.map((f) => f.t)).toEqual([1000 + REMEMBERED_SEC]);
+    expect(t?.ops.hideTrail).toBe(false);
+  });
+
+  it('re-projects what it keeps of a target that dropped out when the projection changes', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    store.ingest(snapshot(1000, [live('a', 34, 131)])); // Yamaguchi
+    store.ingest(snapshot(1001, []));
+    store.reproject(doubled);
+
+    // Act
+    store.ingest(snapshot(1600, [live('a', 33.5, 130.5)])); // south of RJFF
+
+    // Assert
+    expect(store.tracks.get('a')?.history.map((f) => [f.x, f.y])).toEqual([
+      [120, 120],
+      [60, 60],
+    ]);
   });
 });
