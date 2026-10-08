@@ -11,6 +11,7 @@ use crate::position::Position;
 use crate::proto::{
     Address, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory, LastPosition,
     Meteo, Quality, Reception, ResolutionAdvisory, Snapshot, Source, TargetState,
+    target_state::Modes,
 };
 use crate::register::{Known, Register};
 use crate::wmm;
@@ -208,6 +209,56 @@ impl Remembered {
     }
 }
 
+/// The target state, each field as it was last said: a broadcast may leave
+/// out what a reply says.
+#[derive(Default)]
+struct Target {
+    selected_altitude_mcp_ft: Said<i32>,
+    selected_altitude_fms_ft: Said<i32>,
+    selected_heading_deg: Said<f64>,
+    baro_setting_hpa: Said<f64>,
+    modes: Said<Modes>,
+}
+
+impl Target {
+    /// Takes what a broadcast heard at `now_s` says of each field.
+    fn keep(&mut self, said: &TargetState, now_s: f64) {
+        self.selected_altitude_mcp_ft
+            .keep(said.selected_altitude_mcp_ft, now_s);
+        self.selected_altitude_fms_ft
+            .keep(said.selected_altitude_fms_ft, now_s);
+        self.selected_heading_deg
+            .keep(said.selected_heading_deg, now_s);
+        self.baro_setting_hpa.keep(said.baro_setting_hpa, now_s);
+        self.modes.keep(said.modes, now_s);
+    }
+
+    /// Takes what a reply heard at `now_s` says of each field the broadcasts
+    /// leave out.
+    fn fill(&mut self, said: &TargetState, now_s: f64) {
+        self.selected_altitude_mcp_ft
+            .fill(said.selected_altitude_mcp_ft, now_s);
+        self.selected_altitude_fms_ft
+            .fill(said.selected_altitude_fms_ft, now_s);
+        self.selected_heading_deg
+            .fill(said.selected_heading_deg, now_s);
+        self.baro_setting_hpa.fill(said.baro_setting_hpa, now_s);
+        self.modes.fill(said.modes, now_s);
+    }
+
+    /// The fields that have not lapsed by `now_s`, while any is left.
+    fn at(&self, now_s: f64) -> Option<TargetState> {
+        let target = TargetState {
+            selected_altitude_mcp_ft: self.selected_altitude_mcp_ft.at(now_s),
+            selected_altitude_fms_ft: self.selected_altitude_fms_ft.at(now_s),
+            selected_heading_deg: self.selected_heading_deg.at(now_s),
+            baro_setting_hpa: self.baro_setting_hpa.at(now_s),
+            modes: self.modes.at(now_s),
+        };
+        Some(target).filter(|target| *target != TargetState::default())
+    }
+}
+
 /// One aircraft, as its messages have told of it so far.
 #[derive(Default)]
 struct Tracked {
@@ -230,7 +281,7 @@ struct Tracked {
     geometric_vertical_rate_fpm: Said<i32>,
     indicated_airspeed_kt: Said<f64>,
     true_airspeed_kt: Said<f64>,
-    target_state: Said<TargetState>,
+    target_state: Target,
     resolution_advisory: Said<ResolutionAdvisory>,
     nac_p: Said<u32>,
     /// The air data besides, and what they say together.
@@ -327,7 +378,7 @@ impl Tracked {
                 self.resolution_advisory.fill(Some(*said), now_s);
             }
             Register::SelectedVerticalIntention(said) => {
-                self.target_state.fill(Some(said.target), now_s);
+                self.target_state.fill(&said.target, now_s);
             }
             Register::TrackAndTurn(said) => {
                 self.track_deg.fill(said.track_deg, now_s);
@@ -420,7 +471,7 @@ impl Tracked {
                 self.mode_a_code.keep(said.mode_a_code, now_s);
             }
             Report::TargetStateAndStatus(said) => {
-                self.target_state.keep(Some(said.target), now_s);
+                self.target_state.keep(&said.target, now_s);
                 self.nac_p.keep(Some(said.nac_p), now_s);
             }
             Report::ResolutionAdvisory(said) => {
@@ -520,10 +571,7 @@ impl Tracked {
             true_airspeed_kt: self.true_airspeed_kt.at(now_s),
             mach: self.mach.at(now_s),
             magnetic_heading_deg: self.magnetic_heading_deg.at(now_s),
-            target_state: self
-                .target_state
-                .at(now_s)
-                .filter(|target| *target != TargetState::default()),
+            target_state: self.target_state.at(now_s),
             resolution_advisory: self.resolution_advisory.at(now_s),
             quality: Some(quality).filter(|quality| *quality != Quality::default()),
             meteo: Some(meteo).filter(|meteo| *meteo != Meteo::default()),
@@ -1643,9 +1691,9 @@ mod tests {
     }
 
     #[test]
-    fn selected_intention_register_fills_in_the_target_state() {
+    fn selected_intention_register_fills_in_the_target_state_field_by_field() {
         // Arrange: an aircraft that only answers with it, and one that also
-        // broadcasts its target state
+        // broadcasts a target state without the barometric setting
         let intention = TargetState {
             selected_altitude_mcp_ft: Some(6000),
             baro_setting_hpa: Some(1013.6),
@@ -1668,10 +1716,14 @@ mod tests {
         // Act
         let known = reports.map(|reports| known(after(reports)));
 
-        // Assert
+        // Assert: the broadcast wins the altitude, the reply fills in the setting
+        let filled_in = TargetState {
+            baro_setting_hpa: Some(1013.6),
+            ..broadcast
+        };
         assert_eq!(
             known.map(|a| a.target_state),
-            [Some(intention), Some(broadcast)]
+            [Some(intention), Some(filled_in)]
         );
     }
 
