@@ -14,7 +14,6 @@ use crate::proto::{
     target_state::Modes,
 };
 use crate::register::{Known, Register};
-use crate::wmm;
 
 /// readsb lists an aircraft from its second message on: a single one may be
 /// noise that passes for a message.
@@ -450,7 +449,7 @@ impl Tracked {
     /// or else at the site.
     fn declination(&self, now_s: f64, site: Position) -> f64 {
         let at = self.fix.at(now_s).map_or(site, |fix| fix.position);
-        wmm::declination_deg(at, wmm::year_of(now_s))
+        wmm::declination_deg(at.lat_deg, at.lon_deg, wmm::year_of(now_s))
     }
 
     /// Takes what a message says other than where the aircraft is.
@@ -635,7 +634,6 @@ mod tests {
         resolution_advisory::Advisory,
     };
     use crate::register::{HeadingAndSpeed, Register, SelectedVerticalIntention, TrackAndTurn};
-    use crate::wmm;
 
     /// Made up: from a block ICAO reserves for future use.
     const ADDRESS: u32 = 0x00d0_0001;
@@ -1825,7 +1823,7 @@ mod tests {
         // Arrange: east at 480 kt over the ground and 450 kt through the air
         // on the same heading, which the report carries as magnetic
         let now_s = 1_780_000_000.0;
-        let magnetic = 90.0 - wmm::declination_deg(SITE, wmm::year_of(now_s));
+        let magnetic = 90.0 - wmm::declination_deg(SITE.lat_deg, SITE.lon_deg, wmm::year_of(now_s));
         let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
             magnetic_heading_deg: Some(magnetic),
             mach: Some(0.78),

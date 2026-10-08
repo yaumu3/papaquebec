@@ -1,8 +1,6 @@
 //! The World Magnetic Model: how far magnetic north lies from true north, by
 //! NOAA's WMM2025.
 
-use crate::position::Position;
-
 /// The semi-axes of the WGS-84 ellipsoid, km.
 const A_KM: f64 = 6_378.137;
 const B_KM: f64 = 6_356.752_314_2;
@@ -122,9 +120,9 @@ pub fn year_of(epoch_s: f64) -> f64 {
 /// The magnetic declination at the position on the ellipsoid in the year,
 /// degrees east.
 #[must_use]
-pub fn declination_deg(position: Position, year: f64) -> f64 {
-    let lat = position.lat_deg.to_radians();
-    let lon = position.lon_deg.to_radians();
+pub fn declination_deg(lat_deg: f64, lon_deg: f64, year: f64) -> f64 {
+    let lat = lat_deg.to_radians();
+    let lon = lon_deg.to_radians();
     let (sin_lat, cos_lat) = lat.sin_cos();
     // The position as seen from the centre of the sphere.
     let eccentricity2 = 1.0 - (B_KM / A_KM).powi(2);
@@ -213,7 +211,6 @@ fn schmidt(n: u8, m: u8) -> f64 {
 #[allow(clippy::float_cmp)]
 mod tests {
     use super::{declination_deg, year_of};
-    use crate::position::Position;
 
     #[test]
     fn declination_matches_the_test_values_published_with_the_model() {
@@ -229,9 +226,8 @@ mod tests {
         ];
 
         // Act
-        let declinations = rows.map(|(year, lat_deg, lon_deg, _)| {
-            declination_deg(Position { lat_deg, lon_deg }, year)
-        });
+        let declinations =
+            rows.map(|(year, lat_deg, lon_deg, _)| declination_deg(lat_deg, lon_deg, year));
 
         // Assert: to the hundredth of a degree they are published to
         let hundredths = declinations.map(|declination| (declination * 100.0).round() / 100.0);
@@ -241,13 +237,10 @@ mod tests {
     #[test]
     fn declination_near_tokyo_is_about_eight_degrees_west() {
         // Arrange: RJTT
-        let haneda = Position {
-            lat_deg: 35.5533,
-            lon_deg: 139.7811,
-        };
+        let (lat_deg, lon_deg) = (35.5533, 139.7811);
 
         // Act
-        let declination = declination_deg(haneda, 2026.75);
+        let declination = declination_deg(lat_deg, lon_deg, 2026.75);
 
         // Assert
         assert!((-9.0..-7.0).contains(&declination), "{declination}");

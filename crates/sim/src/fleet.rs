@@ -24,7 +24,6 @@ use feeder::proto::{
     resolution_advisory::Advisory, target_state::Modes,
 };
 use feeder::register::{HeadingAndSpeed, TrackAndTurn};
-use feeder::wmm;
 use placer::rng::mulberry32;
 
 use crate::Scenario;
@@ -662,7 +661,8 @@ impl Fleet {
         let elapsed = (now - self.last).max(0.0);
         self.last = now;
         let timestamp = ticks(now - self.started);
-        let declination = wmm::declination_deg(self.site, wmm::year_of(now));
+        let declination =
+            wmm::declination_deg(self.site.lat_deg, self.site.lon_deg, wmm::year_of(now));
         let mut frames = Vec::new();
         for flying in &mut self.flying {
             flying.advance(now, elapsed);
