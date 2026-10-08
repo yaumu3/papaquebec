@@ -17,13 +17,14 @@ const end = (lat: number, lon: number, pos: Vec2 = { x: 0, y: 0 }, vel: Vec2 | n
 const EAST = 10 / 60;
 
 describe('rblLines', () => {
-  it('shows distance and magnetic bearing with a degree sign', () => {
-    // Arrange
+  it('shows distance and the bearing made magnetic at the origin, with a degree sign', () => {
+    // Arrange: a declination of 7.5° east at the origin and nothing like it at the far end
     const a = end(0, 0);
     const b = end(0, EAST, { x: 10, y: 0 });
+    const declination = (_lat: number, lon: number) => (lon === 0 ? 7.5 : -20);
 
     // Act
-    const lines = rblLines(a, b, 7.5);
+    const lines = rblLines(a, b, declination);
 
     // Assert
     expect(lines).toEqual(['10.0 / 083°']);
@@ -35,7 +36,7 @@ describe('rblLines', () => {
     const b = end(36, 142, { x: 3, y: 60 });
 
     // Act
-    const lines = rblLines(a, b, 0);
+    const lines = rblLines(a, b, () => 0);
 
     // Assert
     expect(lines).toEqual(['59.9 / 360°']);
@@ -47,7 +48,7 @@ describe('rblLines', () => {
     const b = end(0, EAST, { x: 10, y: 0 });
 
     // Act
-    const lines = rblLines(a, b, 0);
+    const lines = rblLines(a, b, () => 0);
 
     // Assert
     expect(lines).toEqual(['10.0 / 090° / 10:01']);
@@ -59,7 +60,7 @@ describe('rblLines', () => {
     const b = end(0, EAST, { x: 10, y: 5 }, { x: 0, y: 0 });
 
     // Act
-    const lines = rblLines(a, b, 0);
+    const lines = rblLines(a, b, () => 0);
 
     // Assert
     expect(lines).toEqual(['10.0 / 090°', 'CPA 5.0 in 10:00']);
@@ -79,7 +80,7 @@ function overlays(over: Partial<OverlayInput>): OverlayInput {
     rblPending: null,
     rangeCursor: null,
     pointer: null,
-    declination: 0,
+    declination: () => 0,
     ...lonLat,
     view: { centerX: 140, centerY: 35, pxPerNm: 20, widthPx: 800, heightPx: 600, dpr: 1 },
     atlas,

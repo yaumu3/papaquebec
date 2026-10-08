@@ -14,7 +14,7 @@ import { ringPaths } from '../render/scene/rings';
 import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
 import { hoverInstant } from '../state/history';
-import { declinationOf } from '../state/magnetic';
+import { declinationAt } from '../state/magnetic';
 import {
   aero,
   canvasSize,
@@ -255,7 +255,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         rblPending: rblPending(),
         rangeCursor: rangeCursor(),
         pointer: measuring ? pointer() : null,
-        declination: declinationOf(undefined),
+        declination: declinationAt(),
         project: projectNm,
         unproject: unprojectNm,
         view: v,

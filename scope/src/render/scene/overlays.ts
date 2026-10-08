@@ -9,6 +9,7 @@ import {
   velocityNm,
 } from '../../lib/geo';
 import { geodesicPath, inverse } from '../../lib/geodesic';
+import type { Declination } from '../../lib/wmm';
 import type { RangeCursorOrigin, Rbl, RblAnchor, RblPending } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
@@ -23,8 +24,8 @@ export interface OverlayInput {
   rangeCursor: RangeCursorOrigin | null;
   /** Where a hovering or dragging pointer is, in screen px. */
   pointer: { cx: number; cy: number } | null;
-  /** Magnetic declination at the site, degrees east. */
-  declination: number;
+  /** The declination where a bearing is measured, degrees east. */
+  declination: Declination;
   /** Lat/lon onto the scope plane, for lines drawn along the geodesic. */
   project: ProjectFn;
   /** The scope plane back to lat/lon, for ends that are not targets. */
@@ -80,14 +81,20 @@ function mousePoint(input: OverlayInput): Point | null {
   return freePoint(toWorld(input.view, input.pointer.cx, input.pointer.cy), '', input.unproject);
 }
 
-/** How far `b` lies from `a` along the geodesic, in NM, and on what initial magnetic bearing. */
-function measure(a: Point, b: Point, declination: number): { dist: number; brg: number } {
+/**
+ * How far `b` lies from `a` along the geodesic, in NM, and on what initial bearing, made
+ * magnetic by the declination at `a`, where it is measured.
+ */
+function measure(a: Point, b: Point, declination: Declination): { dist: number; brg: number } {
   const r = inverse(a.geo, b.geo);
-  return { dist: r.distanceNm, brg: trueToMagnetic(r.bearingTrue, declination) };
+  return {
+    dist: r.distanceNm,
+    brg: trueToMagnetic(r.bearingTrue, declination(a.geo.lat, a.geo.lon)),
+  };
 }
 
 /** Distance, magnetic bearing, ETE when only A moves, CPA when both move. */
-export function rblLines(a: Point, b: Point, declination: number): string[] {
+export function rblLines(a: Point, b: Point, declination: Declination): string[] {
   const { dist, brg } = measure(a, b, declination);
   let first = `${dist.toFixed(1)} / ${padBearing(brg)}°`;
   const lines = [first];

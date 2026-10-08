@@ -12,7 +12,7 @@ import type { Readings } from './track';
 export const [declinationAt, setDeclinationAt] = createSignal<Declination>(() => 0);
 
 /** The declination where a target is, or at the site for one without a position. */
-export function declinationOf(at: GeoPoint | undefined): number {
+function declinationOf(at: GeoPoint | undefined): number {
   const where = at ?? site();
   return where ? declinationAt()(where.lat, where.lon) : 0;
 }
