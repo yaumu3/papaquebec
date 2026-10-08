@@ -2,6 +2,18 @@
 # Builds the scope and its server, and serves them over https next to a receiver; see
 # README.md, Deployment.
 FROM rust:1.98-alpine AS server
+RUN apk add --no-cache musl-dev
+WORKDIR /src
+COPY Cargo.toml Cargo.lock ./
+COPY proto/ proto/
+COPY crates/ crates/
+# The target cache is not part of the image, so the binary is copied out of it.
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/src/target \
+    cargo build --release --locked && cp target/release/papaquebec /papaquebec
+
+# Apart from the server, so the scope builds while the server compiles.
+FROM rust:1.98-alpine AS placer
 RUN apk add --no-cache musl-dev && rustup target add wasm32-unknown-unknown
 WORKDIR /src
 COPY Cargo.lock ./
@@ -15,14 +27,10 @@ RUN version="$(sed -n '/^name = "wasm-bindgen"$/{n;s/^version = "\(.*\)"$/\1/p;}
     && tar -xzf /tmp/cli.tar.gz -C /usr/local/bin --strip-components=1 "$name/wasm-bindgen" \
     && rm /tmp/cli.tar.gz
 COPY Cargo.toml ./
-COPY proto/ proto/
 COPY crates/ crates/
-# The target cache is not part of the image, so the binary and the placer's bindings are copied
-# out of it.
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target \
-    cargo build --release --locked && cp target/release/papaquebec /papaquebec \
-    && cargo build --profile wasm -p placer --target wasm32-unknown-unknown --locked \
+    --mount=type=cache,id=placer-target,target=/src/target \
+    cargo build --profile wasm -p placer --target wasm32-unknown-unknown --locked \
     && wasm-bindgen --target web --out-dir /wasm target/wasm32-unknown-unknown/wasm/placer.wasm
 
 FROM oven/bun:1-alpine AS build
@@ -33,7 +41,7 @@ RUN --mount=type=cache,target=/cache/bun \
     BUN_INSTALL_CACHE_DIR=/cache/bun bun install --frozen-lockfile
 COPY proto/ /proto/
 COPY scope/ ./
-COPY --from=server /wasm ./src/render/layout/wasm
+COPY --from=placer /wasm ./src/render/layout/wasm
 RUN bun run build
 
 FROM oven/bun:1-alpine
