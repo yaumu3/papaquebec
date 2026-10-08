@@ -641,8 +641,14 @@ fn gillham(code: u32) -> Option<i32> {
 
 /// Rounded to a count; nothing below zero.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn count(value: f64) -> u32 {
+pub(crate) fn count(value: f64) -> u32 {
     value.round().max(0.0) as u32
+}
+
+/// Rounded to a whole number; the values stay far inside the type's range.
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn rounded(value: f64) -> i32 {
+    value.round() as i32
 }
 
 #[cfg(test)]

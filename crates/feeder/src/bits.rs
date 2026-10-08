@@ -52,6 +52,14 @@ impl Bits {
         self.get(bit, bit) == 1
     }
 
+    /// Bits `first` to `last` as a number in two's complement; they are 32 at most.
+    #[allow(clippy::cast_possible_wrap)]
+    pub(crate) fn signed(self, first: u32, last: u32) -> i32 {
+        let above = 32 - (last - first + 1);
+        // Shifted up to the sign bit, an arithmetic shift back carries the sign down.
+        (self.get(first, last) << above) as i32 >> above
+    }
+
     /// These bits and then the low `width` ones of the value.
     pub(crate) fn put(self, value: u32, width: u32) -> Self {
         Self {
@@ -62,6 +70,12 @@ impl Bits {
 
     pub(crate) fn put_flag(self, set: bool) -> Self {
         self.put(u32::from(set), 1)
+    }
+
+    /// These bits and then the value in two's complement of `width` bits.
+    #[allow(clippy::cast_sign_loss)]
+    pub(crate) fn put_signed(self, value: i32, width: u32) -> Self {
+        self.put(value as u32, width)
     }
 
     /// These bits and then the others.
@@ -145,6 +159,42 @@ mod tests {
 
         // Assert: only the low bits of what does not fit its width are put
         assert_eq!(bits, Bits::default().put(0b10_1111_1111_1111, 14));
+    }
+
+    #[test]
+    fn signed_fields_are_read_in_twos_complement() {
+        // Arrange: ten bits of -1, of 1 and of the most negative, then three of -4
+        let bits = Bits::of(&[0b1111_1111, 0b1100_0000, 0b0001_1000, 0b0000_0010, 0]);
+
+        // Act
+        let read = [
+            bits.signed(1, 10),
+            bits.signed(11, 20),
+            bits.signed(21, 30),
+            bits.signed(31, 33),
+        ];
+
+        // Assert
+        assert_eq!(read, [-1, 1, -512, -4]);
+    }
+
+    #[test]
+    fn signed_values_are_put_in_twos_complement() {
+        // Arrange
+        let values = [(-1, 10), (1, 10), (-512, 10), (-4, 3)];
+
+        // Act
+        let bits = values
+            .into_iter()
+            .fold(Bits::default(), |bits, (value, width)| {
+                bits.put_signed(value, width)
+            });
+
+        // Assert
+        assert_eq!(
+            bits.bytes::<5>(),
+            [0b1111_1111, 0b1100_0000, 0b0001_1000, 0b0000_0010, 0]
+        );
     }
 
     #[test]

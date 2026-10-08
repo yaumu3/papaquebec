@@ -10,6 +10,7 @@ pub mod follow;
 pub mod message;
 pub mod position;
 pub mod proto;
+pub mod register;
 pub mod registry;
 pub mod traffic;
 pub mod transport;
