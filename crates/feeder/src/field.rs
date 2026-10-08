@@ -5,7 +5,11 @@
 
 use crate::bits::Bits;
 use crate::cpr::Cpr;
-use crate::proto::{EmergencyPriorityStatus, EmitterCategory, TargetState, target_state::Modes};
+use crate::proto::{
+    EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
+    resolution_advisory::{Advisory, Corrections},
+    target_state::Modes,
+};
 
 /// The 56 bits an extended squitter carries of one kind of message.
 pub trait Field: Sized {
@@ -128,9 +132,7 @@ impl Field for AirbornePosition {
         } else {
             self.baro_altitude_ft
         };
-        // In steps of 25 ft from -1000 ft, around the Q bit that says so.
-        let steps = altitude.map(|ft| u32::try_from((ft + 1012).div_euclid(25)).unwrap_or(0));
-        let code = steps.map_or(0, |steps| (steps & 0x7f0) << 1 | 0x10 | steps & 0xf);
+        let code = altitude.map_or(0, |ft| without_m(altitude_code(ft)));
         let head = Bits::default()
             .put(self.type_code, 5)
             // Surveillance status
@@ -278,8 +280,10 @@ pub struct Velocity {
     /// Over the ground, with the true track it is made along.
     pub ground_speed_kt: Option<f64>,
     pub track_deg: Option<f64>,
-    /// Through the air, sent in place of the speed over the ground.
+    /// Through the air, sent in place of the speed over the ground, with the
+    /// magnetic heading it is made on.
     pub airspeed: Option<Airspeed>,
+    pub magnetic_heading_deg: Option<f64>,
     /// The vertical rate is the one or the other, as the message says.
     pub baro_vertical_rate_fpm: Option<i32>,
     pub geometric_vertical_rate_fpm: Option<i32>,
@@ -315,6 +319,8 @@ impl Field for Velocity {
             ground_speed_kt: over_ground.map(|(speed, _)| speed),
             track_deg: over_ground.map(|(_, track)| track),
             airspeed: (subtype >= 3).then(|| airspeed(me, step)).flatten(),
+            magnetic_heading_deg: (subtype >= 3 && me.flag(14))
+                .then(|| f64::from(me.get(15, 24)) * 360.0 / 1024.0),
             // The source bit is set for a barometric rate.
             baro_vertical_rate_fpm: rate.filter(|_| me.flag(36)),
             geometric_vertical_rate_fpm: rate.filter(|_| !me.flag(36)),
@@ -324,7 +330,7 @@ impl Field for Velocity {
 
     fn write(&self) -> Bits {
         let (subtype, speeds) = match self.airspeed {
-            Some(airspeed) => through_air(airspeed),
+            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg),
             None => along_ground(self.ground_speed_kt.zip(self.track_deg)),
         };
         let rate = self
@@ -397,8 +403,8 @@ fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
     })
 }
 
-/// The subtype and the 22 bits of an airspeed, without the heading that goes with it.
-fn through_air(airspeed: Airspeed) -> (u32, Bits) {
+/// The subtype and the 22 bits of an airspeed on a magnetic heading.
+fn through_air(airspeed: Airspeed, heading_deg: Option<f64>) -> (u32, Bits) {
     let (is_true, speed) = match airspeed {
         Airspeed::Indicated(speed) => (false, speed),
         Airspeed::True(speed) => (true, speed),
@@ -406,7 +412,8 @@ fn through_air(airspeed: Airspeed) -> (u32, Bits) {
     let supersonic = speed > SUBSONIC_KT;
     let step = if supersonic { 4.0 } else { 1.0 };
     let bits = Bits::default()
-        .put(0, 11)
+        .put_flag(heading_deg.is_some())
+        .put(count(heading_deg.unwrap_or(0.0) * 1024.0 / 360.0), 10)
         .put_flag(is_true)
         .put(count(speed / step) + 1, 10);
     (3 + u32::from(supersonic), bits)
@@ -444,6 +451,104 @@ impl Field for Status {
             .put(self.mode_a_code.map_or(0, identity), 13)
             .filled(ME_LEN)
     }
+}
+
+/// Aircraft Status message of the TCAS RA broadcast subtype, which carries
+/// the active resolution advisory as the ACAS register does.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RaBroadcast {
+    pub advisory: ResolutionAdvisory,
+}
+
+impl Field for RaBroadcast {
+    fn read(me: Bits) -> Option<Self> {
+        // Subtype 2 is the TCAS RA broadcast.
+        if me.get(1, 5) != 28 || me.get(6, 8) != 2 {
+            return None;
+        }
+        Some(Self {
+            advisory: advisory(me)?,
+        })
+    }
+
+    fn write(&self) -> Bits {
+        Bits::default()
+            .put(28, 5)
+            .put(2, 3)
+            .then(advised(&self.advisory))
+    }
+}
+
+/// The active resolution advisory in the 48 bits after the header of the
+/// message or the register; none when no advisory was generated. Of one
+/// threat, or of several that call for one sense, the six bits after the
+/// first say the advisory; of several that differ, what is called for.
+pub(crate) fn advisory(bits: Bits) -> Option<ResolutionAdvisory> {
+    let multiple_threats = bits.flag(28);
+    let (advisory, corrections) = match (bits.flag(9), multiple_threats) {
+        (true, _) => (
+            Some(Advisory {
+                corrective: bits.flag(10),
+                downward: bits.flag(11),
+                increased_rate: bits.flag(12),
+                sense_reversal: bits.flag(13),
+                altitude_crossing: bits.flag(14),
+                positive: bits.flag(15),
+            }),
+            None,
+        ),
+        (false, true) => (
+            None,
+            Some(Corrections {
+                upward: bits.flag(10),
+                positive_climb: bits.flag(11),
+                downward: bits.flag(12),
+                positive_descent: bits.flag(13),
+                crossing: bits.flag(14),
+                sense_reversal: bits.flag(15),
+            }),
+        ),
+        (false, false) => return None,
+    };
+    Some(ResolutionAdvisory {
+        multiple_threats,
+        advisory,
+        corrections,
+        terminated: bits.flag(27),
+    })
+}
+
+/// The 48 bits of an advisory after a header; the complements and the
+/// threat, which are not read, as zeros.
+pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
+    let flags = match (advisory.advisory, advisory.corrections.unwrap_or_default()) {
+        (Some(one), _) => [
+            one.corrective,
+            one.downward,
+            one.increased_rate,
+            one.sense_reversal,
+            one.altitude_crossing,
+            one.positive,
+        ],
+        (None, several) => [
+            several.upward,
+            several.positive_climb,
+            several.downward,
+            several.positive_descent,
+            several.crossing,
+            several.sense_reversal,
+        ],
+    };
+    let head = Bits::default().put_flag(advisory.advisory.is_some());
+    flags
+        .into_iter()
+        .fold(head, Bits::put_flag)
+        // Reserved for ACAS III, then the complements
+        .put(0, 7 + 4)
+        .put_flag(advisory.terminated)
+        .put_flag(advisory.multiple_threats)
+        // The threat's type and identity
+        .put(0, 2 + 26)
 }
 
 /// Where the pulses 4, 2 and 1 of the digits A, B, C and D of a Mode A code
@@ -594,6 +699,19 @@ impl Field for OperationalStatus {
     }
 }
 
+/// The 13-bit altitude code of an altitude: steps of 25 ft from -1000 ft
+/// around the M bit, clear, and the Q bit, set, which says so.
+pub(crate) fn altitude_code(altitude_ft: i32) -> u32 {
+    let steps = u32::try_from((altitude_ft + 1012).div_euclid(25)).unwrap_or(0);
+    (steps & 0x7e0) << 2 | (steps & 0x10) << 1 | 0x10 | steps & 0xf
+}
+
+/// The 12 bits of an altitude code without its M bit, as a position message
+/// carries them.
+fn without_m(code: u32) -> u32 {
+    code >> 1 & 0xfc0 | code & 0x3f
+}
+
 /// The altitude in feet of a 13-bit altitude code; none when it carries none
 /// or counts in metres.
 pub(crate) fn altitude(code: u32) -> Option<i32> {
@@ -641,43 +759,30 @@ fn gillham(code: u32) -> Option<i32> {
 
 /// Rounded to a count; nothing below zero.
 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-fn count(value: f64) -> u32 {
+pub(crate) fn count(value: f64) -> u32 {
     value.round().max(0.0) as u32
+}
+
+/// Rounded to a whole number; the values stay far inside the type's range.
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn rounded(value: f64) -> i32 {
+    value.round() as i32
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, Status,
+        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, RaBroadcast, Status,
         SurfacePosition, TargetStateAndStatus, Velocity, nic, version_0_nac_p,
     };
     use crate::bits::Bits;
+    use crate::bits::published::{field as published, with};
     use crate::cpr::Cpr;
     use crate::proto::{
-        EmergencyPriorityStatus, EmitterCategory, TargetState, target_state::Modes,
+        EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
+        resolution_advisory::{Advisory, Corrections},
+        target_state::Modes,
     };
-
-    /// The message field of a published extended squitter.
-    fn published(hex: &str) -> Bits {
-        let digits = |at| u8::from_str_radix(&hex[at..at + 2], 16).expect("hexadecimal");
-        let message: Vec<u8> = (0..hex.len()).step_by(2).map(digits).collect();
-        Bits::of(&message).field(33, 88)
-    }
-
-    /// The message field with its bits `first` to `last` replaced.
-    fn with(me: Bits, first: u32, last: u32, value: u32) -> Bits {
-        let after = if last < 56 {
-            me.field(last + 1, 56)
-        } else {
-            Bits::default()
-        };
-        let before = if first > 1 {
-            me.field(1, first - 1)
-        } else {
-            Bits::default()
-        };
-        before.put(value, last - first + 1).then(after)
-    }
 
     /// What is read of a field of one kind and written again.
     type Rewritten = fn(Bits) -> Option<Bits>;
@@ -726,15 +831,15 @@ mod tests {
         let written = fields.map(|(hex, rewritten)| rewritten(published(hex)));
 
         // Assert: but for what is not read, which is written as zeros: the IFR
-        // capability of the first velocity, the heading of the second, and the
-        // NIC baro and SIL of the target state
+        // capability of the first velocity, and the NIC baro and SIL of the
+        // target state
         let expected = [
             published("8D4840D6202CC371C32CE0576098"),
             published("8D40621D58C382D690C8AC2863A7"),
             published("8D40621D58C386435CC412692AD6"),
             published("8C4841753A9A153237AEF0F275BE"),
             with(published("8D485020994409940838175B284F"), 10, 10, 0),
-            with(published("8DA05F219B06B6AF189400CBC33F"), 14, 24, 0),
+            published("8DA05F219B06B6AF189400CBC33F"),
             published("8DA2C1B6E112B600000000760759"),
             with(published("8DA05629EA21485CBF3F8CADAEEB"), 44, 46, 0),
         ];
@@ -1024,6 +1129,7 @@ mod tests {
             ground_speed_kt: None,
             track_deg: None,
             airspeed: Some(Airspeed::True(375.0)),
+            magnetic_heading_deg: Some(243.984_375),
             baro_vertical_rate_fpm: Some(-2304),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -1039,6 +1145,7 @@ mod tests {
             ground_speed_kt: None,
             track_deg: None,
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -1059,10 +1166,12 @@ mod tests {
             },
             Velocity {
                 airspeed: Some(Airspeed::Indicated(250.0)),
+                magnetic_heading_deg: None,
                 ..unknown
             },
             Velocity {
                 airspeed: Some(Airspeed::True(1200.0)),
+                magnetic_heading_deg: Some(243.984_375),
                 ..unknown
             },
             unknown,
@@ -1082,6 +1191,7 @@ mod tests {
             ground_speed_kt: Some(290.0),
             track_deg: Some(235.0),
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: Some(-1200),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -1108,6 +1218,7 @@ mod tests {
             ground_speed_kt,
             track_deg: ground_speed_kt.map(|_| 0.0),
             airspeed,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -1225,6 +1336,66 @@ mod tests {
 
         // Assert
         assert_eq!(read, written.map(Some));
+    }
+
+    #[test]
+    fn ra_broadcast_is_read_as_it_is_written() {
+        // Arrange: one threat with every flag, several threats, and one ended
+        let advisory = Advisory {
+            corrective: true,
+            downward: true,
+            increased_rate: true,
+            sense_reversal: true,
+            altitude_crossing: true,
+            positive: true,
+        };
+        let corrections = Corrections {
+            upward: true,
+            positive_climb: false,
+            downward: true,
+            positive_descent: true,
+            crossing: false,
+            sense_reversal: true,
+        };
+        let written = [
+            ResolutionAdvisory {
+                multiple_threats: true,
+                advisory: Some(advisory),
+                corrections: None,
+                terminated: false,
+            },
+            ResolutionAdvisory {
+                multiple_threats: true,
+                advisory: None,
+                corrections: Some(corrections),
+                terminated: false,
+            },
+            ResolutionAdvisory {
+                multiple_threats: false,
+                advisory: Some(Advisory::default()),
+                corrections: None,
+                terminated: true,
+            },
+        ]
+        .map(|advisory| RaBroadcast { advisory });
+
+        // Act
+        let read = written.each_ref().map(reread);
+
+        // Assert
+        assert_eq!(read, written.map(Some));
+    }
+
+    #[test]
+    fn ra_broadcast_with_no_advisory_generated_says_nothing() {
+        // Arrange: type code 28, subtype 2, and no bit set after
+        let me = Bits::default().put(28, 5).put(2, 3).filled(56);
+
+        // Act
+        let read = RaBroadcast::read(me);
+
+        // Assert
+        assert_eq!(read, None);
     }
 
     #[test]

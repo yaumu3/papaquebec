@@ -23,20 +23,21 @@ describe('laneTraces', () => {
     ]);
   });
 
-  it('unwraps degrees and aligns an intent in the lane to them', () => {
+  it('unwraps degrees and aligns the heading and an intent in the lane to them', () => {
     // Arrange
     const samples = [
-      sample(1, { track: 350, selHeading: 340 }),
-      sample(2, { track: 5, selHeading: 10 }),
+      sample(1, { track: 350, heading: 355, selHeading: 340 }),
+      sample(2, { track: 5, heading: 8, selHeading: 10 }),
     ];
 
     // Act
     const traces = laneTraces(samples, ['trk', 'selHdg'], ALL);
 
-    // Assert
-    expect(traces.map((tr) => tr.runs.flat().map((p) => p.v))).toEqual([
-      [350, 365],
-      [340, 370],
+    // Assert: the heading dotted, the intent dashed
+    expect(traces.map((tr) => [tr.dash, tr.runs.flat().map((p) => p.v)])).toEqual([
+      [undefined, [350, 365]],
+      ['dotted', [355, 368]],
+      ['dashed', [340, 370]],
     ]);
   });
 

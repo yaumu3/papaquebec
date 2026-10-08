@@ -1,3 +1,5 @@
+import type { ResolutionAdvisory } from './acas';
+
 /**
  * What the feed tells of the aircraft a receiver hears, as the scope reads it. A field is absent
  * when the receiver does not know it.
@@ -21,6 +23,10 @@ export interface AircraftReport {
   category?: string;
   /** Emergency/priority status by name; `none` when the aircraft reports that it has none. */
   emergency?: string;
+  /** The crew pressed IDENT, which the transponder signals for 18 s. */
+  ident?: true;
+  /** The active resolution advisory, while one is reported. */
+  ra?: ResolutionAdvisory;
   /** Where it reports being. */
   position?: LatLon;
   /** Where it last reported being, once that is no longer current. */
@@ -31,6 +37,8 @@ export interface AircraftReport {
   alt?: number | 'ground';
   gs?: number;
   track?: number;
+  /** Magnetic heading, degrees. */
+  heading?: number;
   /** In fpm: the barometric rate, or the geometric one from an aircraft that reports no other. */
   verticalRate?: number;
   nic?: number;

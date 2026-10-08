@@ -31,7 +31,7 @@ describe('dataBlock', () => {
     const [a, b] = [phaseA, phaseB].map((now) => dataBlock(t, now, STANDARD_ALTIMETER));
 
     // Assert
-    expect(a?.prefix).toBeNull();
+    expect(a?.tags).toEqual([]);
     expect(a?.line1).toBe('TEST01');
     expect([a, b].map((x) => text(x?.line2 ?? [])).toSorted()).toEqual(['110↓ 29M', '110↓ B789']);
   });
@@ -54,7 +54,7 @@ describe('dataBlock', () => {
     expect(['110  [A1]', '110  ---']).toContain(text(block.line2));
   });
 
-  it('adds the emergency prefix', () => {
+  it('tags the block with the emergency', () => {
     // Arrange
     const t = track({ squawk: '7600' });
 
@@ -62,7 +62,20 @@ describe('dataBlock', () => {
     const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
-    expect(block.prefix).toBe('RF');
+    expect(text(block.tags)).toBe('RF');
+  });
+
+  it('tags the emergency, then the advisory, then the ident, the first two as alerts', () => {
+    // Arrange
+    const ra = { multipleThreats: false, terminated: false };
+    const t = track({ squawk: '7700', ra, ident: true });
+
+    // Act
+    const block = dataBlock(t, 0, STANDARD_ALTIMETER);
+
+    // Assert
+    expect(text(block.tags)).toBe('EM RA ID');
+    expect(block.tags.map((r) => r.tone)).toEqual(['alert', 'plain', 'alert', 'plain', 'plain']);
   });
 
   it('flips every block on the same clock, whatever the hex', () => {
@@ -87,9 +100,9 @@ describe('dataBlock', () => {
 
     // Assert
     expect(block.line2).toEqual([
-      { text: '110↑', intent: false },
-      { text: '160', intent: true },
-      { text: ' B789', intent: false },
+      { text: '110↑', tone: 'plain' },
+      { text: '160', tone: 'intent' },
+      { text: ' B789', tone: 'plain' },
     ]);
   });
 
@@ -102,9 +115,9 @@ describe('dataBlock', () => {
 
     // Assert
     expect(block.line2).toEqual([
-      { text: '349', intent: false },
-      { text: '✓', intent: true },
-      { text: ' B789', intent: false },
+      { text: '349', tone: 'plain' },
+      { text: '✓', tone: 'intent' },
+      { text: ' B789', tone: 'plain' },
     ]);
   });
 
@@ -137,7 +150,7 @@ describe('dataBlock', () => {
 });
 
 describe('extraLines', () => {
-  it('counts the emergency prefix and the heading line alike for a track and its block', () => {
+  it('counts the tag line and the heading line alike for a track and its block', () => {
     // Arrange
     const cases = [
       track(),
@@ -181,7 +194,7 @@ describe('drawDataBlock', () => {
     }));
   };
 
-  it('puts the emergency prefix on a line of its own above the standard two', () => {
+  it('puts the tags on a line of their own above the standard two', () => {
     // Arrange
     const plain = track();
     const emergency = track({ squawk: '7600' });

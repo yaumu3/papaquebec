@@ -9,6 +9,7 @@ export function makeSample(t: number, over: Partial<Sample> = {}): Sample {
     alt: undefined,
     gs: undefined,
     track: undefined,
+    heading: undefined,
     verticalRate: undefined,
     nic: undefined,
     nacP: undefined,

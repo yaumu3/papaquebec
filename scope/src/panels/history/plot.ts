@@ -19,7 +19,7 @@ export interface LaneTrace {
 
 /**
  * The traces of a lane, `keys` being its own reading then the intents drawn in it: the own
- * reading first, its stretches along the floor, the second line of a pair dashed, then each
+ * reading first, its stretches along the floor, the second line of a pair with its dash, then each
  * intent with its dash. Degrees are unwrapped and the intents aligned to them. None for a lane
  * of another kind.
  */
@@ -33,14 +33,22 @@ export function laneTraces(
   const own = PLOTS[lane];
   if (own.kind !== 'line' && own.kind !== 'pair') return [];
   const read = (y: Read) => runsOf(samples, y, visible);
-  const angular = own.kind === 'line' && own.angular === true;
+  const angular = (own.kind === 'line' || own.kind === 'pair') && own.angular === true;
   const ownRuns = angular ? unwrap(read(own.y)) : read(own.y);
   const floor = own.kind === 'line' ? own.floor : undefined;
   const floorRuns = floor ? read((s) => (floor(s) ? 0 : undefined)) : [];
   const floored: LaneTrace[] =
     floorRuns.length > 0 ? [{ key: lane, runs: floorRuns, floor: true }] : [];
   const second =
-    own.kind === 'pair' ? [{ key: lane, runs: read(own.y2), dash: 'dashed' as const }] : [];
+    own.kind === 'pair'
+      ? [
+          {
+            key: lane,
+            runs: angular ? alignTo(read(own.y2), ownRuns) : read(own.y2),
+            dash: own.dash,
+          },
+        ]
+      : [];
   const drawn = intents.flatMap((key) => {
     const spec = PLOTS[key];
     if (spec.kind !== 'intent') return [];

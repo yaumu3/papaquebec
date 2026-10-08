@@ -6,8 +6,8 @@
 use crate::beast::Frame;
 use crate::bits::Bits;
 use crate::field::{
-    AirbornePosition, Field, Identification, OperationalStatus, Status, SurfacePosition,
-    TargetStateAndStatus, Velocity, altitude, mode_a_code,
+    AirbornePosition, Field, Identification, OperationalStatus, RaBroadcast, Status,
+    SurfacePosition, TargetStateAndStatus, Velocity, altitude, altitude_code, mode_a_code,
 };
 use crate::proto::{Address, AddressType, Source};
 
@@ -43,21 +43,26 @@ pub enum Report {
     Status(Status),
     TargetStateAndStatus(TargetStateAndStatus),
     OperationalStatus(OperationalStatus),
-    /// The altitude in a surveillance or an air-to-air reply.
-    Altitude {
-        baro_altitude_ft: Option<i32>,
-        /// None when the reply leaves it open.
-        on_ground: Option<bool>,
-    },
-    /// The identity in a surveillance reply.
-    Identity {
-        mode_a_code: u32,
-        on_ground: Option<bool>,
-    },
-    /// An all-call reply or an acquisition squitter: the aircraft is there.
-    AllCall {
-        on_ground: Option<bool>,
-    },
+    ResolutionAdvisory(RaBroadcast),
+    Reply(Reply),
+}
+
+/// A reply to an interrogation, or an acquisition squitter: the aircraft is
+/// there, and what it says of itself besides.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Reply {
+    /// None when the reply leaves it open.
+    pub on_ground: Option<bool>,
+    /// In a surveillance or an air-to-air reply.
+    pub baro_altitude_ft: Option<i32>,
+    /// In a surveillance reply.
+    pub mode_a_code: Option<u32>,
+    /// Whether the flight status of a surveillance reply carries the special
+    /// position identification: the crew pressed IDENT.
+    pub ident: Option<bool>,
+    /// The message field of a Comm-B reply, read as the register it fits
+    /// with what else is known of the aircraft.
+    pub comm_b: Option<Bits>,
 }
 
 /// The downlink format of an extended squitter, with the capability of a
@@ -69,6 +74,29 @@ const SQUITTER: u32 = 17 << 3 | 5;
 pub fn squitter(address: u32, me: Bits) -> [u8; 14] {
     let body = Bits::default().put(SQUITTER, 8).put(address, 24).then(me);
     body.put(parity(&body.bytes::<11>()), 24).bytes()
+}
+
+/// The Comm-B reply of a transponder in the air at the ICAO address, identing
+/// or not, with the altitude code and the message field of the register asked
+/// for; the address lies over the parity.
+#[must_use]
+pub fn comm_b_reply(
+    address: u32,
+    baro_altitude_ft: Option<i32>,
+    ident: bool,
+    mb: Bits,
+) -> [u8; 14] {
+    let code = baro_altitude_ft.map_or(0, altitude_code);
+    // The flight status in the air, with the identification pulse or without.
+    let flight_status = if ident { 5 } else { 0 };
+    let body = Bits::default()
+        .put(20, 5)
+        .put(flight_status, 3)
+        // Downlink request and utility message
+        .put(0, 11)
+        .put(code, 13)
+        .then(mb);
+    body.put(parity(&body.bytes::<11>()) ^ address, 24).bytes()
 }
 
 /// What the frame's message says; none when it is damaged or says nothing read here.
@@ -107,10 +135,26 @@ fn heard(bits: Bits, overlay: u32) -> Option<(Address, Trust, Report)> {
         // Air-to-air surveillance, whose vertical status only tells the ground apart.
         0 | 16 => (
             recovered,
-            altitude_reply(bits, bits.flag(6).then_some(true)),
+            Report::Reply(Reply {
+                on_ground: bits.flag(6).then_some(true),
+                baro_altitude_ft: altitude(bits.get(20, 32)),
+                ..Reply::default()
+            }),
         ),
-        4 | 20 => (recovered, altitude_reply(bits, flight_status(bits))),
-        5 | 21 => (recovered, identity_reply(bits)),
+        4 | 20 => (
+            recovered,
+            Report::Reply(Reply {
+                baro_altitude_ft: altitude(bits.get(20, 32)),
+                ..surveillance(bits)
+            }),
+        ),
+        5 | 21 => (
+            recovered,
+            Report::Reply(Reply {
+                mode_a_code: Some(mode_a_code(bits.get(20, 32))),
+                ..surveillance(bits)
+            }),
+        ),
         11 => (all_call(bits, overlay)?, all_call_reply(bits)),
         17 if overlay == 0 => (
             announced(AddressType::Icao),
@@ -127,7 +171,7 @@ fn heard(bits: Bits, overlay: u32) -> Option<(Address, Trust, Report)> {
 
 /// What the message field of an extended squitter reports: the one kind that reads it.
 fn squittered(me: Bits) -> Option<Report> {
-    const KINDS: [fn(Bits) -> Option<Report>; 7] = [
+    const KINDS: [fn(Bits) -> Option<Report>; 8] = [
         |me| Identification::read(me).map(Report::Identification),
         |me| SurfacePosition::read(me).map(Report::SurfacePosition),
         |me| AirbornePosition::read(me).map(Report::AirbornePosition),
@@ -135,6 +179,7 @@ fn squittered(me: Bits) -> Option<Report> {
         |me| Status::read(me).map(Report::Status),
         |me| TargetStateAndStatus::read(me).map(Report::TargetStateAndStatus),
         |me| OperationalStatus::read(me).map(Report::OperationalStatus),
+        |me| RaBroadcast::read(me).map(Report::ResolutionAdvisory),
     ];
     KINDS.iter().find_map(|read| read(me))
 }
@@ -155,14 +200,15 @@ fn all_call(bits: Bits, overlay: u32) -> Option<(Address, Trust)> {
 }
 
 fn all_call_reply(bits: Bits) -> Report {
-    Report::AllCall {
+    Report::Reply(Reply {
         // The capability says so at levels 4 and 5 only.
         on_ground: match bits.get(6, 8) {
             4 => Some(true),
             5 => Some(false),
             _ => None,
         },
-    }
+        ..Reply::default()
+    })
 }
 
 /// The kind of address a device that is no transponder broadcasts under, by
@@ -175,18 +221,21 @@ fn non_transponder(bits: Bits) -> Option<AddressType> {
     }
 }
 
-fn altitude_reply(bits: Bits, on_ground: Option<bool>) -> Report {
-    Report::Altitude {
-        baro_altitude_ft: altitude(bits.get(20, 32)),
-        on_ground,
+/// What a surveillance reply says in its flight status, and in its message
+/// field when it is a Comm-B one.
+fn surveillance(bits: Bits) -> Reply {
+    Reply {
+        on_ground: flight_status(bits),
+        // The values with the identification pulse.
+        ident: Some(matches!(bits.get(6, 8), 4 | 5)),
+        comm_b: comm_b(bits),
+        ..Reply::default()
     }
 }
 
-fn identity_reply(bits: Bits) -> Report {
-    Report::Identity {
-        mode_a_code: mode_a_code(bits.get(20, 32)),
-        on_ground: flight_status(bits),
-    }
+/// The message field of a Comm-B reply; none of a short reply, which has none.
+fn comm_b(bits: Bits) -> Option<Bits> {
+    (bits.len() == 112).then(|| bits.field(33, 88))
 }
 
 /// Whether the flight status of a surveillance reply puts the aircraft on the
@@ -225,10 +274,16 @@ fn parity(body: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Observation, Report, Trust, overlay, read, squitter};
+    use super::{Observation, Reply, Report, Trust, comm_b_reply, overlay, read, squitter};
     use crate::beast::Frame;
-    use crate::field::{Field, Identification, OperationalStatus};
-    use crate::proto::{Address, AddressType, EmitterCategory, Source};
+    use crate::bits::Bits;
+    use crate::bits::published::{bytes, field};
+    use crate::field::{Field, Identification, OperationalStatus, RaBroadcast, altitude_code};
+    use crate::proto::{
+        Address, AddressType, EmitterCategory, ResolutionAdvisory, Source,
+        resolution_advisory::Advisory,
+    };
+    use crate::register::Register;
 
     /// Made up: from a block ICAO reserves for future use.
     const ADDRESS: u32 = 0x00d0_0001;
@@ -271,17 +326,6 @@ mod tests {
         overlaid(message, ADDRESS)
     }
 
-    /// The altitude code of 25 ft steps for the altitude, its M bit clear and its Q bit set.
-    fn altitude_code(altitude_ft: i32) -> u32 {
-        let steps = u32::try_from((altitude_ft + 1000) / 25).expect("above -1000 ft");
-        (steps & 0x7e0) << 2 | (steps & 0x10) << 1 | 0x10 | steps & 0xf
-    }
-
-    fn bytes(hex: &str) -> Vec<u8> {
-        let digits = |at| u8::from_str_radix(&hex[at..at + 2], 16).expect("hexadecimal");
-        (0..hex.len()).step_by(2).map(digits).collect()
-    }
-
     /// What the published message says.
     fn published(hex: &str) -> Option<Observation> {
         read(&frame(&bytes(hex)))
@@ -297,6 +341,34 @@ mod tests {
 
         // Assert: "The 1090 Megahertz Riddle", aircraft identification
         assert_eq!(message[..], bytes("8D4840D6202CC371C32CE0576098"));
+    }
+
+    #[test]
+    fn comm_b_reply_is_put_together_and_read_with_the_address_over_its_parity() {
+        // Arrange: not identing, and identing
+        let mb = Register::Identification("TEST01".into()).write();
+
+        // Act
+        let messages = [false, true].map(|ident| comm_b_reply(ADDRESS, Some(2500), ident, mb));
+
+        // Assert: the pulse leaves the ground open
+        let observations = messages.map(|message| read(&frame(&message)));
+        let expected = [false, true].map(|ident| {
+            Some(Observation {
+                address: icao(ADDRESS),
+                trust: Trust::Recovered,
+                source: Source::Unspecified,
+                rssi_dbfs: Some(RSSI_DBFS),
+                report: Report::Reply(Reply {
+                    on_ground: (!ident).then_some(false),
+                    baro_altitude_ft: Some(2500),
+                    ident: Some(ident),
+                    comm_b: Some(mb),
+                    ..Reply::default()
+                }),
+            })
+        });
+        assert_eq!(observations, expected);
     }
 
     #[test]
@@ -328,6 +400,12 @@ mod tests {
             nic_supplement_c: false,
             nac_p: Some(9),
         };
+        let broadcast = RaBroadcast {
+            advisory: ResolutionAdvisory {
+                advisory: Some(Advisory::default()),
+                ..ResolutionAdvisory::default()
+            },
+        };
         let messages = [
             bytes("8D4840D6202CC371C32CE0576098"),
             bytes("8D40621D58C382D690C8AC2863A7"),
@@ -336,6 +414,7 @@ mod tests {
             bytes("8DA2C1B6E112B600000000760759"),
             bytes("8DA05629EA21485CBF3F8CADAEEB"),
             squitter(ADDRESS, status.write()).to_vec(),
+            squitter(ADDRESS, broadcast.write()).to_vec(),
         ];
 
         // Act
@@ -350,6 +429,7 @@ mod tests {
             Some(Report::Status(_)) => "status",
             Some(Report::TargetStateAndStatus(_)) => "target state",
             Some(Report::OperationalStatus(read)) if read == status => "operational status",
+            Some(Report::ResolutionAdvisory(_)) => "resolution advisory",
             _ => "another",
         });
         let expected = [
@@ -360,6 +440,7 @@ mod tests {
             "status",
             "target state",
             "operational status",
+            "resolution advisory",
         ];
         assert_eq!(kinds, expected);
     }
@@ -375,28 +456,35 @@ mod tests {
         // Act
         let reports = messages.map(|message| published(message).map(|heard| heard.report));
 
-        // Assert
+        // Assert: each with the message field of the register it answers with
         let expected = [
-            Report::Altitude {
+            Reply {
+                on_ground: Some(false),
                 baro_altitude_ft: Some(32_300),
-                on_ground: Some(false),
+                ident: Some(false),
+                comm_b: Some(field(messages[0])),
+                ..Reply::default()
             },
-            Report::Identity {
-                mode_a_code: 0o1346,
+            Reply {
                 on_ground: Some(false),
+                mode_a_code: Some(0o1346),
+                ident: Some(false),
+                comm_b: Some(field(messages[1])),
+                ..Reply::default()
             },
         ];
-        assert_eq!(reports, expected.map(Some));
+        assert_eq!(reports, expected.map(|reply| Some(Report::Reply(reply))));
     }
 
     #[test]
     fn replies_of_every_format_carry_the_address_over_their_parity() {
         // Arrange: short and long, to the ground and to other aircraft
         let code = altitude_code(2500);
+        // The long ones with the header of a short reply, the rest zeros.
         let mut long_air_air = [0; 14];
-        long_air_air[..7].copy_from_slice(&reply(16, 0, code));
+        long_air_air[..4].copy_from_slice(&reply(16, 0, code)[..4]);
         let mut comm_b = [0; 14];
-        comm_b[..7].copy_from_slice(&reply(21, 0, 0x0808));
+        comm_b[..4].copy_from_slice(&reply(21, 0, 0x0808)[..4]);
         let messages = [
             reply(0, 0, code).to_vec(),
             reply(4, 0, code).to_vec(),
@@ -409,21 +497,31 @@ mod tests {
         let observations = messages.map(|message| read(&frame(&message)));
 
         // Assert
-        let altitude = |on_ground| Report::Altitude {
-            baro_altitude_ft: Some(2500),
-            on_ground,
+        let altitude = |on_ground, ident| {
+            Report::Reply(Reply {
+                on_ground,
+                baro_altitude_ft: Some(2500),
+                ident,
+                ..Reply::default()
+            })
         };
         // A1 and B2 are the pulses set.
-        let identity = Report::Identity {
-            mode_a_code: 0o1200,
-            on_ground: Some(false),
+        let identity = |comm_b| {
+            Report::Reply(Reply {
+                on_ground: Some(false),
+                mode_a_code: Some(0o1200),
+                ident: Some(false),
+                comm_b,
+                ..Reply::default()
+            })
         };
+        // Only the Comm-B reply carries a message field, empty here.
         let expected = [
-            altitude(None),
-            altitude(Some(false)),
-            altitude(None),
-            identity.clone(),
-            identity,
+            altitude(None, None),
+            altitude(Some(false), Some(false)),
+            altitude(None, None),
+            identity(None),
+            identity(Some(Bits::of(&[0; 7]))),
         ];
         let heard =
             observations.map(|heard| heard.map(|heard| (heard.address, heard.trust, heard.report)));
@@ -432,8 +530,9 @@ mod tests {
     }
 
     #[test]
-    fn flight_status_says_whether_the_aircraft_is_on_the_ground() {
-        // Arrange: airborne, on the ground, either with an alert, and two that leave it open
+    fn flight_status_says_whether_the_aircraft_is_on_the_ground_and_identing() {
+        // Arrange: airborne, on the ground, either with an alert, and two that
+        // leave the ground open
         let statuses = [0, 1, 2, 3, 4, 5];
 
         // Act
@@ -441,13 +540,15 @@ mod tests {
             read(&frame(&reply(4, status, altitude_code(0)))).map(|heard| heard.report)
         });
 
-        // Assert
-        let expected = [Some(false), Some(true), Some(false), Some(true), None, None];
-        let on_ground = reports.map(|report| match report {
-            Some(Report::Altitude { on_ground, .. }) => on_ground,
-            other => panic!("not an altitude: {other:?}"),
+        // Assert: the last two are the identification pulse
+        let read = reports.map(|report| match report {
+            Some(Report::Reply(reply)) => (reply.on_ground, reply.ident),
+            other => panic!("not a reply: {other:?}"),
         });
-        assert_eq!(on_ground, expected);
+        let on_ground = [Some(false), Some(true), Some(false), Some(true), None, None];
+        let ident = [false, false, false, false, true, true].map(Some);
+        let expected: Vec<_> = on_ground.into_iter().zip(ident).collect();
+        assert_eq!(read.to_vec(), expected);
     }
 
     #[test]
@@ -463,10 +564,11 @@ mod tests {
 
         // Assert
         let altitude = |on_ground| {
-            Some(Report::Altitude {
-                baro_altitude_ft: Some(0),
+            Some(Report::Reply(Reply {
                 on_ground,
-            })
+                baro_altitude_ft: Some(0),
+                ..Reply::default()
+            }))
         };
         assert_eq!(reports, [altitude(Some(true)), altitude(None)]);
     }
@@ -485,9 +587,10 @@ mod tests {
         // Assert
         let heard =
             observations.map(|heard| heard.map(|heard| (heard.address, heard.trust, heard.report)));
-        let airborne = Report::AllCall {
+        let airborne = Report::Reply(Reply {
             on_ground: Some(false),
-        };
+            ..Reply::default()
+        });
         let expected = [
             Some((icao(ADDRESS), Trust::Announced, airborne.clone())),
             Some((icao(ADDRESS), Trust::Recovered, airborne)),

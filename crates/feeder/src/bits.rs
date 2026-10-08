@@ -52,6 +52,14 @@ impl Bits {
         self.get(bit, bit) == 1
     }
 
+    /// Bits `first` to `last` as a number in two's complement; they are 32 at most.
+    #[allow(clippy::cast_possible_wrap)]
+    pub(crate) fn signed(self, first: u32, last: u32) -> i32 {
+        let above = 32 - (last - first + 1);
+        // Shifted up to the sign bit, an arithmetic shift back carries the sign down.
+        (self.get(first, last) << above) as i32 >> above
+    }
+
     /// These bits and then the low `width` ones of the value.
     pub(crate) fn put(self, value: u32, width: u32) -> Self {
         Self {
@@ -62,6 +70,12 @@ impl Bits {
 
     pub(crate) fn put_flag(self, set: bool) -> Self {
         self.put(u32::from(set), 1)
+    }
+
+    /// These bits and then the value in two's complement of `width` bits.
+    #[allow(clippy::cast_sign_loss)]
+    pub(crate) fn put_signed(self, value: i32, width: u32) -> Self {
+        self.put(value as u32, width)
     }
 
     /// These bits and then the others.
@@ -78,6 +92,39 @@ impl Bits {
             bits: self.bits << (len - self.len),
             len,
         }
+    }
+}
+
+/// Published messages for the tests: as bytes, and as their 56-bit fields.
+#[cfg(test)]
+pub(crate) mod published {
+    use super::Bits;
+
+    /// The bytes of a message written in hexadecimal.
+    pub(crate) fn bytes(hex: &str) -> Vec<u8> {
+        let digits = |at| u8::from_str_radix(&hex[at..at + 2], 16).expect("hexadecimal");
+        (0..hex.len()).step_by(2).map(digits).collect()
+    }
+
+    /// The 56-bit field of a long message: the ME of an extended squitter, or
+    /// the MB of a Comm-B reply.
+    pub(crate) fn field(hex: &str) -> Bits {
+        Bits::of(&bytes(hex)).field(33, 88)
+    }
+
+    /// The field with its bits `first` to `last` replaced.
+    pub(crate) fn with(field: Bits, first: u32, last: u32, value: u32) -> Bits {
+        let after = if last < field.len() {
+            field.field(last + 1, field.len())
+        } else {
+            Bits::default()
+        };
+        let before = if first > 1 {
+            field.field(1, first - 1)
+        } else {
+            Bits::default()
+        };
+        before.put(value, last - first + 1).then(after)
     }
 }
 
@@ -112,6 +159,42 @@ mod tests {
 
         // Assert: only the low bits of what does not fit its width are put
         assert_eq!(bits, Bits::default().put(0b10_1111_1111_1111, 14));
+    }
+
+    #[test]
+    fn signed_fields_are_read_in_twos_complement() {
+        // Arrange: ten bits of -1, of 1 and of the most negative, then three of -4
+        let bits = Bits::of(&[0b1111_1111, 0b1100_0000, 0b0001_1000, 0b0000_0010, 0]);
+
+        // Act
+        let read = [
+            bits.signed(1, 10),
+            bits.signed(11, 20),
+            bits.signed(21, 30),
+            bits.signed(31, 33),
+        ];
+
+        // Assert
+        assert_eq!(read, [-1, 1, -512, -4]);
+    }
+
+    #[test]
+    fn signed_values_are_put_in_twos_complement() {
+        // Arrange
+        let values = [(-1, 10), (1, 10), (-512, 10), (-4, 3)];
+
+        // Act
+        let bits = values
+            .into_iter()
+            .fold(Bits::default(), |bits, (value, width)| {
+                bits.put_signed(value, width)
+            });
+
+        // Assert
+        assert_eq!(
+            bits.bytes::<5>(),
+            [0b1111_1111, 0b1100_0000, 0b0001_1000, 0b0000_0010, 0]
+        );
     }
 
     #[test]

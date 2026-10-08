@@ -29,8 +29,8 @@ mod tests {
 
     use super::{
         Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Frame, LastPosition, Meteo, Quality, Reception, Registry, Snapshot, Source, TargetState,
-        frame::Body, target_state::Modes,
+        Frame, LastPosition, Meteo, Quality, Reception, Registry, ResolutionAdvisory, Snapshot,
+        Source, TargetState, frame::Body, resolution_advisory::Advisory, target_state::Modes,
     };
 
     fn frame_of(aircraft: Aircraft) -> Frame {
@@ -117,6 +117,7 @@ mod tests {
             emitter_category: Some(EmitterCategory::A3Large.into()),
             mode_a_code: Some(0o0421),
             emergency_priority_status: Some(EmergencyPriorityStatus::NoEmergency.into()),
+            ident: true,
             lat_deg: Some(33.5),
             lon_deg: Some(130.5),
             baro_altitude_ft: Some(35_000),
@@ -127,6 +128,7 @@ mod tests {
             geometric_vertical_rate_fpm: Some(-768),
             indicated_airspeed_kt: Some(280.0),
             true_airspeed_kt: Some(440.0),
+            magnetic_heading_deg: Some(176.1),
             mach: Some(0.78),
             target_state: Some(TargetState {
                 selected_altitude_mcp_ft: Some(6000),
@@ -141,6 +143,16 @@ mod tests {
                     lnav: true,
                     tcas: true,
                 }),
+            }),
+            resolution_advisory: Some(ResolutionAdvisory {
+                multiple_threats: false,
+                advisory: Some(Advisory {
+                    corrective: true,
+                    positive: true,
+                    ..Advisory::default()
+                }),
+                corrections: None,
+                terminated: false,
             }),
             quality: Some(Quality {
                 nic: Some(8),

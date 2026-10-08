@@ -1,3 +1,4 @@
+import type { ResolutionAdvisory } from '../lib/acas';
 import type { PositionSource } from '../lib/aircraft';
 
 export type Source = PositionSource;
@@ -37,6 +38,8 @@ export interface Readings {
   alt: number | 'ground' | undefined;
   gs: number | undefined;
   track: number | undefined;
+  /** Magnetic heading, degrees. */
+  heading: number | undefined;
   /** In fpm: the barometric rate, or the geometric one from an aircraft that reports no other. */
   verticalRate: number | undefined;
   nic: number | undefined;
@@ -88,6 +91,10 @@ export interface Track extends Readings {
   registration: string | undefined;
   description: string | undefined;
   emergency: string | undefined;
+  /** The crew pressed IDENT. */
+  ident: boolean;
+  /** The active resolution advisory, while one is reported. */
+  ra: ResolutionAdvisory | undefined;
   position: Position;
   history: Fix[];
   /** One sample per snapshot in which the target was heard, oldest first. */
