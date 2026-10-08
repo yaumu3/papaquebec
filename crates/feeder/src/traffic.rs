@@ -260,21 +260,11 @@ impl Tracked {
                     None => {}
                 }
             }
-            Report::Altitude {
-                baro_altitude_ft,
-                on_ground,
-            } => {
-                self.baro_altitude_ft.keep(*baro_altitude_ft, now_s);
-                self.on_ground.keep(*on_ground, now_s);
+            Report::Reply(said) => {
+                self.on_ground.keep(said.on_ground, now_s);
+                self.baro_altitude_ft.keep(said.baro_altitude_ft, now_s);
+                self.mode_a_code.keep(said.mode_a_code, now_s);
             }
-            Report::Identity {
-                mode_a_code,
-                on_ground,
-            } => {
-                self.mode_a_code.keep(Some(*mode_a_code), now_s);
-                self.on_ground.keep(*on_ground, now_s);
-            }
-            Report::AllCall { on_ground } => self.on_ground.keep(*on_ground, now_s),
             Report::Status(said) => {
                 self.emergency_priority_status
                     .keep(Some(said.emergency_priority_status), now_s);
@@ -413,7 +403,7 @@ mod tests {
         AirbornePosition, Airspeed, Identification, OperationalStatus, Status, SurfacePosition,
         TargetStateAndStatus, Velocity,
     };
-    use crate::message::{Observation, Report, Trust};
+    use crate::message::{Observation, Reply, Report, Trust};
     use crate::position::Position;
     use crate::proto::{
         Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
@@ -478,10 +468,24 @@ mod tests {
     }
 
     fn altitude(baro_altitude_ft: i32, on_ground: Option<bool>) -> Report {
-        Report::Altitude {
-            baro_altitude_ft: Some(baro_altitude_ft),
+        Report::Reply(Reply {
             on_ground,
-        }
+            baro_altitude_ft: Some(baro_altitude_ft),
+            ..Reply::default()
+        })
+    }
+
+    fn identity(mode_a_code: u32, on_ground: Option<bool>) -> Report {
+        Report::Reply(Reply {
+            on_ground,
+            mode_a_code: Some(mode_a_code),
+            ..Reply::default()
+        })
+    }
+
+    /// An all-call reply that says no more than that the aircraft is there.
+    fn here() -> Report {
+        Report::Reply(Reply::default())
     }
 
     fn airborne(at: Position, odd: bool) -> Observation {
@@ -761,13 +765,11 @@ mod tests {
     fn all_call_and_identity_replies_say_whether_it_is_on_the_ground_too() {
         // Arrange
         let reports = [
-            Report::AllCall {
+            Report::Reply(Reply {
                 on_ground: Some(true),
-            },
-            Report::Identity {
-                mode_a_code: 0o2431,
-                on_ground: Some(true),
-            },
+                ..Reply::default()
+            }),
+            identity(0o2431, Some(true)),
         ];
 
         // Act
@@ -789,14 +791,10 @@ mod tests {
             emergency_priority_status: EmergencyPriorityStatus::NoEmergency,
             mode_a_code: None,
         });
-        let identity = Report::Identity {
-            mode_a_code: 0o2431,
-            on_ground: None,
-        };
         let reports = [
             vec![status.clone(), status.clone()],
             vec![status.clone(), code_free],
-            vec![status, identity],
+            vec![status, identity(0o2431, None)],
         ];
 
         // Act
@@ -1168,7 +1166,7 @@ mod tests {
         let mut traffic = after([identification("TEST01"), velocity(290.0, 235.0)]);
         let forgetting = traffic.snapshot(170.0);
         for now_s in [400.0, 401.0] {
-            traffic.hear(&said(Report::AllCall { on_ground: None }), now_s);
+            traffic.hear(&said(here()), now_s);
         }
 
         // Act
@@ -1200,16 +1198,11 @@ mod tests {
     #[test]
     fn what_is_no_longer_said_lapses_after_a_minute_while_the_aircraft_is_heard() {
         // Arrange: only all-call replies after the first seconds
-        let here = || said(Report::AllCall { on_ground: None });
-        let identity = Report::Identity {
-            mode_a_code: 0o2431,
-            on_ground: None,
-        };
         let mut traffic = hearing([
-            (said(identity), 100.0),
+            (said(identity(0o2431, None)), 100.0),
             (said(velocity(290.0, 235.0)), 105.0),
-            (here(), 150.0),
-            (here(), 164.0),
+            (said(here()), 150.0),
+            (said(here()), 164.0),
         ]);
 
         // Act: a minute after the identity reply, and a minute after the velocity
@@ -1226,7 +1219,7 @@ mod tests {
         // Arrange: only an all-call reply after the identification
         let mut traffic = hearing([
             (said(identification("TEST01")), 100.0),
-            (said(Report::AllCall { on_ground: None }), 999.0),
+            (said(here()), 999.0),
         ]);
 
         // Act: just short of fifteen minutes after the identification, and fifteen minutes after it
@@ -1242,11 +1235,10 @@ mod tests {
     #[test]
     fn position_not_renewed_for_a_minute_becomes_the_last_position() {
         // Arrange
-        let here = || said(Report::AllCall { on_ground: None });
         let mut traffic = hearing([
             (airborne(NORTH, false), 100.0),
             (airborne(NORTH, true), 101.0),
-            (here(), 165.0),
+            (said(here()), 165.0),
         ]);
 
         // Act
