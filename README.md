@@ -12,12 +12,16 @@ browser, and the scope draws.
 
 The scope runs in its own container beside the receiver's: one server that serves the build over
 https (browsers expose WebGPU only in secure contexts) and feeds the scope its one source of
-traffic. It follows the receiver's Beast output, which is every message as it was heard, reads the
-messages itself, keeps the last hour of what they add up to, and pushes a snapshot every second over
-[WebTransport](https://developer.mozilla.org/docs/Web/API/WebTransport_API). Registrations and types
-come from the [Mictronics aircraft database](https://github.com/Mictronics/aircraft-database), which
-the server downloads and renews every week. At start the container generates the map data around the
-receiver's position.
+traffic.
+
+- It follows the receiver's Beast output, every message as it was heard, and reads the messages
+  itself.
+- It keeps the last hour of what they add up to and pushes a snapshot every second over
+  [WebTransport](https://developer.mozilla.org/docs/Web/API/WebTransport_API).
+- Registrations and types come from the
+  [Mictronics aircraft database](https://github.com/Mictronics/aircraft-database), which it
+  downloads and renews every week.
+- At start it generates the map data around the receiver's position.
 
 1. Clone this repository on the machine that runs the receiver.
 2. Add the service to the compose file that runs the receiver, then `docker compose up -d --build`:
@@ -47,32 +51,40 @@ volumes:
 3. Open `https://<host>/` on the machine's name (Raspberry Pi OS announces `<hostname>.local`).
    The server signs a certificate for whatever name or address is asked for with its own local
    authority, so the browser objects until that authority is trusted once per device: download
-   `https://<host>/root.crt` and add it to the system trust (Settings > General > VPN & Device
-   Management, then Certificate Trust Settings on iOS; Keychain Access on macOS;
-   `certutil`/`update-ca-certificates` elsewhere).
+   `https://<host>/root.crt` and add it to the system trust.
+   - iOS: Settings > General > VPN & Device Management, then Certificate Trust Settings.
+   - macOS: Keychain Access.
+   - Elsewhere: `certutil` or `update-ca-certificates`.
 
 Environment on the service:
 
-- `PQ_SITE` (`lat,lon`, required): where the receiver is. Positions are made out around it and the
-  map data is generated around it, and nothing a receiver sends tells it.
-- `PQ_BEAST` (default `readsb:30005`): the receiver's Beast output as `host:port`, when the service
-  is named differently or another decoder stands in its place, such as dump1090.
-- `PQ_FEED_PORT` (default `4433`): the UDP port of the feed. The scope connects to the same
-  number, so publish it unchanged (`4500:4500/udp` with `PQ_FEED_PORT=4500`). It cannot be the
-  page's port: Safari sends the page's own requests over a feed connection to the same host and
-  port, which answers only the feed, so the page would fail to load.
-- `PQ_ADDRESS` (default `https://`): how the scope is served. `https://` answers to any name; a
-  host (`https://<host>`, or just `<host>`) keeps the certificates to that one. A browser that opens
-  an address does not say which, and behind Docker's port mapping the container sees only its own,
-  so opening the scope by address needs that address here. `http://` serves plain http on port 80
-  for a setup that terminates TLS itself, such as [Tailscale](https://tailscale.com) or an existing
-  reverse proxy (then publish `80`, not `443`). Each takes a `:<port>` to listen on instead.
+- `PQ_SITE` (`lat,lon`, required): where the receiver is.
+  - Positions are made out around it and the map data is generated around it; nothing a receiver
+    sends tells it.
+- `PQ_BEAST` (default `readsb:30005`): the receiver's Beast output as `host:port`.
+  - For a service named differently, or another decoder in its place, such as dump1090.
+- `PQ_FEED_PORT` (default `4433`): the UDP port of the feed.
+  - The scope connects to the same number, so publish it unchanged: `4500:4500/udp` with
+    `PQ_FEED_PORT=4500`.
+  - It cannot be the page's port. Safari sends the page's own requests over a feed connection to
+    the same host and port, which answers only the feed, and the page fails to load.
+- `PQ_ADDRESS` (default `https://`): how the scope is served.
+  - `https://` answers to any name; `https://<host>`, or just `<host>`, keeps the certificates to
+    that one.
+  - Opening the scope by address needs that address here: a browser does not say which it opened,
+    and behind Docker's port mapping the container sees only its own.
+  - `http://` serves plain http on port 80 for a setup that terminates TLS itself, such as
+    [Tailscale](https://tailscale.com) or a reverse proxy; then publish `80`, not `443`.
+  - Each takes a `:<port>` to listen on instead.
 
-Ports can be remapped (`8443:443`) when 443 is taken. The feed needs no certificate trusted: the
-server makes its own for it every week and the scope accepts it by its hash, read over https. The
-feed accepts a session only from a page served by the host it addresses, so another site cannot read
-it through a visitor's browser. An update is `git pull` and `up -d --build` again; a restart
-refreshes the aeronautical data.
+Besides:
+
+- Ports can be remapped (`8443:443`) when 443 is taken.
+- The feed needs no certificate trusted: the server makes its own for it every week, and the scope
+  accepts it by its hash, read over https.
+- The feed accepts a session only from a page served by the host it addresses, so another site
+  cannot read it through a visitor's browser.
+- An update is `git pull` and `up -d --build` again; a restart refreshes the aeronautical data.
 
 ## Development
 
@@ -90,26 +102,35 @@ mise run bench              # a load test, see below
 mise run bench:blocks       # score the data block placer on the sim's scenarios
 ```
 
-The sim needs no receiver: it stands in for one, sending the messages its fleet would broadcast,
-around RJTT unless `PQ_SITE` says otherwise (with `PQ_SITE` exported, `bun run map` builds the map
-around the same site). The server flies it whenever `PQ_SIM` is set to a site; `PQ_SIM_SPEED` runs
-it up to 1000 times faster than the clock, `PQ_SIM_EXTRA` adds up to 10000 generic targets, and
-`PQ_SIM_SCENARIO` (`merge`, `parallel`, `cross`, `converging` or `random`) flies a traffic scenario
-around RJTT in place of the fleet.
+The sim needs no receiver: it stands in for one, sending the messages its fleet would broadcast
+and answer, around RJTT unless `PQ_SITE` says otherwise (with `PQ_SITE` exported, `bun run map`
+builds the map around the same site). The server flies it whenever `PQ_SIM` is set to a site.
 
-Query parameters: `?site=<lat>,<lon>` overrides the receiver position, `?wx=<base>` reads METARs
-from your own [Aviation Weather Center](https://aviationweather.gov) proxy.
+- `PQ_SIM_SPEED` runs it up to 1000 times faster than the clock.
+- `PQ_SIM_EXTRA` adds up to 10000 generic targets.
+- `PQ_SIM_SCENARIO` (`merge`, `parallel`, `cross`, `converging` or `random`) flies a traffic
+  scenario around RJTT in place of the fleet.
+
+Query parameters:
+
+- `?site=<lat>,<lon>` overrides the receiver position.
+- `?wx=<base>` reads METARs from your own [Aviation Weather Center](https://aviationweather.gov)
+  proxy.
 
 GitHub Actions runs the same checks and builds the image on every push to `main` and every pull
-request. `bun scripts/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a
-frame plus the console log; with `--sim` it starts a server of its own that flies the sim and serves
-the build, as `mise run bench`, a load test with extra sim traffic, always does. `bun run
-screenshot` regenerates the README picture that way. Both describe their flags in their headers.
+request. Two headless scripts describe their flags in their headers:
 
-Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight:
-callsigns are `TEST` plus digits (a real airline callsign is three letters then a number), registrations
-`TEST-` plus digits, and addresses come from `D00000`–`DFFFFF`, a block ICAO Annex 10 Vol III reserves
-for future use. The sim's tests enforce this for the fleet.
+- `bun scripts/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a frame
+  plus the console log; with `--sim` it starts a server of its own that flies the sim and serves
+  the build. `bun run screenshot` regenerates the README picture that way.
+- `mise run bench` is a load test with extra sim traffic, always on a server of its own.
+
+Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight;
+the sim's tests enforce this for the fleet.
+
+- Callsigns are `TEST` plus digits; a real airline callsign is three letters then a number.
+- Registrations are `TEST-` plus digits.
+- Addresses come from `D00000`–`DFFFFF`, a block ICAO Annex 10 Vol III reserves for future use.
 
 ## Altimeter
 
@@ -134,11 +155,13 @@ The site comes from `PQ_SITE` (`lat,lon`); pass `<lat> <lon>` and optionally a r
 script to override it.
 
 openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
-brought in through the Maps panel: `IMPORT JSON…` takes a file in the `aero.json` format, checked
-against `/aero.schema.json` (served by the scope, generated from the code) before it is accepted.
-Each set lists under `SOURCES` by its title and can be toggled or removed; the openAIP
-set generated at start is the one that stays. Imported sets live in the browser's storage, so they
-are per device.
+brought in through the Maps panel.
+
+- `IMPORT JSON…` takes a file in the `aero.json` format, checked against `/aero.schema.json`
+  (served by the scope, generated from the code) before it is accepted.
+- Each set lists under `SOURCES` by its title and can be toggled or removed; the openAIP set
+  generated at start is the one that stays.
+- Imported sets live in the browser's storage, so they are per device.
 
 ## Design
 
@@ -157,15 +180,20 @@ Conventions:
   selected white.
 - **Shape** is source: ADS-B filled square, MLAT square with ring, TIS-B diamond. Filtered-out
   targets persist as bare hollow diamonds.
-- **Emergency** is additive: red plus a two-letter prefix (`HJ` `RF` `EM`), never hidden by filters.
+- **Emergency** is additive: red plus a two-letter tag (`HJ` `RF` `EM`), never hidden by filters.
+  - An active resolution advisory tags the block `RA` in the same red, and an ident `ID` in the
+    block's own tone; the tags share one line in that order.
+  - The detail panel badges them beside the callsign, the advisory in the words TCAS says it in.
 - **Data blocks** put the callsign over the altitude with climb arrow and, flipping every eight
-  seconds in step across all blocks, the type or ground speed with wake letter. Each hangs on a
-  short leader at one of eight bearings round its target, reading away from the leader, and can
-  be dragged to another, which it keeps unless it must give way.
-- **Downlinked intent** is set in a dimmed tone of the block's color: the selected altitude
-  follows the altitude (`240↑350`), or a `✓` replaces the arrow while the aircraft holds it within
-  200 ft on its own altimeter, and a selected heading (`270°`) adds a third line while it steers the
-  aircraft, not LNAV or an approach.
+  seconds in step across all blocks, the type or ground speed with wake letter.
+  - Each hangs on a short leader at one of eight bearings round its target, reading away from the
+    leader.
+  - It can be dragged to another bearing, which it keeps unless it must give way.
+- **Downlinked intent** is set in a dimmed tone of the block's color.
+  - The selected altitude follows the altitude (`240↑350`), or a `✓` replaces the arrow while the
+    aircraft holds it within 200 ft on its own altimeter.
+  - A selected heading (`270°`) adds a third line while it steers the aircraft, not LNAV or an
+    approach.
 - **Trails** are slashes decimated to eight-second slots.
 - **Bearings** shown to the operator are magnetic, 001 to 360.
 - **The top bar** carries only runtime state.
@@ -203,25 +231,38 @@ flowchart LR
 ```
 
 **Data.** The receiver passes on every Mode S message it hears, in the Beast format. The feeder
-reads what each says (`message`, by ICAO Annex 10 Volume IV, and `field`, by RTCA DO-260B), keeps
-what is said of each aircraft until it lapses (`traffic`), places the aircraft by their position
-messages (`cpr`) and adds the registration and type (`registry`). Only ADS-B and the altitude and
-identity in replies to radars are read: what the other replies carry (airspeeds, and the wind and
-temperature they give) and what the ground rebroadcasts (TIS-B, ADS-R) is not yet.
+reads what each says (`message`, by ICAO Annex 10 Volume IV) and keeps what is said of each
+aircraft until it lapses (`traffic`).
+
+- Extended squitters, which is ADS-B: their fields by RTCA DO-260B (`field`), with the positions
+  that place the aircraft (`cpr`).
+- Replies to radars: the altitude, the identity and the ident in every one, and in Comm-B replies
+  the registers the ground asks for (`register`, by ICAO Doc 9871): the callsign, the selected
+  altitudes and QNH, track and ground speed, heading, airspeeds and Mach, and an active resolution
+  advisory.
+  - A reply does not name its register, so each is told apart by the layout it fits and by what
+    the aircraft broadcasts.
+  - A broadcast value wins over an answered one while it is current.
+- Derived from them: the wind, with the magnetic heading made true by the World Magnetic Model
+  (`wmm`), and the air temperature (`air`).
+- Added from the aircraft database: the registration and type (`registry`).
+- Not read yet: what the ground rebroadcasts (TIS-B, ADS-R).
 
 Every second the feeder publishes a snapshot as protobuf (`proto/papaquebec/feed/v1/feed.proto`,
 named after DO-260B), which the feed worker reads into what the scope knows of an aircraft
-(`lib/aircraft.ts`), every field optional. Each session is one ordered stream: a hello with the
-receiver's position and the history since the snapshot the scope last took (one every eight seconds,
-up to an hour), then live snapshots. The history is kept in memory from when the server starts, so a
-session after a lost connection or a sleeping phone fills the trails' gap by itself, while a restart
-of the server starts the trails anew. Every wait on a session has a deadline, and a missed one only
-means connecting again; the top bar tells the feed's state from the age of its data.
+(`lib/aircraft.ts`), every field optional.
 
-Each snapshot is a full one and the track store is rebuilt from it; liveness is the age of an
-aircraft's last message, `seen`. Only position history and operator state (selection, block
-bearing, hidden trail) persist across snapshots. Live `lat/lon` draws normally, `lastPosition` draws
-stale, absent positions appear only in text.
+- Each session is one ordered stream: a hello with the receiver's position and the history since
+  the snapshot the scope last took (one every eight seconds, up to an hour), then live snapshots.
+- The history is kept in memory from when the server starts, so a session after a lost connection
+  or a sleeping phone fills the trails' gap by itself; a restart of the server starts the trails
+  anew.
+- Every wait on a session has a deadline, and a missed one only means connecting again; the top
+  bar tells the feed's state from the age of its data.
+- Each snapshot is a full one and the track store is rebuilt from it; liveness is the age of an
+  aircraft's last message, `seen`. Only position history and operator state (selection, block
+  bearing, hidden trail) persist across snapshots.
+- Live `lat/lon` draws normally, `lastPosition` draws stale, absent positions appear only in text.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has
 no adapter). The main thread owns all state and sends packed buffers; one draw per layer per frame,
@@ -233,19 +274,25 @@ built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
 panels and UI, design tokens. The rules: `state/` is the only shared state, `lib/` imports no
 framework, worker code never imports Solid or touches the DOM, and components are styled only
 through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
-`crates/` holds the server's Rust crates. The server is the `papaquebec` binary of `crates/web/`: it
-reads the environment (`config`), answers for the scope's files and the feed's info (`site`) at a
-door that speaks https or plain http (`door`), and runs the feed. `crates/authority/` is the local
-certificate authority behind the door. `crates/feeder/src/` is the feed as a library: the Beast
-format (`beast`), Mode S messages (`message`) with the fields of their extended squitters (`field`,
-over `bits`) and the positions in them (`cpr`), each read and written in one place; the aircraft
-they tell of (`traffic`), the aircraft database (`registry`), the following of a receiver
-(`follow`), what every session is served from (`feed`), the wire contract (`proto`) and the
-WebTransport endpoint (`transport`). `crates/sim/` stands in for a receiver: a synthetic fleet, sent
-as the messages it would broadcast, written with the same fields. `crates/placer/` places the data
-blocks, annealing over the cost of every bearing each could take; the scope runs it as WebAssembly
-in a worker, the benchmark natively on the sim's scenarios. `proto/` holds the schema both
-sides generate their types from.
+`proto/` holds the schema both sides generate their types from. `crates/` holds the server's Rust
+crates:
+
+- `web/`: the server, the `papaquebec` binary. It reads the environment (`config`), answers for
+  the scope's files and the feed's info (`site`) at a door that speaks https or plain http
+  (`door`), and runs the feed.
+- `authority/`: the local certificate authority behind the door.
+- `feeder/`: the feed as a library.
+  - The Beast format (`beast`); Mode S messages (`message`) with the fields of their extended
+    squitters (`field`) and the Comm-B registers (`register`), over `bits`, and the positions in
+    them (`cpr`), each read and written in one place.
+  - The aircraft they tell of (`traffic`), with the standard atmosphere (`air`) and the magnetic
+    model (`wmm`) they are read by, and the aircraft database (`registry`).
+  - The following of a receiver (`follow`), what every session is served from (`feed`), the wire
+    contract (`proto`) and the WebTransport endpoint (`transport`).
+- `sim/`: a receiver stood in for: a synthetic fleet, sent as the messages it would broadcast and
+  answer, written with the same fields.
+- `placer/`: places the data blocks, annealing over the cost of every bearing each could take; the
+  scope runs it as WebAssembly in a worker, the benchmark natively on the sim's scenarios.
 
 **Stack.**
 
