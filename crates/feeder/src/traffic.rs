@@ -40,10 +40,10 @@ const RELATED_S: f64 = 15.0;
 /// How long a transponder sends the special position identification after
 /// the crew presses IDENT (ICAO Annex 10 Volume IV).
 const IDENT_S: f64 = 18.0;
-/// The heading and the airspeed a wind is derived from are taken within this
-/// of each other: a radar asks for both registers in one sweep, so a pair
-/// further apart is of different sweeps, between which the aircraft may have
-/// turned.
+/// The ground vector and the air vector a wind is derived from, and the
+/// heading and the airspeed of the latter, are taken within this of one
+/// another: a radar asks for the registers in one sweep, so values further
+/// apart are of different sweeps, between which the aircraft may have turned.
 const WIND_WITHIN_S: f64 = 3.0;
 /// An aircraft turning faster than this makes no wind: its heading and its
 /// track are not of one instant.
@@ -427,8 +427,8 @@ impl Tracked {
         let through_air = heading.zip(self.true_airspeed_kt.within(WIND_WITHIN_S, now_s));
         let over_ground = self
             .track_deg
-            .lately(now_s)
-            .zip(self.ground_speed_kt.lately(now_s));
+            .within(WIND_WITHIN_S, now_s)
+            .zip(self.ground_speed_kt.within(WIND_WITHIN_S, now_s));
         let wind = over_ground.zip(through_air).filter(|_| straight).map(
             |((track, speed), (heading, airspeed))| air::wind(track, speed, heading, airspeed),
         );
@@ -1829,6 +1829,41 @@ mod tests {
                 said(answered(&track_and_turn(90.0, 480.0, 450.0))),
                 now_s + 5.0,
             ),
+        ];
+
+        // Act
+        let mut traffic = hearing(messages);
+
+        // Assert: the temperature is derived all the same
+        let meteo = traffic.snapshot(now_s + 6.0).aircraft.remove(0).meteo;
+        let (wind, oat) = meteo.map_or((None, None), |m| (m.wind_speed_kt, m.oat_c));
+        assert_eq!(wind, None);
+        assert!(oat.is_some());
+    }
+
+    #[test]
+    fn wind_pairs_the_ground_vector_with_an_air_vector_of_the_same_sweep() {
+        // Arrange: the track and ground speed five seconds before the
+        // heading, more than a sweep apart; the airspeed within one
+        let now_s = 1_780_000_000.0;
+        let through_the_air = Report::Velocity(Velocity {
+            ground_speed_kt: None,
+            track_deg: None,
+            airspeed: Some(Airspeed::True(450.0)),
+            magnetic_heading_deg: None,
+            baro_vertical_rate_fpm: None,
+            geometric_vertical_rate_fpm: None,
+            geometric_minus_baro_ft: None,
+        });
+        let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
+            magnetic_heading_deg: Some(97.0),
+            mach: Some(0.78),
+            ..HeadingAndSpeed::default()
+        });
+        let messages = [
+            (said(velocity(480.0, 90.0)), now_s),
+            (said(through_the_air), now_s + 4.0),
+            (said(answered(&heading_and_speed)), now_s + 5.0),
         ];
 
         // Act
