@@ -245,6 +245,32 @@ fn air_data_are_heard_of_every_aircraft_in_the_air() {
 }
 
 #[test]
+fn one_aircraft_idents_and_one_flies_an_advisory() {
+    // Arrange
+    let mut heard = Heard::new(0);
+
+    // Act
+    let snapshot = heard.placed();
+
+    // Assert: a climb, of one threat
+    let identing: Vec<_> = snapshot.aircraft.iter().filter(|a| a.ident).collect();
+    assert_eq!(identing.len(), 1);
+    assert_eq!(identing[0].identification.as_deref(), Some("TEST02"));
+    let advised: Vec<_> = snapshot
+        .aircraft
+        .iter()
+        .filter(|a| a.resolution_advisory.is_some())
+        .collect();
+    assert_eq!(advised.len(), 1);
+    assert_eq!(advised[0].identification.as_deref(), Some("TEST07"));
+    let advisory = advised[0]
+        .resolution_advisory
+        .and_then(|ra| ra.advisory)
+        .expect("of one threat");
+    assert!(advisory.corrective && advisory.positive && !advisory.downward);
+}
+
+#[test]
 fn newly_set_level_is_started_toward_after_a_pause() {
     // Arrange
     let mut heard = Heard::new(0);

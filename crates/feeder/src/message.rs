@@ -76,18 +76,22 @@ pub fn squitter(address: u32, me: Bits) -> [u8; 14] {
     body.put(parity(&body.bytes::<11>()), 24).bytes()
 }
 
-/// The downlink format of a Comm-B reply with the altitude, with the flight
-/// status of an aircraft in the air.
-const COMM_B_ALTITUDE: u32 = 20 << 3;
-
-/// The Comm-B reply of a transponder at the ICAO address, with the altitude
-/// code and the message field of the register asked for; the address lies
-/// over the parity.
+/// The Comm-B reply of a transponder in the air at the ICAO address, identing
+/// or not, with the altitude code and the message field of the register asked
+/// for; the address lies over the parity.
 #[must_use]
-pub fn comm_b_reply(address: u32, baro_altitude_ft: Option<i32>, mb: Bits) -> [u8; 14] {
+pub fn comm_b_reply(
+    address: u32,
+    baro_altitude_ft: Option<i32>,
+    ident: bool,
+    mb: Bits,
+) -> [u8; 14] {
     let code = baro_altitude_ft.map_or(0, altitude_code);
+    // The flight status in the air, with the identification pulse or without.
+    let flight_status = if ident { 5 } else { 0 };
     let body = Bits::default()
-        .put(COMM_B_ALTITUDE, 8)
+        .put(20, 5)
+        .put(flight_status, 3)
         // Downlink request and utility message
         .put(0, 11)
         .put(code, 13)
@@ -341,28 +345,30 @@ mod tests {
 
     #[test]
     fn comm_b_reply_is_put_together_and_read_with_the_address_over_its_parity() {
-        // Arrange
+        // Arrange: not identing, and identing
         let mb = Register::Identification("TEST01".into()).write();
 
         // Act
-        let message = comm_b_reply(ADDRESS, Some(2500), mb);
+        let messages = [false, true].map(|ident| comm_b_reply(ADDRESS, Some(2500), ident, mb));
 
-        // Assert
-        let observation = read(&frame(&message));
-        let expected = Observation {
-            address: icao(ADDRESS),
-            trust: Trust::Recovered,
-            source: Source::Unspecified,
-            rssi_dbfs: Some(RSSI_DBFS),
-            report: Report::Reply(Reply {
-                on_ground: Some(false),
-                baro_altitude_ft: Some(2500),
-                ident: Some(false),
-                comm_b: Some(mb),
-                ..Reply::default()
-            }),
-        };
-        assert_eq!(observation, Some(expected));
+        // Assert: the pulse leaves the ground open
+        let observations = messages.map(|message| read(&frame(&message)));
+        let expected = [false, true].map(|ident| {
+            Some(Observation {
+                address: icao(ADDRESS),
+                trust: Trust::Recovered,
+                source: Source::Unspecified,
+                rssi_dbfs: Some(RSSI_DBFS),
+                report: Report::Reply(Reply {
+                    on_ground: (!ident).then_some(false),
+                    baro_altitude_ft: Some(2500),
+                    ident: Some(ident),
+                    comm_b: Some(mb),
+                    ..Reply::default()
+                }),
+            })
+        });
+        assert_eq!(observations, expected);
     }
 
     #[test]
