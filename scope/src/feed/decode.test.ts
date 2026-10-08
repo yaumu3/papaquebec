@@ -28,6 +28,18 @@ describe('messageOf', () => {
         category: 'A3',
         emergency: 'none',
         ident: true,
+        ra: {
+          multipleThreats: false,
+          terminated: false,
+          advisory: {
+            corrective: true,
+            downward: false,
+            increasedRate: false,
+            senseReversal: false,
+            altitudeCrossing: false,
+            positive: true,
+          },
+        },
         position: { lat: 33.5, lon: 130.5 },
         alt: 35000,
         gs: 451.2,

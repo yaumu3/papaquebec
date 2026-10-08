@@ -6,8 +6,8 @@
 use crate::beast::Frame;
 use crate::bits::Bits;
 use crate::field::{
-    AirbornePosition, Field, Identification, OperationalStatus, Status, SurfacePosition,
-    TargetStateAndStatus, Velocity, altitude, altitude_code, mode_a_code,
+    AirbornePosition, Field, Identification, OperationalStatus, RaBroadcast, Status,
+    SurfacePosition, TargetStateAndStatus, Velocity, altitude, altitude_code, mode_a_code,
 };
 use crate::proto::{Address, AddressType, Source};
 
@@ -43,6 +43,7 @@ pub enum Report {
     Status(Status),
     TargetStateAndStatus(TargetStateAndStatus),
     OperationalStatus(OperationalStatus),
+    ResolutionAdvisory(RaBroadcast),
     Reply(Reply),
 }
 
@@ -166,7 +167,7 @@ fn heard(bits: Bits, overlay: u32) -> Option<(Address, Trust, Report)> {
 
 /// What the message field of an extended squitter reports: the one kind that reads it.
 fn squittered(me: Bits) -> Option<Report> {
-    const KINDS: [fn(Bits) -> Option<Report>; 7] = [
+    const KINDS: [fn(Bits) -> Option<Report>; 8] = [
         |me| Identification::read(me).map(Report::Identification),
         |me| SurfacePosition::read(me).map(Report::SurfacePosition),
         |me| AirbornePosition::read(me).map(Report::AirbornePosition),
@@ -174,6 +175,7 @@ fn squittered(me: Bits) -> Option<Report> {
         |me| Status::read(me).map(Report::Status),
         |me| TargetStateAndStatus::read(me).map(Report::TargetStateAndStatus),
         |me| OperationalStatus::read(me).map(Report::OperationalStatus),
+        |me| RaBroadcast::read(me).map(Report::ResolutionAdvisory),
     ];
     KINDS.iter().find_map(|read| read(me))
 }
@@ -272,8 +274,11 @@ mod tests {
     use crate::beast::Frame;
     use crate::bits::Bits;
     use crate::bits::published::{bytes, field};
-    use crate::field::{Field, Identification, OperationalStatus, altitude_code};
-    use crate::proto::{Address, AddressType, EmitterCategory, Source};
+    use crate::field::{Field, Identification, OperationalStatus, RaBroadcast, altitude_code};
+    use crate::proto::{
+        Address, AddressType, EmitterCategory, ResolutionAdvisory, Source,
+        resolution_advisory::Advisory,
+    };
     use crate::register::Register;
 
     /// Made up: from a block ICAO reserves for future use.
@@ -389,6 +394,12 @@ mod tests {
             nic_supplement_c: false,
             nac_p: Some(9),
         };
+        let broadcast = RaBroadcast {
+            advisory: ResolutionAdvisory {
+                advisory: Some(Advisory::default()),
+                ..ResolutionAdvisory::default()
+            },
+        };
         let messages = [
             bytes("8D4840D6202CC371C32CE0576098"),
             bytes("8D40621D58C382D690C8AC2863A7"),
@@ -397,6 +408,7 @@ mod tests {
             bytes("8DA2C1B6E112B600000000760759"),
             bytes("8DA05629EA21485CBF3F8CADAEEB"),
             squitter(ADDRESS, status.write()).to_vec(),
+            squitter(ADDRESS, broadcast.write()).to_vec(),
         ];
 
         // Act
@@ -411,6 +423,7 @@ mod tests {
             Some(Report::Status(_)) => "status",
             Some(Report::TargetStateAndStatus(_)) => "target state",
             Some(Report::OperationalStatus(read)) if read == status => "operational status",
+            Some(Report::ResolutionAdvisory(_)) => "resolution advisory",
             _ => "another",
         });
         let expected = [
@@ -421,6 +434,7 @@ mod tests {
             "status",
             "target state",
             "operational status",
+            "resolution advisory",
         ];
         assert_eq!(kinds, expected);
     }

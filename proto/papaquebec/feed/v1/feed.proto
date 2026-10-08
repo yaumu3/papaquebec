@@ -88,6 +88,7 @@ message Aircraft {
   optional double mach = 28;
 
   optional TargetState target_state = 40;
+  optional ResolutionAdvisory resolution_advisory = 45;
   optional Quality quality = 41;
   optional Meteo meteo = 42;
   optional Registry registry = 43;
@@ -211,6 +212,41 @@ message TargetState {
     bool approach = 4;
     bool lnav = 5;
     bool tcas = 6;
+  }
+}
+
+// Active resolution advisory, from the TCAS RA broadcast of the Aircraft Status
+// message or the Comm-B ACAS register: what the crew is told, as ICAO Annex 10
+// Volume IV lays the ARA subfield out.
+message ResolutionAdvisory {
+  // Several threats at once.
+  bool multiple_threats = 1;
+  // The advisory, when the threats call for one sense.
+  optional Advisory advisory = 2;
+  // What is called for when several threats call for different senses.
+  optional Corrections corrections = 3;
+  // The advisory has ended; it is still reported for 18 s.
+  bool terminated = 4;
+
+  message Advisory {
+    // Corrective, else preventive.
+    bool corrective = 1;
+    // Downward, else upward.
+    bool downward = 2;
+    bool increased_rate = 3;
+    bool sense_reversal = 4;
+    bool altitude_crossing = 5;
+    // A climb or a descent, else a limit on the vertical speed.
+    bool positive = 6;
+  }
+
+  message Corrections {
+    bool upward = 1;
+    bool positive_climb = 2;
+    bool downward = 3;
+    bool positive_descent = 4;
+    bool crossing = 5;
+    bool sense_reversal = 6;
   }
 }
 

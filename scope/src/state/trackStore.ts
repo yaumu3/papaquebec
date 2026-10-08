@@ -128,6 +128,8 @@ function toTrack(
     registration: a.registration,
     description: a.description,
     emergency: a.emergency,
+    ident: a.ident ?? false,
+    ra: a.ra,
     position,
     history,
     samples,

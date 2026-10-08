@@ -8,8 +8,8 @@
 
 use crate::air;
 use crate::bits::Bits;
-use crate::field::{Field, Identification, count, rounded};
-use crate::proto::{EmitterCategory, TargetState, target_state::Modes};
+use crate::field::{Field, Identification, advised, advisory, count, rounded};
+use crate::proto::{EmitterCategory, ResolutionAdvisory, TargetState, target_state::Modes};
 
 /// The envelope within which a field is taken for a track and turn report or
 /// a heading and speed one, after "The 1090 Megahertz Riddle" (BDS code
@@ -36,6 +36,8 @@ const MACH_TOLERANCE: f64 = 0.05;
 pub enum Register {
     /// Aircraft identification, register 2,0: the callsign.
     Identification(String),
+    /// ACAS active resolution advisory, register 3,0.
+    ResolutionAdvisory(ResolutionAdvisory),
     SelectedVerticalIntention(SelectedVerticalIntention),
     TrackAndTurn(TrackAndTurn),
     HeadingAndSpeed(HeadingAndSpeed),
@@ -61,6 +63,7 @@ impl Register {
     pub fn read(mb: Bits, known: &Known) -> Option<Self> {
         let candidates = [
             identification(mb).map(Self::Identification),
+            resolution_advisory(mb).map(Self::ResolutionAdvisory),
             SelectedVerticalIntention::read(mb).map(Self::SelectedVerticalIntention),
             TrackAndTurn::read(mb).map(Self::TrackAndTurn),
             HeadingAndSpeed::read(mb).map(Self::HeadingAndSpeed),
@@ -87,6 +90,7 @@ impl Register {
                 emitter_category: EmitterCategory::Unspecified,
             }
             .write(),
+            Self::ResolutionAdvisory(said) => Bits::default().put(0x30, 8).then(advised(said)),
             Self::SelectedVerticalIntention(said) => said.write(),
             Self::TrackAndTurn(said) => said.write(),
             Self::HeadingAndSpeed(said) => said.write(),
@@ -97,7 +101,9 @@ impl Register {
     /// the furthest of the values both have; none when they have none.
     fn disagreement(&self, known: &Known) -> Option<f64> {
         let compared = match self {
-            Self::Identification(_) | Self::SelectedVerticalIntention(_) => vec![],
+            Self::Identification(_)
+            | Self::ResolutionAdvisory(_)
+            | Self::SelectedVerticalIntention(_) => vec![],
             Self::TrackAndTurn(said) => vec![
                 apart(said.track_deg, known.track_deg),
                 off(
@@ -158,6 +164,11 @@ fn identification(mb: Bits) -> Option<String> {
 /// The field of the register with the code, which its first byte names.
 fn coded(mb: Bits, code: u32) -> Option<Bits> {
     (mb.get(1, 8) == code).then_some(mb)
+}
+
+/// The advisory of the ACAS register; none without one generated.
+fn resolution_advisory(mb: Bits) -> Option<ResolutionAdvisory> {
+    advisory(coded(mb, 0x30)?)
 }
 
 /// A field behind the status bit that gates it: the bit, then the first and
@@ -398,7 +409,9 @@ mod tests {
     use super::{HeadingAndSpeed, Known, Register, SelectedVerticalIntention, TrackAndTurn};
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
-    use crate::proto::{TargetState, target_state::Modes};
+    use crate::proto::{
+        ResolutionAdvisory, TargetState, resolution_advisory::Advisory, target_state::Modes,
+    };
 
     /// What the message field of a published Comm-B reply reads as, with
     /// nothing known of the aircraft.
@@ -409,6 +422,7 @@ mod tests {
     fn kind(register: &Register) -> &'static str {
         match register {
             Register::Identification(_) => "identification",
+            Register::ResolutionAdvisory(_) => "resolution advisory",
             Register::SelectedVerticalIntention(_) => "selected vertical intention",
             Register::TrackAndTurn(_) => "track and turn",
             Register::HeadingAndSpeed(_) => "heading and speed",
@@ -429,6 +443,41 @@ mod tests {
         // Assert
         let expected =
             ["KLM1017", "EXS2MF"].map(|callsign| Some(Register::Identification(callsign.into())));
+        assert_eq!(read, expected);
+    }
+
+    #[test]
+    fn resolution_advisory_is_read_as_in_the_tests_of_pymodes() {
+        // Arrange: an advisory of one threat with no flag set, then one that is
+        // corrective and a sense reversal, of several threats, with a complement
+        let fields = [
+            Bits::of(&[0x30, 0x80, 0, 0, 0, 0, 0]),
+            Bits::of(&[0x30, 0xc8, 0x01, 0x10, 0, 0, 0]),
+        ];
+
+        // Act
+        let read = fields.map(|mb| Register::read(mb, &Known::default()));
+
+        // Assert: the complement is not carried
+        let advisory = |multiple_threats, advisory| {
+            Some(Register::ResolutionAdvisory(ResolutionAdvisory {
+                multiple_threats,
+                advisory: Some(advisory),
+                corrections: None,
+                terminated: false,
+            }))
+        };
+        let expected = [
+            advisory(false, Advisory::default()),
+            advisory(
+                true,
+                Advisory {
+                    corrective: true,
+                    sense_reversal: true,
+                    ..Advisory::default()
+                },
+            ),
+        ];
         assert_eq!(read, expected);
     }
 
@@ -525,7 +574,7 @@ mod tests {
 
     #[test]
     fn published_registers_are_written_back_as_they_were_read() {
-        // Arrange: one of each kind
+        // Arrange: one of each kind with a published message
         let messages = [
             "A000083E202CC371C31DE0AA1CCF",
             "A8001EBCAEE57730A80106DE1344",

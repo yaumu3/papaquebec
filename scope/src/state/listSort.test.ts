@@ -24,6 +24,8 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     registration: undefined,
     description: undefined,
     emergency: undefined,
+    ident: false,
+    ra: undefined,
     tas: undefined,
     ias: undefined,
     mach: undefined,

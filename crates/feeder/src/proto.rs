@@ -29,8 +29,8 @@ mod tests {
 
     use super::{
         Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Frame, LastPosition, Meteo, Quality, Reception, Registry, Snapshot, Source, TargetState,
-        frame::Body, target_state::Modes,
+        Frame, LastPosition, Meteo, Quality, Reception, Registry, ResolutionAdvisory, Snapshot,
+        Source, TargetState, frame::Body, resolution_advisory::Advisory, target_state::Modes,
     };
 
     fn frame_of(aircraft: Aircraft) -> Frame {
@@ -143,6 +143,16 @@ mod tests {
                     lnav: true,
                     tcas: true,
                 }),
+            }),
+            resolution_advisory: Some(ResolutionAdvisory {
+                multiple_threats: false,
+                advisory: Some(Advisory {
+                    corrective: true,
+                    positive: true,
+                    ..Advisory::default()
+                }),
+                corrections: None,
+                terminated: false,
             }),
             quality: Some(Quality {
                 nic: Some(8),

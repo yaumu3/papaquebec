@@ -22,6 +22,8 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     registration: 'TEST-01',
     description: 'Boeing 787-9',
     emergency: undefined,
+    ident: false,
+    ra: undefined,
     tas: undefined,
     ias: undefined,
     mach: undefined,

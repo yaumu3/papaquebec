@@ -1,3 +1,5 @@
+import type { ResolutionAdvisory } from './acas';
+
 /**
  * What the feed tells of the aircraft a receiver hears, as the scope reads it. A field is absent
  * when the receiver does not know it.
@@ -23,6 +25,8 @@ export interface AircraftReport {
   emergency?: string;
   /** The crew pressed IDENT, which the transponder signals for 18 s. */
   ident?: true;
+  /** The active resolution advisory, while one is reported. */
+  ra?: ResolutionAdvisory;
   /** Where it reports being. */
   position?: LatLon;
   /** Where it last reported being, once that is no longer current. */

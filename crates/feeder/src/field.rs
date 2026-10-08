@@ -5,7 +5,11 @@
 
 use crate::bits::Bits;
 use crate::cpr::Cpr;
-use crate::proto::{EmergencyPriorityStatus, EmitterCategory, TargetState, target_state::Modes};
+use crate::proto::{
+    EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
+    resolution_advisory::{Advisory, Corrections},
+    target_state::Modes,
+};
 
 /// The 56 bits an extended squitter carries of one kind of message.
 pub trait Field: Sized {
@@ -449,6 +453,104 @@ impl Field for Status {
     }
 }
 
+/// Aircraft Status message of the TCAS RA broadcast subtype, which carries
+/// the active resolution advisory as the ACAS register does.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RaBroadcast {
+    pub advisory: ResolutionAdvisory,
+}
+
+impl Field for RaBroadcast {
+    fn read(me: Bits) -> Option<Self> {
+        // Subtype 2 is the TCAS RA broadcast.
+        if me.get(1, 5) != 28 || me.get(6, 8) != 2 {
+            return None;
+        }
+        Some(Self {
+            advisory: advisory(me)?,
+        })
+    }
+
+    fn write(&self) -> Bits {
+        Bits::default()
+            .put(28, 5)
+            .put(2, 3)
+            .then(advised(&self.advisory))
+    }
+}
+
+/// The active resolution advisory in the 48 bits after the header of the
+/// message or the register; none when no advisory was generated. Of one
+/// threat, or of several that call for one sense, the six bits after the
+/// first say the advisory; of several that differ, what is called for.
+pub(crate) fn advisory(bits: Bits) -> Option<ResolutionAdvisory> {
+    let multiple_threats = bits.flag(28);
+    let (advisory, corrections) = match (bits.flag(9), multiple_threats) {
+        (true, _) => (
+            Some(Advisory {
+                corrective: bits.flag(10),
+                downward: bits.flag(11),
+                increased_rate: bits.flag(12),
+                sense_reversal: bits.flag(13),
+                altitude_crossing: bits.flag(14),
+                positive: bits.flag(15),
+            }),
+            None,
+        ),
+        (false, true) => (
+            None,
+            Some(Corrections {
+                upward: bits.flag(10),
+                positive_climb: bits.flag(11),
+                downward: bits.flag(12),
+                positive_descent: bits.flag(13),
+                crossing: bits.flag(14),
+                sense_reversal: bits.flag(15),
+            }),
+        ),
+        (false, false) => return None,
+    };
+    Some(ResolutionAdvisory {
+        multiple_threats,
+        advisory,
+        corrections,
+        terminated: bits.flag(27),
+    })
+}
+
+/// The 48 bits of an advisory after a header; the complements and the
+/// threat, which are not read, as zeros.
+pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
+    let flags = match (advisory.advisory, advisory.corrections.unwrap_or_default()) {
+        (Some(one), _) => [
+            one.corrective,
+            one.downward,
+            one.increased_rate,
+            one.sense_reversal,
+            one.altitude_crossing,
+            one.positive,
+        ],
+        (None, several) => [
+            several.upward,
+            several.positive_climb,
+            several.downward,
+            several.positive_descent,
+            several.crossing,
+            several.sense_reversal,
+        ],
+    };
+    let head = Bits::default().put_flag(advisory.advisory.is_some());
+    flags
+        .into_iter()
+        .fold(head, Bits::put_flag)
+        // Reserved for ACAS III, then the complements
+        .put(0, 7 + 4)
+        .put_flag(advisory.terminated)
+        .put_flag(advisory.multiple_threats)
+        // The threat's type and identity
+        .put(0, 2 + 26)
+}
+
 /// Where the pulses 4, 2 and 1 of the digits A, B, C and D of a Mode A code
 /// lie in a 13-bit identity code, from its last bit: they are interleaved as
 /// C1 A1 C2 A2 C4 A4 - B1 D1 B2 D2 B4 D4.
@@ -670,14 +772,16 @@ pub(crate) fn rounded(value: f64) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, Status,
+        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, RaBroadcast, Status,
         SurfacePosition, TargetStateAndStatus, Velocity, nic, version_0_nac_p,
     };
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
     use crate::cpr::Cpr;
     use crate::proto::{
-        EmergencyPriorityStatus, EmitterCategory, TargetState, target_state::Modes,
+        EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
+        resolution_advisory::{Advisory, Corrections},
+        target_state::Modes,
     };
 
     /// What is read of a field of one kind and written again.
@@ -1232,6 +1336,66 @@ mod tests {
 
         // Assert
         assert_eq!(read, written.map(Some));
+    }
+
+    #[test]
+    fn ra_broadcast_is_read_as_it_is_written() {
+        // Arrange: one threat with every flag, several threats, and one ended
+        let advisory = Advisory {
+            corrective: true,
+            downward: true,
+            increased_rate: true,
+            sense_reversal: true,
+            altitude_crossing: true,
+            positive: true,
+        };
+        let corrections = Corrections {
+            upward: true,
+            positive_climb: false,
+            downward: true,
+            positive_descent: true,
+            crossing: false,
+            sense_reversal: true,
+        };
+        let written = [
+            ResolutionAdvisory {
+                multiple_threats: true,
+                advisory: Some(advisory),
+                corrections: None,
+                terminated: false,
+            },
+            ResolutionAdvisory {
+                multiple_threats: true,
+                advisory: None,
+                corrections: Some(corrections),
+                terminated: false,
+            },
+            ResolutionAdvisory {
+                multiple_threats: false,
+                advisory: Some(Advisory::default()),
+                corrections: None,
+                terminated: true,
+            },
+        ]
+        .map(|advisory| RaBroadcast { advisory });
+
+        // Act
+        let read = written.each_ref().map(reread);
+
+        // Assert
+        assert_eq!(read, written.map(Some));
+    }
+
+    #[test]
+    fn ra_broadcast_with_no_advisory_generated_says_nothing() {
+        // Arrange: type code 28, subtype 2, and no bit set after
+        let me = Bits::default().put(28, 5).put(2, 3).filled(56);
+
+        // Act
+        let read = RaBroadcast::read(me);
+
+        // Assert
+        assert_eq!(read, None);
     }
 
     #[test]

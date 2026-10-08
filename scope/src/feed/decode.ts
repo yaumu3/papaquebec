@@ -1,3 +1,4 @@
+import type { ResolutionAdvisory } from '../lib/acas';
 import type { AircraftReport, AircraftSnapshot, ReceiverPosition } from '../lib/aircraft';
 import {
   AddressType,
@@ -54,6 +55,24 @@ function source(a: Aircraft): AircraftReport['source'] {
   return undefined;
 }
 
+/** A message as plain data, without the type name protobuf-es stamps on it. */
+function plain<T extends { $typeName: string }>(message: T): Omit<T, '$typeName'> {
+  const fields = Object.entries(message).filter(([key]) => key !== '$typeName');
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- dropping the type name keeps the fields
+  return Object.fromEntries(fields) as Omit<T, '$typeName'>;
+}
+
+/** The advisory as the scope reads it, its nested messages plain too. */
+function advisoryOf(ra: Aircraft['resolutionAdvisory']): ResolutionAdvisory | undefined {
+  if (ra === undefined) return undefined;
+  const { advisory, corrections, ...rest } = plain(ra);
+  return {
+    ...rest,
+    ...(advisory && { advisory: plain(advisory) }),
+    ...(corrections && { corrections: plain(corrections) }),
+  };
+}
+
 /** Every key of `T`, each known or not: what is built before the unknown ones are dropped. */
 type Loose<T> = { [K in keyof T]-?: T[K] | undefined };
 
@@ -69,6 +88,7 @@ function toReport(a: Aircraft): AircraftReport {
     emergency:
       a.emergencyPriorityStatus === undefined ? undefined : EMERGENCIES[a.emergencyPriorityStatus],
     ident: a.ident ? true : undefined,
+    ra: advisoryOf(a.resolutionAdvisory),
     position: position(a),
     lastPosition: last && { lat: last.latDeg, lon: last.lonDeg },
     source: source(a),

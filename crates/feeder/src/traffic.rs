@@ -10,7 +10,7 @@ use crate::message::{Observation, Report, Trust};
 use crate::position::Position;
 use crate::proto::{
     Address, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory, LastPosition,
-    Meteo, Quality, Reception, Snapshot, Source, TargetState,
+    Meteo, Quality, Reception, ResolutionAdvisory, Snapshot, Source, TargetState,
 };
 use crate::register::{Known, Register};
 use crate::wmm;
@@ -231,6 +231,7 @@ struct Tracked {
     indicated_airspeed_kt: Said<f64>,
     true_airspeed_kt: Said<f64>,
     target_state: Said<TargetState>,
+    resolution_advisory: Said<ResolutionAdvisory>,
     nac_p: Said<u32>,
     /// The air data besides, and what they say together.
     magnetic_heading_deg: Said<f64>,
@@ -322,6 +323,9 @@ impl Tracked {
                 .remembered
                 .identification
                 .keep(Some(callsign.clone()), now_s),
+            Register::ResolutionAdvisory(said) => {
+                self.resolution_advisory.fill(Some(*said), now_s);
+            }
             Register::SelectedVerticalIntention(said) => {
                 self.target_state.fill(Some(said.target), now_s);
             }
@@ -418,6 +422,9 @@ impl Tracked {
             Report::TargetStateAndStatus(said) => {
                 self.target_state.keep(Some(said.target), now_s);
                 self.nac_p.keep(Some(said.nac_p), now_s);
+            }
+            Report::ResolutionAdvisory(said) => {
+                self.resolution_advisory.keep(Some(said.advisory), now_s);
             }
             Report::OperationalStatus(said) => {
                 self.nac_p.keep(said.nac_p, now_s);
@@ -517,6 +524,7 @@ impl Tracked {
                 .target_state
                 .at(now_s)
                 .filter(|target| *target != TargetState::default()),
+            resolution_advisory: self.resolution_advisory.at(now_s),
             quality: Some(quality).filter(|quality| *quality != Quality::default()),
             meteo: Some(meteo).filter(|meteo| *meteo != Meteo::default()),
             reception: Some(Reception {
@@ -557,14 +565,15 @@ mod tests {
     use crate::bits::Bits;
     use crate::cpr;
     use crate::field::{
-        AirbornePosition, Airspeed, Identification, OperationalStatus, Status, SurfacePosition,
-        TargetStateAndStatus, Velocity,
+        AirbornePosition, Airspeed, Identification, OperationalStatus, RaBroadcast, Status,
+        SurfacePosition, TargetStateAndStatus, Velocity,
     };
     use crate::message::{Observation, Reply, Report, Trust};
     use crate::position::Position;
     use crate::proto::{
         Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Quality, Reception, Snapshot, Source, TargetState,
+        Quality, Reception, ResolutionAdvisory, Snapshot, Source, TargetState,
+        resolution_advisory::Advisory,
     };
     use crate::register::{HeadingAndSpeed, Register, SelectedVerticalIntention, TrackAndTurn};
     use crate::wmm;
@@ -1506,6 +1515,46 @@ mod tests {
 
         // Assert
         assert_eq!(known(traffic).magnetic_heading_deg, Some(243.984_375));
+    }
+
+    #[test]
+    fn advisory_comes_from_the_broadcast_and_from_the_register() {
+        // Arrange: a climb broadcast, then a descent answered, then ended in a broadcast
+        let advising = |downward, terminated| ResolutionAdvisory {
+            multiple_threats: false,
+            advisory: Some(Advisory {
+                corrective: true,
+                downward,
+                positive: true,
+                ..Advisory::default()
+            }),
+            corrections: None,
+            terminated,
+        };
+        let broadcast = |downward, terminated| {
+            Report::ResolutionAdvisory(RaBroadcast {
+                advisory: advising(downward, terminated),
+            })
+        };
+        let reports = [
+            vec![here(), broadcast(false, false)],
+            vec![
+                here(),
+                answered(&Register::ResolutionAdvisory(advising(true, false))),
+            ],
+            vec![broadcast(false, false), broadcast(false, true)],
+        ];
+
+        // Act
+        let known = reports.map(|reports| known(after(reports)));
+
+        // Assert
+        let expected = [
+            Some(advising(false, false)),
+            Some(advising(true, false)),
+            Some(advising(false, true)),
+        ];
+        assert_eq!(known.map(|a| a.resolution_advisory), expected);
     }
 
     #[test]
