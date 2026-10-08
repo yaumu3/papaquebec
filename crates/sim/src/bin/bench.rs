@@ -1,7 +1,6 @@
 //! Scores the data block placer on the sim's scenarios: the annealer against the greedy
-//! baseline, on fixed seeds, by the scoring energy and the counts of what a layout should
-//! avoid, with block moves a minute and, on the parallel finals, the share of blocks on the
-//! outer side.
+//! baseline, on fixed seeds, by the energy and the counts of what a layout should avoid, with
+//! block moves a minute and, on the parallel finals, the share of blocks on the outer side.
 //!
 //!   bench [--seconds 180] [--seeds 1,2,3,4,5,6] [--scenarios merge,cross] [--extra 0] [--check]
 //!
@@ -176,8 +175,8 @@ fn subjects_of(
 }
 
 /// Flies the scenario through a placer, carrying the state as the scope would, and scores each
-/// frame with the scoring energy. The search is the same every run: the placer's clock ticks
-/// as long as a batch of steps takes the worker, and its draws come from the seed.
+/// frame by its energy. The search is the same every run: the placer's clock ticks as long as a
+/// batch of steps takes the worker, and its draws come from the seed.
 fn fly(job: &Job, seconds: u32, extra: u32) -> Totals {
     let (width, height) = by_seed(&CANVASES, job.seed);
     let k = px_per_nm_for(

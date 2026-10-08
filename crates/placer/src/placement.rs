@@ -21,7 +21,7 @@ pub fn place_blocks<R: FnMut() -> f64, C: FnMut() -> f64>(
     now: C,
     hyper: &Hyperparams,
 ) -> Vec<usize> {
-    let tables = build_tables(scene, &hyper.search);
+    let tables = build_tables(scene, &hyper.energy);
     let start: Vec<usize> = scene
         .subjects
         .iter()
@@ -146,9 +146,9 @@ mod tests {
             ..subject(0.0, 0.0)
         }]; // eastbound: north-west by default
         let mut hyper = HYPER.clone();
-        hyper.search = Energy {
-            lookahead: HYPER.search.lookahead.clone(),
-            ..HYPER.search.only(&[Term::DefaultDir])
+        hyper.energy = Energy {
+            lookahead: HYPER.energy.lookahead.clone(),
+            ..HYPER.energy.only(&[Term::DefaultDir])
         };
 
         // Act

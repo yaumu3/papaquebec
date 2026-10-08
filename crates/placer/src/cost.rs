@@ -521,9 +521,9 @@ mod tests {
         }
     }
 
-    /// The scoring energy with every term but those named switched off, so a test sees one alone.
+    /// The energy with every term but those named switched off, so a test sees one alone.
     fn only(terms: &[Term]) -> Energy {
-        HYPER.scoring.only(terms)
+        HYPER.energy.only(terms)
     }
 
     fn unary_of(t: &Tables, i: usize) -> Vec<f64> {
@@ -726,7 +726,7 @@ mod tests {
         let subjects = vec![subject(0.0, 0.0), subject(1000.0, 1000.0)];
 
         // Act
-        let t = build_tables(&scene(subjects), &HYPER.scoring);
+        let t = build_tables(&scene(subjects), &HYPER.energy);
 
         // Assert
         assert!(t.pairs.is_empty());
@@ -742,7 +742,7 @@ mod tests {
             },
             subject(0.0, 10.0),
         ];
-        let t = build_tables(&scene(subjects), &HYPER.scoring);
+        let t = build_tables(&scene(subjects), &HYPER.energy);
 
         // Act
         let energy = evaluate(&t, &[SW, NE]);
@@ -857,10 +857,10 @@ mod tests {
         assert!(close(u[SW], 0.0));
     }
 
-    /// One term alone, with the horizons weighed in as the scoring energy has them.
+    /// One term alone, with the horizons weighed in as the energy has them.
     fn ahead(terms: &[Term]) -> Energy {
         Energy {
-            lookahead: HYPER.scoring.lookahead.clone(),
+            lookahead: HYPER.energy.lookahead.clone(),
             ..only(terms)
         }
     }

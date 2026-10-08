@@ -199,7 +199,7 @@ mod tests {
                 subject(-30.0, 18.0),
                 subject(15.0, 30.0),
             ]),
-            &HYPER.scoring,
+            &HYPER.energy,
         )
     }
 
@@ -265,7 +265,7 @@ mod tests {
         // Arrange
         let tables = build_tables(
             &scene(vec![subject(0.0, 0.0), subject(0.0, 10.0)]),
-            &HYPER.scoring,
+            &HYPER.energy,
         );
 
         // Act
@@ -325,7 +325,7 @@ mod tests {
             glyph(70.0),
             glyph(100.0),
         ];
-        let tables = build_tables(&scene(subjects), &HYPER.scoring);
+        let tables = build_tables(&scene(subjects), &HYPER.energy);
         let flip_first = || 0.0;
 
         // Act

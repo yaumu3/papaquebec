@@ -1,4 +1,4 @@
-//! How a layout scores: the scoring energy, and counts of what a layout should avoid.
+//! How a layout scores: its energy, and counts of what a layout should avoid.
 
 use crate::cost::{Scene, Tables, build_tables, evaluate};
 use crate::geometry::DIRECTIONS;
@@ -37,13 +37,13 @@ fn tracks_charged(t: &Tables, dirs: &[usize], at_least: f64) -> usize {
         .count()
 }
 
-/// The scoring of a layout of `scene`, the blocks at `dirs`.
+/// How a layout of `scene` scores, the blocks at `dirs`.
 #[must_use]
 pub fn score(scene: &Scene, dirs: &[usize]) -> Metrics {
-    let w = &HYPER.scoring.weights;
-    let term = |terms: &[Term]| build_tables(scene, &HYPER.scoring.only(terms));
+    let w = &HYPER.energy.weights;
+    let term = |terms: &[Term]| build_tables(scene, &HYPER.energy.only(terms));
     Metrics {
-        energy: evaluate(&build_tables(scene, &HYPER.scoring), dirs),
+        energy: evaluate(&build_tables(scene, &HYPER.energy), dirs),
         overlaps: pairs_charged(&term(&[Term::Overlap]), dirs),
         crossings: pairs_charged(&term(&[Term::LeaderCross]), dirs),
         through: pairs_charged(&term(&[Term::LeaderThrough]), dirs),
@@ -79,7 +79,7 @@ mod tests {
     }
 
     #[test]
-    fn counts_what_a_layout_should_avoid_with_the_scoring_energy() {
+    fn counts_what_a_layout_should_avoid_with_its_energy() {
         // Arrange
         let kt150 = 150.0 * 10.0 / 3600.0;
         let subjects = vec![
