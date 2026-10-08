@@ -23,18 +23,11 @@
   background: var(--control-on-bg);
   color: var(--control-on-text);
 }
-/* Who it is, then what it is, on one baseline. */
+/* Who it is. */
 .head {
   display: flex;
   align-items: baseline;
   gap: var(--space-6);
-}
-.description {
-  overflow: hidden;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 /* Each group rules itself off above, closer than the panel's dividers sit. */
 .group {

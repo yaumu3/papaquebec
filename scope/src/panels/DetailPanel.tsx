@@ -36,11 +36,14 @@ function Cell(props: {
   tone?: 'alert' | undefined;
   /** Columns taken, for a value too long for one. */
   span?: 2 | 4 | undefined;
+  /** What hovering the cell tells beyond its value. */
+  title?: string | undefined;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
+      title={props.title}
       class={cx(
         s.cell,
         props.span === 2 && s.span2,
@@ -85,6 +88,7 @@ function CopyCell(props: {
   text: string | undefined;
   dim?: boolean;
   tone?: 'alert' | undefined;
+  title?: string | undefined;
 }) {
   return (
     <Cell
@@ -93,6 +97,7 @@ function CopyCell(props: {
       glyph="⧉"
       dim={props.dim}
       tone={props.tone}
+      title={props.title}
       onClick={() => {
         if (props.text !== undefined) copyText(props.text);
       }}
@@ -157,9 +162,6 @@ export function DetailPanel() {
                     <span class={s.tag}>ID</span>
                   </Show>
                 </div>
-                <Show when={t().description}>
-                  <div class={s.description}>{t().description}</div>
-                </Show>
               </div>
               <Divider />
               <History track={t()} />
@@ -175,6 +177,7 @@ export function DetailPanel() {
                   k="TYPE"
                   r={typeReading(t().type, t().category)}
                   text={t().type}
+                  title={t().description}
 
                   dim={t().type === undefined}
                 />
