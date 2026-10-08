@@ -7,7 +7,7 @@ use crate::beast::Frame;
 use crate::bits::Bits;
 use crate::field::{
     AirbornePosition, Field, Identification, OperationalStatus, Status, SurfacePosition,
-    TargetStateAndStatus, Velocity, altitude, mode_a_code,
+    TargetStateAndStatus, Velocity, altitude, altitude_code, mode_a_code,
 };
 use crate::proto::{Address, AddressType, Source};
 
@@ -70,6 +70,25 @@ const SQUITTER: u32 = 17 << 3 | 5;
 pub fn squitter(address: u32, me: Bits) -> [u8; 14] {
     let body = Bits::default().put(SQUITTER, 8).put(address, 24).then(me);
     body.put(parity(&body.bytes::<11>()), 24).bytes()
+}
+
+/// The downlink format of a Comm-B reply with the altitude, with the flight
+/// status of an aircraft in the air.
+const COMM_B_ALTITUDE: u32 = 20 << 3;
+
+/// The Comm-B reply of a transponder at the ICAO address, with the altitude
+/// code and the message field of the register asked for; the address lies
+/// over the parity.
+#[must_use]
+pub fn comm_b_reply(address: u32, baro_altitude_ft: Option<i32>, mb: Bits) -> [u8; 14] {
+    let code = baro_altitude_ft.map_or(0, altitude_code);
+    let body = Bits::default()
+        .put(COMM_B_ALTITUDE, 8)
+        // Downlink request and utility message
+        .put(0, 11)
+        .put(code, 13)
+        .then(mb);
+    body.put(parity(&body.bytes::<11>()) ^ address, 24).bytes()
 }
 
 /// What the frame's message says; none when it is damaged or says nothing read here.
@@ -239,12 +258,13 @@ fn parity(body: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Observation, Reply, Report, Trust, overlay, read, squitter};
+    use super::{Observation, Reply, Report, Trust, comm_b_reply, overlay, read, squitter};
     use crate::beast::Frame;
     use crate::bits::Bits;
     use crate::bits::published::{bytes, field};
     use crate::field::{Field, Identification, OperationalStatus, altitude_code};
     use crate::proto::{Address, AddressType, EmitterCategory, Source};
+    use crate::register::Register;
 
     /// Made up: from a block ICAO reserves for future use.
     const ADDRESS: u32 = 0x00d0_0001;
@@ -302,6 +322,31 @@ mod tests {
 
         // Assert: "The 1090 Megahertz Riddle", aircraft identification
         assert_eq!(message[..], bytes("8D4840D6202CC371C32CE0576098"));
+    }
+
+    #[test]
+    fn comm_b_reply_is_put_together_and_read_with_the_address_over_its_parity() {
+        // Arrange
+        let mb = Register::Identification("TEST01".into()).write();
+
+        // Act
+        let message = comm_b_reply(ADDRESS, Some(2500), mb);
+
+        // Assert
+        let observation = read(&frame(&message));
+        let expected = Observation {
+            address: icao(ADDRESS),
+            trust: Trust::Recovered,
+            source: Source::Unspecified,
+            rssi_dbfs: Some(RSSI_DBFS),
+            report: Report::Reply(Reply {
+                on_ground: Some(false),
+                baro_altitude_ft: Some(2500),
+                comm_b: Some(mb),
+                ..Reply::default()
+            }),
+        };
+        assert_eq!(observation, Some(expected));
     }
 
     #[test]
