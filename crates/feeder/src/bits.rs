@@ -81,6 +81,39 @@ impl Bits {
     }
 }
 
+/// Published messages for the tests: as bytes, and as their 56-bit fields.
+#[cfg(test)]
+pub(crate) mod published {
+    use super::Bits;
+
+    /// The bytes of a message written in hexadecimal.
+    pub(crate) fn bytes(hex: &str) -> Vec<u8> {
+        let digits = |at| u8::from_str_radix(&hex[at..at + 2], 16).expect("hexadecimal");
+        (0..hex.len()).step_by(2).map(digits).collect()
+    }
+
+    /// The 56-bit field of a long message: the ME of an extended squitter, or
+    /// the MB of a Comm-B reply.
+    pub(crate) fn field(hex: &str) -> Bits {
+        Bits::of(&bytes(hex)).field(33, 88)
+    }
+
+    /// The field with its bits `first` to `last` replaced.
+    pub(crate) fn with(field: Bits, first: u32, last: u32, value: u32) -> Bits {
+        let after = if last < field.len() {
+            field.field(last + 1, field.len())
+        } else {
+            Bits::default()
+        };
+        let before = if first > 1 {
+            field.field(1, first - 1)
+        } else {
+            Bits::default()
+        };
+        before.put(value, last - first + 1).then(after)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Bits;

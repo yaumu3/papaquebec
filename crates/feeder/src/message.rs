@@ -228,6 +228,7 @@ fn parity(body: &[u8]) -> u32 {
 mod tests {
     use super::{Observation, Reply, Report, Trust, overlay, read, squitter};
     use crate::beast::Frame;
+    use crate::bits::published::bytes;
     use crate::field::{Field, Identification, OperationalStatus};
     use crate::proto::{Address, AddressType, EmitterCategory, Source};
 
@@ -276,11 +277,6 @@ mod tests {
     fn altitude_code(altitude_ft: i32) -> u32 {
         let steps = u32::try_from((altitude_ft + 1000) / 25).expect("above -1000 ft");
         (steps & 0x7e0) << 2 | (steps & 0x10) << 1 | 0x10 | steps & 0xf
-    }
-
-    fn bytes(hex: &str) -> Vec<u8> {
-        let digits = |at| u8::from_str_radix(&hex[at..at + 2], 16).expect("hexadecimal");
-        (0..hex.len()).step_by(2).map(digits).collect()
     }
 
     /// What the published message says.

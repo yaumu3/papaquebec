@@ -652,32 +652,11 @@ mod tests {
         SurfacePosition, TargetStateAndStatus, Velocity, nic, version_0_nac_p,
     };
     use crate::bits::Bits;
+    use crate::bits::published::{field as published, with};
     use crate::cpr::Cpr;
     use crate::proto::{
         EmergencyPriorityStatus, EmitterCategory, TargetState, target_state::Modes,
     };
-
-    /// The message field of a published extended squitter.
-    fn published(hex: &str) -> Bits {
-        let digits = |at| u8::from_str_radix(&hex[at..at + 2], 16).expect("hexadecimal");
-        let message: Vec<u8> = (0..hex.len()).step_by(2).map(digits).collect();
-        Bits::of(&message).field(33, 88)
-    }
-
-    /// The message field with its bits `first` to `last` replaced.
-    fn with(me: Bits, first: u32, last: u32, value: u32) -> Bits {
-        let after = if last < 56 {
-            me.field(last + 1, 56)
-        } else {
-            Bits::default()
-        };
-        let before = if first > 1 {
-            me.field(1, first - 1)
-        } else {
-            Bits::default()
-        };
-        before.put(value, last - first + 1).then(after)
-    }
 
     /// What is read of a field of one kind and written again.
     type Rewritten = fn(Bits) -> Option<Bits>;
