@@ -128,9 +128,7 @@ impl Field for AirbornePosition {
         } else {
             self.baro_altitude_ft
         };
-        // In steps of 25 ft from -1000 ft, around the Q bit that says so.
-        let steps = altitude.map(|ft| u32::try_from((ft + 1012).div_euclid(25)).unwrap_or(0));
-        let code = steps.map_or(0, |steps| (steps & 0x7f0) << 1 | 0x10 | steps & 0xf);
+        let code = altitude.map_or(0, |ft| without_m(altitude_code(ft)));
         let head = Bits::default()
             .put(self.type_code, 5)
             // Surveillance status
@@ -592,6 +590,19 @@ impl Field for OperationalStatus {
             .put(self.nac_p.unwrap_or(0), 4)
             .filled(ME_LEN)
     }
+}
+
+/// The 13-bit altitude code of an altitude: steps of 25 ft from -1000 ft
+/// around the M bit, clear, and the Q bit, set, which says so.
+pub(crate) fn altitude_code(altitude_ft: i32) -> u32 {
+    let steps = u32::try_from((altitude_ft + 1012).div_euclid(25)).unwrap_or(0);
+    (steps & 0x7e0) << 2 | (steps & 0x10) << 1 | 0x10 | steps & 0xf
+}
+
+/// The 12 bits of an altitude code without its M bit, as a position message
+/// carries them.
+fn without_m(code: u32) -> u32 {
+    code >> 1 & 0xfc0 | code & 0x3f
 }
 
 /// The altitude in feet of a 13-bit altitude code; none when it carries none

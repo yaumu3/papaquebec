@@ -243,7 +243,7 @@ mod tests {
     use crate::beast::Frame;
     use crate::bits::Bits;
     use crate::bits::published::{bytes, field};
-    use crate::field::{Field, Identification, OperationalStatus};
+    use crate::field::{Field, Identification, OperationalStatus, altitude_code};
     use crate::proto::{Address, AddressType, EmitterCategory, Source};
 
     /// Made up: from a block ICAO reserves for future use.
@@ -285,12 +285,6 @@ mod tests {
         let mut message = [0; 7];
         message[..4].copy_from_slice(&head.to_be_bytes());
         overlaid(message, ADDRESS)
-    }
-
-    /// The altitude code of 25 ft steps for the altitude, its M bit clear and its Q bit set.
-    fn altitude_code(altitude_ft: i32) -> u32 {
-        let steps = u32::try_from((altitude_ft + 1000) / 25).expect("above -1000 ft");
-        (steps & 0x7e0) << 2 | (steps & 0x10) << 1 | 0x10 | steps & 0xf
     }
 
     /// What the published message says.
