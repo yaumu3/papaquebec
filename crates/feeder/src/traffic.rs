@@ -40,6 +40,10 @@ const RELATED_S: f64 = 15.0;
 /// How long a transponder sends the special position identification after
 /// the crew presses IDENT (ICAO Annex 10 Volume IV).
 const IDENT_S: f64 = 18.0;
+/// How long an aircraft keeps reporting a resolution advisory once it has
+/// ended (ICAO Annex 10 Volume IV, RTCA DO-260B): one not reported for this
+/// long is over, not kept the minute the rest is.
+const ADVISORY_S: f64 = 18.0;
 /// The ground vector and the air vector a wind is derived from, and the
 /// heading and the airspeed of the latter, are taken within this of one
 /// another: a radar asks for the registers in one sweep, so values further
@@ -141,7 +145,13 @@ impl<T: Clone> Said<T> {
     /// broadcast said it within the lapse: replies fill in what the
     /// broadcasts leave out.
     fn fill(&mut self, said: Option<T>, now_s: f64) {
-        if said.is_some() && (self.answered || self.at(now_s).is_none()) {
+        self.fill_within(said, LAPSE_S, now_s);
+    }
+
+    /// Fills in what a reply says, unless a broadcast said it less than
+    /// `lapse_s` before `now_s`.
+    fn fill_within(&mut self, said: Option<T>, lapse_s: f64, now_s: f64) {
+        if said.is_some() && (self.answered || self.within(lapse_s, now_s).is_none()) {
             self.kept = said.map(|said| (said, now_s));
             self.answered = true;
         }
@@ -375,7 +385,8 @@ impl Tracked {
                 .identification
                 .keep(Some(callsign.clone()), now_s),
             Register::ResolutionAdvisory(said) => {
-                self.resolution_advisory.fill(Some(*said), now_s);
+                self.resolution_advisory
+                    .fill_within(Some(*said), ADVISORY_S, now_s);
             }
             Register::SelectedVerticalIntention(said) => {
                 self.target_state.fill(&said.target, now_s);
@@ -572,7 +583,7 @@ impl Tracked {
             mach: self.mach.at(now_s),
             magnetic_heading_deg: self.magnetic_heading_deg.at(now_s),
             target_state: self.target_state.at(now_s),
-            resolution_advisory: self.resolution_advisory.at(now_s),
+            resolution_advisory: self.resolution_advisory.within(ADVISORY_S, now_s),
             quality: Some(quality).filter(|quality| *quality != Quality::default()),
             meteo: Some(meteo).filter(|meteo| *meteo != Meteo::default()),
             reception: Some(Reception {
@@ -1603,6 +1614,70 @@ mod tests {
             Some(advising(false, true)),
         ];
         assert_eq!(known.map(|a| a.resolution_advisory), expected);
+    }
+
+    #[test]
+    fn advisory_lapses_once_not_reported_for_the_terminated_period() {
+        // Arrange: an advisory broadcast at 100 s as ended
+        let ended = ResolutionAdvisory {
+            advisory: Some(Advisory {
+                corrective: true,
+                positive: true,
+                ..Advisory::default()
+            }),
+            terminated: true,
+            ..ResolutionAdvisory::default()
+        };
+        let messages = [
+            (said(here()), 99.0),
+            (
+                said(Report::ResolutionAdvisory(RaBroadcast { advisory: ended })),
+                100.0,
+            ),
+        ];
+        let mut traffic = hearing(messages);
+
+        // Act
+        let shown = [117.9, 118.0].map(|now_s| {
+            traffic
+                .snapshot(now_s)
+                .aircraft
+                .remove(0)
+                .resolution_advisory
+        });
+
+        // Assert
+        assert_eq!(shown, [Some(ended), None]);
+    }
+
+    #[test]
+    fn answered_advisory_fills_in_once_the_broadcast_one_has_lapsed() {
+        // Arrange: a climb broadcast at 100 s, then a descent answered 20 s on
+        let advising = |downward| ResolutionAdvisory {
+            advisory: Some(Advisory {
+                corrective: true,
+                downward,
+                positive: true,
+                ..Advisory::default()
+            }),
+            ..ResolutionAdvisory::default()
+        };
+        let climb = Report::ResolutionAdvisory(RaBroadcast {
+            advisory: advising(false),
+        });
+        let descent = answered(&Register::ResolutionAdvisory(advising(true)));
+        let messages = [(said(climb), 100.0), (said(descent), 120.0)];
+        let mut traffic = hearing(messages);
+
+        // Act
+        let shown = traffic
+            .snapshot(121.0)
+            .aircraft
+            .remove(0)
+            .resolution_advisory;
+
+        // Assert
+        assert_eq!(shown, Some(advising(true)));
     }
 
     #[test]
