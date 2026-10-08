@@ -9,6 +9,7 @@ use std::f64::consts::TAU;
 use std::ops::Range;
 use std::sync::Arc;
 
+use feeder::air::{self, Wind};
 use feeder::beast::Frame;
 use feeder::bits::Bits;
 use feeder::cpr;
@@ -16,9 +17,11 @@ use feeder::field::{
     AirbornePosition, Field, Identification, OperationalStatus, Status, SurfacePosition,
     TargetStateAndStatus, Velocity,
 };
-use feeder::message::squitter;
+use feeder::message::{comm_b_reply, squitter};
 use feeder::position::Position;
 use feeder::proto::{EmergencyPriorityStatus, EmitterCategory, TargetState, target_state::Modes};
+use feeder::register::{HeadingAndSpeed, TrackAndTurn};
+use feeder::wmm;
 use placer::rng::mulberry32;
 
 use crate::Scenario;
@@ -31,6 +34,12 @@ const SET_DELAY_S: f64 = 20.0;
 const HOLD_S: f64 = 60.0;
 /// The level every message is heard at: about -8 dB against full scale.
 const SIGNAL: u8 = 100;
+/// The wind the fleet flies in, which its air data differ by from its motion
+/// over the ground.
+const WIND: Wind = Wind {
+    from_deg: 270.0,
+    speed_kt: 35.0,
+};
 /// The type codes of the positions, which put their containment radius under
 /// 0.1 NM in the air and on the ground, and the accuracy reported with them.
 const AIRBORNE_TYPE_CODE: u32 = 11;
@@ -479,6 +488,33 @@ impl Flying {
             nac_p: NAC_P,
         })
     }
+
+    /// What it answers to a radar's interrogations in the air: the track and
+    /// turn report and the heading and speed report, flying through the
+    /// standard air in the wind, the heading as magnetic by the declination.
+    fn answers(&self, declination_deg: f64) -> Vec<Bits> {
+        let plan = &self.plan;
+        if plan.ground {
+            return vec![];
+        }
+        let (heading, airspeed) = air::through_air(plan.track, plan.gs, WIND);
+        let mach = air::mach(airspeed, self.alt);
+        let track_and_turn = TrackAndTurn {
+            roll_deg: None,
+            track_deg: Some(plan.track),
+            ground_speed_kt: Some(plan.gs),
+            track_rate_deg_per_s: Some(self.turning),
+            true_airspeed_kt: Some(airspeed),
+        };
+        let heading_and_speed = HeadingAndSpeed {
+            magnetic_heading_deg: Some((heading - declination_deg).rem_euclid(360.0)),
+            indicated_airspeed_kt: Some(air::calibrated_airspeed_kt(mach, self.alt)),
+            mach: Some(mach),
+            baro_vertical_rate_fpm: Some(whole(self.baro_rate)),
+            inertial_vertical_rate_fpm: Some(whole(self.baro_rate)),
+        };
+        vec![track_and_turn.write(), heading_and_speed.write()]
+    }
 }
 
 /// The emergency/priority status that goes with a Mode A code.
@@ -595,6 +631,7 @@ impl Fleet {
         let elapsed = (now - self.last).max(0.0);
         self.last = now;
         let timestamp = ticks(now - self.started);
+        let declination = wmm::declination_deg(self.site, wmm::year_of(now));
         let mut frames = Vec::new();
         for flying in &mut self.flying {
             flying.advance(now, elapsed);
@@ -604,10 +641,16 @@ impl Fleet {
             } else {
                 (timestamp, SIGNAL)
             };
-            for me in flying.broadcasts(self.site, self.flown) {
-                let message = squitter(flying.plan.address, me);
-                let frame = Frame::new(timestamp, signal, &message);
+            let mut heard = |message: &[u8]| {
+                let frame = Frame::new(timestamp, signal, message);
                 frames.extend(frame.into_iter().flat_map(|frame| frame.write()));
+            };
+            let address = flying.plan.address;
+            for me in flying.broadcasts(self.site, self.flown) {
+                heard(&squitter(address, me));
+            }
+            for mb in flying.answers(declination) {
+                heard(&comm_b_reply(address, Some(whole(flying.alt)), mb));
             }
         }
         self.flown += 1;

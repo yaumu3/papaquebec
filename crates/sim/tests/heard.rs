@@ -202,6 +202,49 @@ fn taxiing_targets_are_on_the_ground_at_taxi_speed() {
 }
 
 #[test]
+fn air_data_are_heard_of_every_aircraft_in_the_air() {
+    // Arrange
+    let mut heard = Heard::new(0);
+    heard.placed();
+
+    // Act: through another second of replies
+    let snapshot = heard.after(1.0);
+
+    // Assert: the speeds through the air, the wind the sim blows, and the
+    // standard temperature at the level to what the steps of the Mach
+    // number and the airspeed allow
+    let airborne: Vec<_> = snapshot
+        .aircraft
+        .iter()
+        .filter(|a| a.air_ground_state() != AirGroundState::OnGround)
+        .collect();
+    assert_eq!(airborne.len(), 9);
+    let speeds = |a: &&Aircraft| {
+        a.true_airspeed_kt.is_some() && a.indicated_airspeed_kt.is_some() && a.mach.is_some()
+    };
+    assert!(airborne.iter().all(speeds), "{airborne:?}");
+    let wind = |a: &&Aircraft| {
+        let wind = a.meteo.and_then(|m| m.wind_dir_deg.zip(m.wind_speed_kt));
+        wind.is_some_and(|(from, speed)| (from - 270.0).abs() < 4.0 && (speed - 35.0).abs() < 3.0)
+    };
+    assert!(airborne.iter().all(wind), "{airborne:?}");
+    let standard = |a: &&Aircraft| {
+        let isa = a
+            .baro_altitude_ft
+            .map(|ft| 15.0 - 1.9812 * f64::from(ft) / 1000.0);
+        let steps = a
+            .mach
+            .zip(a.true_airspeed_kt)
+            .map(|(mach, tas)| 2.0 * 288.0 * (0.004 / mach + 1.0 / tas));
+        let oat = a.meteo.and_then(|m| m.oat_c);
+        oat.zip(isa)
+            .zip(steps)
+            .is_some_and(|((oat, isa), within)| (oat - isa).abs() < within)
+    };
+    assert!(airborne.iter().all(standard), "{airborne:?}");
+}
+
+#[test]
 fn newly_set_level_is_started_toward_after_a_pause() {
     // Arrange
     let mut heard = Heard::new(0);
