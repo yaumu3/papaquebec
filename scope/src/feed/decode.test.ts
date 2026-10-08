@@ -27,6 +27,7 @@ describe('messageOf', () => {
         squawk: '0421',
         category: 'A3',
         emergency: 'none',
+        ident: true,
         position: { lat: 33.5, lon: 130.5 },
         alt: 35000,
         gs: 451.2,

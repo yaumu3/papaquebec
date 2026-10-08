@@ -21,6 +21,8 @@ export interface AircraftReport {
   category?: string;
   /** Emergency/priority status by name; `none` when the aircraft reports that it has none. */
   emergency?: string;
+  /** The crew pressed IDENT, which the transponder signals for 18 s. */
+  ident?: true;
   /** Where it reports being. */
   position?: LatLon;
   /** Where it last reported being, once that is no longer current. */

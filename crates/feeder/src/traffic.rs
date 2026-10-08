@@ -36,6 +36,9 @@ const MAX_RANGE_NM: f64 = 300.0;
 /// taken within this of one another: a radar sweep or two, in which an
 /// airliner changes little.
 const RELATED_S: f64 = 15.0;
+/// How long a transponder sends the special position identification after
+/// the crew presses IDENT (ICAO Annex 10 Volume IV).
+const IDENT_S: f64 = 18.0;
 /// The heading and the airspeed a wind is derived from are taken within this
 /// of each other: a radar asks for both registers in one sweep, so a pair
 /// further apart is of different sweeps, between which the aircraft may have
@@ -215,6 +218,7 @@ struct Tracked {
     powers: VecDeque<f64>,
     remembered: Remembered,
     mode_a_code: Said<u32>,
+    ident: Said<bool>,
     emergency_priority_status: Said<EmergencyPriorityStatus>,
     on_ground: Said<bool>,
     baro_altitude_ft: Said<i32>,
@@ -284,6 +288,7 @@ impl Tracked {
                 self.on_ground.keep(said.on_ground, now_s);
                 self.baro_altitude_ft.keep(said.baro_altitude_ft, now_s);
                 self.mode_a_code.keep(said.mode_a_code, now_s);
+                self.ident.keep(said.ident, now_s);
                 let register = said
                     .comm_b
                     .and_then(|mb| Register::read(mb, &self.known(now_s)));
@@ -490,6 +495,7 @@ impl Tracked {
             emitter_category: emitter_category.map(Into::into),
             mode_a_code: self.mode_a_code.at(now_s),
             emergency_priority_status: self.emergency_priority_status.at(now_s).map(Into::into),
+            ident: self.ident.within(IDENT_S, now_s).unwrap_or(false),
             lat_deg: fix.map(|fix| fix.position.lat_deg),
             lon_deg: fix.map(|fix| fix.position.lon_deg),
             position_source: fix.map_or(Source::Unspecified, |fix| fix.source).into(),
@@ -1439,6 +1445,39 @@ mod tests {
 
         // Assert
         assert_eq!(known(traffic).last_position, None);
+    }
+
+    #[test]
+    fn ident_is_shown_for_the_seconds_the_transponder_sends_it() {
+        // Arrange: one reply with the identification pulse, then nothing
+        let identing = Report::Reply(Reply {
+            ident: Some(true),
+            ..Reply::default()
+        });
+        let mut traffic = hearing([(said(here()), 99.0), (said(identing), 100.0)]);
+
+        // Act: within 18 s of it, and at 18 s
+        let shown = [117.9, 118.0].map(|now_s| traffic.snapshot(now_s).aircraft.remove(0).ident);
+
+        // Assert
+        assert_eq!(shown, [true, false]);
+    }
+
+    #[test]
+    fn ident_ends_with_a_reply_that_says_so() {
+        // Arrange
+        let identing = |ident| {
+            Report::Reply(Reply {
+                ident: Some(ident),
+                ..Reply::default()
+            })
+        };
+
+        // Act
+        let traffic = after([identing(true), identing(false)]);
+
+        // Assert
+        assert!(!known(traffic).ident);
     }
 
     #[test]

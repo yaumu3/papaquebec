@@ -53,6 +53,11 @@ message Aircraft {
   optional uint32 mode_a_code = 4;
   optional EmergencyPriorityStatus emergency_priority_status = 5;
 
+  // Surveillance replies.
+  // The crew pressed IDENT: the special position identification, which the
+  // transponder sends for 18 s.
+  bool ident = 6;
+
   // Airborne and Surface Position messages.
   optional double lat_deg = 10;
   optional double lon_deg = 11;

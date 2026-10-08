@@ -68,6 +68,7 @@ function toReport(a: Aircraft): AircraftReport {
     category: a.emitterCategory === undefined ? undefined : category(a.emitterCategory),
     emergency:
       a.emergencyPriorityStatus === undefined ? undefined : EMERGENCIES[a.emergencyPriorityStatus],
+    ident: a.ident ? true : undefined,
     position: position(a),
     lastPosition: last && { lat: last.latDeg, lon: last.lonDeg },
     source: source(a),
