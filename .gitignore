@@ -13,3 +13,4 @@ scope/public/icon-192.png
 scope/public/apple-touch-icon.png
 target/
 scope/src/render/layout/wasm/
+scope/src/lib/wasm/

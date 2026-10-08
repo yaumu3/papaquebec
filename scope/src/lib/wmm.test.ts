@@ -1,44 +1,37 @@
 import { describe, expect, it } from 'bun:test';
 
-import { magneticDeclination } from './wmm';
+import { loadDeclination, meshed } from './wmm';
 
-describe('magneticDeclination (WMM2025)', () => {
-  it('matches the NOAA WMM2025 test values to 0.01 degree', () => {
-    // Arrange
-    // Rows from WMM2025_TEST_VALUES.txt: [decimal year, height km, lat, lon, declination]
-    const cases: [number, number, number, number, number][] = [
-      [2025.0, 0, 80, 0, 1.28],
-      [2025.0, 0, 0, 120, -0.16],
-      [2025.0, 0, -80, 240, 68.78],
-      [2025.0, 100, 80, 0, 0.85],
-      [2025.0, 100, 0, 120, -0.15],
-      [2025.0, 100, -80, 240, 68.21],
-      [2027.5, 0, 80, 0, 2.59],
-      [2027.5, 0, 0, 120, -0.24],
-      [2027.5, 0, -80, 240, 68.49],
-      [2027.5, 100, 80, 0, 2.16],
-      [2027.5, 100, 0, 120, -0.23],
-    ];
+describe('meshed', () => {
+  it('answers from the centre of the cell, evaluating the model once per cell', () => {
+    // Arrange: a model that records where it is asked
+    const asked: [number, number][] = [];
+    const declination = meshed((lat, lon) => {
+      asked.push([lat, lon]);
+      return lat + lon;
+    }, 1);
 
     // Act
-    const results = cases.map(([year, hKm, lat, lon]) => magneticDeclination(lat, lon, hKm, year));
+    const answers = [declination(35.2, 139.6), declination(35.4, 139.7), declination(36.1, 139.6)];
 
     // Assert
-    results.forEach((d, i) => {
-      expect(d).toBeCloseTo(cases[i]?.[4] ?? NaN, 2);
-    });
+    expect(answers).toEqual([175, 175, 176]);
+    expect(asked).toEqual([
+      [35, 140],
+      [36, 140],
+    ]);
   });
+});
 
-  it('reports west declination as negative for Fukuoka', () => {
-    // Arrange
-    const lat = 33.5844;
-    const lon = 130.4517;
+describe('loadDeclination', () => {
+  it('reads the model in the year of the clock', async () => {
+    // Arrange: the start of 2025, the model's epoch; the value is one NOAA publishes with it
+    const declination = await loadDeclination(Date.UTC(2025, 0, 1));
 
     // Act
-    const d = magneticDeclination(lat, lon, 0, 2026.7);
+    const d = declination(80, 0);
 
     // Assert
-    expect(d).toBeLessThan(-6.5);
-    expect(d).toBeGreaterThan(-9);
+    expect(d).toBeCloseTo(1.28, 2);
   });
 });

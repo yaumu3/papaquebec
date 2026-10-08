@@ -1,4 +1,4 @@
-import { decimalYear, magneticDeclination } from '../lib/wmm';
+import { loadDeclination } from '../lib/wmm';
 import {
   bumpSnapshot,
   setDeclination,
@@ -33,7 +33,9 @@ export function feedOptionsFromUrl(search: string): FeedOptions {
 
 function adoptSite(position: Site): void {
   configureProjection(position);
-  setDeclination(magneticDeclination(position.lat, position.lon, 0, decimalYear(new Date())));
+  void loadDeclination()
+    .then((declination) => setDeclination(declination(position.lat, position.lon)))
+    .catch((err: unknown) => console.warn('magnetic model unavailable', err));
   setSite(position);
 }
 

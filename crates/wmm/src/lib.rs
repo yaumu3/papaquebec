@@ -1,6 +1,9 @@
 //! The World Magnetic Model: how far magnetic north lies from true north, by
 //! NOAA's WMM2025.
 
+#[cfg(target_arch = "wasm32")]
+mod wasm;
+
 /// The semi-axes of the WGS-84 ellipsoid, km.
 const A_KM: f64 = 6_378.137;
 const B_KM: f64 = 6_356.752_314_2;
