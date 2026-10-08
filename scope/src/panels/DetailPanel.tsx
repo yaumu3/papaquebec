@@ -33,7 +33,7 @@ function Cell(props: {
   /** Pressed, for a cell that plots: filled light, label and value dark. */
   on?: boolean | undefined;
   dim?: boolean | undefined;
-  tone?: 'enriched' | 'alert' | undefined;
+  tone?: 'alert' | undefined;
   /** Columns taken, for a value too long for one. */
   span?: 2 | 4 | undefined;
   onClick: () => void;
@@ -45,7 +45,6 @@ function Cell(props: {
         s.cell,
         props.span === 2 && s.span2,
         props.span === 4 && s.span4,
-        props.tone === 'enriched' && s.enriched,
         props.tone === 'alert' && s.alert,
         (props.dim ?? props.r === NONE) && s.dim,
         props.on && s.on,
@@ -65,13 +64,7 @@ function Cell(props: {
 }
 
 /** The cell of one reading of the catalog: a tap plots it, another takes it off again. */
-function ReadingCell(props: {
-  of: ReadingKey;
-  t: Track;
-  dim?: boolean;
-  tone?: 'enriched' | undefined;
-  span?: 4;
-}) {
+function ReadingCell(props: { of: ReadingKey; t: Track; dim?: boolean; span?: 4 }) {
   const spec = READINGS[props.of];
   return (
     <Cell
@@ -79,7 +72,6 @@ function ReadingCell(props: {
       r={spec.format(props.t)}
       on={plotted().includes(props.of)}
       dim={props.dim}
-      tone={props.tone}
       span={props.span}
       onClick={() => togglePlot(props.of)}
     />
@@ -92,7 +84,7 @@ function CopyCell(props: {
   r: Reading;
   text: string | undefined;
   dim?: boolean;
-  tone?: 'enriched' | 'alert' | undefined;
+  tone?: 'alert' | undefined;
 }) {
   return (
     <Cell
@@ -183,21 +175,16 @@ export function DetailPanel() {
                   k="TYPE"
                   r={typeReading(t().type, t().category)}
                   text={t().type}
-                  tone="enriched"
+
                   dim={t().type === undefined}
                 />
-                <CopyCell
-                  k="REG"
-                  r={plain(t().registration)}
-                  text={t().registration}
-                  tone="enriched"
-                />
+                <CopyCell k="REG" r={plain(t().registration)} text={t().registration} />
               </Group>
               <Group name="FLT">
                 <ReadingCell of="alt" t={t()} />
                 <ReadingCell of="vs" t={t()} />
                 <ReadingCell of="gs" t={t()} />
-                <ReadingCell of="trk" t={t()} tone="enriched" />
+                <ReadingCell of="trk" t={t()} />
               </Group>
               <Group name="NAV">
                 <ReadingCell of="selAlt" t={t()} />

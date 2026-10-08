@@ -31,7 +31,7 @@
 }
 .description {
   overflow: hidden;
-  color: var(--color-enriched);
+  color: var(--text-muted);
   font-size: var(--text-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -83,9 +83,6 @@
 }
 .glyph {
   color: var(--text-muted);
-}
-.enriched {
-  --value: var(--color-enriched);
 }
 .alert {
   --value: var(--color-emergency);
