@@ -232,7 +232,7 @@ struct Tracked {
     true_airspeed_kt: Said<f64>,
     target_state: Said<TargetState>,
     nac_p: Said<u32>,
-    /// What the aircraft answers with, and what that says together.
+    /// The air data besides, and what they say together.
     magnetic_heading_deg: Said<f64>,
     track_rate_deg_per_s: Said<f64>,
     mach: Said<f64>,
@@ -394,6 +394,8 @@ impl Tracked {
             Report::Velocity(said) => {
                 self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
                 self.track_deg.keep(said.track_deg, now_s);
+                self.magnetic_heading_deg
+                    .keep(said.magnetic_heading_deg, now_s);
                 self.baro_vertical_rate_fpm
                     .keep(said.baro_vertical_rate_fpm, now_s);
                 self.geometric_vertical_rate_fpm
@@ -510,6 +512,7 @@ impl Tracked {
             indicated_airspeed_kt: self.indicated_airspeed_kt.at(now_s),
             true_airspeed_kt: self.true_airspeed_kt.at(now_s),
             mach: self.mach.at(now_s),
+            magnetic_heading_deg: self.magnetic_heading_deg.at(now_s),
             target_state: self
                 .target_state
                 .at(now_s)
@@ -617,6 +620,7 @@ mod tests {
             ground_speed_kt: Some(ground_speed_kt),
             track_deg: Some(track_deg),
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: Some(-1216),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -817,6 +821,7 @@ mod tests {
             ground_speed_kt: None,
             track_deg: None,
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -846,6 +851,7 @@ mod tests {
             ground_speed_kt: None,
             track_deg: None,
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: Some(-832),
             geometric_minus_baro_ft: None,
@@ -900,6 +906,7 @@ mod tests {
             ground_speed_kt: None,
             track_deg: None,
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: Some(550),
@@ -991,6 +998,7 @@ mod tests {
                 ground_speed_kt: None,
                 track_deg: None,
                 airspeed: Some(airspeed),
+                magnetic_heading_deg: None,
                 baro_vertical_rate_fpm: None,
                 geometric_vertical_rate_fpm: None,
                 geometric_minus_baro_ft: None,
@@ -1478,6 +1486,26 @@ mod tests {
 
         // Assert
         assert!(!known(traffic).ident);
+    }
+
+    #[test]
+    fn heading_comes_from_the_velocity_through_the_air_too() {
+        // Arrange
+        let through_the_air = Report::Velocity(Velocity {
+            ground_speed_kt: None,
+            track_deg: None,
+            airspeed: Some(Airspeed::True(375.0)),
+            magnetic_heading_deg: Some(243.984_375),
+            baro_vertical_rate_fpm: None,
+            geometric_vertical_rate_fpm: None,
+            geometric_minus_baro_ft: None,
+        });
+
+        // Act
+        let traffic = after([through_the_air.clone(), through_the_air]);
+
+        // Assert
+        assert_eq!(known(traffic).magnetic_heading_deg, Some(243.984_375));
     }
 
     #[test]

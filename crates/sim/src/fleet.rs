@@ -465,6 +465,7 @@ impl Flying {
             ground_speed_kt: Some(plan.gs),
             track_deg: Some(plan.track),
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: Some(whole(self.baro_rate)),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,

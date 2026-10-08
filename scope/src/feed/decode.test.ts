@@ -32,6 +32,7 @@ describe('messageOf', () => {
         alt: 35000,
         gs: 451.2,
         track: 182.9,
+        heading: 176.1,
         verticalRate: -832,
         ias: 280,
         tas: 440,

@@ -128,6 +128,7 @@ mod tests {
             geometric_vertical_rate_fpm: Some(-768),
             indicated_airspeed_kt: Some(280.0),
             true_airspeed_kt: Some(440.0),
+            magnetic_heading_deg: Some(176.1),
             mach: Some(0.78),
             target_state: Some(TargetState {
                 selected_altitude_mcp_ft: Some(6000),

@@ -37,6 +37,8 @@ export interface Readings {
   alt: number | 'ground' | undefined;
   gs: number | undefined;
   track: number | undefined;
+  /** Magnetic heading, degrees. */
+  heading: number | undefined;
   /** In fpm: the barometric rate, or the geometric one from an aircraft that reports no other. */
   verticalRate: number | undefined;
   nic: number | undefined;

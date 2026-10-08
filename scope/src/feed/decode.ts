@@ -75,6 +75,7 @@ function toReport(a: Aircraft): AircraftReport {
     alt: a.airGroundState === AirGroundState.ON_GROUND ? 'ground' : a.baroAltitudeFt,
     gs: a.groundSpeedKt,
     track: a.trackDeg,
+    heading: a.magneticHeadingDeg,
     verticalRate: a.baroVerticalRateFpm ?? a.geometricVerticalRateFpm,
     ias: a.indicatedAirspeedKt,
     tas: a.trueAirspeedKt,

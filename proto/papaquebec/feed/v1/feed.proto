@@ -82,6 +82,9 @@ message Aircraft {
   optional sint32 geometric_vertical_rate_fpm = 23;
   optional double indicated_airspeed_kt = 24;
   optional double true_airspeed_kt = 25;
+  // Magnetic heading, from the airspeed form of the velocity message or the
+  // Comm-B heading and speed report.
+  optional double magnetic_heading_deg = 26;
   optional double mach = 28;
 
   optional TargetState target_state = 40;

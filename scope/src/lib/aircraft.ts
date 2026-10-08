@@ -33,6 +33,8 @@ export interface AircraftReport {
   alt?: number | 'ground';
   gs?: number;
   track?: number;
+  /** Magnetic heading, degrees. */
+  heading?: number;
   /** In fpm: the barometric rate, or the geometric one from an aircraft that reports no other. */
   verticalRate?: number;
   nic?: number;

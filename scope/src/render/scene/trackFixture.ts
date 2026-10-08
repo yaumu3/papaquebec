@@ -11,6 +11,7 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     alt: 11000,
     gs: 290,
     track: 235,
+    heading: undefined,
     verticalRate: 0,
     nic: 8,
     nacP: 9,

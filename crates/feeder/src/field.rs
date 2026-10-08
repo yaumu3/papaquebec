@@ -276,8 +276,10 @@ pub struct Velocity {
     /// Over the ground, with the true track it is made along.
     pub ground_speed_kt: Option<f64>,
     pub track_deg: Option<f64>,
-    /// Through the air, sent in place of the speed over the ground.
+    /// Through the air, sent in place of the speed over the ground, with the
+    /// magnetic heading it is made on.
     pub airspeed: Option<Airspeed>,
+    pub magnetic_heading_deg: Option<f64>,
     /// The vertical rate is the one or the other, as the message says.
     pub baro_vertical_rate_fpm: Option<i32>,
     pub geometric_vertical_rate_fpm: Option<i32>,
@@ -313,6 +315,8 @@ impl Field for Velocity {
             ground_speed_kt: over_ground.map(|(speed, _)| speed),
             track_deg: over_ground.map(|(_, track)| track),
             airspeed: (subtype >= 3).then(|| airspeed(me, step)).flatten(),
+            magnetic_heading_deg: (subtype >= 3 && me.flag(14))
+                .then(|| f64::from(me.get(15, 24)) * 360.0 / 1024.0),
             // The source bit is set for a barometric rate.
             baro_vertical_rate_fpm: rate.filter(|_| me.flag(36)),
             geometric_vertical_rate_fpm: rate.filter(|_| !me.flag(36)),
@@ -322,7 +326,7 @@ impl Field for Velocity {
 
     fn write(&self) -> Bits {
         let (subtype, speeds) = match self.airspeed {
-            Some(airspeed) => through_air(airspeed),
+            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg),
             None => along_ground(self.ground_speed_kt.zip(self.track_deg)),
         };
         let rate = self
@@ -395,8 +399,8 @@ fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
     })
 }
 
-/// The subtype and the 22 bits of an airspeed, without the heading that goes with it.
-fn through_air(airspeed: Airspeed) -> (u32, Bits) {
+/// The subtype and the 22 bits of an airspeed on a magnetic heading.
+fn through_air(airspeed: Airspeed, heading_deg: Option<f64>) -> (u32, Bits) {
     let (is_true, speed) = match airspeed {
         Airspeed::Indicated(speed) => (false, speed),
         Airspeed::True(speed) => (true, speed),
@@ -404,7 +408,8 @@ fn through_air(airspeed: Airspeed) -> (u32, Bits) {
     let supersonic = speed > SUBSONIC_KT;
     let step = if supersonic { 4.0 } else { 1.0 };
     let bits = Bits::default()
-        .put(0, 11)
+        .put_flag(heading_deg.is_some())
+        .put(count(heading_deg.unwrap_or(0.0) * 1024.0 / 360.0), 10)
         .put_flag(is_true)
         .put(count(speed / step) + 1, 10);
     (3 + u32::from(supersonic), bits)
@@ -722,15 +727,15 @@ mod tests {
         let written = fields.map(|(hex, rewritten)| rewritten(published(hex)));
 
         // Assert: but for what is not read, which is written as zeros: the IFR
-        // capability of the first velocity, the heading of the second, and the
-        // NIC baro and SIL of the target state
+        // capability of the first velocity, and the NIC baro and SIL of the
+        // target state
         let expected = [
             published("8D4840D6202CC371C32CE0576098"),
             published("8D40621D58C382D690C8AC2863A7"),
             published("8D40621D58C386435CC412692AD6"),
             published("8C4841753A9A153237AEF0F275BE"),
             with(published("8D485020994409940838175B284F"), 10, 10, 0),
-            with(published("8DA05F219B06B6AF189400CBC33F"), 14, 24, 0),
+            published("8DA05F219B06B6AF189400CBC33F"),
             published("8DA2C1B6E112B600000000760759"),
             with(published("8DA05629EA21485CBF3F8CADAEEB"), 44, 46, 0),
         ];
@@ -1020,6 +1025,7 @@ mod tests {
             ground_speed_kt: None,
             track_deg: None,
             airspeed: Some(Airspeed::True(375.0)),
+            magnetic_heading_deg: Some(243.984_375),
             baro_vertical_rate_fpm: Some(-2304),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -1035,6 +1041,7 @@ mod tests {
             ground_speed_kt: None,
             track_deg: None,
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -1055,10 +1062,12 @@ mod tests {
             },
             Velocity {
                 airspeed: Some(Airspeed::Indicated(250.0)),
+                magnetic_heading_deg: None,
                 ..unknown
             },
             Velocity {
                 airspeed: Some(Airspeed::True(1200.0)),
+                magnetic_heading_deg: Some(243.984_375),
                 ..unknown
             },
             unknown,
@@ -1078,6 +1087,7 @@ mod tests {
             ground_speed_kt: Some(290.0),
             track_deg: Some(235.0),
             airspeed: None,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: Some(-1200),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
@@ -1104,6 +1114,7 @@ mod tests {
             ground_speed_kt,
             track_deg: ground_speed_kt.map(|_| 0.0),
             airspeed,
+            magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,

@@ -434,6 +434,7 @@ describe('createTrackStore samples', () => {
       alt: 'ground',
       gs: undefined,
       track: 235,
+      heading: undefined,
       verticalRate: -1200,
       ias: 229,
       tas: 282,
