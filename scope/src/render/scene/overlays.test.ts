@@ -167,7 +167,7 @@ describe('the RBL readout', () => {
 });
 
 describe('the RBL line', () => {
-  it('is dotted, faint behind the readout', () => {
+  it('is dotted, faint behind the readout, with a solid arrow', () => {
     // Arrange
     const input = east.input();
 
@@ -175,7 +175,7 @@ describe('the RBL line', () => {
     const drawn = kinds(strokes(buildOverlays(input)));
 
     // Assert
-    expect(drawn).toEqual(['line', 'line', 'faint']);
+    expect(drawn).toEqual(['line', 'line', 'faint', 'solid', 'solid', 'solid']);
   });
 
   it('fades for the whole width of the readout', () => {
@@ -253,6 +253,41 @@ describe('the RBL tag', () => {
 
     // Assert
     expect(atAnchor).toEqual([]);
+  });
+});
+
+describe('the RBL arrow', () => {
+  it('is a hollow 7 px triangle at the end of the line, its tip just short of B', () => {
+    // Arrange
+    const b = { x: 131, y: 35 };
+    const batches = buildOverlays(east.input());
+
+    // Act
+    const triangle = strokes(batches).filter((s) => kinds([s])[0] === 'solid');
+
+    // Assert
+    const tip = [expect.closeTo(-4, 4), expect.closeTo(0, 4)];
+    const above = [expect.closeTo(-10.06, 2), expect.closeTo(-3.5, 3)];
+    const below = [expect.closeTo(-10.06, 2), expect.closeTo(3.5, 3)];
+    expect(triangle.map((s) => [s.a, s.b])).toEqual(triangle.map(() => [b, b]));
+    expect(triangle.map((s) => [s.pa, s.pb].map((p) => [p.x, p.y]))).toEqual([
+      [tip, above],
+      [tip, below],
+      [above, below],
+    ]);
+  });
+
+  it('keeps the dotted line out of the triangle, ending it at the base', () => {
+    // Arrange
+    const b = { x: 131, y: 35 };
+    const batches = buildOverlays(east.input());
+
+    // Act
+    const dotted = strokes(batches).filter((s) => kinds([s])[0] === 'line');
+
+    // Assert
+    const reach = Math.max(...dotted.flatMap((s) => [s.a.x, s.b.x]).map((x) => (x - b.x) * 100));
+    expect(reach).toBeCloseTo(-10.06, 2);
   });
 });
 

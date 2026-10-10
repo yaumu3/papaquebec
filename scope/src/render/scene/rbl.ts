@@ -1,5 +1,6 @@
 import { formatMmSs } from '../../lib/format';
 import {
+  type Span,
   splitByCircle,
   type GeoPoint,
   type ProjectFn,
@@ -59,6 +60,11 @@ export function rblLines(a: Point, b: Point, declination: Declination): string[]
 const READOUT_MARGIN_PX = 4;
 /** An RBL is dotted, so it reads as a measure and not a track: px on, px off. */
 const RBL_DASH: [number, number] = [1, 3];
+/** Size of the square that marks an RBL end, CSS px. */
+const END_PX = 6;
+/** Length of each side of the triangle that points an RBL from A to B, CSS px. */
+const ARROW_PX = 7;
+const ARROW_SPREAD = Math.PI / 6;
 
 /** A point on a drawn path, and which way the path runs there. */
 interface PathSite {
@@ -89,13 +95,37 @@ function reachAlong(dir: Vec2, box: Box, pad: number): number {
   return Math.min(x, y) + pad;
 }
 
-/** The dotted path, faint within `reach` of `c` where the readout sits, so the text stays clear. */
-function drawFadingAt(lines: LineBatch, path: Vec2[], c: Vec2, reach: number): void {
-  const parts = path.slice(1).map((q, i) => splitByCircle(path[i] ?? q, q, c, reach));
+/** The spans of a path that lie further than `r` from `c`. */
+function clearOf(path: Vec2[], c: Vec2, r: number): Span[] {
+  return path.slice(1).flatMap((q, i) => splitByCircle(path[i] ?? q, q, c, r).outside);
+}
+
+/** The dotted spans, faint within `reach` of `c` where the readout sits, so the text stays clear. */
+function drawFadingAt(lines: LineBatch, spans: Span[], c: Vec2, reach: number): void {
+  const parts = spans.map(([p, q]) => splitByCircle(p, q, c, reach));
   for (const [p, q] of parts.flatMap((s) => s.outside))
     lines.segment(p, q, THEME.cursor, { dash: RBL_DASH });
   for (const [p, q] of parts.flatMap((s) => s.inside))
     lines.segment(p, q, THEME.cursorFaint, { dash: RBL_DASH });
+}
+
+/** A hollow triangle with its tip `tipPx` along the line from `site`, pointing the way it runs. */
+function drawArrow(lines: LineBatch, site: PathSite, tipPx: number): void {
+  const tip = { ...site.at, px: site.dir.x * tipPx, py: site.dir.y * tipPx };
+  const corner = (turn: number) => {
+    const c = Math.cos(turn);
+    const s = Math.sin(turn);
+    return {
+      ...site.at,
+      px: tip.px - ARROW_PX * (site.dir.x * c - site.dir.y * s),
+      py: tip.py - ARROW_PX * (site.dir.x * s + site.dir.y * c),
+    };
+  };
+  const above = corner(ARROW_SPREAD);
+  const below = corner(-ARROW_SPREAD);
+  lines.segment(tip, above, THEME.cursor);
+  lines.segment(tip, below, THEME.cursor);
+  lines.segment(above, below, THEME.cursor);
 }
 
 /** What an RBL is drawn with, beside its batches. */
@@ -122,9 +152,14 @@ export function drawRbl(
   const stack = [nameLine(tag), ...figures(rblLines(a, b, input.declination))];
   const box = stackBox(text, stack);
   const reach = reachAlong(site.dir, box, READOUT_MARGIN_PX);
-  drawFadingAt(lines, path, site.at, reach / input.view.pxPerNm);
-  markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
-  markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
+  const end = siteOn(path, 'end');
+  const tipPx = reachAlong(end.dir, { w: END_PX, h: END_PX }, 1);
+  const basePx = tipPx + ARROW_PX * Math.cos(ARROW_SPREAD);
+  const spans = clearOf(path, end.at, basePx / input.view.pxPerNm);
+  drawFadingAt(lines, spans, site.at, reach / input.view.pxPerNm);
+  drawArrow(lines, end, -tipPx);
+  markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, END_PX, THEME.cursor);
+  markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, END_PX, THEME.cursor);
   drawStack(text, stack, { ...site.at, px: -box.w / 2, py: -box.h / 2 });
 }
 
@@ -140,6 +175,6 @@ export function drawPendingRbl(
   input: RblDrawing,
 ): void {
   lines.polyline(rblPath(a, b, input.project), THEME.cursor, { dash: RBL_DASH });
-  markers.marker(a.pos, aOnTarget ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
+  markers.marker(a.pos, aOnTarget ? Shape.Square : Shape.HollowSquare, END_PX, THEME.cursor);
   drawAtPointer(lines, text, pointer, figures(rblLines(a, b, input.declination)));
 }
