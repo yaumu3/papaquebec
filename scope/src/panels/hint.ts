@@ -37,7 +37,7 @@ export const HINT: readonly HintBlock[] = [
   {
     title: 'MOUSE',
     columns: [
-      [key('DRAG', 'PAN'), key('DRAG TARGET', 'RBL')],
+      [key('DRAG', 'PAN'), key('DRAG SELECTED', 'RBL')],
       [key('RIGHT-DRAG', 'RANGE CURSOR'), key('WHEEL', 'ZOOM')],
     ],
   },

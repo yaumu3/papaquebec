@@ -6,6 +6,7 @@ import {
   pan,
   rblPending,
   rbls,
+  selected,
   setLabelDrag,
   setModeText,
   setPointer,
@@ -34,19 +35,20 @@ const pastThreshold = (d: Drag, at: Point) =>
   Math.hypot(at.x - d.from.x, at.y - d.from.y) > DRAG_THRESHOLD_PX;
 
 /**
- * The drag a primary press starts, whatever pressed: off a target it drags out an RBL, on a data
- * block it moves the block, elsewhere it pans. Nothing happens until it moves past the threshold.
+ * The drag a primary press starts, whatever pressed: off the selected target it drags out an RBL,
+ * on a data block it moves the block, elsewhere it pans. Nothing happens until it moves past the
+ * threshold.
  */
 export function trackDrags(host: DragHost) {
   let panDrag: (Drag & { x: number; y: number }) | null = null;
   let blockDrag: (Drag & { hex: string; grabX: number; grabY: number }) | null = null;
-  /** A drag that began on a target; once it moves it is a pending RBL anchored there. */
+  /** A drag that began on the selected target; once it moves it is a pending RBL anchored there. */
   let rblDrag: (Drag & { hex: string; precision: Precision }) | null = null;
 
   const start = (at: Point, precision: Precision) => {
     const v = host.view();
     const t = targetAt(v, at.x, at.y, precision.reach);
-    if (t) {
+    if (t && selected() === t.hex) {
       rblDrag = { hex: t.hex, from: at, moved: false, precision };
       return;
     }

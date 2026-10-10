@@ -12,6 +12,7 @@ import {
   setPan,
   setRblPending,
   setRbls,
+  setSelected,
 } from '../../state/scope';
 import { trackStore } from '../../state/tracks';
 import { pxPerNmFor } from '../view';
@@ -53,6 +54,7 @@ describe('trackDrags', () => {
     setRbls([]);
     setRblPending(null);
     setModeText(null);
+    setSelected(null);
   });
 
   it('pans with the pointer once it moves past the threshold', () => {
@@ -96,9 +98,10 @@ describe('trackDrags', () => {
     expect(cursors).toEqual(['move', 'crosshair']);
   });
 
-  it('drags an RBL out of a target and drops its far end where released', () => {
+  it('drags an RBL out of the selected target and drops its far end where released', () => {
     // Arrange
     trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
+    setSelected('d00123');
     const { d } = subject();
     d.start({ x: 401, y: 300 }, precise);
     d.move({ x: 600, y: 200 });
@@ -112,6 +115,21 @@ describe('trackDrags', () => {
       { a: { kind: 'target', hex: 'd00123' }, b: { kind: 'free', ...toWorld(view, 600, 200) } },
     ]);
     expect([rblPending(), modeText()]).toEqual([null, null]);
+  });
+
+  it('pans off a target that is not selected instead of dragging an RBL', () => {
+    // Arrange
+    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
+    const { d } = subject();
+    d.start({ x: 401, y: 300 }, precise);
+
+    // Act
+    d.move({ x: 600, y: 200 });
+
+    // Assert
+    expect(pan().x).toBeCloseTo(-199 / view.pxPerNm, 9);
+    expect(pan().y).toBeCloseTo(-100 / view.pxPerNm, 9);
+    expect([rblPending(), modeText(), rbls()]).toEqual([null, null, []]);
   });
 
   it('moves a dragged block where its leader points when released', () => {
@@ -134,6 +152,7 @@ describe('trackDrags', () => {
   it('drops a pending RBL when the drag is cancelled', () => {
     // Arrange
     trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
+    setSelected('d00123');
     const { d } = subject();
     d.start({ x: 401, y: 300 }, precise);
     d.move({ x: 600, y: 200 });
