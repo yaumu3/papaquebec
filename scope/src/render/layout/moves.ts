@@ -1,5 +1,5 @@
 /** How long a block takes to slide to a new bearing, ms. */
-export const MOVE_MS = 300;
+export const MOVE_MS = 150;
 
 /** Offset from a target to its block's top-left corner, CSS px. */
 export interface Offset {
