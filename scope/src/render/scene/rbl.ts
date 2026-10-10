@@ -39,6 +39,9 @@ export function rblLines(a: Point, b: Point, declination: Declination): string[]
   return lines;
 }
 
+/** An RBL is dotted, so it reads as a measure and not a track: px on, px off. */
+const RBL_DASH: [number, number] = [1, 3];
+
 /** What an RBL is drawn with, beside its batches. */
 export interface RblDrawing {
   /** Lat/lon onto the scope plane, for lines drawn along the geodesic. */
@@ -58,7 +61,7 @@ export function drawRbl(
   labelAt: Anchor,
   input: RblDrawing,
 ): void {
-  lines.polyline(rblPath(a, b, input.project), THEME.cursor);
+  lines.polyline(rblPath(a, b, input.project), THEME.cursor, { dash: RBL_DASH });
   markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
   if (tag !== null)
     markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);

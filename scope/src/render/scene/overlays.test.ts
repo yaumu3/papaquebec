@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Vec2 } from '../../lib/geo';
-import { type Batch, TEXT_STRIDE } from '../protocol';
+import { type Batch, LINE_STRIDE, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildOverlays, type OverlayInput } from './overlays';
 
@@ -98,5 +98,54 @@ describe('the range cursor readout', () => {
     // Assert
     const top = Math.min(...glyphs.map((g) => g.top));
     expect(glyphs.filter((g) => g.top === top).length).toBe('49.1'.length);
+  });
+});
+
+/** A segment of the lines batch: its world ends, its offsets from them in px, dash and color. */
+interface Stroke {
+  a: Vec2;
+  b: Vec2;
+  pa: Vec2;
+  pb: Vec2;
+  dash: [number, number];
+  color: number[];
+}
+
+function strokes(batches: Batch[]): Stroke[] {
+  const lines = batches.find((b) => b.kind === 'lines');
+  if (!lines) return [];
+  const d = lines.data;
+  return Array.from({ length: lines.count }, (_, i) => {
+    const o = i * LINE_STRIDE;
+    const at = (k: number) => ({ x: d[o + k] ?? 0, y: d[o + k + 1] ?? 0 });
+    return {
+      a: at(0),
+      pa: at(2),
+      b: at(4),
+      pb: at(6),
+      dash: [d[o + 9] ?? 0, d[o + 10] ?? 0],
+      color: Array.from(d.subarray(o + 11, o + 15)),
+    };
+  });
+}
+
+const free = (x: number, y: number) => ({ kind: 'free' as const, x, y });
+
+describe('the RBL line', () => {
+  it('is dotted, finished or pending', () => {
+    // Arrange
+    const cases = [
+      overlays({ rbls: [rbl(131)] }),
+      overlays({ rblPending: { a: free(130, 35) }, pointer: { cx: 500, cy: 300 } }),
+    ];
+
+    // Act
+    const drawn = cases.map((input) => strokes(buildOverlays(input))[0]?.dash);
+
+    // Assert
+    expect(drawn).toEqual([
+      [1, 3],
+      [1, 3],
+    ]);
   });
 });
