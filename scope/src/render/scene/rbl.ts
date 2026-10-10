@@ -1,4 +1,4 @@
-import { formatMmSs, padBearing } from '../../lib/format';
+import { formatMmSs } from '../../lib/format';
 import type { GeoPoint, ProjectFn, UnprojectFn, Vec2 } from '../../lib/geo';
 import { geodesicPath } from '../../lib/geodesic';
 import type { Declination } from '../../lib/wmm';
@@ -6,7 +6,17 @@ import type { RblAnchor } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { Shape } from '../protocol';
 import type { Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
-import { freePoint, measure, type Point, trackPoint } from './readout';
+import {
+  drawAtPointer,
+  drawStack,
+  figures,
+  freePoint,
+  measure,
+  nameLine,
+  type Point,
+  rangeBearing,
+  trackPoint,
+} from './readout';
 import { THEME } from './rules';
 
 /** Where an RBL end is: on its target while it has a position, else where it was placed. */
@@ -26,15 +36,13 @@ export function rblPath(a: { geo: GeoPoint }, b: { geo: GeoPoint }, project: Pro
   return geodesicPath([a.geo, b.geo], project);
 }
 
-/** Distance and magnetic bearing, then ETE when only A moves. */
+/** Distance, magnetic bearing, then ETE when only A moves. */
 export function rblLines(a: Point, b: Point, declination: Declination): string[] {
   const { dist, brg } = measure(a, b, declination);
-  let first = `${dist.toFixed(1)} / ${padBearing(brg)}°`;
-  const lines = [first];
+  const lines = rangeBearing(dist, brg);
   if (a.vel && !b.vel) {
     const gs = Math.hypot(a.vel.x, a.vel.y);
-    if (gs > 1) first = `${first} / ${formatMmSs((dist / gs) * 3600)}`;
-    lines[0] = first;
+    if (gs > 1) lines.push(formatMmSs((dist / gs) * 3600));
   }
   return lines;
 }
@@ -57,20 +65,28 @@ export function drawRbl(
   a: Point,
   b: Point,
   onTarget: [boolean, boolean],
-  tag: string | null,
+  tag: string,
   labelAt: Anchor,
   input: RblDrawing,
 ): void {
   lines.polyline(rblPath(a, b, input.project), THEME.cursor, { dash: RBL_DASH });
   markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
-  if (tag !== null)
-    markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
-  rblLines(a, b, input.declination).forEach((line, i) => {
-    text.text(line, { ...labelAt, py: (labelAt.py ?? 0) + i * 13 }, 11, THEME.cursor);
-  });
-  if (tag !== null)
-    text.text(tag, { ...a.pos, px: -10, py: -10 }, 11, THEME.cursor, {
-      align: 'right',
-      baseline: 'bottom',
-    });
+  markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
+  drawStack(text, [nameLine(tag), ...figures(rblLines(a, b, input.declination))], labelAt);
+}
+
+/** An RBL being placed: its line to the pointer, read there as the range cursor reads. */
+export function drawPendingRbl(
+  lines: LineBatch,
+  markers: MarkerBatch,
+  text: TextBatch,
+  a: Point,
+  b: Point,
+  aOnTarget: boolean,
+  pointer: Vec2,
+  input: RblDrawing,
+): void {
+  lines.polyline(rblPath(a, b, input.project), THEME.cursor, { dash: RBL_DASH });
+  markers.marker(a.pos, aOnTarget ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
+  drawAtPointer(lines, text, pointer, figures(rblLines(a, b, input.declination)));
 }

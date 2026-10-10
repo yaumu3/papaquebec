@@ -5,7 +5,7 @@ import type { RangeCursorOrigin, Rbl, RblPending } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
-import { anchorPoint, drawRbl } from './rbl';
+import { anchorPoint, drawPendingRbl, drawRbl } from './rbl';
 import {
   drawAtPointer,
   freePoint,
@@ -95,23 +95,11 @@ export function buildOverlays(input: OverlayInput): Batch[] {
     );
   }
   const pending = input.rblPending?.a;
-  if (pending) {
+  if (pending && input.pointer) {
     const a = anchorPoint(pending, input);
     const b = mousePoint(input);
-    if (a && b && input.pointer) {
-      const w = toWorld(input.view, input.pointer.cx, input.pointer.cy);
-      drawRbl(
-        lines,
-        markers,
-        text,
-        a,
-        b,
-        [pending.kind === 'target', false],
-        null,
-        { ...w, px: 12, py: 12 },
-        input,
-      );
-    }
+    const at = toWorld(input.view, input.pointer.cx, input.pointer.cy);
+    if (a && b) drawPendingRbl(lines, markers, text, a, b, pending.kind === 'target', at, input);
   }
   drawRangeCursor(lines, markers, text, input);
   return [lines.finish(), markers.finish(), text.finish()];

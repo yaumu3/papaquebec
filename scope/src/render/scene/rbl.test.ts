@@ -15,7 +15,7 @@ const end = (lat: number, lon: number, pos: Vec2 = { x: 0, y: 0 }, vel: Vec2 | n
 const EAST = 10 / 60;
 
 describe('rblLines', () => {
-  it('shows distance and the bearing made magnetic at the origin, with a degree sign', () => {
+  it('shows the distance over the bearing made magnetic at the origin', () => {
     // Arrange: a declination of 7.5° east at the origin and nothing like it at the far end
     const a = end(0, 0);
     const b = end(0, EAST, { x: 10, y: 0 });
@@ -25,7 +25,7 @@ describe('rblLines', () => {
     const lines = rblLines(a, b, declination);
 
     // Assert
-    expect(lines).toEqual(['10.0 / 083°']);
+    expect(lines).toEqual(['10.0', '083°']);
   });
 
   it('measures along the geodesic, not across the map the ends are drawn on', () => {
@@ -37,7 +37,7 @@ describe('rblLines', () => {
     const lines = rblLines(a, b, () => 0);
 
     // Assert
-    expect(lines).toEqual(['59.9 / 360°']);
+    expect(lines).toEqual(['59.9', '360°']);
   });
 
   it('appends time to go along the geodesic when only the origin moves', () => {
@@ -49,7 +49,7 @@ describe('rblLines', () => {
     const lines = rblLines(a, b, () => 0);
 
     // Assert
-    expect(lines).toEqual(['10.0 / 090° / 10:01']);
+    expect(lines).toEqual(['10.0', '090°', '10:01']);
   });
 
   it('shows only distance and bearing when both move', () => {
@@ -61,6 +61,6 @@ describe('rblLines', () => {
     const lines = rblLines(a, b, () => 0);
 
     // Assert
-    expect(lines).toEqual(['10.0 / 090°']);
+    expect(lines).toEqual(['10.0', '090°']);
   });
 });
