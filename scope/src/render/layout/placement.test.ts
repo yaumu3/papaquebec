@@ -24,7 +24,7 @@ describe('blockSubjects', () => {
       gs: 360,
       track: 90,
       position: { kind: 'live', lat: 0, lon: 0, x: 1, y: 2 },
-      ops: { hideTrail: false, dir: 3, movedAt: 990, manual: true },
+      ops: { dir: 3, movedAt: 990, manual: true },
     });
 
     // Act
@@ -118,15 +118,15 @@ describe('applyPlacement', () => {
     // Arrange
     const kept = makeTrack({
       hex: 'd00001',
-      ops: { hideTrail: false, dir: 3, movedAt: 900, manual: true },
+      ops: { dir: 3, movedAt: 900, manual: true },
     });
     const moved = makeTrack({
       hex: 'd00002',
-      ops: { hideTrail: false, dir: 3, movedAt: 900, manual: true },
+      ops: { dir: 3, movedAt: 900, manual: true },
     });
     const fresh = makeTrack({
       hex: 'd00003',
-      ops: { hideTrail: false, dir: null, movedAt: null, manual: false },
+      ops: { dir: null, movedAt: null, manual: false },
     });
     const dirs = new Map([
       ['d00001', 3],
@@ -143,9 +143,9 @@ describe('applyPlacement', () => {
     applyPlacement([kept, moved, fresh], dirs, 1000, seen);
 
     // Assert
-    expect(kept.ops).toEqual({ hideTrail: false, dir: 3, movedAt: 900, manual: true });
-    expect(moved.ops).toEqual({ hideTrail: false, dir: 5, movedAt: 1000, manual: false });
-    expect(fresh.ops).toEqual({ hideTrail: false, dir: 7, movedAt: 1000, manual: false });
+    expect(kept.ops).toEqual({ dir: 3, movedAt: 900, manual: true });
+    expect(moved.ops).toEqual({ dir: 5, movedAt: 1000, manual: false });
+    expect(fresh.ops).toEqual({ dir: 7, movedAt: 1000, manual: false });
   });
 });
 
@@ -154,7 +154,7 @@ describe('applyPlacement after a drag', () => {
     // Arrange
     const dragged = makeTrack({
       hex: 'd00001',
-      ops: { hideTrail: false, dir: 1, movedAt: 995, manual: true },
+      ops: { dir: 1, movedAt: 995, manual: true },
     });
     const seen = [{ hex: 'd00001', dir: 3, manual: false }];
 
@@ -162,6 +162,6 @@ describe('applyPlacement after a drag', () => {
     applyPlacement([dragged], new Map([['d00001', 5]]), 1000, seen);
 
     // Assert
-    expect(dragged.ops).toEqual({ hideTrail: false, dir: 1, movedAt: 995, manual: true });
+    expect(dragged.ops).toEqual({ dir: 1, movedAt: 995, manual: true });
   });
 });

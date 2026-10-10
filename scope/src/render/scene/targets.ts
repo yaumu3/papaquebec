@@ -83,7 +83,7 @@ function drawables(input: TargetInput): Drawable[] {
 }
 
 function drawTrails(lines: LineBatch, d: Drawable, input: TargetInput): void {
-  if (d.visibility === 'filtered' || d.t.ops.hideTrail) return;
+  if (d.visibility === 'filtered') return;
   for (const f of decimateTrail(d.t.history, input.now, input.trailSec)) {
     lines.segment(
       { x: f.x, y: f.y, px: -SLASH, py: SLASH },

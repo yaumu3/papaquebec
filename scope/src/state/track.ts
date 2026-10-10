@@ -22,7 +22,6 @@ export interface Fix {
 
 /** Per-track state the operator sets; survives snapshot rebuilds. */
 export interface OperatorState {
-  hideTrail: boolean;
   /** Direction the data block sits at, set by the placer or by a drag; null until placed. */
   dir: number | null;
   /** Snapshot time the block last moved, seconds; null until placed. */

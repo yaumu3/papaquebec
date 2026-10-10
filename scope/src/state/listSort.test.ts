@@ -45,7 +45,7 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     position: { kind: 'none' },
     history: [],
     samples: [],
-    ops: { hideTrail: false, dir: null, movedAt: null, manual: false },
+    ops: { dir: null, movedAt: null, manual: false },
     ...over,
   };
 }

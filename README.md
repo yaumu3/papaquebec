@@ -262,7 +262,7 @@ named after DO-260B), which the feed worker reads into what the scope knows of a
   bar tells the feed's state from the age of its data.
 - Each snapshot is a full one and the track store is rebuilt from it; liveness is the age of an
   aircraft's last message, `seen`. Only position history and operator state (selection, block
-  bearing, hidden trail) persist across snapshots.
+  bearing) persist across snapshots.
 - Live `lat/lon` draws normally, `lastPosition` draws stale, absent positions appear only in text.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has

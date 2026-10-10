@@ -97,20 +97,15 @@ describe('createTrackStore', () => {
     store.ingest(snapshot(1000, [live('a')]));
     const before = store.tracks.get('a');
     if (before) {
-      before.ops.hideTrail = true;
       before.ops.dir = 3;
+      before.ops.manual = true;
     }
 
     // Act
     store.ingest(snapshot(1001, [live('a')]));
 
     // Assert
-    expect(store.tracks.get('a')?.ops).toEqual({
-      hideTrail: true,
-      dir: 3,
-      movedAt: null,
-      manual: false,
-    });
+    expect(store.tracks.get('a')?.ops).toEqual({ dir: 3, movedAt: null, manual: true });
   });
 
   it("takes a position as the aircraft's own broadcast unless the feed says how it came", () => {
@@ -480,14 +475,14 @@ describe('createTrackStore remembering', () => {
     const store = createTrackStore(project);
     store.ingest(snapshot(1000, [live('a')]));
     const before = store.tracks.get('a');
-    if (before) before.ops.hideTrail = true;
+    if (before) before.ops.dir = 3;
     store.ingest(snapshot(1001, []));
 
     // Act
     store.ingest(snapshot(1600, [live('a')]));
 
     // Assert
-    expect(store.tracks.get('a')?.ops.hideTrail).toBe(true);
+    expect(store.tracks.get('a')?.ops.dir).toBe(3);
   });
 
   it('keeps what a target left until fifteen minutes after it was last heard', () => {
@@ -511,7 +506,7 @@ describe('createTrackStore remembering', () => {
     const store = createTrackStore(project);
     store.ingest(snapshot(1000, [live('a')]));
     const before = store.tracks.get('a');
-    if (before) before.ops.hideTrail = true;
+    if (before) before.ops.dir = 3;
     store.ingest(snapshot(1001, []));
 
     // Act
@@ -520,7 +515,7 @@ describe('createTrackStore remembering', () => {
     // Assert
     const t = store.tracks.get('a');
     expect(t?.history.map((f) => f.t)).toEqual([1000 + REMEMBERED_SEC]);
-    expect(t?.ops.hideTrail).toBe(false);
+    expect(t?.ops).toEqual({ dir: null, movedAt: null, manual: false });
   });
 
   it('re-projects what it keeps of a target that dropped out when the projection changes', () => {
