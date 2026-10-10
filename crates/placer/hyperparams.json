@@ -1,11 +1,11 @@
 {
   "meta": {
     "bench": {
-      "merge": 64109,
-      "parallel": 3851,
-      "cross": 7238,
-      "converging": 4792,
-      "random": 36698
+      "merge": 64123,
+      "parallel": 3812,
+      "cross": 7148,
+      "converging": 4735,
+      "random": 36640
     }
   },
   "energy": {

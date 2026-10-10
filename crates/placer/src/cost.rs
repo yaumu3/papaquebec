@@ -186,15 +186,16 @@ fn segment_hits_rect(s: &Segment, r: Rect) -> bool {
     (0..4).any(|k| proper_cross(s.a, s.b, corners[k], corners[(k + 1) % 4]))
 }
 
-/// The angle preference of EUROCONTROL EEC Note 19/05: full cost with the block ahead or abeam,
-/// none at 135° behind, half straight behind.
+/// The angle preference, after EUROCONTROL EEC Note 19/05 but kinder abeam and harsher behind,
+/// where a block hides the track's own history: full cost ahead, half abeam, none at 135°,
+/// three quarters straight behind.
 fn angle_penalty(deg: f64) -> f64 {
-    if deg <= 90.0 {
+    if deg <= 45.0 {
         1.0
     } else if deg <= 135.0 {
-        1.0 - (deg - 90.0) / 45.0
+        1.0 - (deg - 45.0) / 90.0
     } else {
-        0.5 * (deg - 135.0) / 45.0
+        0.75 * (deg - 135.0) / 45.0
     }
 }
 
@@ -560,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn penalises_a_block_ahead_of_or_abeam_the_aircraft_not_one_in_the_rear_quarters() {
+    fn penalises_a_block_ahead_most_behind_next_abeam_half_and_the_rear_quarters_not_at_all() {
         // Arrange
         let subjects = vec![Subject {
             vx: 1.0,
@@ -574,7 +575,7 @@ mod tests {
         ));
 
         // Assert
-        assert_eq!(u, [20.0, 20.0, 20.0, 0.0, 10.0, 0.0, 20.0, 20.0]);
+        assert_eq!(u, [20.0, 20.0, 10.0, 0.0, 15.0, 0.0, 10.0, 20.0]);
     }
 
     #[test]
