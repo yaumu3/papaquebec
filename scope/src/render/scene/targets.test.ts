@@ -87,15 +87,15 @@ describe('buildTargets', () => {
     expect(count(batches, 'text')).toBeGreaterThan(0);
   });
 
-  it('omits the trail when the operator hid it and the vector when it is off', () => {
+  it('omits the vector when it is off', () => {
     // Arrange
-    const t = track({ ops: { hideTrail: true, dir: null, movedAt: null, manual: false } });
+    const t = track();
 
     // Act
     const batches = buildTargets(input([t], { vectorMin: 0 }));
 
     // Assert
-    expect(count(batches, 'lines')).toBe(1); // leader only
+    expect(count(batches, 'lines')).toBe(2 + 1); // two trail slashes, leader
   });
 
   it('skips targets without a drawable position', () => {

@@ -49,7 +49,7 @@ describe('rblNear', () => {
 describe('drawnBlockRect', () => {
   it('is where the block was last drawn, so a block mid-slide is hit where it is seen', () => {
     // Arrange
-    const t = makeTrack({ ops: { hideTrail: false, dir: 0, movedAt: 990, manual: false } });
+    const t = makeTrack({ ops: { dir: 0, movedAt: 990, manual: false } });
     const drawn = { dx: 12, dy: -30 };
 
     // Act
@@ -61,7 +61,7 @@ describe('drawnBlockRect', () => {
 
   it("is at the block's bearing before the block has been drawn", () => {
     // Arrange
-    const t = makeTrack({ ops: { hideTrail: false, dir: 0, movedAt: 990, manual: false } });
+    const t = makeTrack({ ops: { dir: 0, movedAt: 990, manual: false } });
     const rest = blockOffset(0, 0);
 
     // Act

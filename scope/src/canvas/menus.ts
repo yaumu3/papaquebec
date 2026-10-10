@@ -27,13 +27,6 @@ export function targetMenu(t: Track): MenuItem[] {
         setModeText('RBL · SELECT ANCHOR B');
       },
     },
-    { label: '', separator: true },
-    {
-      label: t.ops.hideTrail ? 'Show trail' : 'Hide trail',
-      onSelect: () => {
-        t.ops.hideTrail = !t.ops.hideTrail;
-      },
-    },
   ];
 }
 
