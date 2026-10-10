@@ -76,6 +76,12 @@ export const readoutOf = (lines: string[], name: string): ReadoutLine[] => [
 /** Lines of a readout stack this far apart, CSS px. */
 const READOUT_LINE_PX = 13;
 
+/** A readout's size, CSS px. */
+export interface Box {
+  w: number;
+  h: number;
+}
+
 const lineSize = (l: ReadoutLine) => (l.dim ? 10 : 11);
 
 /** The stack of a readout's lines from `at` down, figures bright and names dim. */
@@ -84,6 +90,15 @@ export function drawStack(text: TextBatch, lines: ReadoutLine[], at: Anchor): vo
     const py = (at.py ?? 0) + i * READOUT_LINE_PX;
     text.text(l.text, { ...at, py }, lineSize(l), l.dim ? THEME.cursorDim : THEME.cursor);
   });
+}
+
+/** The size of the stack {@link drawStack} draws. */
+export function stackBox(text: TextBatch, lines: ReadoutLine[]): Box {
+  const last = lines[lines.length - 1];
+  return {
+    w: Math.max(...lines.map((l) => text.measure(l.text, lineSize(l)))),
+    h: (lines.length - 1) * READOUT_LINE_PX + (last ? text.lineHeight(lineSize(last)) : 0),
+  };
 }
 
 /** Arm of the crosshair at the pointer, CSS px. */

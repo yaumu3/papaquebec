@@ -29,6 +29,32 @@ export function distanceToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(p.x - (a.x + t * abx), p.y - (a.y + t * aby));
 }
 
+/** A segment from its first point to its second. */
+export type Span = [Vec2, Vec2];
+
+/** Segment `p`–`q` split into what lies outside the circle of radius `r` about `c` and what inside. */
+export function splitByCircle(
+  p: Vec2,
+  q: Vec2,
+  c: Vec2,
+  r: number,
+): { outside: Span[]; inside: Span[] } {
+  const d = { x: q.x - p.x, y: q.y - p.y };
+  const f = { x: p.x - c.x, y: p.y - c.y };
+  const a = d.x * d.x + d.y * d.y;
+  const b = 2 * (f.x * d.x + f.y * d.y);
+  const disc = b * b - 4 * a * (f.x * f.x + f.y * f.y - r * r);
+  if (a === 0 || disc <= 0) return { outside: [[p, q]], inside: [] };
+  const t1 = Math.max((-b - Math.sqrt(disc)) / (2 * a), 0);
+  const t2 = Math.min((-b + Math.sqrt(disc)) / (2 * a), 1);
+  if (t1 >= 1 || t2 <= 0) return { outside: [[p, q]], inside: [] };
+  const at = (t: number) => ({ x: p.x + d.x * t, y: p.y + d.y * t });
+  const outside: Span[] = [];
+  if (t1 > 0) outside.push([p, at(t1)]);
+  if (t2 < 1) outside.push([at(t2), q]);
+  return { outside, inside: [[at(t1), at(t2)]] };
+}
+
 export interface GeoPoint {
   lat: number;
   lon: number;

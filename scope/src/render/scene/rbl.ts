@@ -1,12 +1,19 @@
 import { formatMmSs } from '../../lib/format';
-import type { GeoPoint, ProjectFn, UnprojectFn, Vec2 } from '../../lib/geo';
+import {
+  splitByCircle,
+  type GeoPoint,
+  type ProjectFn,
+  type UnprojectFn,
+  type Vec2,
+} from '../../lib/geo';
 import { geodesicPath } from '../../lib/geodesic';
 import type { Declination } from '../../lib/wmm';
 import type { RblAnchor } from '../../state/scope';
 import type { Track } from '../../state/track';
-import { Shape } from '../protocol';
-import type { Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
+import { Shape, type View } from '../protocol';
+import type { LineBatch, MarkerBatch, TextBatch } from './pack';
 import {
+  type Box,
   drawAtPointer,
   drawStack,
   figures,
@@ -15,6 +22,7 @@ import {
   nameLine,
   type Point,
   rangeBearing,
+  stackBox,
   trackPoint,
 } from './readout';
 import { THEME } from './rules';
@@ -47,8 +55,48 @@ export function rblLines(a: Point, b: Point, declination: Declination): string[]
   return lines;
 }
 
+/** How far past its readout an RBL stays faint, CSS px. */
+const READOUT_MARGIN_PX = 4;
 /** An RBL is dotted, so it reads as a measure and not a track: px on, px off. */
 const RBL_DASH: [number, number] = [1, 3];
+
+/** A point on a drawn path, and which way the path runs there. */
+interface PathSite {
+  /** Where it is on the scope plane. */
+  at: Vec2;
+  /** The line's direction there on screen, y down, of unit length. */
+  dir: Vec2;
+}
+
+/** The middle of a drawn path, or its far end. */
+function siteOn(path: Vec2[], where: 'middle' | 'end'): PathSite {
+  const last = path.length - 1;
+  const m = where === 'end' ? last : last / 2;
+  const p = path[Math.floor(m)] ?? { x: 0, y: 0 };
+  const q = path[Math.ceil(m)] ?? p;
+  const before = path[Math.floor(m) - 1] ?? p;
+  const after = path[Math.ceil(m) + 1] ?? q;
+  const dx = after.x - before.x;
+  const dy = before.y - after.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { at: { x: (p.x + q.x) / 2, y: (p.y + q.y) / 2 }, dir: { x: dx / len, y: dy / len } };
+}
+
+/** Px along the line from a readout's centre to the edge of its box, plus `pad`. */
+function reachAlong(dir: Vec2, box: Box, pad: number): number {
+  const x = dir.x === 0 ? Infinity : box.w / 2 / Math.abs(dir.x);
+  const y = dir.y === 0 ? Infinity : box.h / 2 / Math.abs(dir.y);
+  return Math.min(x, y) + pad;
+}
+
+/** The dotted path, faint within `reach` of `c` where the readout sits, so the text stays clear. */
+function drawFadingAt(lines: LineBatch, path: Vec2[], c: Vec2, reach: number): void {
+  const parts = path.slice(1).map((q, i) => splitByCircle(path[i] ?? q, q, c, reach));
+  for (const [p, q] of parts.flatMap((s) => s.outside))
+    lines.segment(p, q, THEME.cursor, { dash: RBL_DASH });
+  for (const [p, q] of parts.flatMap((s) => s.inside))
+    lines.segment(p, q, THEME.cursorFaint, { dash: RBL_DASH });
+}
 
 /** What an RBL is drawn with, beside its batches. */
 export interface RblDrawing {
@@ -56,6 +104,7 @@ export interface RblDrawing {
   project: ProjectFn;
   /** The declination where a bearing is measured, degrees east. */
   declination: Declination;
+  view: View;
 }
 
 export function drawRbl(
@@ -66,13 +115,17 @@ export function drawRbl(
   b: Point,
   onTarget: [boolean, boolean],
   tag: string,
-  labelAt: Anchor,
   input: RblDrawing,
 ): void {
-  lines.polyline(rblPath(a, b, input.project), THEME.cursor, { dash: RBL_DASH });
+  const path = rblPath(a, b, input.project);
+  const site = siteOn(path, 'middle');
+  const stack = [nameLine(tag), ...figures(rblLines(a, b, input.declination))];
+  const box = stackBox(text, stack);
+  const reach = reachAlong(site.dir, box, READOUT_MARGIN_PX);
+  drawFadingAt(lines, path, site.at, reach / input.view.pxPerNm);
   markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
   markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, 6, THEME.cursor);
-  drawStack(text, [nameLine(tag), ...figures(rblLines(a, b, input.declination))], labelAt);
+  drawStack(text, stack, { ...site.at, px: -box.w / 2, py: -box.h / 2 });
 }
 
 /** An RBL being placed: its line to the pointer, read there as the range cursor reads. */

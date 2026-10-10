@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { distanceToSegment, trueToMagnetic, velocityNm, nearest, rankByDistance } from './geo';
+import {
+  distanceToSegment,
+  trueToMagnetic,
+  velocityNm,
+  nearest,
+  rankByDistance,
+  splitByCircle,
+} from './geo';
 
 describe('trueToMagnetic', () => {
   it('subtracts east declination and wraps into 0..360', () => {
@@ -100,5 +107,43 @@ describe('rankByDistance', () => {
     // Assert
     expect(out.map((a) => a.id)).toEqual(['RJTT', 'RJAA', 'RJAH']);
     expect(items[0]?.id).toBe('RJAH');
+  });
+});
+
+/** A point at `x`, `y`, on the x axis unless told otherwise. */
+const at = (x: number, y = 0) => ({ x, y });
+
+describe('splitByCircle', () => {
+  it('cuts a segment where it enters and leaves a circle, if it does', () => {
+    // Arrange: a unit circle about the origin
+    const c = { x: 0, y: 0 };
+    const cases = [
+      { name: 'through', p: { x: -3, y: 0 }, q: { x: 3, y: 0 } },
+      { name: 'into', p: { x: -3, y: 0 }, q: { x: 0, y: 0 } },
+      { name: 'within', p: { x: -0.5, y: 0 }, q: { x: 0.5, y: 0 } },
+      { name: 'past', p: { x: -3, y: 2 }, q: { x: 3, y: 2 } },
+      { name: 'short of', p: { x: -3, y: 0 }, q: { x: -2, y: 0 } },
+    ];
+
+    // Act
+    const split = cases.map((s) => [s.name, splitByCircle(s.p, s.q, c, 1)]);
+
+    // Assert
+    expect(split).toEqual([
+      [
+        'through',
+        {
+          outside: [
+            [at(-3), at(-1)],
+            [at(1), at(3)],
+          ],
+          inside: [[at(-1), at(1)]],
+        },
+      ],
+      ['into', { outside: [[at(-3), at(-1)]], inside: [[at(-1), at(0)]] }],
+      ['within', { outside: [], inside: [[at(-0.5), at(0.5)]] }],
+      ['past', { outside: [[at(-3, 2), at(3, 2)]], inside: [] }],
+      ['short of', { outside: [[at(-3), at(-2)]], inside: [] }],
+    ]);
   });
 });

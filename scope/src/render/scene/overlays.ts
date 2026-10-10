@@ -4,7 +4,7 @@ import type { Declination } from '../../lib/wmm';
 import type { RangeCursorOrigin, Rbl, RblPending } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
-import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
+import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { anchorPoint, drawPendingRbl, drawRbl } from './rbl';
 import {
   drawAtPointer,
@@ -81,7 +81,6 @@ export function buildOverlays(input: OverlayInput): Batch[] {
     const a = anchorPoint(rbl.a, input);
     const b = anchorPoint(rbl.b, input);
     if (!a || !b) continue;
-    const mid: Anchor = { x: (a.pos.x + b.pos.x) / 2, y: (a.pos.y + b.pos.y) / 2, px: 6, py: -6 };
     drawRbl(
       lines,
       markers,
@@ -90,7 +89,6 @@ export function buildOverlays(input: OverlayInput): Batch[] {
       b,
       [rbl.a.kind === 'target', rbl.b.kind === 'target'],
       rbl.tag,
-      mid,
       input,
     );
   }

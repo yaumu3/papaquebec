@@ -36,21 +36,65 @@ const rbl = (x: number) => ({
   tag: 'A',
 });
 
-const segments = (batches: Batch[]) => batches.find((b) => b.kind === 'lines')?.count ?? 0;
+/** A segment of the lines batch: its world ends, its offsets from them in px, dash and color. */
+interface Stroke {
+  a: Vec2;
+  b: Vec2;
+  pa: Vec2;
+  pb: Vec2;
+  dash: [number, number];
+  color: number[];
+}
+
+function strokes(batches: Batch[]): Stroke[] {
+  const lines = batches.find((b) => b.kind === 'lines');
+  if (!lines) return [];
+  const d = lines.data;
+  return Array.from({ length: lines.count }, (_, i) => {
+    const o = i * LINE_STRIDE;
+    const at = (k: number) => ({ x: d[o + k] ?? 0, y: d[o + k + 1] ?? 0 });
+    return {
+      a: at(0),
+      pa: at(2),
+      b: at(4),
+      pb: at(6),
+      dash: [d[o + 9] ?? 0, d[o + 10] ?? 0],
+      color: Array.from(d.subarray(o + 11, o + 15)),
+    };
+  });
+}
+
+const color = (hex: string) => parseColor(hex).map(Math.fround);
+
+/** What each stroke is: the RBL's line, its faint stretch behind the readout, or solid. */
+const kinds = (s: Stroke[]) =>
+  s.map((x) =>
+    x.dash[0] === 0
+      ? 'solid'
+      : x.color.join() === color(THEME.cursorFaint).join()
+        ? 'faint'
+        : 'line',
+  );
+
+/** How far north of 35° the dotted line bows, in degrees. */
+const bow = (s: Stroke[]) =>
+  Math.max(...s.filter((x) => x.dash[0] > 0).flatMap((x) => [x.a.y, x.b.y].map((y) => y - 35)));
 
 describe('buildOverlays', () => {
-  it('draws a short RBL as one segment and a long one along its geodesic', () => {
+  it('draws a short RBL straight and a long one along its geodesic', () => {
     // Arrange
-    const cases = [rbl(130.05), rbl(150)];
+    const cases = [rbl(131), rbl(150)];
 
     // Act
-    const drawn = cases.map((r) => segments(buildOverlays(overlays({ rbls: [r] }))));
+    const drawn = cases.map((r) => strokes(buildOverlays(overlays({ rbls: [r] }))));
 
     // Assert
-    expect(drawn[0]).toBe(1);
-    expect(drawn[1]).toBeGreaterThan(1);
+    expect(bow(drawn[0] ?? [])).toBeLessThan(1e-3);
+    expect(bow(drawn[1] ?? [])).toBeGreaterThan(0.1);
   });
 });
+
+const free = (x: number, y: number) => ({ kind: 'free' as const, x, y });
 
 /** A glyph anchored at world `at`: where it is inked relative to the anchor, CSS px, its size and color. */
 interface Glyph {
@@ -86,77 +130,6 @@ function inked(batches: Batch[], at: Vec2): Glyph[] {
   return out;
 }
 
-describe('the range cursor readout', () => {
-  it('reads the distance as a bare figure, as an RBL does', () => {
-    // Arrange: a degree of longitude east along 35° N, 49.1 NM
-    const input = overlays({
-      rangeCursor: { kind: 'free', x: 130, y: 35 },
-      pointer: { cx: 500, cy: 300 },
-    });
-
-    // Act
-    const glyphs = inked(buildOverlays(input), { x: 131, y: 35 });
-
-    // Assert
-    const top = Math.min(...glyphs.map((g) => g.top));
-    expect(glyphs.filter((g) => g.top === top).length).toBe('49.1'.length);
-  });
-});
-
-/** A segment of the lines batch: its world ends, its offsets from them in px, dash and color. */
-interface Stroke {
-  a: Vec2;
-  b: Vec2;
-  pa: Vec2;
-  pb: Vec2;
-  dash: [number, number];
-  color: number[];
-}
-
-function strokes(batches: Batch[]): Stroke[] {
-  const lines = batches.find((b) => b.kind === 'lines');
-  if (!lines) return [];
-  const d = lines.data;
-  return Array.from({ length: lines.count }, (_, i) => {
-    const o = i * LINE_STRIDE;
-    const at = (k: number) => ({ x: d[o + k] ?? 0, y: d[o + k + 1] ?? 0 });
-    return {
-      a: at(0),
-      pa: at(2),
-      b: at(4),
-      pb: at(6),
-      dash: [d[o + 9] ?? 0, d[o + 10] ?? 0],
-      color: Array.from(d.subarray(o + 11, o + 15)),
-    };
-  });
-}
-
-const free = (x: number, y: number) => ({ kind: 'free' as const, x, y });
-
-describe('the RBL line', () => {
-  it('is dotted, finished or pending', () => {
-    // Arrange
-    const cases = [
-      overlays({ rbls: [rbl(131)] }),
-      overlays({ rblPending: { a: free(130, 35) }, pointer: { cx: 500, cy: 300 } }),
-    ];
-
-    // Act
-    const drawn = cases.map((input) => strokes(buildOverlays(input))[0]?.dash);
-
-    // Assert
-    expect(drawn).toEqual([
-      [1, 3],
-      [1, 3],
-    ]);
-  });
-});
-
-const color = (hex: string) => parseColor(hex).map(Math.fround);
-
-/** What each stroke is: the RBL's dotted line, or solid. */
-const kinds = (s: Stroke[]) => s.map((x) => (x.dash[0] === 0 ? 'solid' : 'line'));
-
 /** The box the glyphs ink, CSS px from their anchor. */
 const extent = (g: Glyph[]) => ({
   left: Math.min(...g.map((x) => x.left)),
@@ -172,6 +145,54 @@ const pending = {
   input: () => overlays({ rblPending: { a: free(130, 35) }, pointer: { cx: 500, cy: 300 } }),
   at: { x: 131, y: 35 },
 };
+
+describe('the RBL readout', () => {
+  it('is centred on the middle of the line', () => {
+    // Arrange
+    const cases = [
+      east,
+      {
+        input: () => overlays({ rbls: [{ a: free(130, 35), b: free(130, 36), tag: 'A' }] }),
+        at: { x: 130, y: 35.5 },
+      },
+    ];
+
+    // Act
+    const boxes = cases.map((c) => extent(inked(buildOverlays(c.input()), c.at)));
+
+    // Assert
+    const centres = boxes.map((b) => [(b.left + b.right) / 2, (b.top + b.bottom) / 2]);
+    expect(centres).toEqual(cases.map(() => [expect.closeTo(0, 4), expect.closeTo(0, 4)]));
+  });
+});
+
+describe('the RBL line', () => {
+  it('is dotted, faint behind the readout', () => {
+    // Arrange
+    const input = east.input();
+
+    // Act
+    const drawn = kinds(strokes(buildOverlays(input)));
+
+    // Assert
+    expect(drawn).toEqual(['line', 'line', 'faint']);
+  });
+
+  it('fades for the whole width of the readout', () => {
+    // Arrange
+    const batches = buildOverlays(east.input());
+    const box = extent(inked(batches, east.at));
+
+    // Act
+    const faint = strokes(batches).find((s) => kinds([s])[0] === 'faint');
+
+    // Assert
+    const px = (x: number) => (x - east.at.x) * 100;
+    const ends = [faint?.a.x ?? 0, faint?.b.x ?? 0].map(px);
+    expect(Math.min(...ends)).toBeLessThanOrEqual(box.left);
+    expect(Math.max(...ends)).toBeGreaterThanOrEqual(box.right);
+  });
+});
 
 /** The strokes pinned at world `at` by both ends, as offsets from it in px. */
 const pinnedAt = (s: Stroke[], at: Vec2) =>
@@ -232,5 +253,22 @@ describe('the RBL tag', () => {
 
     // Assert
     expect(atAnchor).toEqual([]);
+  });
+});
+
+describe('the range cursor readout', () => {
+  it('reads the distance as a bare figure, as an RBL does', () => {
+    // Arrange: a degree of longitude east along 35° N, 49.1 NM
+    const input = overlays({
+      rangeCursor: { kind: 'free', x: 130, y: 35 },
+      pointer: { cx: 500, cy: 300 },
+    });
+
+    // Act
+    const glyphs = inked(buildOverlays(input), { x: 131, y: 35 });
+
+    // Assert
+    const top = Math.min(...glyphs.map((g) => g.top));
+    expect(glyphs.filter((g) => g.top === top).length).toBe('49.1'.length);
   });
 });
