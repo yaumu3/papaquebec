@@ -13,7 +13,7 @@
     "build": "bun run proto && bun run schema && bun run icons && bunx --bun tsc --noEmit && bunx --bun vite build",
     "preview": "bunx --bun vite preview",
     "bench": "bun run build --minify false && bun scripts/bench.ts",
-    "screenshot": "bun run build && bun scripts/screenshot.ts --sim 10 --wait 15000 --select TEST02 --hint --scale 1 --out ../docs/screenshot.png",
+    "screenshot": "bun run build && bun scripts/screenshot.ts --sim 10 --wait 15000 --select TEST01 --hint --scale 1 --out ../docs/screenshot.png",
     "test": "bun run proto && bun test",
     "lint": "bun run proto && bunx --bun oxlint --type-aware",
     "format": "cd .. && bun scope/node_modules/oxfmt/bin/oxfmt",
