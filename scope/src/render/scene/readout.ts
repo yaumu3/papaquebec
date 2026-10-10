@@ -52,7 +52,7 @@ export function measure(
 
 /** Distance in NM over magnetic bearing, the first two lines of every readout. */
 export function rangeBearing(dist: number, brg: number): string[] {
-  return [`${dist.toFixed(1)} NM`, `${padBearing(brg)}°`];
+  return [dist.toFixed(1), `${padBearing(brg)}°`];
 }
 
 /** A line of a readout; a dim one names what is measured. */
