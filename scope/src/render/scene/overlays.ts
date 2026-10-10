@@ -1,6 +1,5 @@
 import { formatMmSs, padBearing } from '../../lib/format';
 import {
-  closestApproach,
   type GeoPoint,
   type ProjectFn,
   trueToMagnetic,
@@ -93,7 +92,7 @@ function measure(a: Point, b: Point, declination: Declination): { dist: number; 
   };
 }
 
-/** Distance, magnetic bearing, ETE when only A moves, CPA when both move. */
+/** Distance and magnetic bearing, then ETE when only A moves. */
 export function rblLines(a: Point, b: Point, declination: Declination): string[] {
   const { dist, brg } = measure(a, b, declination);
   let first = `${dist.toFixed(1)} / ${padBearing(brg)}°`;
@@ -102,11 +101,6 @@ export function rblLines(a: Point, b: Point, declination: Declination): string[]
     const gs = Math.hypot(a.vel.x, a.vel.y);
     if (gs > 1) first = `${first} / ${formatMmSs((dist / gs) * 3600)}`;
     lines[0] = first;
-  } else if (a.vel && b.vel) {
-    const r = closestApproach({ pos: a.pos, vel: a.vel }, { pos: b.pos, vel: b.vel });
-    if (r.kind === 'diverging') lines.push('DIV');
-    else if (r.kind === 'co-speed') lines.push(`SEP ${r.distanceNm.toFixed(1)}`);
-    else lines.push(`CPA ${r.distanceNm.toFixed(1)} in ${formatMmSs(r.seconds)}`);
   }
   return lines;
 }

@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import {
-  closestApproach,
-  distanceToSegment,
-  trueToMagnetic,
-  velocityNm,
-  nearest,
-  rankByDistance,
-} from './geo';
+import { distanceToSegment, trueToMagnetic, velocityNm, nearest, rankByDistance } from './geo';
 
 describe('trueToMagnetic', () => {
   it('subtracts east declination and wraps into 0..360', () => {
@@ -39,48 +32,6 @@ describe('velocityNm', () => {
     // Assert
     expect(v.x).toBeCloseTo(100, 9);
     expect(v.y).toBeCloseTo(0, 9);
-  });
-});
-
-describe('closestApproach', () => {
-  it('finds the CPA of two converging targets', () => {
-    // Arrange
-    const a = { pos: { x: 0, y: 0 }, vel: { x: 60, y: 0 } };
-    const b = { pos: { x: 10, y: 5 }, vel: { x: 0, y: 0 } };
-
-    // Act
-    const r = closestApproach(a, b);
-
-    // Assert
-    expect(r.kind).toBe('converging');
-    if (r.kind === 'converging') {
-      expect(r.distanceNm).toBeCloseTo(5, 9);
-      expect(r.seconds).toBeCloseTo(600, 6);
-    }
-  });
-
-  it('reports diverging targets', () => {
-    // Arrange
-    const a = { pos: { x: 0, y: 0 }, vel: { x: -60, y: 0 } };
-    const b = { pos: { x: 10, y: 5 }, vel: { x: 0, y: 0 } };
-
-    // Act
-    const r = closestApproach(a, b);
-
-    // Assert
-    expect(r.kind).toBe('diverging');
-  });
-
-  it('reports co-speed targets with their fixed separation', () => {
-    // Arrange
-    const a = { pos: { x: 0, y: 0 }, vel: { x: 60, y: 0 } };
-    const b = { pos: { x: 3, y: 4 }, vel: { x: 60, y: 0 } };
-
-    // Act
-    const r = closestApproach(a, b);
-
-    // Assert
-    expect(r).toEqual({ kind: 'co-speed', distanceNm: 5 });
   });
 });
 

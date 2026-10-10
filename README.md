@@ -169,7 +169,7 @@ brought in through the Maps panel.
   world". No basemaps, raster imagery, clustering, themes or eased camera motion.
 - **Honesty over polish.** Stale looks stale, missing is shown as missing, a dead feed says so.
   Nothing is interpolated or smoothed; the raw report is the track. The only extrapolations are the
-  velocity vector and the RBL closure readout, both drawn as what they are. No conflict alerting.
+  velocity vector and an RBL's time to go, both drawn as what they are. No conflict alerting.
 - **Stillness is the default.** Nothing reported animates, pulses, blinks or fades. A trail mark
   stays where it was drawn until it ages out. The one exception is a data block changing bearing,
   which slides there so the eye can follow it.

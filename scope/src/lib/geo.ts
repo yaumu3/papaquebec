@@ -29,34 +29,6 @@ export function distanceToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(p.x - (a.x + t * abx), p.y - (a.y + t * aby));
 }
 
-export interface Mover {
-  pos: Vec2;
-  /** Knots. */
-  vel: Vec2;
-}
-
-export type Approach =
-  | { kind: 'converging'; distanceNm: number; seconds: number }
-  | { kind: 'diverging' }
-  | { kind: 'co-speed'; distanceNm: number };
-
-/** Closest point of approach assuming both movers hold their current velocity. */
-export function closestApproach(a: Mover, b: Mover): Approach {
-  const dx = b.pos.x - a.pos.x;
-  const dy = b.pos.y - a.pos.y;
-  const vx = b.vel.x - a.vel.x;
-  const vy = b.vel.y - a.vel.y;
-  const vv = vx * vx + vy * vy;
-  if (vv < 1e-6) return { kind: 'co-speed', distanceNm: Math.hypot(dx, dy) };
-  const tHours = -(dx * vx + dy * vy) / vv;
-  if (tHours <= 0) return { kind: 'diverging' };
-  return {
-    kind: 'converging',
-    distanceNm: Math.hypot(dx + vx * tHours, dy + vy * tHours),
-    seconds: tHours * 3600,
-  };
-}
-
 export interface GeoPoint {
   lat: number;
   lon: number;

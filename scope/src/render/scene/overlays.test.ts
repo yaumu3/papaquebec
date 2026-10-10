@@ -54,7 +54,7 @@ describe('rblLines', () => {
     expect(lines).toEqual(['10.0 / 090° / 10:01']);
   });
 
-  it('appends the closest approach, worked on the scope plane, when both move', () => {
+  it('shows only distance and bearing when both move', () => {
     // Arrange
     const a = end(0, 0, { x: 0, y: 0 }, { x: 60, y: 0 });
     const b = end(0, EAST, { x: 10, y: 5 }, { x: 0, y: 0 });
@@ -63,7 +63,7 @@ describe('rblLines', () => {
     const lines = rblLines(a, b, () => 0);
 
     // Assert
-    expect(lines).toEqual(['10.0 / 090°', 'CPA 5.0 in 10:00']);
+    expect(lines).toEqual(['10.0 / 090°']);
   });
 });
 
