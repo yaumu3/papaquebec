@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  closestApproach,
   distanceToSegment,
   trueToMagnetic,
   velocityNm,
   nearest,
   rankByDistance,
+  splitByCircle,
 } from './geo';
 
 describe('trueToMagnetic', () => {
@@ -39,48 +39,6 @@ describe('velocityNm', () => {
     // Assert
     expect(v.x).toBeCloseTo(100, 9);
     expect(v.y).toBeCloseTo(0, 9);
-  });
-});
-
-describe('closestApproach', () => {
-  it('finds the CPA of two converging targets', () => {
-    // Arrange
-    const a = { pos: { x: 0, y: 0 }, vel: { x: 60, y: 0 } };
-    const b = { pos: { x: 10, y: 5 }, vel: { x: 0, y: 0 } };
-
-    // Act
-    const r = closestApproach(a, b);
-
-    // Assert
-    expect(r.kind).toBe('converging');
-    if (r.kind === 'converging') {
-      expect(r.distanceNm).toBeCloseTo(5, 9);
-      expect(r.seconds).toBeCloseTo(600, 6);
-    }
-  });
-
-  it('reports diverging targets', () => {
-    // Arrange
-    const a = { pos: { x: 0, y: 0 }, vel: { x: -60, y: 0 } };
-    const b = { pos: { x: 10, y: 5 }, vel: { x: 0, y: 0 } };
-
-    // Act
-    const r = closestApproach(a, b);
-
-    // Assert
-    expect(r.kind).toBe('diverging');
-  });
-
-  it('reports co-speed targets with their fixed separation', () => {
-    // Arrange
-    const a = { pos: { x: 0, y: 0 }, vel: { x: 60, y: 0 } };
-    const b = { pos: { x: 3, y: 4 }, vel: { x: 60, y: 0 } };
-
-    // Act
-    const r = closestApproach(a, b);
-
-    // Assert
-    expect(r).toEqual({ kind: 'co-speed', distanceNm: 5 });
   });
 });
 
@@ -149,5 +107,43 @@ describe('rankByDistance', () => {
     // Assert
     expect(out.map((a) => a.id)).toEqual(['RJTT', 'RJAA', 'RJAH']);
     expect(items[0]?.id).toBe('RJAH');
+  });
+});
+
+/** A point at `x`, `y`, on the x axis unless told otherwise. */
+const at = (x: number, y = 0) => ({ x, y });
+
+describe('splitByCircle', () => {
+  it('cuts a segment where it enters and leaves a circle, if it does', () => {
+    // Arrange: a unit circle about the origin
+    const c = { x: 0, y: 0 };
+    const cases = [
+      { name: 'through', p: { x: -3, y: 0 }, q: { x: 3, y: 0 } },
+      { name: 'into', p: { x: -3, y: 0 }, q: { x: 0, y: 0 } },
+      { name: 'within', p: { x: -0.5, y: 0 }, q: { x: 0.5, y: 0 } },
+      { name: 'past', p: { x: -3, y: 2 }, q: { x: 3, y: 2 } },
+      { name: 'short of', p: { x: -3, y: 0 }, q: { x: -2, y: 0 } },
+    ];
+
+    // Act
+    const split = cases.map((s) => [s.name, splitByCircle(s.p, s.q, c, 1)]);
+
+    // Assert
+    expect(split).toEqual([
+      [
+        'through',
+        {
+          outside: [
+            [at(-3), at(-1)],
+            [at(1), at(3)],
+          ],
+          inside: [[at(-1), at(1)]],
+        },
+      ],
+      ['into', { outside: [[at(-3), at(-1)]], inside: [[at(-1), at(0)]] }],
+      ['within', { outside: [], inside: [[at(-0.5), at(0.5)]] }],
+      ['past', { outside: [[at(-3, 2), at(3, 2)]], inside: [] }],
+      ['short of', { outside: [[at(-3), at(-2)]], inside: [] }],
+    ]);
   });
 });

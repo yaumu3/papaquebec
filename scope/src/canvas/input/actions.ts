@@ -43,7 +43,10 @@ export interface Precision {
 
 /** Everything input can ask of the scope. Each device offers some of these through its gestures. */
 export interface ScopeActions {
-  /** Takes hold of what is under `at`: a target to drag an RBL from, a data block, or the scope. */
+  /**
+   * Takes hold of what is under `at`: the selected target to drag an RBL from, a data block, or
+   * the scope.
+   */
   grab: (at: Point, precision: Precision) => void;
   /** Moves what is held; nothing moves until it passes the drag threshold. */
   dragTo: (at: Point) => void;

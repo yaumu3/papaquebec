@@ -35,6 +35,7 @@ export const THEME = {
   history: '#ffa050',
   cursor: '#d48cf0',
   cursorDim: '#9a6ab0',
+  cursorFaint: '#d48cf04d',
   filtered: '#808080',
   hover: '#a0a0a0',
 } as const;

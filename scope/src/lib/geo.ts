@@ -29,32 +29,30 @@ export function distanceToSegment(p: Vec2, a: Vec2, b: Vec2): number {
   return Math.hypot(p.x - (a.x + t * abx), p.y - (a.y + t * aby));
 }
 
-export interface Mover {
-  pos: Vec2;
-  /** Knots. */
-  vel: Vec2;
-}
+/** A segment from its first point to its second. */
+export type Span = [Vec2, Vec2];
 
-export type Approach =
-  | { kind: 'converging'; distanceNm: number; seconds: number }
-  | { kind: 'diverging' }
-  | { kind: 'co-speed'; distanceNm: number };
-
-/** Closest point of approach assuming both movers hold their current velocity. */
-export function closestApproach(a: Mover, b: Mover): Approach {
-  const dx = b.pos.x - a.pos.x;
-  const dy = b.pos.y - a.pos.y;
-  const vx = b.vel.x - a.vel.x;
-  const vy = b.vel.y - a.vel.y;
-  const vv = vx * vx + vy * vy;
-  if (vv < 1e-6) return { kind: 'co-speed', distanceNm: Math.hypot(dx, dy) };
-  const tHours = -(dx * vx + dy * vy) / vv;
-  if (tHours <= 0) return { kind: 'diverging' };
-  return {
-    kind: 'converging',
-    distanceNm: Math.hypot(dx + vx * tHours, dy + vy * tHours),
-    seconds: tHours * 3600,
-  };
+/** Segment `p`–`q` split into what lies outside the circle of radius `r` about `c` and what inside. */
+export function splitByCircle(
+  p: Vec2,
+  q: Vec2,
+  c: Vec2,
+  r: number,
+): { outside: Span[]; inside: Span[] } {
+  const d = { x: q.x - p.x, y: q.y - p.y };
+  const f = { x: p.x - c.x, y: p.y - c.y };
+  const a = d.x * d.x + d.y * d.y;
+  const b = 2 * (f.x * d.x + f.y * d.y);
+  const disc = b * b - 4 * a * (f.x * f.x + f.y * f.y - r * r);
+  if (a === 0 || disc <= 0) return { outside: [[p, q]], inside: [] };
+  const t1 = Math.max((-b - Math.sqrt(disc)) / (2 * a), 0);
+  const t2 = Math.min((-b + Math.sqrt(disc)) / (2 * a), 1);
+  if (t1 >= 1 || t2 <= 0) return { outside: [[p, q]], inside: [] };
+  const at = (t: number) => ({ x: p.x + d.x * t, y: p.y + d.y * t });
+  const outside: Span[] = [];
+  if (t1 > 0) outside.push([p, at(t1)]);
+  if (t2 < 1) outside.push([at(t2), q]);
+  return { outside, inside: [[at(t1), at(t2)]] };
 }
 
 export interface GeoPoint {

@@ -169,7 +169,7 @@ brought in through the Maps panel.
   world". No basemaps, raster imagery, clustering, themes or eased camera motion.
 - **Honesty over polish.** Stale looks stale, missing is shown as missing, a dead feed says so.
   Nothing is interpolated or smoothed; the raw report is the track. The only extrapolations are the
-  velocity vector and the RBL closure readout, both drawn as what they are. No conflict alerting.
+  velocity vector and an RBL's time to go, both drawn as what they are. No conflict alerting.
 - **Stillness is the default.** Nothing reported animates, pulses, blinks or fades. A trail mark
   stays where it was drawn until it ages out. The one exception is a data block changing bearing,
   which slides there so the eye can follow it.
@@ -208,9 +208,9 @@ Layout:
 - **Phone** (below 720 px): the columns become one bottom sheet with a tab bar, and the top bar
   keeps clock, QNH and feed state.
 - **Touch**: one finger pans, two pinch-zoom around the fingers, a tap selects, a long press opens
-  the menu, a drag off a target draws an RBL.
-- **Mouse and keyboard**: hover, right-drag range cursor, drag off a target for an RBL, wheel zoom
-  and the shortcuts `?` lists.
+  the menu, a drag off the selected target draws an RBL.
+- **Mouse and keyboard**: hover, right-drag range cursor, drag off the selected target for an RBL,
+  wheel zoom and the shortcuts `?` lists.
 
 ## Architecture
 
