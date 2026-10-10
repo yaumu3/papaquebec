@@ -8,8 +8,11 @@ import { THEME, trackLabel, typeLabel } from './rules';
 
 const DATA_BLOCK_PERIOD_SEC = 8;
 
-/** The tone of a stretch of block text: the block's own, the dimmed one of downlinked intent, or an alert. */
-export type Tone = 'plain' | 'intent' | 'alert';
+/**
+ * The tone of a stretch of block text: the block's own, the dimmed one of downlinked intent,
+ * an alert, or the white of the ident.
+ */
+export type Tone = 'plain' | 'intent' | 'alert' | 'ident';
 
 /** A stretch of block text in one tone. */
 export interface Run {
@@ -29,17 +32,18 @@ export interface DataBlock {
 const plain = (text: string): Run => ({ text, tone: 'plain' });
 const intent = (text: string): Run => ({ text, tone: 'intent' });
 const alert = (text: string): Run => ({ text, tone: 'alert' });
+const ident = (text: string): Run => ({ text, tone: 'ident' });
 
 /**
  * The tags above the block in order of precedence: the emergency, then an active advisory,
- * then the ident; alerts but the last.
+ * then the ident; alerts but the last, which reads in white.
  */
 function tagsOf(t: Track): Run[] {
   const code = emergencyCode(t.squawk, t.emergency);
   const tags = [
     ...(code ? [alert(code)] : []),
     ...(t.ra && !t.ra.terminated ? [alert('RA')] : []),
-    ...(t.ident ? [plain('ID')] : []),
+    ...(t.ident ? [ident('ID')] : []),
   ];
   return tags.flatMap((tag, i) => (i === 0 ? [tag] : [plain(' '), tag]));
 }
@@ -158,7 +162,12 @@ export function drawDataBlock(
     px: lineStart(tipX, dx, text.measure(s, DB_FONT_PX)),
     py: dy + row * DB_LINE,
   });
-  const colors = { plain: color, intent: dim(color, INTENT_TONE), alert: THEME.emergency };
+  const colors = {
+    plain: color,
+    intent: dim(color, INTENT_TONE),
+    alert: THEME.emergency,
+    ident: THEME.ident,
+  };
   const top = block.tags.length > 0 ? 1 : 0;
   if (top) drawRuns(text, block.tags, anchor(block.tags.map((r) => r.text).join(''), 0), colors);
   text.text(block.line1, anchor(block.line1, top), DB_FONT_PX, color);

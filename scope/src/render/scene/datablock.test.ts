@@ -65,7 +65,7 @@ describe('dataBlock', () => {
     expect(text(block.tags)).toBe('RF');
   });
 
-  it('tags the emergency, then the advisory, then the ident, the first two as alerts', () => {
+  it('tags the emergency, then the advisory as alerts, then the ident in its own tone', () => {
     // Arrange
     const ra = { multipleThreats: false, terminated: false };
     const t = track({ squawk: '7700', ra, ident: true });
@@ -75,7 +75,7 @@ describe('dataBlock', () => {
 
     // Assert
     expect(text(block.tags)).toBe('EM RA ID');
-    expect(block.tags.map((r) => r.tone)).toEqual(['alert', 'plain', 'alert', 'plain', 'plain']);
+    expect(block.tags.map((r) => r.tone)).toEqual(['alert', 'plain', 'alert', 'plain', 'ident']);
   });
 
   it('flips every block on the same clock, whatever the hex', () => {
@@ -222,6 +222,20 @@ describe('drawDataBlock', () => {
     const tones = g.map(({ rgb }) => (near(rgb, plain) ? 'p' : near(rgb, intent) ? 'i' : '?'));
     // TEST01 / 110↑ 160 B789 / 095°, spaces drawing nothing
     expect(tones.join('')).toBe(['pppppp', 'pppp', 'iii', 'pppp', 'iiii'].join(''));
+  });
+
+  it('sets the ident tag in white, whatever the block color', () => {
+    // Arrange
+    const t = track({ ident: true });
+    const level = { ...ne, color: '#8ac060' };
+
+    // Act
+    const g = glyphs(t, level);
+
+    // Assert
+    const white = g.map(({ rgb }) => near(rgb, [1, 1, 1]));
+    expect(white.slice(0, 'ID'.length)).toEqual([true, true]);
+    expect(white.slice('ID'.length).some(Boolean)).toBe(false);
   });
 
   it('ends the text at the right edge of a block west of its target', () => {
