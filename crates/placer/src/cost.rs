@@ -911,7 +911,7 @@ mod tests {
     }
 
     #[test]
-    fn charges_five_times_as_much_to_move_a_block_the_operator_placed() {
+    fn charges_the_manual_multiple_to_move_a_block_the_operator_placed() {
         // Arrange
         let placed = vec![Subject {
             dir: Some(NE),
@@ -930,7 +930,7 @@ mod tests {
             .collect();
 
         // Assert
-        assert!(close(costs[1][E], 5.0 * costs[0][E]));
+        assert!(close(costs[1][E], HYPER.energy.moving.manual * costs[0][E]));
         assert!(close(costs[1][NE], 0.0));
     }
 }
