@@ -1,4 +1,3 @@
-import { padBearing } from '../../lib/format';
 import type { ProjectFn, UnprojectFn } from '../../lib/geo';
 import { geodesicPath } from '../../lib/geodesic';
 import type { Declination } from '../../lib/wmm';
@@ -7,7 +6,15 @@ import type { Track } from '../../state/track';
 import { type AtlasInfo, type Batch, Shape, type View } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { anchorPoint, drawRbl } from './rbl';
-import { freePoint, measure, type Point, trackPoint } from './readout';
+import {
+  drawAtPointer,
+  freePoint,
+  measure,
+  type Point,
+  rangeBearing,
+  readoutOf,
+  trackPoint,
+} from './readout';
 import { THEME } from './rules';
 import { toWorld } from './view';
 
@@ -62,11 +69,7 @@ function drawRangeCursor(
   lines.polyline(geodesicPath([from.geo, to.geo], input.project), THEME.cursor, { dash: [2, 3] });
   markers.marker(o, Shape.Ring, 8, THEME.cursor);
   markers.marker(o, Shape.Dot, 4, THEME.cursor);
-  lines.segment({ ...m, px: -8 }, { ...m, px: 8 }, THEME.cursor);
-  lines.segment({ ...m, py: -8 }, { ...m, py: 8 }, THEME.cursor);
-  text.text(`${dist.toFixed(1)} NM`, { ...m, px: 12, py: 6 }, 11, THEME.cursor);
-  text.text(`${padBearing(brg)}°`, { ...m, px: 12, py: 19 }, 11, THEME.cursor);
-  text.text(from.label, { ...m, px: 12, py: 32 }, 10, THEME.cursorDim);
+  drawAtPointer(lines, text, m, readoutOf(rangeBearing(dist, brg), from.label));
 }
 
 export function buildOverlays(input: OverlayInput): Batch[] {

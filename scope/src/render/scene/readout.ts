@@ -1,3 +1,4 @@
+import { padBearing } from '../../lib/format';
 import {
   type GeoPoint,
   trueToMagnetic,
@@ -8,7 +9,8 @@ import {
 import { inverse } from '../../lib/geodesic';
 import type { Declination } from '../../lib/wmm';
 import type { Track } from '../../state/track';
-import { trackLabel } from './rules';
+import type { Anchor, LineBatch, TextBatch } from './pack';
+import { THEME, trackLabel } from './rules';
 
 /** A point a readout measures from or to. */
 export interface Point {
@@ -46,4 +48,55 @@ export function measure(
     dist: r.distanceNm,
     brg: trueToMagnetic(r.bearingTrue, declination(a.geo.lat, a.geo.lon)),
   };
+}
+
+/** Distance in NM over magnetic bearing, the first two lines of every readout. */
+export function rangeBearing(dist: number, brg: number): string[] {
+  return [`${dist.toFixed(1)} NM`, `${padBearing(brg)}°`];
+}
+
+/** A line of a readout; a dim one names what is measured. */
+export interface ReadoutLine {
+  text: string;
+  dim?: boolean;
+}
+
+/** A dim line naming what a readout measures. */
+export const nameLine = (name: string): ReadoutLine => ({ text: name, dim: true });
+
+/** Figures as readout lines. */
+export const figures = (lines: string[]): ReadoutLine[] => lines.map((text) => ({ text }));
+
+/** A readout: its figures, then what it measures named dim beneath. */
+export const readoutOf = (lines: string[], name: string): ReadoutLine[] => [
+  ...figures(lines),
+  nameLine(name),
+];
+
+/** Lines of a readout stack this far apart, CSS px. */
+const READOUT_LINE_PX = 13;
+
+const lineSize = (l: ReadoutLine) => (l.dim ? 10 : 11);
+
+/** The stack of a readout's lines from `at` down, figures bright and names dim. */
+export function drawStack(text: TextBatch, lines: ReadoutLine[], at: Anchor): void {
+  lines.forEach((l, i) => {
+    const py = (at.py ?? 0) + i * READOUT_LINE_PX;
+    text.text(l.text, { ...at, py }, lineSize(l), l.dim ? THEME.cursorDim : THEME.cursor);
+  });
+}
+
+/** Arm of the crosshair at the pointer, CSS px. */
+const CROSSHAIR_PX = 8;
+
+/** A readout at the pointer: a crosshair there, the stack below right of it. */
+export function drawAtPointer(
+  lines: LineBatch,
+  text: TextBatch,
+  at: Vec2,
+  stack: ReadoutLine[],
+): void {
+  lines.segment({ ...at, px: -CROSSHAIR_PX }, { ...at, px: CROSSHAIR_PX }, THEME.cursor);
+  lines.segment({ ...at, py: -CROSSHAIR_PX }, { ...at, py: CROSSHAIR_PX }, THEME.cursor);
+  drawStack(text, stack, { ...at, px: 12, py: 6 });
 }
