@@ -3,7 +3,7 @@ import { distanceToSegment, type ProjectFn, type UnprojectFn } from '../lib/geo'
 import type { Offset } from '../render/layout/moves';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
-import { anchorPoint, rblPath } from '../render/scene/overlays';
+import { anchorPoint, rblPath } from '../render/scene/rbl';
 import { restingOffset } from '../render/scene/targets';
 import { toScreen, toWorld } from '../render/scene/view';
 import { aero, drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
