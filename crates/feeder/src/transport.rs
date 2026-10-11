@@ -205,11 +205,14 @@ async fn session(
         started = feed.wait_for(Option::is_some) => started?.clone(),
         _ = connection.closed() => return Ok(()),
     };
-    let Some(published) = started else {
+    // Taken apart at once, so that the session does not hold on to the history it started from.
+    let Some((hello, latest)) =
+        started.map(|published| (published.hello(since), published.latest().clone()))
+    else {
         return Ok(());
     };
-    stream.write_all(&published.hello(since)).await?;
-    stream.write_all(published.latest()).await?;
+    stream.write_all(&hello).await?;
+    stream.write_all(&latest).await?;
     loop {
         tokio::select! {
             changed = feed.changed() => changed?,
