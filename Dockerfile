@@ -30,9 +30,10 @@ COPY Cargo.toml ./
 COPY crates/ crates/
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,id=wasm-target,target=/src/target \
-    cargo build --profile wasm -p placer -p wmm --target wasm32-unknown-unknown --locked \
+    cargo build --profile wasm -p placer -p wmm -p geodesy --target wasm32-unknown-unknown --locked \
     && wasm-bindgen --target web --out-dir /wasm/placer target/wasm32-unknown-unknown/wasm/placer.wasm \
-    && wasm-bindgen --target web --out-dir /wasm/wmm target/wasm32-unknown-unknown/wasm/wmm.wasm
+    && wasm-bindgen --target web --out-dir /wasm/wmm target/wasm32-unknown-unknown/wasm/wmm.wasm \
+    && wasm-bindgen --target web --out-dir /wasm/geodesy target/wasm32-unknown-unknown/wasm/geodesy.wasm
 
 FROM oven/bun:1-alpine AS build
 WORKDIR /app
@@ -44,6 +45,7 @@ COPY proto/ /proto/
 COPY scope/ ./
 COPY --from=wasm /wasm/placer ./src/render/layout/wasm
 COPY --from=wasm /wasm/wmm ./src/lib/wasm
+COPY --from=wasm /wasm/geodesy ./src/lib/wasm
 RUN bun run build
 
 FROM oven/bun:1-alpine

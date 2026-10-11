@@ -486,6 +486,9 @@ dependencies = [
 [[package]]
 name = "geodesy"
 version = "0.1.0"
+dependencies = [
+ "wasm-bindgen",
+]
 
 [[package]]
 name = "getrandom"

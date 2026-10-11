@@ -4,6 +4,9 @@
 //! receiver's ranges. The inverse fails to converge only for nearly antipodal
 //! places, which nothing here measures.
 
+#[cfg(target_arch = "wasm32")]
+mod wasm;
+
 /// The semi-axes of the WGS-84 ellipsoid, m, and its flattening.
 const A_M: f64 = 6_378_137.0;
 const F: f64 = 1.0 / 298.257_223_563;
