@@ -11,16 +11,10 @@ pub struct Position {
 }
 
 impl Position {
-    /// The distance along the great circle to the other position.
+    /// The distance along the geodesic to the other position, on the WGS-84 ellipsoid.
     #[must_use]
     pub fn distance_nm(self, other: Self) -> f64 {
-        /// The mean radius of the Earth.
-        const RADIUS_NM: f64 = 3440.065;
-        let haversine = |degrees: f64| (degrees.to_radians() / 2.0).sin().powi(2);
-        let across = self.lat_deg.to_radians().cos() * other.lat_deg.to_radians().cos();
-        let between = haversine(other.lat_deg - self.lat_deg)
-            + across * haversine(other.lon_deg - self.lon_deg);
-        2.0 * RADIUS_NM * between.sqrt().asin()
+        geodesy::inverse(self.into(), other.into()).distance_nm
     }
 
     /// How far east of true north magnetic north lies here at `now_s`, in
@@ -28,6 +22,13 @@ impl Position {
     #[must_use]
     pub fn declination_deg(self, now_s: f64) -> f64 {
         wmm::declination_deg(self.lat_deg, self.lon_deg, wmm::year_of(now_s))
+    }
+}
+
+/// Latitude and longitude, as the geodesics take a place.
+impl From<Position> for (f64, f64) {
+    fn from(position: Position) -> Self {
+        (position.lat_deg, position.lon_deg)
     }
 }
 
@@ -79,46 +80,21 @@ mod tests {
     };
 
     #[test]
-    fn distance_is_along_the_great_circle() {
-        // Arrange: RJTT, from RJFF; a degree of latitude; a degree of longitude at 60 N; nowhere
-        let pairs = [
-            (
-                SITE,
-                Position {
-                    lat_deg: 35.5533,
-                    lon_deg: 139.7811,
-                },
-            ),
-            (
-                SITE,
-                Position {
-                    lat_deg: SITE.lat_deg + 1.0,
-                    ..SITE
-                },
-            ),
-            (
-                Position {
-                    lat_deg: 60.0,
-                    lon_deg: -1.0,
-                },
-                Position {
-                    lat_deg: 60.0,
-                    lon_deg: 0.0,
-                },
-            ),
-            (SITE, SITE),
-        ];
+    fn distance_is_along_the_ellipsoid() {
+        // Arrange: a degree of latitude across the equator and up to the pole, and nowhere
+        let at = |lat_deg| Position {
+            lat_deg,
+            lon_deg: 130.0,
+        };
+        let pairs = [(at(-0.5), at(0.5)), (at(89.0), at(90.0)), (SITE, SITE)];
 
         // Act
         let distances = pairs.map(|(from, to)| from.distance_nm(to));
 
-        // Assert: a degree of a great circle is 60.04 NM
-        let expected = [477.0, 60.04, 30.02, 0.0];
+        // Assert: 59.705 and 60.310 NM, where a sphere has 60.04 for both
+        let expected = [59.705, 60.310, 0.0];
         for (distance, expected) in distances.iter().zip(expected) {
-            assert!(
-                (distance - expected).abs() < expected * 0.005 + 1e-9,
-                "{distances:?}"
-            );
+            assert!((distance - expected).abs() < 0.005, "{distances:?}");
         }
     }
 

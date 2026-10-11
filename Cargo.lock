@@ -2071,6 +2071,7 @@ dependencies = [
 name = "tracker"
 version = "0.1.0"
 dependencies = [
+ "geodesy",
  "prost",
  "prost-build",
  "protox",
