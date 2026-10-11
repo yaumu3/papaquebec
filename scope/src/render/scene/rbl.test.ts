@@ -14,15 +14,17 @@ const end = (lat: number, lon: number, pos: Vec2 = { x: 0, y: 0 }, vel: Vec2 | n
 /** Ten minutes of longitude east along the equator: 10.0 NM on course 090. */
 const EAST = 10 / 60;
 
+/** A declination of 7.5° east at the origin and nothing like it anywhere else. */
+const eastAtOrigin = (_lat: number, lon: number) => (lon === 0 ? 7.5 : -20);
+
 describe('rblLines', () => {
   it('shows the distance over the bearing made magnetic at the origin', () => {
-    // Arrange: a declination of 7.5° east at the origin and nothing like it at the far end
+    // Arrange
     const a = end(0, 0);
     const b = end(0, EAST, { x: 10, y: 0 });
-    const declination = (_lat: number, lon: number) => (lon === 0 ? 7.5 : -20);
 
     // Act
-    const lines = rblLines(a, b, declination);
+    const lines = rblLines(a, b, eastAtOrigin);
 
     // Assert
     expect(lines).toEqual(['10.0', '083°']);
