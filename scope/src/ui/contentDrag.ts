@@ -8,6 +8,30 @@ interface Pull {
   up(y: number, t: number): void;
 }
 
+/** The parts of a `Touch` the tracker reads. */
+export interface Finger {
+  identifier: number;
+  clientX: number;
+  clientY: number;
+}
+
+/** The parts of a `TouchEvent` the tracker reads. */
+export interface Fingers {
+  touches: ArrayLike<Finger>;
+  changedTouches: ArrayLike<Finger>;
+  target: EventTarget | null;
+  timeStamp: number;
+}
+
+/** What the tracker asks of the page about where a finger is. */
+export interface ContentReads {
+  /** Whether a finger on `target` is free to pull the sheet, not held by a control of its own. */
+  free(target: EventTarget | null): boolean;
+  /** Whether the content under `target` is scrolled to its top, or has nothing to scroll. */
+  atTop(target: EventTarget | null): boolean;
+  atLargest(): boolean;
+}
+
 /** Whether what the finger landed on takes drags itself, as a slider does, keeping them from the sheet. */
 function ownsDrag(target: Element, sheet: Element): boolean {
   for (let el: Element | null = target; el && el !== sheet; el = el.parentElement) {
@@ -28,6 +52,56 @@ function scrolledToTop(target: Element, sheet: Element): boolean {
 }
 
 /**
+ * Tells which fingers on a sheet's content pull the sheet: a lone finger whose first move goes
+ * where the content would not scroll. `move` returns true when the move is the sheet's, so that
+ * the content must not scroll.
+ */
+export function trackContentTouches(
+  pull: {
+    down(y: number, t: number): void;
+    move(y: number, t: number): void;
+    up(y: number, t: number): void;
+  },
+  read: ContentReads,
+) {
+  let landed: { x: number; y: number; t: number } | null = null;
+  let moving = false;
+  return {
+    start(e: Fingers): void {
+      const touch = e.touches[0];
+      landed =
+        touch && e.touches.length === 1 && read.free(e.target)
+          ? { x: touch.clientX, y: touch.clientY, t: e.timeStamp }
+          : null;
+      moving = false;
+    },
+    move(e: Fingers): boolean {
+      const touch = e.touches[0];
+      if (!touch) return false;
+      if (landed) {
+        moving = contentMovesSheet({
+          up: landed.y - touch.clientY,
+          across: touch.clientX - landed.x,
+          atLargest: read.atLargest(),
+          atTop: read.atTop(e.target),
+        });
+        if (moving) pull.down(landed.y, landed.t);
+        landed = null;
+      }
+      if (!moving) return false;
+      pull.move(touch.clientY, e.timeStamp);
+      return true;
+    },
+    end(e: Fingers): void {
+      const touch = e.changedTouches[0];
+      if (moving && touch) pull.up(touch.clientY, e.timeStamp);
+      landed = null;
+      moving = false;
+    },
+  };
+}
+
+/**
  * Lets a finger on a phone sheet's content drag the sheet where the content would not scroll that
  * way, deciding on its first move, before the content can start to scroll. Returns a disposer.
  */
@@ -36,40 +110,23 @@ export function dragFromContent(
   drag: Pull,
   atLargest: () => boolean,
 ): () => void {
-  let landed: { x: number; y: number; t: number } | null = null;
-  let moving = false;
-  const start = (e: TouchEvent) => {
-    const touch = e.touches[0];
-    const free = isPhone() && e.target instanceof Element && !ownsDrag(e.target, sheet);
-    landed =
-      touch && e.touches.length === 1 && free
-        ? { x: touch.clientX, y: touch.clientY, t: e.timeStamp }
-        : null;
-    moving = false;
-  };
+  const fingers = trackContentTouches(
+    {
+      down: (y, t) => drag.down(sheet, y, t),
+      move: (y, t) => drag.move(y, t),
+      up: (y, t) => drag.up(y, t),
+    },
+    {
+      free: (target) => isPhone() && target instanceof Element && !ownsDrag(target, sheet),
+      atTop: (target) => target instanceof Element && scrolledToTop(target, sheet),
+      atLargest,
+    },
+  );
+  const start = (e: TouchEvent) => fingers.start(e);
   const move = (e: TouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    if (landed && e.target instanceof Element) {
-      moving = contentMovesSheet({
-        up: landed.y - touch.clientY,
-        across: touch.clientX - landed.x,
-        atLargest: atLargest(),
-        atTop: scrolledToTop(e.target, sheet),
-      });
-      if (moving) drag.down(sheet, landed.y, landed.t);
-      landed = null;
-    }
-    if (!moving) return;
-    e.preventDefault();
-    drag.move(touch.clientY, e.timeStamp);
+    if (fingers.move(e)) e.preventDefault();
   };
-  const end = (e: TouchEvent) => {
-    const touch = e.changedTouches[0];
-    if (moving && touch) drag.up(touch.clientY, e.timeStamp);
-    landed = null;
-    moving = false;
-  };
+  const end = (e: TouchEvent) => fingers.end(e);
   sheet.addEventListener('touchstart', start, { passive: true });
   sheet.addEventListener('touchmove', move, { passive: false });
   sheet.addEventListener('touchend', end);
