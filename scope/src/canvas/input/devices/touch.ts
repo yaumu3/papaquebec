@@ -58,6 +58,8 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
   let tapping: { id: number; at: Point } | null = null;
   let lastTap: Tap | null = null;
   let zoom: { id: number; anchor: Point; started: boolean } | null = null;
+  /** The finger that made the second touch of a double tap, while it stays down. */
+  let doubleTap: number | null = null;
 
   const cancelLongPress = () => {
     if (longPress) clearTimeout(longPress);
@@ -72,10 +74,11 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     const p = at(e);
     fingers.set(e.pointerId, p);
     if (fingers.size === 1) {
-      const second = isDoubleTap(lastTap, { ...p, t: e.timeStamp }) && !h.startsRbl(p);
+      const second = isDoubleTap(lastTap, { ...p, t: e.timeStamp });
       // Any other touch between two taps breaks the pair, so only the tap just before counts.
       lastTap = null;
-      if (second) {
+      if (second) doubleTap = e.pointerId;
+      if (second && !h.startsRbl(p)) {
         zoom = { id: e.pointerId, anchor: p, started: false };
         return;
       }
@@ -132,6 +135,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
   /** A finger lifted, or the browser `cancelled` it, which is never a tap. */
   const up = (e: FingerEvent, cancelled = false): boolean => {
     if (!fingers.delete(e.pointerId)) return false;
+    if (doubleTap === e.pointerId) doubleTap = null;
     cancelLongPress();
     if (pinch) {
       if (fingers.size < 2) {
@@ -154,10 +158,10 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     return false;
   };
 
-  /** Whether a double-tap drag zoom owns the current touch. */
-  const zooming = () => zoom !== null;
+  /** Whether the second touch of a double tap is down, whether it zooms or drags out an RBL. */
+  const holdingDoubleTap = () => doubleTap !== null;
 
-  return { down, move, up, zooming };
+  return { down, move, up, holdingDoubleTap };
 }
 
 /**
@@ -203,12 +207,12 @@ export function attachTouch(canvas: HTMLCanvasElement, a: ScopeActions): () => v
     }),
     listen(window, 'pointerup', (e) => lift(e, false)),
     listen(window, 'pointercancel', (e) => lift(e, true)),
-    // iOS shows its text magnifier when a double tap is held; a drag zoom is not a text gesture.
+    // iOS shows its text magnifier when a double tap is held; a zoom or an RBL is no text gesture.
     listen(
       canvas,
       'touchstart',
       (e) => {
-        if (touch.zooming()) e.preventDefault();
+        if (touch.holdingDoubleTap()) e.preventDefault();
       },
       { passive: false },
     ),

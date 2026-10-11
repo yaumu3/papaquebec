@@ -266,7 +266,7 @@ describe('trackTouches', () => {
     // Assert
     expect(calls.slice(-2).map(([name]) => name)).toEqual(['zoomEnd', 'zoomStart']);
   });
-  it('is zooming from the second touch of a double tap until that finger lifts', () => {
+  it('holds a double tap from its second touch until that finger lifts, zooming or dragging an RBL', () => {
     // Arrange
     const steps: ((t: ReturnType<typeof trackTouches>) => void)[] = [
       (t) => t.down(finger(1, 100, 200, 0)),
@@ -274,16 +274,21 @@ describe('trackTouches', () => {
       (t) => t.down(finger(2, 100, 200, 180)),
       (t) => t.up(finger(2, 100, 200, 240)),
     ];
-    const { t } = recorder();
+    const runs = [recorder(), recorder({ rbl: true })];
 
     // Act
-    const zooming = steps.map((step) => {
-      step(t);
-      return t.zooming();
-    });
+    const held = runs.map(({ t }) =>
+      steps.map((step) => {
+        step(t);
+        return t.holdingDoubleTap();
+      }),
+    );
 
     // Assert
-    expect(zooming).toEqual([false, false, true, false]);
+    expect(held).toEqual([
+      [false, false, true, false],
+      [false, false, true, false],
+    ]);
   });
 
   it('taps where a lone finger lifts, unless it dragged first', () => {
