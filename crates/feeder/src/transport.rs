@@ -16,8 +16,8 @@ use wtransport::endpoint::endpoint_side;
 use wtransport::tls::Sha256DigestFmt;
 use wtransport::{Endpoint, Identity, ServerConfig};
 
+use crate::Failure;
 use crate::feed::Published;
-use tracker::Failure;
 
 /// A household's screens with room to spare: every session costs up to an hour
 /// of history, and a client on the network can claim any origin.

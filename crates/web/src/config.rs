@@ -4,9 +4,9 @@ use std::num::NonZeroU16;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use crate::Failure;
 use authority::Subject;
 use sim::Scenario;
-use tracker::Failure;
 use tracker::position::Position;
 
 /// Where the traffic comes from.
