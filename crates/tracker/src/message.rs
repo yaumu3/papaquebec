@@ -102,12 +102,8 @@ pub fn read(message: &[u8]) -> Option<(Address, Trust, Report)> {
 /// Who sent the message and what it says, by its downlink format. `overlay`
 /// is what lies over its parity.
 fn heard(bits: Bits, overlay: u32) -> Option<(Address, Trust, Report)> {
-    let address = |value, r#type: AddressType| Address {
-        value,
-        r#type: r#type.into(),
-    };
-    let recovered = (address(overlay, AddressType::Icao), Trust::Recovered);
-    let announced = |r#type| (address(bits.get(9, 32), r#type), Trust::Announced);
+    let recovered = (Address::new(overlay, AddressType::Icao), Trust::Recovered);
+    let announced = |r#type| (Address::new(bits.get(9, 32), r#type), Trust::Announced);
     let ((address, trust), report) = match bits.get(1, 5) {
         // Air-to-air surveillance, whose vertical status only tells the ground apart.
         0 | 16 => (
@@ -169,11 +165,7 @@ fn all_call(bits: Bits, overlay: u32) -> Option<(Address, Trust)> {
         1..=0x7f => Trust::Recovered,
         _ => return None,
     };
-    let address = Address {
-        value: bits.get(9, 32),
-        r#type: AddressType::Icao.into(),
-    };
-    Some((address, trust))
+    Some((Address::new(bits.get(9, 32), AddressType::Icao), trust))
 }
 
 fn all_call_reply(bits: Bits) -> Report {
@@ -265,10 +257,7 @@ mod tests {
     const ADDRESS: u32 = 0x00d0_0001;
 
     fn icao(value: u32) -> Address {
-        Address {
-            value,
-            r#type: AddressType::Icao.into(),
-        }
+        Address::new(value, AddressType::Icao)
     }
 
     fn identification(callsign: &str) -> Identification {
@@ -566,10 +555,7 @@ mod tests {
 
         // Assert
         let addresses = heard.map(|one| one.map(|(address, _, _)| address));
-        let other = Address {
-            value: ADDRESS,
-            r#type: AddressType::NonIcao.into(),
-        };
+        let other = Address::new(ADDRESS, AddressType::NonIcao);
         assert_eq!(addresses, [Some(icao(ADDRESS)), Some(other), None]);
     }
 

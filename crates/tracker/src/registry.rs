@@ -252,10 +252,7 @@ mod tests {
         // Arrange: the same number as an ICAO address and as another
         let registry = Registry::read(&database()).expect("reads");
         let at = |r#type: AddressType| Aircraft {
-            address: Some(Address {
-                value: 0x00d0_0002,
-                r#type: r#type.into(),
-            }),
+            address: Some(Address::new(0x00d0_0002, r#type)),
             ..Aircraft::default()
         };
         let mut snapshot = Snapshot {

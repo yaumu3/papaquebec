@@ -656,10 +656,7 @@ mod tests {
     const RSSI_DBFS: f64 = -20.0;
 
     fn icao(value: u32) -> Address {
-        Address {
-            value,
-            r#type: AddressType::Icao.into(),
-        }
+        Address::new(value, AddressType::Icao)
     }
 
     fn from(address: u32, report: Report) -> Observation {

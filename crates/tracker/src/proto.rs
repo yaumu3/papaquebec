@@ -9,6 +9,16 @@ mod generated {
 
 pub use generated::*;
 
+impl Address {
+    #[must_use]
+    pub fn new(value: u32, r#type: AddressType) -> Self {
+        Self {
+            value,
+            r#type: r#type.into(),
+        }
+    }
+}
+
 impl From<Snapshot> for Frame {
     fn from(snapshot: Snapshot) -> Self {
         Self {
@@ -49,10 +59,7 @@ mod tests {
     fn frame_survives_the_wire() {
         // Arrange
         let frame = frame_of(Aircraft {
-            address: Some(Address {
-                value: 0x00d0_0001,
-                r#type: AddressType::Icao.into(),
-            }),
+            address: Some(Address::new(0x00d0_0001, AddressType::Icao)),
             identification: Some("TEST01".into()),
             baro_altitude_ft: Some(0),
             emergency_priority_status: Some(EmergencyPriorityStatus::NoEmergency.into()),
@@ -104,17 +111,10 @@ mod tests {
         assert_eq!(actual, expected.map(|(_, code)| code));
     }
 
-    fn address(value: u32, r#type: AddressType) -> Address {
-        Address {
-            value,
-            r#type: r#type.into(),
-        }
-    }
-
     /// An aircraft of which the feed carries everything it can in the air.
     fn known_in_full() -> Aircraft {
         Aircraft {
-            address: Some(address(0x00d0_0001, AddressType::Icao)),
+            address: Some(Address::new(0x00d0_0001, AddressType::Icao)),
             identification: Some("TEST01".into()),
             emitter_category: Some(EmitterCategory::A3Large.into()),
             mode_a_code: Some(0o0421),
@@ -184,7 +184,7 @@ mod tests {
     /// The aircraft in the pinned bytes, which the scope's tests read back.
     fn pinned_aircraft() -> Vec<Aircraft> {
         let on_the_ground = Aircraft {
-            address: Some(address(0x00d0_0002, AddressType::NonIcao)),
+            address: Some(Address::new(0x00d0_0002, AddressType::NonIcao)),
             mode_a_code: Some(0o7700),
             emitter_category: Some(EmitterCategory::C1SurfaceEmergencyVehicle.into()),
             emergency_priority_status: Some(EmergencyPriorityStatus::GeneralEmergency.into()),
@@ -203,7 +203,7 @@ mod tests {
             ..Aircraft::default()
         };
         let with_a_last_position = Aircraft {
-            address: Some(address(0x00d0_0003, AddressType::Icao)),
+            address: Some(Address::new(0x00d0_0003, AddressType::Icao)),
             lat_deg: Some(33.0),
             lon_deg: Some(130.0),
             position_source: Source::Tisb.into(),
@@ -218,7 +218,7 @@ mod tests {
             ..Aircraft::default()
         };
         let bare = Aircraft {
-            address: Some(address(0x00d0_0004, AddressType::Icao)),
+            address: Some(Address::new(0x00d0_0004, AddressType::Icao)),
             ..Aircraft::default()
         };
         vec![known_in_full(), on_the_ground, with_a_last_position, bare]
