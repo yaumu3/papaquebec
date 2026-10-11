@@ -8,9 +8,6 @@
   box-shadow: 0 0 0 1px var(--panel-outline);
   pointer-events: auto;
 }
-.hidden {
-  display: none;
-}
 .body {
   min-height: 0;
   overflow-y: auto;

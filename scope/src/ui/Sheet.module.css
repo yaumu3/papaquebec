@@ -1,3 +1,7 @@
+/* Two classes, to outrank the display of whatever box it is. */
+.sheet.hidden {
+  display: none;
+}
 .grip {
   display: none;
 }
@@ -11,7 +15,20 @@
     transition-duration: var(--sheet-ms);
     transition-timing-function: var(--sheet-ease);
   }
-  /* After .sheet: a drag moves it straight to the finger. */
+  /* Off the foot of the screen before it shows, and again until it hides. */
+  .slides {
+    transition-property: height, transform, display;
+    transition-behavior: allow-discrete;
+  }
+  @starting-style {
+    .slides {
+      transform: translateY(100%);
+    }
+  }
+  .slides.hidden {
+    transform: translateY(100%);
+  }
+  /* After .sheet and .slides: a drag moves it straight to the finger. */
   .dragging {
     transition: none;
   }

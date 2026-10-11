@@ -55,6 +55,9 @@ export const DETENTS: Record<PanelId, Detents> = {
   maps: ['large'],
 };
 
+/** True when the sheet slides up from closed or down to it; false when it passes between panels. */
+export const [sheetSlides, setSheetSlides] = createSignal(true);
+
 /** The detent the open sheet rests at. */
 export const [sheetDetent, setSheetDetent] = createSignal<Detent>('medium');
 
@@ -85,6 +88,7 @@ export function toggleSheet(id: PanelId): void {
     return;
   }
   setSheetDetent(detentFor(DETENTS[next], current === null ? null : sheetDetent()));
+  setSheetSlides(current === null);
   setActiveSheet(next);
 }
 
@@ -94,6 +98,7 @@ export function cycleSheet(): void {
 }
 
 export function closeSheet(): void {
+  setSheetSlides(true);
   setActiveSheet(null);
 }
 

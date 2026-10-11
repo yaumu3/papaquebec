@@ -14,6 +14,7 @@ import {
   setActiveSheet,
   setSheetDetent,
   sheetDetent,
+  sheetSlides,
   toggleSheet,
 } from './layout';
 
@@ -257,5 +258,22 @@ describe('cycleSheet', () => {
 
     // Assert
     expect(sheetDetent()).toBe('medium');
+  });
+});
+
+describe('sheetSlides', () => {
+  it('slides the sheet when it opens from closed or closes, not when it passes between panels', () => {
+    // Arrange
+    closeSheet();
+    const taps = ['list', 'maps', 'maps'] as const;
+
+    // Act
+    const out = taps.map((id) => {
+      toggleSheet(id);
+      return sheetSlides();
+    });
+
+    // Assert
+    expect(out).toEqual([true, false, true]);
   });
 });

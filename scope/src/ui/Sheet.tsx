@@ -9,6 +9,7 @@ import {
   largestDetent,
   setSheetDetent,
   sheetDetent,
+  sheetSlides,
 } from '../state/layout';
 import { trackPull } from './pull';
 import { grabberShown, type SheetStop, settle, sheetFrame, sheetStops } from './sheetMotion';
@@ -92,11 +93,13 @@ function Grip(props: { drag: SheetDrag }) {
 }
 
 /**
- * On a phone, a bottom sheet that rests at its detents, as SwiftUI's presentation detents: its
- * grabber drags it, and it settles at the detent its flick carries it to. Elsewhere a plain box.
+ * On a phone, a bottom sheet that rests at its detents, as SwiftUI's presentation detents: it
+ * slides up when shown and down when hidden, its grabber drags it, and it settles at the detent
+ * its flick carries it to. Elsewhere a plain box.
  */
 export function Sheet(props: {
   detents: Detents;
+  shown: boolean;
   class?: string | undefined;
   children: JSX.Element;
 }) {
@@ -111,7 +114,14 @@ export function Sheet(props: {
   };
   return (
     <div
-      class={cx(s.sheet, props.class, !grabber() && s.bare, frame() && s.dragging)}
+      class={cx(
+        s.sheet,
+        props.class,
+        !props.shown && s.hidden,
+        sheetSlides() && s.slides,
+        !grabber() && s.bare,
+        frame() && s.dragging,
+      )}
       style={style()}
     >
       {grabber() && <Grip drag={drag} />}

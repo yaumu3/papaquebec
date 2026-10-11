@@ -16,7 +16,7 @@ export function Window(props: {
 }) {
   const shown = () => isShown(isPhone(), activeSheet(), props.id, panels()[props.id]);
   return (
-    <Sheet detents={DETENTS[props.id]} class={cx(s.win, props.class, !shown() && s.hidden)}>
+    <Sheet detents={DETENTS[props.id]} shown={shown()} class={cx(s.win, props.class)}>
       <div class={cx(s.body, props.bodyClass)}>{props.children}</div>
     </Sheet>
   );
