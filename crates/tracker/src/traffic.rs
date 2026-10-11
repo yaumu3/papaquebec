@@ -4,9 +4,10 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 
 use crate::air::{self, Wind};
+use crate::beast::{Frame, Observation};
 use crate::cpr::{self, Cpr};
 use crate::field::{Airspeed, Identification};
-use crate::message::{Observation, Report, Trust};
+use crate::message::{Report, Trust};
 use crate::position::Position;
 use crate::proto::{
     Address, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory, LastPosition,
@@ -73,11 +74,19 @@ impl Traffic {
         }
     }
 
-    /// Takes in what a message heard at `now_s`, in seconds since the epoch, says.
+    /// Takes in what the messages of the frames heard at `now_s`, in seconds
+    /// since the epoch, say; a damaged one says nothing.
+    pub fn hear(&mut self, frames: &[Frame], now_s: f64) {
+        for observation in frames.iter().filter_map(Frame::observation) {
+            self.take(&observation, now_s);
+        }
+    }
+
+    /// Takes in what a message heard at `now_s` says.
     ///
     /// An address that is only recovered is believed of an aircraft already
     /// known; of any other, the message is taken for a damaged one.
-    pub fn hear(&mut self, observation: &Observation, now_s: f64) {
+    fn take(&mut self, observation: &Observation, now_s: f64) {
         let Address { value, r#type } = observation.address;
         let key = (r#type, value);
         let tracked = match (self.aircraft.entry(key), observation.trust) {
@@ -341,8 +350,7 @@ impl Tracked {
                 self.qualify(said.nac_p_of_version_0(), now_s);
                 let nic = said.nic(self.nic_supplement_a, self.nic_supplement_c);
                 // A receiver hears an aircraft on the ground only from nearby.
-                let reference = self.fix.at(now_s).map_or(site, |fix| fix.position);
-                let position = cpr::surface_near(said.cpr, reference);
+                let position = cpr::surface_near(said.cpr, self.whereabouts(now_s, site));
                 self.place(position, nic, observation.source, now_s, site);
             }
             Report::Reply(said) => {
@@ -357,7 +365,44 @@ impl Tracked {
                     self.answer(&register, now_s, site);
                 }
             }
-            said => self.note(said, now_s),
+            Report::Identification(said) => self.remembered.keep(said, now_s),
+            Report::Velocity(said) => {
+                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
+                self.track_deg.keep(said.track_deg, now_s);
+                self.magnetic_heading_deg
+                    .keep(said.magnetic_heading_deg, now_s);
+                self.baro_vertical_rate_fpm
+                    .keep(said.baro_vertical_rate_fpm, now_s);
+                self.geometric_vertical_rate_fpm
+                    .keep(said.geometric_vertical_rate_fpm, now_s);
+                self.geometric_minus_baro_ft
+                    .keep(said.geometric_minus_baro_ft, now_s);
+                match said.airspeed {
+                    Some(Airspeed::Indicated(kt)) => {
+                        self.indicated_airspeed_kt.keep(Some(kt), now_s);
+                    }
+                    Some(Airspeed::True(kt)) => self.true_airspeed_kt.keep(Some(kt), now_s),
+                    None => {}
+                }
+            }
+            Report::Status(said) => {
+                self.emergency_priority_status
+                    .keep(Some(said.emergency_priority_status), now_s);
+                self.mode_a_code.keep(said.mode_a_code, now_s);
+            }
+            Report::TargetStateAndStatus(said) => {
+                self.target_state.keep(&said.target, now_s);
+                self.nac_p.keep(Some(said.nac_p), now_s);
+            }
+            Report::ResolutionAdvisory(said) => {
+                self.resolution_advisory.keep(Some(said.advisory), now_s);
+            }
+            Report::OperationalStatus(said) => {
+                self.nac_p.keep(said.nac_p, now_s);
+                self.version = said.version;
+                self.nic_supplement_a = said.nic_supplement_a;
+                self.nic_supplement_c = said.nic_supplement_c;
+            }
         }
     }
 
@@ -445,56 +490,15 @@ impl Tracked {
         self.wind.keep(wind, now_s);
     }
 
+    /// Where the aircraft is, or else the site.
+    fn whereabouts(&self, now_s: f64, site: Position) -> Position {
+        self.fix.at(now_s).map_or(site, |fix| fix.position)
+    }
+
     /// How far east of true north magnetic north lies where the aircraft is,
     /// or else at the site.
     fn declination(&self, now_s: f64, site: Position) -> f64 {
-        let at = self.fix.at(now_s).map_or(site, |fix| fix.position);
-        wmm::declination_deg(at.lat_deg, at.lon_deg, wmm::year_of(now_s))
-    }
-
-    /// Takes what a message says other than where the aircraft is.
-    fn note(&mut self, report: &Report, now_s: f64) {
-        match report {
-            Report::Identification(said) => self.remembered.keep(said, now_s),
-            Report::Velocity(said) => {
-                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
-                self.track_deg.keep(said.track_deg, now_s);
-                self.magnetic_heading_deg
-                    .keep(said.magnetic_heading_deg, now_s);
-                self.baro_vertical_rate_fpm
-                    .keep(said.baro_vertical_rate_fpm, now_s);
-                self.geometric_vertical_rate_fpm
-                    .keep(said.geometric_vertical_rate_fpm, now_s);
-                self.geometric_minus_baro_ft
-                    .keep(said.geometric_minus_baro_ft, now_s);
-                match said.airspeed {
-                    Some(Airspeed::Indicated(kt)) => {
-                        self.indicated_airspeed_kt.keep(Some(kt), now_s);
-                    }
-                    Some(Airspeed::True(kt)) => self.true_airspeed_kt.keep(Some(kt), now_s),
-                    None => {}
-                }
-            }
-            Report::Status(said) => {
-                self.emergency_priority_status
-                    .keep(Some(said.emergency_priority_status), now_s);
-                self.mode_a_code.keep(said.mode_a_code, now_s);
-            }
-            Report::TargetStateAndStatus(said) => {
-                self.target_state.keep(&said.target, now_s);
-                self.nac_p.keep(Some(said.nac_p), now_s);
-            }
-            Report::ResolutionAdvisory(said) => {
-                self.resolution_advisory.keep(Some(said.advisory), now_s);
-            }
-            Report::OperationalStatus(said) => {
-                self.nac_p.keep(said.nac_p, now_s);
-                self.version = said.version;
-                self.nic_supplement_a = said.nic_supplement_a;
-                self.nic_supplement_c = said.nic_supplement_c;
-            }
-            Report::AirbornePosition(_) | Report::SurfacePosition(_) | Report::Reply(_) => {}
-        }
+        self.whereabouts(now_s, site).declination_deg(now_s)
     }
 
     /// Takes the accuracy that a position message stands for, from an aircraft
@@ -620,13 +624,14 @@ impl Tracked {
 #[cfg(test)]
 mod tests {
     use super::Traffic;
+    use crate::beast::{Frame, Observation};
     use crate::bits::Bits;
     use crate::cpr;
     use crate::field::{
-        AirbornePosition, Airspeed, Identification, OperationalStatus, RaBroadcast, Status,
+        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, RaBroadcast, Status,
         SurfacePosition, TargetStateAndStatus, Velocity,
     };
-    use crate::message::{Observation, Reply, Report, Trust};
+    use crate::message::{Reply, Report, Trust, squitter};
     use crate::position::Position;
     use crate::proto::{
         Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
@@ -654,10 +659,7 @@ mod tests {
     const RSSI_DBFS: f64 = -20.0;
 
     fn icao(value: u32) -> Address {
-        Address {
-            value,
-            r#type: AddressType::Icao.into(),
-        }
+        Address::new(value, AddressType::Icao)
     }
 
     fn from(address: u32, report: Report) -> Observation {
@@ -754,7 +756,7 @@ mod tests {
     fn hearing(messages: impl IntoIterator<Item = (Observation, f64)>) -> Traffic {
         let mut traffic = Traffic::new(SITE);
         for (observation, now_s) in messages {
-            traffic.hear(&observation, now_s);
+            traffic.take(&observation, now_s);
         }
         traffic
     }
@@ -773,7 +775,7 @@ mod tests {
     fn after(reports: impl IntoIterator<Item = Report>) -> Traffic {
         let mut traffic = Traffic::new(SITE);
         for (report, second) in reports.into_iter().zip(0_u32..) {
-            traffic.hear(&said(report), 100.0 + f64::from(second));
+            traffic.take(&said(report), 100.0 + f64::from(second));
         }
         traffic
     }
@@ -789,10 +791,10 @@ mod tests {
     fn aircraft_is_known_by_what_its_messages_said() {
         // Arrange
         let mut traffic = Traffic::new(SITE);
-        traffic.hear(&said(identification("TEST01")), 100.0);
+        traffic.take(&said(identification("TEST01")), 100.0);
 
         // Act
-        traffic.hear(&said(velocity(290.0, 235.0)), 101.0);
+        traffic.take(&said(velocity(290.0, 235.0)), 101.0);
 
         // Assert
         let expected = Snapshot {
@@ -818,12 +820,40 @@ mod tests {
     }
 
     #[test]
+    fn frames_are_heard_for_what_their_messages_say() {
+        // Arrange: the made-up aircraft's identification twice, and once damaged
+        let me = Identification {
+            identification: Some("TEST01".into()),
+            emitter_category: EmitterCategory::A3Large,
+        }
+        .write();
+        let message = squitter(ADDRESS, me);
+        let mut damaged = message;
+        damaged[5] ^= 0x01;
+        let frames = [message, message, damaged]
+            .map(|message| Frame::new(0, 128, &message).expect("a message"));
+        let mut traffic = Traffic::new(SITE);
+
+        // Act
+        traffic.hear(&frames, 100.0);
+
+        // Assert
+        let snapshot = traffic.snapshot(100.0);
+        let callsigns: Vec<_> = snapshot
+            .aircraft
+            .iter()
+            .map(|known| known.identification.as_deref())
+            .collect();
+        assert_eq!((snapshot.messages, callsigns), (2, vec![Some("TEST01")]));
+    }
+
+    #[test]
     fn aircraft_heard_once_is_left_out_as_possible_noise() {
         // Arrange
         let mut traffic = Traffic::new(SITE);
 
         // Act
-        traffic.hear(&said(identification("TEST01")), 100.0);
+        traffic.take(&said(identification("TEST01")), 100.0);
 
         // Assert
         assert_eq!(traffic.snapshot(101.0).aircraft, vec![]);
@@ -837,7 +867,7 @@ mod tests {
 
         // Act
         for address in addresses.into_iter().chain(addresses) {
-            traffic.hear(&from(address, identification("TEST01")), 100.0);
+            traffic.take(&from(address, identification("TEST01")), 100.0);
         }
 
         // Assert
@@ -858,11 +888,11 @@ mod tests {
             ..from(address, altitude(2500, None))
         };
         let mut traffic = Traffic::new(SITE);
-        traffic.hear(&said(identification("TEST01")), 100.0);
+        traffic.take(&said(identification("TEST01")), 100.0);
 
         // Act
         for address in [ADDRESS, ADDRESS + 1, ADDRESS + 1] {
-            traffic.hear(&reply(address), 101.0);
+            traffic.take(&reply(address), 101.0);
         }
 
         // Assert
@@ -1132,7 +1162,7 @@ mod tests {
                 rssi_dbfs: Some(rssi_dbfs),
                 ..said(identification("TEST01"))
             };
-            traffic.hear(&heard, 100.0);
+            traffic.take(&heard, 100.0);
         }
 
         // Assert: half at a hundredth and half at a tenth of full scale
@@ -1152,10 +1182,10 @@ mod tests {
             ..said(identification("TEST01"))
         };
         let mut traffic = Traffic::new(SITE);
-        traffic.hear(&unmeasured, 100.0);
+        traffic.take(&unmeasured, 100.0);
 
         // Act
-        traffic.hear(&unmeasured, 101.0);
+        traffic.take(&unmeasured, 101.0);
 
         // Assert
         let reception = known(traffic).reception;
@@ -1399,7 +1429,7 @@ mod tests {
 
         // Act
         for now_s in [171.0, 172.0] {
-            traffic.hear(&reply, now_s);
+            traffic.take(&reply, now_s);
         }
 
         // Assert
@@ -1413,7 +1443,7 @@ mod tests {
         let mut traffic = after([identification("TEST01"), velocity(290.0, 235.0)]);
         let forgetting = traffic.snapshot(170.0);
         for now_s in [400.0, 401.0] {
-            traffic.hear(&said(here()), now_s);
+            traffic.take(&said(here()), now_s);
         }
 
         // Act
@@ -1823,7 +1853,7 @@ mod tests {
         // Arrange: east at 480 kt over the ground and 450 kt through the air
         // on the same heading, which the report carries as magnetic
         let now_s = 1_780_000_000.0;
-        let magnetic = 90.0 - wmm::declination_deg(SITE.lat_deg, SITE.lon_deg, wmm::year_of(now_s));
+        let magnetic = 90.0 - SITE.declination_deg(now_s);
         let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
             magnetic_heading_deg: Some(magnetic),
             mach: Some(0.78),

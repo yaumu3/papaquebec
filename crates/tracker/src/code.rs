@@ -33,6 +33,12 @@ pub(crate) fn without_m(code: u32) -> u32 {
     code >> 1 & 0xfc0 | code & 0x3f
 }
 
+/// The altitude code of the 12 bits a position message carries, with its M
+/// bit put back, clear.
+pub(crate) fn with_m(code: u32) -> u32 {
+    code << 1 & 0x1f80 | code & 0x3f
+}
+
 /// The altitude in feet of a 13-bit altitude code; none when it carries none
 /// or counts in metres.
 pub(crate) fn altitude(code: u32) -> Option<i32> {

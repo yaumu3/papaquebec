@@ -9,6 +9,7 @@
 use crate::air;
 use crate::bits::Bits;
 use crate::field::{Field, Identification, advised, advisory, count, rounded};
+use crate::position::signed_bearing;
 use crate::proto::{EmitterCategory, ResolutionAdvisory, TargetState, target_state::Modes};
 
 /// The envelope within which a field is taken for a track and turn report or
@@ -149,11 +150,6 @@ fn apart(said: Option<f64>, known: Option<f64>) -> Option<f64> {
     Some(signed_bearing(said? - known?).abs() / BEARING_TOLERANCE_DEG)
 }
 
-/// A bearing as the angle from north, -180 up to 180.
-fn signed_bearing(bearing_deg: f64) -> f64 {
-    (bearing_deg + 180.0).rem_euclid(360.0) - 180.0
-}
-
 /// The callsign of the aircraft identification register, which is laid out as
 /// the identification message of an extended squitter with no category; none
 /// without a callsign to read.
@@ -191,6 +187,14 @@ fn consistent(mb: Bits, fields: &[Gated]) -> bool {
 /// A bearing counted in steps of 90/512° either way from north.
 fn bearing(steps: i32) -> f64 {
     (f64::from(steps) * 90.0 / 512.0).rem_euclid(360.0)
+}
+
+/// The status bit and the 11 bits of a bearing, as `bearing` reads them.
+fn bearing_field(bearing_deg: Option<f64>) -> Bits {
+    signed(
+        bearing_deg.map(|deg| signed_bearing(deg) * 512.0 / 90.0),
+        11,
+    )
 }
 
 /// A status bit and the field of `width` bits it says is available: the
@@ -327,11 +331,7 @@ impl Field for TrackAndTurn {
     fn write(&self) -> Bits {
         Bits::default()
             .then(signed(self.roll_deg.map(|roll| roll * 256.0 / 45.0), 10))
-            .then(signed(
-                self.track_deg
-                    .map(|track| signed_bearing(track) * 512.0 / 90.0),
-                11,
-            ))
+            .then(bearing_field(self.track_deg))
             .then(counted(self.ground_speed_kt.map(|speed| speed / 2.0), 10))
             .then(signed(
                 self.track_rate_deg_per_s.map(|rate| rate * 256.0 / 8.0),
@@ -392,11 +392,7 @@ impl Field for HeadingAndSpeed {
     fn write(&self) -> Bits {
         let rate = |fpm: Option<i32>| signed(fpm.map(|fpm| f64::from(fpm) / 32.0), 10);
         Bits::default()
-            .then(signed(
-                self.magnetic_heading_deg
-                    .map(|heading| signed_bearing(heading) * 512.0 / 90.0),
-                11,
-            ))
+            .then(bearing_field(self.magnetic_heading_deg))
             .then(counted(self.indicated_airspeed_kt, 10))
             .then(counted(self.mach.map(|mach| mach * 250.0), 10))
             .then(rate(self.baro_vertical_rate_fpm))

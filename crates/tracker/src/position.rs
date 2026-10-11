@@ -1,4 +1,4 @@
-//! Places on the globe.
+//! Places on the globe, and vectors told apart east and north or by their bearing.
 
 use std::str::FromStr;
 
@@ -22,6 +22,13 @@ impl Position {
             + across * haversine(other.lon_deg - self.lon_deg);
         2.0 * RADIUS_NM * between.sqrt().asin()
     }
+
+    /// How far east of true north magnetic north lies here at `now_s`, in
+    /// seconds since the epoch, by the World Magnetic Model.
+    #[must_use]
+    pub fn declination_deg(self, now_s: f64) -> f64 {
+        wmm::declination_deg(self.lat_deg, self.lon_deg, wmm::year_of(now_s))
+    }
 }
 
 impl FromStr for Position {
@@ -37,6 +44,28 @@ impl FromStr for Position {
         }
         Ok(Self { lat_deg, lon_deg })
     }
+}
+
+/// The components east and north of a length on a bearing.
+#[must_use]
+pub fn toward(bearing_deg: f64, length: f64) -> (f64, f64) {
+    let (sin, cos) = bearing_deg.to_radians().sin_cos();
+    (length * sin, length * cos)
+}
+
+/// A bearing as the angle from north, -180 up to 180.
+#[must_use]
+pub fn signed_bearing(bearing_deg: f64) -> f64 {
+    (bearing_deg + 180.0).rem_euclid(360.0) - 180.0
+}
+
+/// The bearing and the length of the components east and north.
+#[must_use]
+pub fn bearing_of(east: f64, north: f64) -> (f64, f64) {
+    (
+        east.atan2(north).to_degrees().rem_euclid(360.0),
+        east.hypot(north),
+    )
 }
 
 #[cfg(test)]

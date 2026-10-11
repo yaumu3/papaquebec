@@ -3,6 +3,9 @@
 //! A frame is `0x1a`, a type, a 48-bit timestamp, a signal level and the
 //! message. A `0x1a` anywhere after the type is sent twice.
 
+use crate::message::{self, Report, Trust};
+use crate::proto::{Address, Source};
+
 const ESCAPE: u8 = 0x1a;
 /// The timestamp and the signal level.
 const HEADER_LEN: usize = 7;
@@ -66,17 +69,45 @@ impl Frame {
         &self.message[..self.len]
     }
 
-    /// Whether the message came by multilateration.
+    /// What the message says and how it came; none when it is damaged or
+    /// says nothing read here.
     #[must_use]
-    pub fn multilaterated(&self) -> bool {
+    pub fn observation(&self) -> Option<Observation> {
+        let (address, trust, report) = message::read(self.message())?;
+        Some(Observation {
+            address,
+            trust,
+            source: if self.multilaterated() {
+                Source::Mlat
+            } else {
+                Source::Unspecified
+            },
+            rssi_dbfs: self.rssi_dbfs(),
+            report,
+        })
+    }
+
+    /// Whether the message came by multilateration.
+    fn multilaterated(&self) -> bool {
         self.timestamp == Self::MULTILATERATED
     }
 
     /// The power in dB against full scale; none when the receiver measured none.
-    #[must_use]
-    pub fn rssi_dbfs(&self) -> Option<f64> {
+    fn rssi_dbfs(&self) -> Option<f64> {
         (self.signal > 0).then(|| 20.0 * (f64::from(self.signal) / 255.0).log10())
     }
+}
+
+/// What one message says, about whom, and how it came.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Observation {
+    pub address: Address,
+    pub trust: Trust,
+    /// How the message came, when not by the aircraft's own broadcast.
+    pub source: Source,
+    /// The power it was received at.
+    pub rssi_dbfs: Option<f64>,
+    pub report: Report,
 }
 
 /// Frames out of a byte stream, however the stream is cut up.
@@ -172,6 +203,8 @@ fn frame(body: &[u8]) -> Option<Frame> {
 #[cfg(test)]
 mod tests {
     use super::{Frame, Reader};
+    use crate::bits::published::bytes;
+    use crate::proto::Source;
 
     /// An identification message, from the examples of "The 1090 Megahertz Riddle".
     const LONG: [u8; 14] = [
@@ -358,5 +391,36 @@ mod tests {
         // Assert
         let rounded = powers.map(|power| power.map(|db| (db * 10.0).round() / 10.0));
         assert_eq!(rounded, [Some(0.0), Some(-6.0), None]);
+    }
+
+    /// "The 1090 Megahertz Riddle", aircraft identification.
+    const IDENTIFICATION: &str = "8D4840D6202CC371C32CE0576098";
+
+    #[test]
+    fn frame_is_observed_with_whom_its_message_is_from_and_its_power() {
+        // Arrange
+        let frame = Frame::new(0, 128, &bytes(IDENTIFICATION)).expect("a message");
+
+        // Act
+        let observation = frame.observation();
+
+        // Assert
+        let heard = observation.map(|heard| (heard.address.value, heard.source, heard.rssi_dbfs));
+        let power = Some(-5.986_604_215_721_735);
+        assert_eq!(heard, Some((0x0048_40d6, Source::Unspecified, power)));
+    }
+
+    #[test]
+    fn frame_that_came_by_multilateration_is_observed_so() {
+        // Arrange: readsb stamps such a message so, and measures no signal
+        let frame =
+            Frame::new(Frame::MULTILATERATED, 0, &bytes(IDENTIFICATION)).expect("a message");
+
+        // Act
+        let observation = frame.observation();
+
+        // Assert
+        let heard = observation.map(|heard| (heard.source, heard.rssi_dbfs));
+        assert_eq!(heard, Some((Source::Mlat, None)));
     }
 }

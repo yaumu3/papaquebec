@@ -5,7 +5,7 @@ mod scenario;
 
 use std::time::Duration;
 
-pub use fleet::{Fleet, State};
+pub use fleet::{Fleet, MOST_EXTRA, State};
 pub use scenario::{Runway, Scenario};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};
@@ -41,18 +41,44 @@ pub fn clock(speed: f64, wall: impl Fn() -> f64 + Clone) -> impl Fn() -> f64 + C
 }
 
 #[cfg(test)]
-mod tests {
+mod testing {
     use std::sync::{Arc, Mutex};
 
+    use tracker::position::Position;
+
+    /// RJFF
+    pub(crate) const SITE: Position = Position {
+        lat_deg: 33.5844,
+        lon_deg: 130.4517,
+    };
+
+    /// A clock at `start` seconds that only its hand moves on: the clock, and
+    /// the hand, which moves it on by the seconds.
+    pub(crate) fn hand_clock(
+        start: f64,
+    ) -> (impl Fn() -> f64 + Clone + Send + 'static, impl Fn(f64)) {
+        let now = Arc::new(Mutex::new(start));
+        let hand = Arc::clone(&now);
+        (
+            move || *now.lock().expect("clock"),
+            move |seconds| {
+                *hand.lock().expect("clock") += seconds;
+            },
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
     use super::clock;
+    use crate::testing::hand_clock;
 
     #[test]
     fn clock_runs_at_a_multiple_of_wall_time() {
         // Arrange
-        let wall = Arc::new(Mutex::new(1000.0));
-        let hand = Arc::clone(&wall);
-        let clock = clock(10.0, move || *wall.lock().expect("clock"));
-        *hand.lock().expect("clock") += 3.0;
+        let (wall, hand) = hand_clock(1000.0);
+        let clock = clock(10.0, wall);
+        hand(3.0);
 
         // Act
         let now = clock();

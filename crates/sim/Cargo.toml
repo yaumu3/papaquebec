@@ -14,9 +14,8 @@ workspace = true
 placer = { path = "../placer" }
 tokio = { version = "1.53.1", features = ["net", "time", "io-util", "macros"] }
 tracker = { path = "../tracker" }
-wmm = { path = "../wmm" }
 
 [dev-dependencies]
 feeder = { path = "../feeder" }
 prost = "0.14.4"
-tokio = { version = "1.53.1", features = ["rt", "macros", "net", "time", "sync"] }
+tokio = { version = "1.53.1", features = ["rt", "sync"] }

@@ -2,15 +2,14 @@
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
-use feeder::follow::follow;
+use feeder::follow::{follow, wall};
 use prost::Message;
 use sim::Fleet;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 use tracker::beast::Reader;
-use tracker::message;
 use tracker::position::Position;
 use tracker::proto::{
     AirGroundState, Aircraft, EmergencyPriorityStatus, Frame, Snapshot, Source, frame::Body,
@@ -51,11 +50,8 @@ impl Heard {
     fn after(&mut self, seconds: f64) -> Snapshot {
         *self.now.lock().expect("clock") += seconds;
         let now_s = *self.now.lock().expect("clock");
-        for frame in self.reader.read(&self.fleet.fly()) {
-            if let Some(observation) = message::read(&frame) {
-                self.traffic.hear(&observation, now_s);
-            }
-        }
+        self.traffic
+            .hear(&self.reader.read(&self.fleet.fly()), now_s);
         let mut snapshot = self.traffic.snapshot(now_s);
         self.registry.fill(&mut snapshot);
         snapshot
@@ -352,12 +348,6 @@ fn every_identity_is_fictional_and_registered() {
             .all(|callsign| callsign.starts_with("TEST"))
     );
     assert!(snapshot.aircraft.iter().all(registered));
-}
-
-/// Seconds since the epoch.
-fn wall() -> f64 {
-    let since = SystemTime::now().duration_since(UNIX_EPOCH);
-    since.map_or(0.0, |since| since.as_secs_f64())
 }
 
 #[tokio::test]

@@ -76,7 +76,7 @@ impl Server {
     /// # Errors
     ///
     /// When no certificate can be made.
-    pub fn renew(&self) -> io::Result<()> {
+    fn renew(&self) -> io::Result<()> {
         let identity = identity()?;
         let hash = hash(&identity);
         self.endpoint
@@ -205,11 +205,14 @@ async fn session(
         started = feed.wait_for(Option::is_some) => started?.clone(),
         _ = connection.closed() => return Ok(()),
     };
-    let Some(published) = started else {
+    // Taken apart at once, so that the session does not hold on to the history it started from.
+    let Some((hello, latest)) =
+        started.map(|published| (published.hello(since), published.latest().clone()))
+    else {
         return Ok(());
     };
-    stream.write_all(&published.hello(since)).await?;
-    stream.write_all(published.latest()).await?;
+    stream.write_all(&hello).await?;
+    stream.write_all(&latest).await?;
     loop {
         tokio::select! {
             changed = feed.changed() => changed?,
@@ -257,7 +260,7 @@ mod tests {
 
     /// Published at `now_s`, with history eight and sixteen seconds before.
     fn at(now_s: f64) -> Published {
-        let history = [now_s - 16.0, now_s - 8.0].map(snapshot_at);
+        let history = [now_s - 16.0, now_s - 8.0].map(|now_s| Arc::new(snapshot_at(now_s)));
         Published::new(RECEIVER, history.into(), snapshot_at(now_s))
     }
 

@@ -5,6 +5,8 @@
 
 use std::str::FromStr;
 
+use tracker::position::toward;
+
 use crate::fleet::Leg;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,8 +93,7 @@ const RWY_16R: Runway = Runway {
 impl Runway {
     /// Unit vector of its bearing.
     fn heading(self) -> (f64, f64) {
-        let rad = self.bearing_deg.to_radians();
-        (rad.sin(), rad.cos())
+        toward(self.bearing_deg, 1.0)
     }
 
     /// The point `nm` out on final, before the threshold.
@@ -141,10 +142,8 @@ const fn leg(x: f64, y: f64, alt: f64, gs: f64) -> Leg {
 
 /// The point `nm` from `from` along a heading of `deg`.
 fn ahead(from: (f64, f64), deg: f64, nm: f64) -> (f64, f64) {
-    (
-        from.0 + nm * deg.to_radians().sin(),
-        from.1 + nm * deg.to_radians().cos(),
-    )
+    let (east, north) = toward(deg, nm);
+    (from.0 + east, from.1 + north)
 }
 
 /// A route onto `runway`: a leg `nm` long at `side_deg` off the final, flown at `entry_kt`
@@ -317,19 +316,10 @@ impl Scenario {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use tracker::position::Position;
-
     use super::{RWY_05, RWY_16L, RWY_16R, RWY_22, RWY_23, RWY_34L, RWY_34R, Runway};
+    use crate::testing::{SITE, hand_clock};
     use crate::{Fleet, Scenario, State};
     use placer::rng::mulberry32;
-
-    /// RJFF
-    const SITE: Position = Position {
-        lat_deg: 33.5844,
-        lon_deg: 130.4517,
-    };
 
     /// A scenario fleet at second 1000 and the hand that moves its clock.
     fn fleet(scenario: Scenario, seed: u32) -> (Fleet, impl Fn(f64)) {
@@ -338,18 +328,8 @@ mod tests {
 
     /// The same with `extra` background aircraft.
     fn fleet_with(scenario: Scenario, seed: u32, extra: u32) -> (Fleet, impl Fn(f64)) {
-        let now = Arc::new(Mutex::new(1000.0));
-        let hand = Arc::clone(&now);
-        let fleet = Fleet::scenario(
-            SITE,
-            move || *now.lock().expect("clock"),
-            scenario,
-            seed,
-            extra,
-        );
-        (fleet, move |seconds| {
-            *hand.lock().expect("clock") += seconds;
-        })
+        let (clock, hand) = hand_clock(1000.0);
+        (Fleet::scenario(SITE, clock, scenario, seed, extra), hand)
     }
 
     /// Whether a point is established on `runway`'s final, within `out_nm`.

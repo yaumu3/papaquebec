@@ -1,6 +1,8 @@
 //! Air data in the standard atmosphere: what the speeds through the air say
 //! together, by the ISA of ICAO Doc 7488 and the subsonic airspeed relations.
 
+use crate::position::{bearing_of, toward};
+
 /// Sea level in the standard atmosphere: the temperature and the speed of sound.
 const SEA_LEVEL_K: f64 = 288.15;
 const SEA_LEVEL_SOUND_KT: f64 = 661.4786;
@@ -48,7 +50,7 @@ pub fn mach(true_airspeed_kt: f64, pressure_altitude_ft: f64) -> f64 {
 /// The static air temperature the true airspeed stands for at the Mach
 /// number; none without a Mach number to stand against.
 #[must_use]
-pub fn static_air_temperature_c(mach: f64, true_airspeed_kt: f64) -> Option<f64> {
+pub(crate) fn static_air_temperature_c(mach: f64, true_airspeed_kt: f64) -> Option<f64> {
     if mach <= 0.0 {
         return None;
     }
@@ -59,7 +61,7 @@ pub fn static_air_temperature_c(mach: f64, true_airspeed_kt: f64) -> Option<f64>
 /// The total air temperature: the static one raised by the air brought to
 /// rest against the aircraft at the Mach number.
 #[must_use]
-pub fn total_air_temperature_c(static_c: f64, mach: f64) -> f64 {
+pub(crate) fn total_air_temperature_c(static_c: f64, mach: f64) -> f64 {
     (static_c + KELVIN_AT_0_C) * (1.0 + 0.2 * mach * mach) - KELVIN_AT_0_C
 }
 
@@ -90,20 +92,6 @@ pub fn through_air(track_deg: f64, ground_speed_kt: f64, wind: Wind) -> (f64, f6
     let (ground_east, ground_north) = toward(track_deg, ground_speed_kt);
     let (wind_east, wind_north) = toward(wind.from_deg + 180.0, wind.speed_kt);
     bearing_of(ground_east - wind_east, ground_north - wind_north)
-}
-
-/// The components east and north of a speed on a bearing.
-fn toward(bearing_deg: f64, speed_kt: f64) -> (f64, f64) {
-    let (sin, cos) = bearing_deg.to_radians().sin_cos();
-    (speed_kt * sin, speed_kt * cos)
-}
-
-/// The bearing and the speed of the components east and north.
-fn bearing_of(east: f64, north: f64) -> (f64, f64) {
-    (
-        east.atan2(north).to_degrees().rem_euclid(360.0),
-        east.hypot(north),
-    )
 }
 
 #[cfg(test)]

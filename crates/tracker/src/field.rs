@@ -4,8 +4,9 @@
 //! read here is written as zeros.
 
 use crate::bits::Bits;
-use crate::code::{altitude, altitude_code, identity, mode_a_code, without_m};
+use crate::code::{altitude, altitude_code, identity, mode_a_code, with_m, without_m};
 use crate::cpr::Cpr;
+use crate::position::{bearing_of, toward};
 use crate::proto::{
     EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
     resolution_advisory::{Advisory, Corrections},
@@ -106,7 +107,7 @@ impl AirbornePosition {
     /// The Navigation Accuracy Category for position that the message stands
     /// for when it is from an aircraft of ADS-B version 0, which reports none.
     #[must_use]
-    pub fn nac_p_of_version_0(&self) -> u32 {
+    pub(crate) fn nac_p_of_version_0(&self) -> u32 {
         version_0_nac_p(self.type_code)
     }
 }
@@ -114,9 +115,7 @@ impl AirbornePosition {
 impl Field for AirbornePosition {
     fn read(me: Bits) -> Option<Self> {
         let type_code = Some(me.get(1, 5)).filter(|code| matches!(code, 9..=18 | 20..=22))?;
-        // The 12 bits are an altitude code without its M bit.
-        let code = me.get(9, 20);
-        let altitude = altitude(code << 1 & 0x1f80 | code & 0x3f);
+        let altitude = altitude(with_m(me.get(9, 20)));
         let by_gnss = Self::by_gnss(type_code);
         Some(Self {
             cpr: position(me),
@@ -215,7 +214,7 @@ impl SurfacePosition {
     /// The Navigation Accuracy Category for position that the message stands
     /// for when it is from an aircraft of ADS-B version 0, which reports none.
     #[must_use]
-    pub fn nac_p_of_version_0(&self) -> u32 {
+    pub(crate) fn nac_p_of_version_0(&self) -> u32 {
         version_0_nac_p(self.type_code)
     }
 }
@@ -371,8 +370,8 @@ fn steps(value: Option<i32>, step: u32) -> (bool, u32) {
 fn over_ground(me: Bits, step: f64) -> Option<(f64, f64)> {
     let east = f64::from(stepped(me.flag(14), me.get(15, 24), 1)?) * step;
     let north = f64::from(stepped(me.flag(25), me.get(26, 35), 1)?) * step;
-    let track = east.atan2(north).to_degrees().rem_euclid(360.0);
-    Some((east.hypot(north), track))
+    let (track, speed) = bearing_of(east, north);
+    Some((speed, track))
 }
 
 /// The subtype and the 22 bits of a ground speed along a track, as the
@@ -381,10 +380,7 @@ fn along_ground(velocity: Option<(f64, f64)>) -> (u32, Bits) {
     let Some((speed, track)) = velocity else {
         return (1, Bits::default().filled(22));
     };
-    let (east, north) = (
-        speed * track.to_radians().sin(),
-        speed * track.to_radians().cos(),
-    );
+    let (east, north) = toward(track, speed);
     let supersonic = east.abs().max(north.abs()) > SUBSONIC_KT;
     let step = if supersonic { 4.0 } else { 1.0 };
     let toward = |velocity: f64| {

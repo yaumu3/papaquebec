@@ -35,6 +35,18 @@ pub enum Subject {
     Address(IpAddr),
 }
 
+impl Subject {
+    /// What the host names: an address when it is one, or else a name, in
+    /// lower case since names compare so.
+    #[must_use]
+    pub fn of_host(host: &str) -> Self {
+        match host.parse() {
+            Ok(address) => Self::Address(address),
+            Err(_) => Self::Name(host.to_ascii_lowercase()),
+        }
+    }
+}
+
 /// A certificate and its key, as a TLS server presents them.
 pub struct Issued {
     pub chain: Vec<CertificateDer<'static>>,
@@ -100,7 +112,7 @@ impl Authority {
     ///
     /// When either cannot be read, the certificate is not an authority's or not
     /// valid now, or the key is not the certificate's.
-    pub fn from_pem(certificate_pem: &str, key_pem: &str) -> Result<Self, Failure> {
+    fn from_pem(certificate_pem: &str, key_pem: &str) -> Result<Self, Failure> {
         let certificate = CertificateDer::from(pem::parse(certificate_pem)?.into_contents());
         let key = KeyPair::from_pem_and_sign_algo(key_pem, &PKCS_ECDSA_P256_SHA256)?;
         let (_, parsed) = X509Certificate::from_der(&certificate)?;
@@ -248,6 +260,23 @@ mod tests {
         let (leaf, rest) = issued.chain.split_first().expect("a certificate");
         let verdict = verifier.verify_server_cert(leaf, rest, &host, &[], UnixTime::now());
         verdict.is_ok()
+    }
+
+    #[test]
+    fn host_is_a_subject_by_its_address_or_by_its_name_in_lower_case() {
+        // Arrange
+        let hosts = ["192.168.1.20", "::1", "RaspberryPi.Local"];
+
+        // Act
+        let subjects = hosts.map(Subject::of_host);
+
+        // Assert
+        let expected = [
+            Subject::Address([192, 168, 1, 20].into()),
+            Subject::Address(std::net::Ipv6Addr::LOCALHOST.into()),
+            Subject::Name("raspberrypi.local".into()),
+        ];
+        assert_eq!(subjects, expected);
     }
 
     #[test]

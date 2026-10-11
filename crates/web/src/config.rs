@@ -1,12 +1,13 @@
 //! What the environment says about where things are.
 
+use std::fmt::Display;
 use std::num::NonZeroU16;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use crate::Failure;
 use authority::Subject;
-use sim::Scenario;
+use sim::{MOST_EXTRA, Scenario};
 use tracker::position::Position;
 
 /// Where the traffic comes from.
@@ -66,7 +67,7 @@ impl FromStr for Door {
         match (secure, host) {
             (true, only) => Ok(Self::Secure {
                 port: port.unwrap_or(443),
-                only: only.map(subject),
+                only: only.map(Subject::of_host),
             }),
             (false, None) => Ok(Self::Plain {
                 port: port.unwrap_or(80),
@@ -99,13 +100,6 @@ fn host_and_port(rest: &str) -> Result<(Option<&str>, Option<u16>), Failure> {
     ))
 }
 
-fn subject(host: &str) -> Subject {
-    match host.parse() {
-        Ok(address) => Subject::Address(address),
-        Err(_) => Subject::Name(host.to_ascii_lowercase()),
-    }
-}
-
 impl Config {
     /// Reads the variables through `lookup`, which answers like `std::env::var`.
     ///
@@ -113,11 +107,9 @@ impl Config {
     ///
     /// When a variable is set to what it cannot be.
     pub fn read(lookup: impl Fn(&str) -> Option<String>) -> Result<Self, Failure> {
-        let origin = match lookup("PQ_SIM") {
+        let origin = match parsed(&lookup, "PQ_SIM")? {
             Some(site) => Origin::Sim {
-                site: site
-                    .parse()
-                    .map_err(|error| format!("PQ_SIM={site}: {error}"))?,
+                site,
                 speed: parsed(&lookup, "PQ_SIM_SPEED")?.map_or(Ok(1.0), sim_speed)?,
                 extra: parsed(&lookup, "PQ_SIM_EXTRA")?.map_or(Ok(0), sim_extra)?,
                 scenario: parsed(&lookup, "PQ_SIM_SCENARIO")?,
@@ -130,15 +122,10 @@ impl Config {
             },
         };
         let port: Option<NonZeroU16> = parsed(&lookup, "PQ_FEED_PORT")?;
-        let door = match lookup("PQ_ADDRESS") {
-            Some(address) => address
-                .parse()
-                .map_err(|error| format!("PQ_ADDRESS={address}: {error}"))?,
-            None => Door::Secure {
-                port: 443,
-                only: None,
-            },
-        };
+        let door = parsed(&lookup, "PQ_ADDRESS")?.unwrap_or(Door::Secure {
+            port: 443,
+            only: None,
+        });
         let port = port.map_or(4433, NonZeroU16::get);
         if matches!(door, Door::Secure { port: page, .. } if page == port) {
             return Err(format!("PQ_FEED_PORT={port}: the page is served there too").into());
@@ -156,7 +143,7 @@ impl Config {
 }
 
 /// The variable read as a `T`, or none when it is not set.
-fn parsed<T: FromStr>(
+fn parsed<T: FromStr<Err: Display>>(
     lookup: impl Fn(&str) -> Option<String>,
     name: &str,
 ) -> Result<Option<T>, Failure> {
@@ -165,18 +152,13 @@ fn parsed<T: FromStr>(
     };
     let read = value
         .parse()
-        .map_err(|_| format!("{name}={value}: not what it can be"))?;
+        .map_err(|error| format!("{name}={value}: {error}"))?;
     Ok(Some(read))
 }
 
 /// The sim is asked once per sim second, so any faster would mean asking more
 /// often than every millisecond.
 const FASTEST_SIM: f64 = 1000.0;
-
-/// Far beyond a real receiver's traffic, which is what a load test wants; the
-/// sim builds every target up front, and more would also run their addresses out
-/// of the block reserved for them.
-const MOST_EXTRA: u32 = 10_000;
 
 fn sim_extra(extra: u32) -> Result<u32, Failure> {
     if extra <= MOST_EXTRA {
@@ -295,6 +277,20 @@ mod tests {
                 .is_some_and(|said| said.contains("PQ_SITE"))),
             "{refusals:?}"
         );
+    }
+
+    #[test]
+    fn variable_that_does_not_read_is_refused_with_why() {
+        // Arrange
+        let ports = [("PQ_FEED_PORT", "feed")];
+
+        // Act
+        let config = Config::read(environment(&ports));
+
+        // Assert
+        let refusal = config.err().map(|refusal| refusal.to_string());
+        let why = "PQ_FEED_PORT=feed: invalid digit found in string";
+        assert_eq!(refusal.as_deref(), Some(why));
     }
 
     /// Safari sends the page's requests over a feed connection to the same host

@@ -1,6 +1,6 @@
 //! Compact Position Reporting: the format positions are broadcast in.
 
-use crate::position::Position;
+use crate::position::{Position, signed_bearing};
 
 /// A position as one message carries it: 17 bits of each coordinate, in the
 /// even or the odd format.
@@ -59,7 +59,7 @@ fn low(steps: f64) -> u32 {
 /// one of each format, without knowing anything else. None when the two do not
 /// fit together, as when the aircraft moved too far between them.
 #[must_use]
-pub fn global(earlier: Cpr, later: Cpr) -> Option<Position> {
+pub(crate) fn global(earlier: Cpr, later: Cpr) -> Option<Position> {
     let (even, odd) = match (earlier.odd, later.odd) {
         (false, true) => (earlier, later),
         (true, false) => (later, earlier),
@@ -96,13 +96,13 @@ pub fn global(earlier: Cpr, later: Cpr) -> Option<Position> {
 
 /// Where an aircraft in the air is, given a position it is within 180 NM of.
 #[must_use]
-pub fn airborne_near(cpr: Cpr, reference: Position) -> Option<Position> {
+pub(crate) fn airborne_near(cpr: Cpr, reference: Position) -> Option<Position> {
     near(cpr, reference, 360.0)
 }
 
 /// Where an aircraft on the ground is, given a position it is within 45 NM of.
 #[must_use]
-pub fn surface_near(cpr: Cpr, reference: Position) -> Option<Position> {
+pub(crate) fn surface_near(cpr: Cpr, reference: Position) -> Option<Position> {
     near(cpr, reference, 90.0)
 }
 
@@ -122,7 +122,7 @@ fn near(cpr: Cpr, reference: Position, span: f64) -> Option<Position> {
     let lon_deg = closest(reference.lon_deg, lon_zone, fraction(cpr.lon));
     Some(Position {
         lat_deg,
-        lon_deg: (lon_deg + 180.0).rem_euclid(360.0) - 180.0,
+        lon_deg: signed_bearing(lon_deg),
     })
 }
 

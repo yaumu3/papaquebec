@@ -5,7 +5,6 @@
 //! addresses come from `D00000` to `DFFFFF`, a block ICAO Annex 10 Vol III
 //! reserves for future use.
 
-use std::f64::consts::TAU;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -19,7 +18,7 @@ use tracker::field::{
     SurfacePosition, TargetStateAndStatus, Velocity,
 };
 use tracker::message::{comm_b_reply, squitter};
-use tracker::position::Position;
+use tracker::position::{Position, bearing_of, signed_bearing, toward};
 use tracker::proto::{
     EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
     resolution_advisory::Advisory, target_state::Modes,
@@ -83,10 +82,7 @@ pub struct State {
 
 /// True bearing from one point to another, degrees.
 fn bearing(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> f64 {
-    (to_x - from_x)
-        .atan2(to_y - from_y)
-        .to_degrees()
-        .rem_euclid(360.0)
+    bearing_of(to_x - from_x, to_y - from_y).0
 }
 
 /// One aircraft as it starts out.
@@ -192,22 +188,28 @@ fn fleet() -> Vec<Plan> {
     ]
 }
 
-/// An arrival of a scenario, numbered on from the streams before it.
-fn arrival(number: u32) -> Plan {
+/// A generic airliner, its address `number` on from `block`.
+fn generic(block: u32, number: u32, kind: &'static str) -> Plan {
     Plan {
-        address: 0x00d2_0000 + number,
+        address: block + number,
         number,
         digits: 4,
         callsign: true,
         category: EmitterCategory::A3Large,
         squawk: 0o1000 + number % 0o6000,
-        kind: if number.is_multiple_of(2) {
-            "A320"
-        } else {
-            "B738"
-        },
+        kind,
         ..Plan::default()
     }
+}
+
+/// An arrival of a scenario, numbered on from the streams before it.
+fn arrival(number: u32) -> Plan {
+    let kind = if number.is_multiple_of(2) {
+        "A320"
+    } else {
+        "B738"
+    };
+    generic(0x00d2_0000, number, kind)
 }
 
 /// `count` aircraft crossing within `radius_nm` of the site on straight tracks between FL050
@@ -246,10 +248,10 @@ fn scattered(
     numbers
         .map(|number| {
             let range = radius_nm * random().sqrt();
-            let bearing = random() * TAU;
+            let (x, y) = toward(random() * 360.0, range);
             Plan {
-                x: range * bearing.sin(),
-                y: range * bearing.cos(),
+                x,
+                y,
                 alt: 1000.0 * (levels.0 + random() * levels.1).round(),
                 gs: (speeds.0 + random() * speeds.1).round(),
                 track: (random() * 360.0).round(),
@@ -259,25 +261,20 @@ fn scattered(
         .collect()
 }
 
+/// The most extra targets the sim flies: far beyond a real receiver's traffic,
+/// which is what a load test wants; every target is built up front, and more
+/// would also run their addresses out of the block reserved for them.
+pub const MOST_EXTRA: u32 = 10_000;
+
 /// `count` generic en-route targets spread over the area, for load testing.
 fn extra_fleet(count: u32) -> Vec<Plan> {
-    let plan = |number| Plan {
-        address: 0x00d1_0000 + number,
-        number,
-        digits: 4,
-        callsign: true,
-        category: EmitterCategory::A3Large,
-        squawk: 0o1000 + number % 0o6000,
-        kind: "A320",
-        ..Plan::default()
-    };
     scattered(
         &mut mulberry32(count),
         0..count,
         50.0,
         (3.0, 35.0),
         (180.0, 300.0),
-        plan,
+        |number| generic(0x00d1_0000, number, "A320"),
     )
 }
 
@@ -300,7 +297,7 @@ struct Flying {
     leg: usize,
     /// Degrees per second, as it last turned.
     turning: f64,
-    /// How many times it has reached the end of its route.
+    /// Whether it has reached the end of its route.
     landed: bool,
 }
 
@@ -357,7 +354,7 @@ impl Flying {
         };
         let to_go = (target.x - self.x).hypot(target.y - self.y);
         let wanted = bearing(self.x, self.y, target.x, target.y);
-        let off = (wanted - self.plan.track + 540.0).rem_euclid(360.0) - 180.0;
+        let off = signed_bearing(wanted - self.plan.track);
         let most = TURN_DEG_PER_S * elapsed;
         let turn = off.clamp(-most, most);
         self.plan.track = (self.plan.track + turn).rem_euclid(360.0);
@@ -384,9 +381,9 @@ impl Flying {
     /// Flies on along its track at its speed for `elapsed` seconds; returns how far, NM.
     fn fly_straight(&mut self, elapsed: f64) -> f64 {
         let distance = self.plan.gs * elapsed / 3600.0;
-        let track = self.plan.track.to_radians();
-        self.x += distance * track.sin();
-        self.y += distance * track.cos();
+        let (east, north) = toward(self.plan.track, distance);
+        self.x += east;
+        self.y += north;
         distance
     }
 
@@ -661,8 +658,7 @@ impl Fleet {
         let elapsed = (now - self.last).max(0.0);
         self.last = now;
         let timestamp = ticks(now - self.started);
-        let declination =
-            wmm::declination_deg(self.site.lat_deg, self.site.lon_deg, wmm::year_of(now));
+        let declination = self.site.declination_deg(now);
         let mut frames = Vec::new();
         for flying in &mut self.flying {
             flying.advance(now, elapsed);
@@ -725,26 +721,13 @@ fn ticks(seconds: f64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use tracker::position::Position;
-
     use super::Fleet;
-
-    /// RJFF
-    const SITE: Position = Position {
-        lat_deg: 33.5844,
-        lon_deg: 130.4517,
-    };
+    use crate::testing::{SITE, hand_clock};
 
     /// A fleet at second 1000 and the hand that moves its clock.
     fn fleet(extra: u32) -> (Fleet, impl Fn(f64)) {
-        let now = Arc::new(Mutex::new(1000.0));
-        let hand = Arc::clone(&now);
-        let fleet = Fleet::new(SITE, move || *now.lock().expect("clock"), extra);
-        (fleet, move |seconds| {
-            *hand.lock().expect("clock") += seconds;
-        })
+        let (clock, hand) = hand_clock(1000.0);
+        (Fleet::new(SITE, clock, extra), hand)
     }
 
     #[test]

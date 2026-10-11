@@ -3,7 +3,7 @@
 
 use std::io;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::sync::watch;
@@ -11,8 +11,7 @@ use tokio::time::{Instant, MissedTickBehavior, interval_at};
 
 use crate::Failure;
 use crate::feed::{History, Published};
-use tracker::beast::{Frame, Reader};
-use tracker::message;
+use tracker::beast::Reader;
 use tracker::position::Position;
 use tracker::proto::Receiver;
 use tracker::registry::Registry;
@@ -54,6 +53,13 @@ pub async fn follow<S, F>(
         () = following.keep_hearing(connect) => {}
         () = feed.closed() => {}
     }
+}
+
+/// Seconds since the epoch, the clock to follow a receiver by.
+#[must_use]
+pub fn wall() -> f64 {
+    let since = SystemTime::now().duration_since(UNIX_EPOCH);
+    since.map_or(0.0, |since| since.as_secs_f64())
 }
 
 /// What is kept while a source is followed, across its connections.
@@ -107,7 +113,7 @@ impl<C: Fn() -> f64> Following<'_, C> {
                     Ok(0) => return "the source closed the connection".into(),
                     Ok(read) => {
                         heard = Instant::now();
-                        self.take(&frames.read(&bytes[..read]));
+                        self.traffic.hear(&frames.read(&bytes[..read]), (self.clock)());
                     }
                     Err(failure) => return failure.into(),
                 },
@@ -118,13 +124,6 @@ impl<C: Fn() -> f64> Following<'_, C> {
                     self.publish();
                 }
             }
-        }
-    }
-
-    fn take(&mut self, frames: &[Frame]) {
-        let now_s = (self.clock)();
-        for observation in frames.iter().filter_map(message::read) {
-            self.traffic.hear(&observation, now_s);
         }
     }
 
