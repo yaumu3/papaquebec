@@ -81,5 +81,6 @@ export const DEFAULT_SETTINGS: Settings = {
 
 export type PanelId = 'display' | 'maps' | 'list' | 'detail';
 export type Panels = Record<PanelId, boolean>;
+/** Every panel, in the order the bars list them. */
 export const PANEL_IDS: readonly PanelId[] = ['display', 'maps', 'list', 'detail'];
 export const DEFAULT_PANELS: Panels = { display: true, maps: true, list: true, detail: true };

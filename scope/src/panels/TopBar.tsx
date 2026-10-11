@@ -17,17 +17,18 @@ import {
   togglePanel,
 } from '../state/scope';
 import { settings } from '../state/settings';
+import { PANEL_IDS } from '../state/settingsDefaults';
 import { trackStore } from '../state/tracks';
 import { Button } from '../ui/Button';
 
 import s from './TopBar.module.css';
 
-const PANELS: [PanelId, string][] = [
-  ['display', 'DISP'],
-  ['maps', 'MAP'],
-  ['list', 'LIST'],
-  ['detail', 'DETAIL'],
-];
+const LABELS: Record<PanelId, string> = {
+  display: 'DISP',
+  maps: 'MAP',
+  list: 'LIST',
+  detail: 'DETAIL',
+};
 
 function trackCount(): number {
   snapshotVersion();
@@ -84,9 +85,9 @@ export function TopBar() {
         <div class={cx(s.item, s.err, s.desktopOnly)}>GPU · {renderError()}</div>
       </Show>
       <div class={cx(s.buttons, s.desktopOnly)}>
-        {PANELS.map(([id, label]) => (
+        {PANEL_IDS.map((id) => (
           <Button class={s.btn} on={panels()[id]} onClick={() => togglePanel(id)}>
-            {label}
+            {LABELS[id]}
           </Button>
         ))}
         <Button
