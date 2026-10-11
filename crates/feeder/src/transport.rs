@@ -257,7 +257,7 @@ mod tests {
 
     /// Published at `now_s`, with history eight and sixteen seconds before.
     fn at(now_s: f64) -> Published {
-        let history = [now_s - 16.0, now_s - 8.0].map(snapshot_at);
+        let history = [now_s - 16.0, now_s - 8.0].map(|now_s| Arc::new(snapshot_at(now_s)));
         Published::new(RECEIVER, history.into(), snapshot_at(now_s))
     }
 

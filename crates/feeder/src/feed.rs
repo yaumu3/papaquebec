@@ -17,9 +17,10 @@ const RETENTION_S: f64 = 3660.0;
 /// session that joins gets the hour of trail and readings the scope shows.
 #[derive(Default)]
 pub struct History {
-    kept: VecDeque<Snapshot>,
-    /// What sessions are handed, rebuilt only when `kept` changes.
-    shared: Arc<[Snapshot]>,
+    kept: VecDeque<Arc<Snapshot>>,
+    /// What sessions are handed, rebuilt only when `kept` changes; the
+    /// snapshots themselves are shared, not copied.
+    shared: Arc<[Arc<Snapshot>]>,
 }
 
 impl History {
@@ -33,7 +34,7 @@ impl History {
         if snapshot.now_s - last < CADENCE_S {
             return;
         }
-        self.kept.push_back(snapshot.clone());
+        self.kept.push_back(Arc::new(snapshot.clone()));
         let oldest = snapshot.now_s - RETENTION_S;
         while self.kept.front().is_some_and(|kept| kept.now_s < oldest) {
             self.kept.pop_front();
@@ -42,7 +43,7 @@ impl History {
     }
 
     #[must_use]
-    pub fn shared(&self) -> Arc<[Snapshot]> {
+    pub fn shared(&self) -> Arc<[Arc<Snapshot>]> {
         Arc::clone(&self.shared)
     }
 }
@@ -51,7 +52,7 @@ impl History {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Published {
     receiver: Receiver,
-    history: Arc<[Snapshot]>,
+    history: Arc<[Arc<Snapshot>]>,
     /// The latest snapshot as a frame after its length, encoded once for every session.
     latest: Bytes,
     latest_now_s: f64,
@@ -59,7 +60,7 @@ pub struct Published {
 
 impl Published {
     #[must_use]
-    pub fn new(receiver: Receiver, history: Arc<[Snapshot]>, latest: Snapshot) -> Self {
+    pub fn new(receiver: Receiver, history: Arc<[Arc<Snapshot>]>, latest: Snapshot) -> Self {
         Self {
             receiver,
             history,
@@ -72,12 +73,13 @@ impl Published {
     /// Its history stops short of the latest snapshot, which follows it in full.
     #[must_use]
     pub fn hello(&self, since: f64) -> Bytes {
-        let between =
-            |snapshot: &&Snapshot| since < snapshot.now_s && snapshot.now_s < self.latest_now_s;
+        let between = |snapshot: &&Arc<Snapshot>| {
+            since < snapshot.now_s && snapshot.now_s < self.latest_now_s
+        };
         let after = self.history.iter().filter(between);
         let hello = Hello {
             receiver: Some(self.receiver),
-            history: after.cloned().collect(),
+            history: after.map(|snapshot| Snapshot::clone(snapshot)).collect(),
         };
         Frame::from(hello).encode_length_delimited_to_vec().into()
     }
@@ -116,11 +118,11 @@ mod tests {
         Frame::decode_length_delimited(bytes).ok()?.body
     }
 
-    fn instants(snapshots: &[Snapshot]) -> Vec<f64> {
+    fn instants(snapshots: &[Arc<Snapshot>]) -> Vec<f64> {
         snapshots.iter().map(|snapshot| snapshot.now_s).collect()
     }
 
-    fn history_of(instants: impl IntoIterator<Item = f64>) -> Arc<[Snapshot]> {
+    fn history_of(instants: impl IntoIterator<Item = f64>) -> Arc<[Arc<Snapshot>]> {
         let mut history = History::default();
         for now_s in instants {
             history.record(&at(now_s));
