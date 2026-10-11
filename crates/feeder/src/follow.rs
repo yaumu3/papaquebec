@@ -11,7 +11,7 @@ use tokio::time::{Instant, MissedTickBehavior, interval_at};
 
 use crate::Failure;
 use crate::feed::{History, Published};
-use tracker::beast::{Frame, Reader};
+use tracker::beast::Reader;
 use tracker::position::Position;
 use tracker::proto::Receiver;
 use tracker::registry::Registry;
@@ -106,7 +106,7 @@ impl<C: Fn() -> f64> Following<'_, C> {
                     Ok(0) => return "the source closed the connection".into(),
                     Ok(read) => {
                         heard = Instant::now();
-                        self.take(&frames.read(&bytes[..read]));
+                        self.traffic.hear(&frames.read(&bytes[..read]), (self.clock)());
                     }
                     Err(failure) => return failure.into(),
                 },
@@ -117,13 +117,6 @@ impl<C: Fn() -> f64> Following<'_, C> {
                     self.publish();
                 }
             }
-        }
-    }
-
-    fn take(&mut self, frames: &[Frame]) {
-        let now_s = (self.clock)();
-        for observation in frames.iter().filter_map(Frame::observation) {
-            self.traffic.hear(&observation, now_s);
         }
     }
 

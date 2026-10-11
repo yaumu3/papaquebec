@@ -50,11 +50,8 @@ impl Heard {
     fn after(&mut self, seconds: f64) -> Snapshot {
         *self.now.lock().expect("clock") += seconds;
         let now_s = *self.now.lock().expect("clock");
-        for frame in self.reader.read(&self.fleet.fly()) {
-            if let Some(observation) = frame.observation() {
-                self.traffic.hear(&observation, now_s);
-            }
-        }
+        self.traffic
+            .hear(&self.reader.read(&self.fleet.fly()), now_s);
         let mut snapshot = self.traffic.snapshot(now_s);
         self.registry.fill(&mut snapshot);
         snapshot
