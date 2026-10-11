@@ -3,6 +3,7 @@
 pub mod air;
 pub mod beast;
 pub mod bits;
+pub mod code;
 pub mod cpr;
 pub mod field;
 pub mod message;
