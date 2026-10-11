@@ -157,14 +157,13 @@ mod tests {
     use crate::position::Position;
     use crate::proto::{EmitterCategory, Frame, Hello, Receiver, Snapshot, frame::Body};
     use crate::registry::Registry;
-    use crate::registry::tests::database;
 
     /// RJFF
     const SITE: Position = Position {
         lat_deg: 33.5844,
         lon_deg: 130.4517,
     };
-    /// Made up: from a block ICAO reserves for future use, and in the test database.
+    /// Made up: from a block ICAO reserves for future use.
     const ADDRESS: u32 = 0x00d0_0002;
     const EVERY: Duration = Duration::from_secs(1);
 
@@ -297,7 +296,7 @@ mod tests {
     async fn aircraft_are_published_with_what_is_registered() {
         // Arrange
         let (mut source, connection) = duplex(1024);
-        let registry = Registry::read(&database()).expect("reads");
+        let registry = Registry::from_iter([(ADDRESS, "TEST-02".into(), "B789".into())]);
         let mut followed = followed(vec![Ok(connection)], registry);
         source
             .write_all(&[message(), message()].concat())

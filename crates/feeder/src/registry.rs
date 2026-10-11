@@ -238,7 +238,7 @@ fn file(archive: &mut ZipArchive<Cursor<&[u8]>>, name: &str) -> Result<Vec<u8>, 
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod tests {
     use std::io::{Cursor, Write};
     use std::path::PathBuf;
     use std::sync::Arc;
@@ -266,7 +266,7 @@ pub(crate) mod tests {
     const TYPES: &str = r#"{"B789": ["BOEING 787-9 Dreamliner", "L2J", "H"]}"#;
 
     /// A zip of the files, each with its name.
-    pub(crate) fn zipped(files: &[(&str, &str)]) -> Vec<u8> {
+    fn zipped(files: &[(&str, &str)]) -> Vec<u8> {
         let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
         for (name, contents) in files {
             zip.start_file(*name, SimpleFileOptions::default())
@@ -276,7 +276,7 @@ pub(crate) mod tests {
         zip.finish().expect("finishes").into_inner()
     }
 
-    pub(crate) fn database() -> Vec<u8> {
+    fn database() -> Vec<u8> {
         zipped(&[("aircrafts.json", AIRCRAFT), ("types.json", TYPES)])
     }
 
