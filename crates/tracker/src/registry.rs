@@ -58,14 +58,12 @@ impl Registry {
         Ok(registry)
     }
 
-    /// Takes the aircraft at the address written in hexadecimal, with its
-    /// registration and then its type designator; one that has neither is left out.
-    fn push(&mut self, address: &str, fields: &[String]) {
-        let field = |at: usize| fields.get(at).map_or("", String::as_str);
-        let (registration, designator) = (field(0), field(1));
+    /// Takes the aircraft at the address with its registration and its type
+    /// designator; one that has neither is left out.
+    fn push(&mut self, address: u32, registration: &str, designator: &str) {
         let entry = || {
             Some(Entry {
-                address: u32::from_str_radix(address, 16).ok()?,
+                address,
                 at: u32::try_from(self.text.len()).ok()?,
                 registration_len: u8::try_from(registration.len()).ok()?,
                 designator_len: u8::try_from(designator.len()).ok()?,
@@ -123,7 +121,7 @@ impl FromIterator<(u32, String, String)> for Registry {
     fn from_iter<I: IntoIterator<Item = (u32, String, String)>>(aircraft: I) -> Self {
         let mut registry = Self::default();
         for (address, registration, designator) in aircraft {
-            registry.push(&format!("{address:x}"), &[registration, designator]);
+            registry.push(address, &registration, &designator);
         }
         registry
             .aircraft
@@ -142,7 +140,10 @@ impl<'de> Visitor<'de> for &mut Registry {
 
     fn visit_map<A: MapAccess<'de>>(self, mut aircraft: A) -> Result<(), A::Error> {
         while let Some((address, fields)) = aircraft.next_entry::<String, Vec<String>>()? {
-            self.push(&address, &fields);
+            let field = |at: usize| fields.get(at).map_or("", String::as_str);
+            if let Ok(address) = u32::from_str_radix(&address, 16) {
+                self.push(address, field(0), field(1));
+            }
         }
         Ok(())
     }
