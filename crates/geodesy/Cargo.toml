@@ -1,0 +1,11 @@
+[package]
+name = "geodesy"
+description = "Geodesics on the WGS-84 ellipsoid by Vincenty's formulae: how far apart two places are, and where a course leads"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
