@@ -76,12 +76,23 @@ const RECORDER = `(() => {
 const seconds = Number(opt.seconds);
 const traced = opt.fn.split(',').filter(Boolean);
 
-/** Runs `work` under the CPU profiler and reports the time in each traced function. */
-async function profiled(cdp: CDPSession, work: () => Promise<void>): Promise<Map<string, number>> {
+/**
+ * Runs `work` under the CPU profiler and reports what it gave with the time in each traced
+ * function. Starting the profiler stalls the page for a few frames, so `work` waits until the
+ * page has drawn past it.
+ */
+async function profiled<T>(
+  cdp: CDPSession,
+  page: Page,
+  work: () => Promise<T>,
+): Promise<[T, Map<string, number>]> {
   await cdp.send('Profiler.start');
-  await work();
+  await page.evaluate(
+    () => new Promise((drawn) => requestAnimationFrame(() => requestAnimationFrame(drawn))),
+  );
+  const done = await work();
   const { profile } = await cdp.send('Profiler.stop');
-  return inclusiveMs(profile, traced);
+  return [done, inclusiveMs(profile, traced)];
 }
 
 interface Point {
@@ -228,9 +239,12 @@ try {
   await cdp.send('Profiler.enable');
   await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
   const results = await inSequence(Object.entries(scenarios), async ([name, run]) => {
-    await page.evaluate('window.__bench.start()');
-    const ms = await profiled(cdp, () => run(stage));
-    return summarize(name, await page.evaluate<Sample>('window.__bench.stop()'), ms);
+    const [sample, ms] = await profiled(cdp, page, async () => {
+      await page.evaluate('window.__bench.start()');
+      await run(stage);
+      return page.evaluate<Sample>('window.__bench.stop()');
+    });
+    return summarize(name, sample, ms);
   });
   const status = await page.evaluate(() => document.querySelector('#top-bar')?.textContent ?? '');
   console.log(status);
