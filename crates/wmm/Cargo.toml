@@ -7,9 +7,6 @@ license.workspace = true
 rust-version.workspace = true
 publish = false
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
 # Not the workspace's lints: wasm-bindgen's exports are unsafe attributes, which the workspace forbids.
 [lints.rust]
 unsafe_code = "deny"
