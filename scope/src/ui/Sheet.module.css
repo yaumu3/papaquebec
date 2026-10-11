@@ -22,6 +22,12 @@
     transition-duration: var(--sheet-ms);
     transition-timing-function: var(--sheet-ease);
   }
+  /* Under Reduce Motion too, as an iOS sheet: its motion shows where it went. */
+  @media (prefers-reduced-motion: reduce) {
+    .sheet {
+      transition-duration: var(--sheet-ms);
+    }
+  }
   /* Off the foot of the screen before it shows, and again until it hides. */
   .slides {
     transition-property: height, transform, display;
