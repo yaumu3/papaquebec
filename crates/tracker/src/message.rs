@@ -88,12 +88,17 @@ pub fn comm_b_reply(
 }
 
 /// Who sent the message, how far that can be believed, and what it says;
-/// none when it is damaged or says nothing read here.
+/// none when it is neither 7 nor 14 bytes, damaged, or says nothing read here.
 #[must_use]
 pub fn read(message: &[u8]) -> Option<(Address, Trust, Report)> {
+    let long = match message.len() {
+        7 => false,
+        14 => true,
+        _ => return None,
+    };
     let bits = Bits::of(message);
     // Formats from 16 on are the long ones.
-    if (bits.get(1, 5) >= 16) != (bits.len() == 112) {
+    if (bits.get(1, 5) >= 16) != long {
         return None;
     }
     heard(bits, overlay(message))
@@ -557,6 +562,19 @@ mod tests {
         let addresses = heard.map(|one| one.map(|(address, _, _)| address));
         let other = Address::new(ADDRESS, AddressType::NonIcao);
         assert_eq!(addresses, [Some(icao(ADDRESS)), Some(other), None]);
+    }
+
+    #[test]
+    fn message_of_neither_mode_s_length_says_nothing() {
+        // Arrange: none, part of a short one, a short one too long, and longer than a long one
+        let short = reply(4, 0, altitude_code(2500));
+        let messages: [&[u8]; 4] = [&[], &short[..3], &[short, [0; 7]].concat()[..9], &[0; 17]];
+
+        // Act
+        let heard = messages.map(read);
+
+        // Assert
+        assert_eq!(heard, [None, None, None, None]);
     }
 
     #[test]
