@@ -3,10 +3,10 @@
 use std::net::{Ipv4Addr, Ipv6Addr};
 use std::path::Path;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use authority::{Authority, How};
-use feeder::follow::follow;
+use feeder::follow::{follow, wall};
 use feeder::transport::Server;
 use sim::Fleet;
 use tokio::net::{TcpListener, TcpStream};
@@ -114,10 +114,4 @@ fn authority(data: &Path) -> Result<Authority, Failure> {
         How::Created => eprintln!("authority: created; devices must trust /root.crt once"),
     }
     Ok(opened.authority)
-}
-
-/// Seconds since the epoch.
-fn wall() -> f64 {
-    let since = SystemTime::now().duration_since(UNIX_EPOCH);
-    since.map_or(0.0, |since| since.as_secs_f64())
 }

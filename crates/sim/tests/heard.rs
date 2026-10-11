@@ -2,9 +2,9 @@
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
-use feeder::follow::follow;
+use feeder::follow::{follow, wall};
 use prost::Message;
 use sim::Fleet;
 use tokio::net::{TcpListener, TcpStream};
@@ -348,12 +348,6 @@ fn every_identity_is_fictional_and_registered() {
             .all(|callsign| callsign.starts_with("TEST"))
     );
     assert!(snapshot.aircraft.iter().all(registered));
-}
-
-/// Seconds since the epoch.
-fn wall() -> f64 {
-    let since = SystemTime::now().duration_since(UNIX_EPOCH);
-    since.map_or(0.0, |since| since.as_secs_f64())
 }
 
 #[tokio::test]

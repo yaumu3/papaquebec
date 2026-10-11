@@ -3,7 +3,7 @@
 
 use std::io;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use tokio::io::{AsyncRead, AsyncReadExt};
 use tokio::sync::watch;
@@ -53,6 +53,13 @@ pub async fn follow<S, F>(
         () = following.keep_hearing(connect) => {}
         () = feed.closed() => {}
     }
+}
+
+/// Seconds since the epoch, the clock to follow a receiver by.
+#[must_use]
+pub fn wall() -> f64 {
+    let since = SystemTime::now().duration_since(UNIX_EPOCH);
+    since.map_or(0.0, |since| since.as_secs_f64())
 }
 
 /// What is kept while a source is followed, across its connections.
