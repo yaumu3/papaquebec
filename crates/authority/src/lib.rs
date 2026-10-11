@@ -100,7 +100,7 @@ impl Authority {
     ///
     /// When either cannot be read, the certificate is not an authority's or not
     /// valid now, or the key is not the certificate's.
-    pub fn from_pem(certificate_pem: &str, key_pem: &str) -> Result<Self, Failure> {
+    fn from_pem(certificate_pem: &str, key_pem: &str) -> Result<Self, Failure> {
         let certificate = CertificateDer::from(pem::parse(certificate_pem)?.into_contents());
         let key = KeyPair::from_pem_and_sign_algo(key_pem, &PKCS_ECDSA_P256_SHA256)?;
         let (_, parsed) = X509Certificate::from_der(&certificate)?;

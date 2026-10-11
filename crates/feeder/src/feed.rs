@@ -16,7 +16,7 @@ const RETENTION_S: f64 = 3660.0;
 /// One snapshot every eight seconds for the last hour, each aircraft whole, so a
 /// session that joins gets the hour of trail and readings the scope shows.
 #[derive(Default)]
-pub struct History {
+pub(crate) struct History {
     kept: VecDeque<Arc<Snapshot>>,
     /// What sessions are handed, rebuilt only when `kept` changes; the
     /// snapshots themselves are shared, not copied.
@@ -26,7 +26,7 @@ pub struct History {
 impl History {
     /// Keeps the snapshot when eight seconds have passed since the last one kept,
     /// and forgets those older than the retention.
-    pub fn record(&mut self, snapshot: &Snapshot) {
+    pub(crate) fn record(&mut self, snapshot: &Snapshot) {
         let last = self
             .kept
             .back()
@@ -43,7 +43,7 @@ impl History {
     }
 
     #[must_use]
-    pub fn shared(&self) -> Arc<[Arc<Snapshot>]> {
+    pub(crate) fn shared(&self) -> Arc<[Arc<Snapshot>]> {
         Arc::clone(&self.shared)
     }
 }

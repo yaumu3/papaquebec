@@ -48,7 +48,7 @@ pub fn mach(true_airspeed_kt: f64, pressure_altitude_ft: f64) -> f64 {
 /// The static air temperature the true airspeed stands for at the Mach
 /// number; none without a Mach number to stand against.
 #[must_use]
-pub fn static_air_temperature_c(mach: f64, true_airspeed_kt: f64) -> Option<f64> {
+pub(crate) fn static_air_temperature_c(mach: f64, true_airspeed_kt: f64) -> Option<f64> {
     if mach <= 0.0 {
         return None;
     }
@@ -59,7 +59,7 @@ pub fn static_air_temperature_c(mach: f64, true_airspeed_kt: f64) -> Option<f64>
 /// The total air temperature: the static one raised by the air brought to
 /// rest against the aircraft at the Mach number.
 #[must_use]
-pub fn total_air_temperature_c(static_c: f64, mach: f64) -> f64 {
+pub(crate) fn total_air_temperature_c(static_c: f64, mach: f64) -> f64 {
     (static_c + KELVIN_AT_0_C) * (1.0 + 0.2 * mach * mach) - KELVIN_AT_0_C
 }
 

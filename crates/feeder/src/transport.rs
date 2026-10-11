@@ -76,7 +76,7 @@ impl Server {
     /// # Errors
     ///
     /// When no certificate can be made.
-    pub fn renew(&self) -> io::Result<()> {
+    fn renew(&self) -> io::Result<()> {
         let identity = identity()?;
         let hash = hash(&identity);
         self.endpoint

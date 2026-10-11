@@ -106,7 +106,7 @@ impl AirbornePosition {
     /// The Navigation Accuracy Category for position that the message stands
     /// for when it is from an aircraft of ADS-B version 0, which reports none.
     #[must_use]
-    pub fn nac_p_of_version_0(&self) -> u32 {
+    pub(crate) fn nac_p_of_version_0(&self) -> u32 {
         version_0_nac_p(self.type_code)
     }
 }
@@ -215,7 +215,7 @@ impl SurfacePosition {
     /// The Navigation Accuracy Category for position that the message stands
     /// for when it is from an aircraft of ADS-B version 0, which reports none.
     #[must_use]
-    pub fn nac_p_of_version_0(&self) -> u32 {
+    pub(crate) fn nac_p_of_version_0(&self) -> u32 {
         version_0_nac_p(self.type_code)
     }
 }

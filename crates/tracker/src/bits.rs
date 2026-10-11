@@ -9,7 +9,7 @@ pub struct Bits {
 
 impl Bits {
     #[must_use]
-    pub fn of(bytes: &[u8]) -> Self {
+    pub(crate) fn of(bytes: &[u8]) -> Self {
         Self {
             bits: bytes
                 .iter()
@@ -20,7 +20,7 @@ impl Bits {
 
     /// The bits as bytes, what they leave of the last ones filled with zeros.
     #[must_use]
-    pub fn bytes<const N: usize>(self) -> [u8; N] {
+    pub(crate) fn bytes<const N: usize>(self) -> [u8; N] {
         let mut bytes = [0; N];
         if self.len > 0 {
             let from_the_top = (self.bits << (u128::BITS - self.len)).to_be_bytes();
