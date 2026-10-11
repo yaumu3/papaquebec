@@ -4,7 +4,7 @@
 //! read here is written as zeros.
 
 use crate::bits::Bits;
-use crate::code::{altitude, altitude_code, identity, mode_a_code, without_m};
+use crate::code::{altitude, altitude_code, identity, mode_a_code, with_m, without_m};
 use crate::cpr::Cpr;
 use crate::position::{bearing_of, toward};
 use crate::proto::{
@@ -115,9 +115,7 @@ impl AirbornePosition {
 impl Field for AirbornePosition {
     fn read(me: Bits) -> Option<Self> {
         let type_code = Some(me.get(1, 5)).filter(|code| matches!(code, 9..=18 | 20..=22))?;
-        // The 12 bits are an altitude code without its M bit.
-        let code = me.get(9, 20);
-        let altitude = altitude(code << 1 & 0x1f80 | code & 0x3f);
+        let altitude = altitude(with_m(me.get(9, 20)));
         let by_gnss = Self::by_gnss(type_code);
         Some(Self {
             cpr: position(me),
