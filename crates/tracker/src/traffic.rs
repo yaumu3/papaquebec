@@ -4,9 +4,10 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 
 use crate::air::{self, Wind};
+use crate::beast::Observation;
 use crate::cpr::{self, Cpr};
 use crate::field::{Airspeed, Identification};
-use crate::message::{Observation, Report, Trust};
+use crate::message::{Report, Trust};
 use crate::position::Position;
 use crate::proto::{
     Address, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory, LastPosition,
@@ -620,13 +621,14 @@ impl Tracked {
 #[cfg(test)]
 mod tests {
     use super::Traffic;
+    use crate::beast::Observation;
     use crate::bits::Bits;
     use crate::cpr;
     use crate::field::{
         AirbornePosition, Airspeed, Identification, OperationalStatus, RaBroadcast, Status,
         SurfacePosition, TargetStateAndStatus, Velocity,
     };
-    use crate::message::{Observation, Reply, Report, Trust};
+    use crate::message::{Reply, Report, Trust};
     use crate::position::Position;
     use crate::proto::{
         Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,

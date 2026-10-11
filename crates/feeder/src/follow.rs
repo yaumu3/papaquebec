@@ -12,7 +12,6 @@ use tokio::time::{Instant, MissedTickBehavior, interval_at};
 use crate::Failure;
 use crate::feed::{History, Published};
 use tracker::beast::{Frame, Reader};
-use tracker::message;
 use tracker::position::Position;
 use tracker::proto::Receiver;
 use tracker::registry::Registry;
@@ -123,7 +122,7 @@ impl<C: Fn() -> f64> Following<'_, C> {
 
     fn take(&mut self, frames: &[Frame]) {
         let now_s = (self.clock)();
-        for observation in frames.iter().filter_map(message::read) {
+        for observation in frames.iter().filter_map(Frame::observation) {
             self.traffic.hear(&observation, now_s);
         }
     }

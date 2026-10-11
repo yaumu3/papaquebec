@@ -3,26 +3,13 @@
 //!
 //! They are laid out as in ICAO Annex 10 Volume IV.
 
-use crate::beast::Frame;
 use crate::bits::Bits;
 use crate::code::{altitude, altitude_code, mode_a_code};
 use crate::field::{
     AirbornePosition, Field, Identification, OperationalStatus, RaBroadcast, Status,
     SurfacePosition, TargetStateAndStatus, Velocity,
 };
-use crate::proto::{Address, AddressType, Source};
-
-/// What one message says, and about whom.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Observation {
-    pub address: Address,
-    pub trust: Trust,
-    /// How the message came, when not by the aircraft's own broadcast.
-    pub source: Source,
-    /// The power it was received at.
-    pub rssi_dbfs: Option<f64>,
-    pub report: Report,
-}
+use crate::proto::{Address, AddressType};
 
 /// How far the address of a message can be believed.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -100,27 +87,16 @@ pub fn comm_b_reply(
     body.put(parity(&body.bytes::<11>()) ^ address, 24).bytes()
 }
 
-/// What the frame's message says; none when it is damaged or says nothing read here.
+/// Who sent the message, how far that can be believed, and what it says;
+/// none when it is damaged or says nothing read here.
 #[must_use]
-pub fn read(frame: &Frame) -> Option<Observation> {
-    let message = frame.message();
+pub fn read(message: &[u8]) -> Option<(Address, Trust, Report)> {
     let bits = Bits::of(message);
     // Formats from 16 on are the long ones.
     if (bits.get(1, 5) >= 16) != (bits.len() == 112) {
         return None;
     }
-    let (address, trust, report) = heard(bits, overlay(message))?;
-    Some(Observation {
-        address,
-        trust,
-        source: if frame.multilaterated() {
-            Source::Mlat
-        } else {
-            Source::Unspecified
-        },
-        rssi_dbfs: frame.rssi_dbfs(),
-        report,
-    })
+    heard(bits, overlay(message))
 }
 
 /// Who sent the message and what it says, by its downlink format. `overlay`
@@ -275,27 +251,18 @@ fn parity(body: &[u8]) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Observation, Reply, Report, Trust, comm_b_reply, overlay, read, squitter};
-    use crate::beast::Frame;
+    use super::{Reply, Report, Trust, comm_b_reply, overlay, read, squitter};
     use crate::bits::Bits;
     use crate::bits::published::{bytes, field};
     use crate::code::altitude_code;
     use crate::field::{Field, Identification, OperationalStatus, RaBroadcast};
     use crate::proto::{
-        Address, AddressType, EmitterCategory, ResolutionAdvisory, Source,
-        resolution_advisory::Advisory,
+        Address, AddressType, EmitterCategory, ResolutionAdvisory, resolution_advisory::Advisory,
     };
     use crate::register::Register;
 
     /// Made up: from a block ICAO reserves for future use.
     const ADDRESS: u32 = 0x00d0_0001;
-
-    /// The power of signal level 128.
-    const RSSI_DBFS: f64 = -5.986_604_215_721_735;
-
-    fn frame(message: &[u8]) -> Frame {
-        Frame::new(0, 128, message).expect("a message")
-    }
 
     fn icao(value: u32) -> Address {
         Address {
@@ -329,8 +296,8 @@ mod tests {
     }
 
     /// What the published message says.
-    fn published(hex: &str) -> Option<Observation> {
-        read(&frame(&bytes(hex)))
+    fn published(hex: &str) -> Option<(Address, Trust, Report)> {
+        read(&bytes(hex))
     }
 
     #[test]
@@ -354,42 +321,31 @@ mod tests {
         let messages = [false, true].map(|ident| comm_b_reply(ADDRESS, Some(2500), ident, mb));
 
         // Assert: the pulse leaves the ground open
-        let observations = messages.map(|message| read(&frame(&message)));
+        let heard = messages.map(|message| read(&message));
         let expected = [false, true].map(|ident| {
-            Some(Observation {
-                address: icao(ADDRESS),
-                trust: Trust::Recovered,
-                source: Source::Unspecified,
-                rssi_dbfs: Some(RSSI_DBFS),
-                report: Report::Reply(Reply {
-                    on_ground: (!ident).then_some(false),
-                    baro_altitude_ft: Some(2500),
-                    ident: Some(ident),
-                    comm_b: Some(mb),
-                    ..Reply::default()
-                }),
-            })
+            let reply = Reply {
+                on_ground: (!ident).then_some(false),
+                baro_altitude_ft: Some(2500),
+                ident: Some(ident),
+                comm_b: Some(mb),
+                ..Reply::default()
+            };
+            Some((icao(ADDRESS), Trust::Recovered, Report::Reply(reply)))
         });
-        assert_eq!(observations, expected);
+        assert_eq!(heard, expected);
     }
 
     #[test]
-    fn squitter_is_read_with_whom_it_is_from_and_how_it_was_heard() {
+    fn squitter_is_read_with_whom_it_is_from() {
         // Arrange: "The 1090 Megahertz Riddle", aircraft identification
         let message = "8D4840D6202CC371C32CE0576098";
 
         // Act
-        let observation = published(message);
+        let heard = published(message);
 
         // Assert
-        let expected = Observation {
-            address: icao(0x0048_40d6),
-            trust: Trust::Announced,
-            source: Source::Unspecified,
-            rssi_dbfs: Some(RSSI_DBFS),
-            report: Report::Identification(identification("KLM1023")),
-        };
-        assert_eq!(observation, Some(expected));
+        let report = Report::Identification(identification("KLM1023"));
+        assert_eq!(heard, Some((icao(0x0048_40d6), Trust::Announced, report)));
     }
 
     #[test]
@@ -420,7 +376,7 @@ mod tests {
         ];
 
         // Act
-        let reports = messages.map(|message| read(&frame(&message)).map(|heard| heard.report));
+        let reports = messages.map(|message| read(&message).map(|(_, _, report)| report));
 
         // Assert
         let kinds = reports.map(|report| match report {
@@ -456,7 +412,7 @@ mod tests {
         ];
 
         // Act
-        let reports = messages.map(|message| published(message).map(|heard| heard.report));
+        let reports = messages.map(|message| published(message).map(|(_, _, report)| report));
 
         // Assert: each with the message field of the register it answers with
         let expected = [
@@ -496,7 +452,7 @@ mod tests {
         ];
 
         // Act
-        let observations = messages.map(|message| read(&frame(&message)));
+        let heard = messages.map(|message| read(&message));
 
         // Assert
         let altitude = |on_ground, ident| {
@@ -525,8 +481,6 @@ mod tests {
             identity(None),
             identity(Some(Bits::of(&[0; 7]))),
         ];
-        let heard =
-            observations.map(|heard| heard.map(|heard| (heard.address, heard.trust, heard.report)));
         let recovered = |report| Some((icao(ADDRESS), Trust::Recovered, report));
         assert_eq!(heard, expected.map(recovered));
     }
@@ -538,9 +492,8 @@ mod tests {
         let statuses = [0, 1, 2, 3, 4, 5];
 
         // Act
-        let reports = statuses.map(|status| {
-            read(&frame(&reply(4, status, altitude_code(0)))).map(|heard| heard.report)
-        });
+        let reports = statuses
+            .map(|status| read(&reply(4, status, altitude_code(0))).map(|(_, _, report)| report));
 
         // Assert: the last two are the identification pulse
         let read = reports.map(|report| match report {
@@ -562,7 +515,7 @@ mod tests {
         ];
 
         // Act
-        let reports = messages.map(|message| read(&frame(&message)).map(|heard| heard.report));
+        let reports = messages.map(|message| read(&message).map(|(_, _, report)| report));
 
         // Assert
         let altitude = |on_ground| {
@@ -584,11 +537,9 @@ mod tests {
         let messages = [0, 5, 0x0001_0000].map(|over| overlaid(message, over));
 
         // Act
-        let observations = messages.map(|message| read(&frame(&message)));
+        let heard = messages.map(|message| read(&message));
 
         // Assert
-        let heard =
-            observations.map(|heard| heard.map(|heard| (heard.address, heard.trust, heard.report)));
         let airborne = Report::Reply(Reply {
             on_ground: Some(false),
             ..Reply::default()
@@ -611,10 +562,10 @@ mod tests {
         });
 
         // Act
-        let observations = messages.map(|message| read(&frame(&message)));
+        let heard = messages.map(|message| read(&message));
 
         // Assert
-        let addresses = observations.map(|heard| heard.map(|heard| heard.address));
+        let addresses = heard.map(|one| one.map(|(address, _, _)| address));
         let other = Address {
             value: ADDRESS,
             r#type: AddressType::NonIcao.into(),
@@ -623,29 +574,15 @@ mod tests {
     }
 
     #[test]
-    fn message_that_came_by_multilateration_says_so() {
-        // Arrange: readsb stamps such a message so, and measures no signal
-        let message = squitter(ADDRESS, identification("TEST01").write());
-        let frame = Frame::new(Frame::MULTILATERATED, 0, &message).expect("a message");
-
-        // Act
-        let observation = read(&frame);
-
-        // Assert
-        let heard = observation.map(|heard| (heard.source, heard.rssi_dbfs));
-        assert_eq!(heard, Some((Source::Mlat, None)));
-    }
-
-    #[test]
     fn long_format_in_a_short_frame_says_nothing() {
         // Arrange
         let message = squitter(ADDRESS, identification("TEST01").write());
 
         // Act
-        let observation = read(&frame(&message[..7]));
+        let heard = read(&message[..7]);
 
         // Assert
-        assert_eq!(observation, None);
+        assert_eq!(heard, None);
     }
 
     #[test]
@@ -655,10 +592,10 @@ mod tests {
         message[5] ^= 0x01;
 
         // Act
-        let observation = read(&frame(&message));
+        let heard = read(&message);
 
         // Assert
-        assert_eq!(observation, None);
+        assert_eq!(heard, None);
     }
 
     #[test]
@@ -667,9 +604,9 @@ mod tests {
         let message = squitter(ADDRESS, crate::bits::Bits::of(&[0; 7]));
 
         // Act
-        let observation = read(&frame(&message));
+        let heard = read(&message);
 
         // Assert
-        assert_eq!(observation, None);
+        assert_eq!(heard, None);
     }
 }

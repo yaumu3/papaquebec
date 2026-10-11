@@ -10,7 +10,6 @@ use sim::Fleet;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 use tracker::beast::Reader;
-use tracker::message;
 use tracker::position::Position;
 use tracker::proto::{
     AirGroundState, Aircraft, EmergencyPriorityStatus, Frame, Snapshot, Source, frame::Body,
@@ -52,7 +51,7 @@ impl Heard {
         *self.now.lock().expect("clock") += seconds;
         let now_s = *self.now.lock().expect("clock");
         for frame in self.reader.read(&self.fleet.fly()) {
-            if let Some(observation) = message::read(&frame) {
+            if let Some(observation) = frame.observation() {
                 self.traffic.hear(&observation, now_s);
             }
         }
