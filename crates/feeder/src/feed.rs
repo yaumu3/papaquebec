@@ -65,7 +65,7 @@ impl Published {
             receiver,
             history,
             latest_now_s: latest.now_s,
-            latest: Frame::from(latest).encode_length_delimited_to_vec().into(),
+            latest: framed(latest),
         }
     }
 
@@ -81,13 +81,18 @@ impl Published {
             receiver: Some(self.receiver),
             history: after.map(|snapshot| Snapshot::clone(snapshot)).collect(),
         };
-        Frame::from(hello).encode_length_delimited_to_vec().into()
+        framed(hello)
     }
 
     #[must_use]
     pub fn latest(&self) -> &Bytes {
         &self.latest
     }
+}
+
+/// The frame after its length, as a session's stream carries it.
+fn framed(frame: impl Into<Frame>) -> Bytes {
+    frame.into().encode_length_delimited_to_vec().into()
 }
 
 #[cfg(test)]
