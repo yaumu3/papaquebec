@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type ContentReads, type Finger, type Fingers, trackContentTouches } from './contentDrag';
+import {
+  type ContentReads,
+  DECIDE_PX,
+  type Finger,
+  type Fingers,
+  trackContentTouches,
+} from './contentDrag';
 
 const finger = (identifier: number, clientY: number, clientX = 100): Finger => ({
   identifier,
@@ -119,6 +125,33 @@ describe('trackContentTouches', () => {
 
     // Assert
     expect(pulls.at(-1)).toEqual(['up', 470, 30]);
+  });
+
+  it('leaves the wobble of a tap undecided, neither pulling the sheet nor keeping the content still', () => {
+    // Arrange
+    const { pulls, t } = subject();
+    t.start(fingers(0, [finger(1, 500)]));
+
+    // Act
+    const claimed = t.move(fingers(10, [finger(1, 500 - DECIDE_PX + 1)]));
+
+    // Assert
+    expect(claimed).toBe(false);
+    expect(pulls).toEqual([]);
+  });
+
+  it('decides by where the finger has gone once past the wobble, not by its first move', () => {
+    // Arrange
+    const { pulls, t } = subject({ atTop: () => false });
+    t.start(fingers(0, [finger(1, 500)]));
+    t.move(fingers(10, [finger(1, 498)]));
+
+    // Act
+    const claimed = t.move(fingers(20, [finger(1, 500 + DECIDE_PX)]));
+
+    // Assert
+    expect(claimed).toBe(false);
+    expect(pulls).toEqual([]);
   });
 
   it('leaves the content to scroll where the sheet would not move that way', () => {

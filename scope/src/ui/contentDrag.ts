@@ -1,6 +1,12 @@
 import { isPhone } from '../state/layout';
 import { contentMovesSheet } from './sheetMotion';
 
+/**
+ * How far a finger on a sheet's content travels before it is told a pull from a scroll, CSS px:
+ * past the wobble of a tap, short of where the page starts to scroll on its own.
+ */
+export const DECIDE_PX = 6;
+
 /** The sheet's drag, which a finger on its content works once it takes the sheet. */
 interface Pull {
   down(sheet: Element, y: number, t: number): void;
@@ -56,9 +62,9 @@ const fingerOf = (list: ArrayLike<Finger>, id: number) =>
   Array.from(list).find((f) => f.identifier === id);
 
 /**
- * Tells which fingers on a sheet's content pull the sheet: a lone finger whose first move goes
- * where the content would not scroll, followed by its identifier until it lifts, whatever other
- * fingers do meanwhile. `move` returns true when the move is the sheet's, so that the content
+ * Tells which fingers on a sheet's content pull the sheet: a lone finger that, once past a tap's
+ * wobble, goes where the content would not scroll, followed by its identifier until it lifts,
+ * whatever other fingers do meanwhile. `move` returns true when the move is the sheet's, so that the content
  * must not scroll.
  */
 export function trackContentTouches(
@@ -84,9 +90,12 @@ export function trackContentTouches(
     move(e: Fingers): boolean {
       const first = landed && fingerOf(e.changedTouches, landed.id);
       if (landed && first) {
+        const up = landed.y - first.clientY;
+        const across = first.clientX - landed.x;
+        if (Math.hypot(up, across) < DECIDE_PX) return false;
         const moves = contentMovesSheet({
-          up: landed.y - first.clientY,
-          across: first.clientX - landed.x,
+          up,
+          across,
           atLargest: read.atLargest(),
           atTop: read.atTop(e.target),
         });
