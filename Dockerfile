@@ -30,10 +30,11 @@ COPY Cargo.toml ./
 COPY crates/ crates/
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,id=wasm-target,target=/src/target \
-    cargo build --profile wasm -p placer -p wmm -p geodesy --target wasm32-unknown-unknown --locked \
-    && wasm-bindgen --target web --out-dir /wasm/placer target/wasm32-unknown-unknown/wasm/placer.wasm \
-    && wasm-bindgen --target web --out-dir /wasm/wmm target/wasm32-unknown-unknown/wasm/wmm.wasm \
-    && wasm-bindgen --target web --out-dir /wasm/geodesy target/wasm32-unknown-unknown/wasm/geodesy.wasm
+    for crate in placer wmm geodesy; do \
+      cargo rustc --profile wasm -p "$crate" --target wasm32-unknown-unknown --crate-type cdylib --locked \
+      && wasm-bindgen --target web --out-dir "/wasm/$crate" "target/wasm32-unknown-unknown/wasm/$crate.wasm" \
+      || exit 1; \
+    done
 
 FROM oven/bun:1-alpine AS build
 WORKDIR /app
