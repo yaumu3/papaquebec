@@ -76,12 +76,23 @@ const RECORDER = `(() => {
 const seconds = Number(opt.seconds);
 const traced = opt.fn.split(',').filter(Boolean);
 
-/** Runs `work` under the CPU profiler and reports the time in each traced function. */
-async function profiled(cdp: CDPSession, work: () => Promise<void>): Promise<Map<string, number>> {
+/**
+ * Runs `work` under the CPU profiler and reports what it gave with the time in each traced
+ * function. Starting the profiler stalls the page for a few frames, so `work` waits until the
+ * page has drawn past it.
+ */
+async function profiled<T>(
+  cdp: CDPSession,
+  page: Page,
+  work: () => Promise<T>,
+): Promise<[T, Map<string, number>]> {
   await cdp.send('Profiler.start');
-  await work();
+  await page.evaluate(
+    () => new Promise((drawn) => requestAnimationFrame(() => requestAnimationFrame(drawn))),
+  );
+  const done = await work();
   const { profile } = await cdp.send('Profiler.stop');
-  return inclusiveMs(profile, traced);
+  return [done, inclusiveMs(profile, traced)];
 }
 
 interface Point {
@@ -160,37 +171,40 @@ async function panOrigin(page: Page): Promise<Point> {
   return found;
 }
 
-interface Stage {
-  page: Page;
-  /** Where a left drag pans, found before recording starts. */
-  panFrom: Point;
-}
-
-const scenarios: Record<string, (stage: Stage) => Promise<void>> = {
-  async idle({ page }) {
-    await page.waitForTimeout(seconds * 1000);
+/**
+ * Each scenario gets ready, then hands over what is recorded. The pan looks for its spot just
+ * before it drags, so traffic has no time to move onto it.
+ */
+const scenarios: Record<string, (page: Page) => Promise<() => Promise<void>>> = {
+  async idle(page) {
+    return () => page.waitForTimeout(seconds * 1000);
   },
-  async pan({ page, panFrom: o }) {
-    await page.mouse.move(o.x, o.y);
-    await page.mouse.down();
-    await everyFrame(page, seconds * 1000, (i) =>
-      page.mouse.move(o.x + 120 * Math.sin(i / 10), o.y + 60 * Math.sin(i / 7)),
-    );
-    await page.mouse.up();
+  async pan(page) {
+    const o = await panOrigin(page);
+    return async () => {
+      await page.mouse.move(o.x, o.y);
+      await page.mouse.down();
+      await everyFrame(page, seconds * 1000, (i) =>
+        page.mouse.move(o.x + 120 * Math.sin(i / 10), o.y + 60 * Math.sin(i / 7)),
+      );
+      await page.mouse.up();
+    };
   },
-  async zoom({ page }) {
+  async zoom(page) {
     const b = await canvasBox(page);
     await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
-    await everyFrame(page, seconds * 1000, (i) => page.mouse.wheel(0, i % 40 < 20 ? -40 : 40));
+    return () =>
+      everyFrame(page, seconds * 1000, (i) => page.mouse.wheel(0, i % 40 < 20 ? -40 : 40));
   },
-  async hover({ page }) {
+  async hover(page) {
     const b = await canvasBox(page);
-    await everyFrame(page, seconds * 1000, (i) =>
-      page.mouse.move(
-        b.x + b.width * (0.25 + (0.5 * (i % 120)) / 120),
-        b.y + b.height * (0.5 + 0.2 * Math.sin(i / 5)),
-      ),
-    );
+    return () =>
+      everyFrame(page, seconds * 1000, (i) =>
+        page.mouse.move(
+          b.x + b.width * (0.25 + (0.5 * (i % 120)) / 120),
+          b.y + b.height * (0.5 + 0.2 * Math.sin(i / 5)),
+        ),
+      );
   },
 };
 
@@ -223,14 +237,18 @@ const { page, log, close } = await openScope({
 try {
   await page.waitForTimeout(Number(opt.warmup));
   await page.evaluate(RECORDER);
-  const stage = { page, panFrom: await panOrigin(page) };
+
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Profiler.enable');
   await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
-  const results = await inSequence(Object.entries(scenarios), async ([name, run]) => {
-    await page.evaluate('window.__bench.start()');
-    const ms = await profiled(cdp, () => run(stage));
-    return summarize(name, await page.evaluate<Sample>('window.__bench.stop()'), ms);
+  const results = await inSequence(Object.entries(scenarios), async ([name, ready]) => {
+    const run = await ready(page);
+    const [sample, ms] = await profiled(cdp, page, async () => {
+      await page.evaluate('window.__bench.start()');
+      await run();
+      return page.evaluate<Sample>('window.__bench.stop()');
+    });
+    return summarize(name, sample, ms);
   });
   const status = await page.evaluate(() => document.querySelector('#top-bar')?.textContent ?? '');
   console.log(status);
