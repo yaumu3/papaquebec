@@ -1,18 +1,13 @@
 /**
- * Geodesics on the WGS84 ellipsoid by Vincenty's formulae (T. Vincenty, "Direct and inverse
- * solutions of geodesics on the ellipsoid with application of nested equations", Survey Review
- * XXIII/176, 1975). Sub-millimetre at radar ranges; the inverse fails to converge only for
- * nearly antipodal points, which a scope never measures.
+ * Geodesics on the WGS84 ellipsoid, as the geodesy crate compiled to WebAssembly measures them
+ * by Vincenty's formulae, and the lines and rings drawn along them.
  */
-import { type GeoPoint, NM_IN_METERS, type ProjectFn, type Vec2 } from './geo';
-import { WGS84 } from './projection';
+import { type GeoPoint, type ProjectFn, type Vec2 } from './geo';
 import { RAD } from './units';
+import init, { direct as directOf, inverse as inverseOf } from './wasm/geodesy';
 
-const A = WGS84.a;
-const F = 1 / WGS84.invF;
-const B = A * (1 - F);
-const MAX_ITERATIONS = 100;
-const CONVERGED = 1e-12;
+// Instantiated before anything measures: a range ring or an RBL cannot be drawn without it.
+await init();
 
 export interface RangeBearing {
   distanceNm: number;
@@ -20,107 +15,21 @@ export interface RangeBearing {
   bearingTrue: number;
 }
 
-/** Vincenty's A and B series in u², shared by the inverse and the direct solution. */
-function series(cos2Alpha: number): { a: number; b: number } {
-  const u2 = (cos2Alpha * (A * A - B * B)) / (B * B);
-  return {
-    a: 1 + (u2 / 16384) * (4096 + u2 * (-768 + u2 * (320 - 175 * u2))),
-    b: (u2 / 1024) * (256 + u2 * (-128 + u2 * (74 - 47 * u2))),
-  };
-}
-
-/** Δσ, the correction from the sphere's arc to the ellipsoid's. */
-function deltaSigma(b: number, sinS: number, cosS: number, cos2Sm: number): number {
-  const c2 = cos2Sm * cos2Sm;
-  return (
-    b *
-    sinS *
-    (cos2Sm +
-      (b / 4) * (cosS * (-1 + 2 * c2) - (b / 6) * cos2Sm * (-3 + 4 * sinS * sinS) * (-3 + 4 * c2)))
-  );
-}
-
-/** How much the ellipsoid's longitude difference exceeds the auxiliary sphere's over the arc σ. */
-function longitudeCorrection(
-  sinAlpha: number,
-  cos2Alpha: number,
-  sigma: number,
-  sinS: number,
-  cosS: number,
-  cos2Sm: number,
-): number {
-  const c = (F / 16) * cos2Alpha * (4 + F * (4 - 3 * cos2Alpha));
-  return (
-    (1 - c) * F * sinAlpha * (sigma + c * sinS * (cos2Sm + c * cosS * (-1 + 2 * cos2Sm * cos2Sm)))
-  );
-}
-
 /** Distance and initial true course from `a` to `b` along the geodesic. */
 export function inverse(a: GeoPoint, b: GeoPoint): RangeBearing {
-  const l = (b.lon - a.lon) * RAD;
-  const u1 = Math.atan((1 - F) * Math.tan(a.lat * RAD));
-  const u2 = Math.atan((1 - F) * Math.tan(b.lat * RAD));
-  const [sinU1, cosU1, sinU2, cosU2] = [Math.sin(u1), Math.cos(u1), Math.sin(u2), Math.cos(u2)];
-  let lambda = l;
-  let sinL = 0;
-  let cosL = 1;
-  let sinS = 0;
-  let cosS = 1;
-  let sigma = 0;
-  let cos2Alpha = 1;
-  let cos2Sm = 0;
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    sinL = Math.sin(lambda);
-    cosL = Math.cos(lambda);
-    sinS = Math.hypot(cosU2 * sinL, cosU1 * sinU2 - sinU1 * cosU2 * cosL);
-    if (sinS === 0) return { distanceNm: 0, bearingTrue: 0 };
-    cosS = sinU1 * sinU2 + cosU1 * cosU2 * cosL;
-    sigma = Math.atan2(sinS, cosS);
-    const sinAlpha = (cosU1 * cosU2 * sinL) / sinS;
-    cos2Alpha = 1 - sinAlpha * sinAlpha;
-    cos2Sm = cos2Alpha === 0 ? 0 : cosS - (2 * sinU1 * sinU2) / cos2Alpha;
-    const prev = lambda;
-    lambda = l + longitudeCorrection(sinAlpha, cos2Alpha, sigma, sinS, cosS, cos2Sm);
-    if (Math.abs(lambda - prev) < CONVERGED) break;
-  }
-  const s = series(cos2Alpha);
-  const metres = B * s.a * (sigma - deltaSigma(s.b, sinS, cosS, cos2Sm));
-  const course = Math.atan2(cosU2 * sinL, cosU1 * sinU2 - sinU1 * cosU2 * cosL) / RAD;
-  return { distanceNm: metres / NM_IN_METERS, bearingTrue: (course + 360) % 360 };
+  const [distanceNm = Number.NaN, bearingTrue = Number.NaN] = inverseOf(a.lat, a.lon, b.lat, b.lon);
+  return { distanceNm, bearingTrue };
 }
 
 /** The point `distanceNm` along the geodesic that leaves `from` on the true course `bearingTrue`. */
 export function direct(from: GeoPoint, bearingTrue: number, distanceNm: number): GeoPoint {
-  const s = distanceNm * NM_IN_METERS;
-  const sinA1 = Math.sin(bearingTrue * RAD);
-  const cosA1 = Math.cos(bearingTrue * RAD);
-  const tanU1 = (1 - F) * Math.tan(from.lat * RAD);
-  const cosU1 = 1 / Math.sqrt(1 + tanU1 * tanU1);
-  const sinU1 = tanU1 * cosU1;
-  const sigma1 = Math.atan2(tanU1, cosA1);
-  const sinAlpha = cosU1 * sinA1;
-  const cos2Alpha = 1 - sinAlpha * sinAlpha;
-  const k = series(cos2Alpha);
-  let sigma = s / (B * k.a);
-  let sinS = 0;
-  let cosS = 1;
-  let cos2Sm = 0;
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    cos2Sm = Math.cos(2 * sigma1 + sigma);
-    sinS = Math.sin(sigma);
-    cosS = Math.cos(sigma);
-    const prev = sigma;
-    sigma = s / (B * k.a) + deltaSigma(k.b, sinS, cosS, cos2Sm);
-    if (Math.abs(sigma - prev) < CONVERGED) break;
-  }
-  sinS = Math.sin(sigma);
-  cosS = Math.cos(sigma);
-  cos2Sm = Math.cos(2 * sigma1 + sigma);
-  const x = sinU1 * sinS - cosU1 * cosS * cosA1;
-  const lat = Math.atan2(sinU1 * cosS + cosU1 * sinS * cosA1, (1 - F) * Math.hypot(sinAlpha, x));
-  const lambda = Math.atan2(sinS * sinA1, cosU1 * cosS - sinU1 * sinS * cosA1);
-  const l = lambda - longitudeCorrection(sinAlpha, cos2Alpha, sigma, sinS, cosS, cos2Sm);
-  return { lat: lat / RAD, lon: from.lon + l / RAD };
+  const [lat = Number.NaN, lon = Number.NaN] = directOf(
+    from.lat,
+    from.lon,
+    bearingTrue,
+    distanceNm,
+  );
+  return { lat, lon };
 }
 
 /** `segments + 1` points `radiusNm` from `center`, clockwise from due north and back to it. */
