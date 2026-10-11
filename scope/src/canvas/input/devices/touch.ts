@@ -38,6 +38,8 @@ export interface TouchHandlers {
   zoom(anchor: Point, factor: number, to: Point): void;
   /** A pinching finger or the sliding finger lifted. */
   zoomEnd(): void;
+  /** Whether a press at `at` would drag out an RBL, which outranks a double-tap drag zoom. */
+  startsRbl(at: Point): boolean;
 }
 
 /** A finger held still this long opens the menu a right click would. */
@@ -70,7 +72,7 @@ export function trackTouches(h: TouchHandlers, longPressMs = LONG_PRESS_MS) {
     const p = at(e);
     fingers.set(e.pointerId, p);
     if (fingers.size === 1) {
-      const second = isDoubleTap(lastTap, { ...p, t: e.timeStamp });
+      const second = isDoubleTap(lastTap, { ...p, t: e.timeStamp }) && !h.startsRbl(p);
       // Any other touch between two taps breaks the pair, so only the tap just before counts.
       lastTap = null;
       if (second) {
@@ -176,6 +178,7 @@ export function touchBindings(a: ScopeActions, precision: () => Precision): Touc
     },
     zoom: (anchor, factor, to) => a.zoomTo(anchor, factor, to),
     zoomEnd: () => a.zoomEnd(),
+    startsRbl: (p) => a.startsRbl(p, precision()),
   };
 }
 

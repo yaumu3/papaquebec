@@ -117,6 +117,23 @@ describe('trackDrags', () => {
     expect([rblPending(), modeText()]).toEqual([null, null]);
   });
 
+  it('tells a press on the selected target, which drags out an RBL, from a press elsewhere', () => {
+    // Arrange
+    trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });
+    setSelected('d00123');
+    const { d } = subject();
+    const presses = [
+      { x: 401, y: 300 },
+      { x: 200, y: 150 },
+    ];
+
+    // Act
+    const out = presses.map((p) => d.startsRbl(p, precise));
+
+    // Assert
+    expect(out).toEqual([true, false]);
+  });
+
   it('pans off a target that is not selected instead of dragging an RBL', () => {
     // Arrange
     trackStore.ingest({ now: 1000, messages: 0, aircraft: [aircraft('d00123')] });

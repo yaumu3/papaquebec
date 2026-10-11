@@ -48,6 +48,8 @@ export interface ScopeActions {
    * the scope.
    */
   grab: (at: Point, precision: Precision) => void;
+  /** Whether a press at `at` would drag out an RBL, landing on the selected target. */
+  startsRbl: (at: Point, precision: Precision) => boolean;
   /** Moves what is held; nothing moves until it passes the drag threshold. */
   dragTo: (at: Point) => void;
   /** Lets go at `at`; true when it was a drag rather than a press. */
@@ -191,6 +193,7 @@ export function createActions(host: DragHost): ScopeActions {
   return {
     ...plain,
     grab: drags.start,
+    startsRbl: drags.startsRbl,
     dragTo: drags.move,
     release: drags.end,
     dropGrab: drags.cancel,
