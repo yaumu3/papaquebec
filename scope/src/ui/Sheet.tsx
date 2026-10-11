@@ -17,12 +17,9 @@ import { grabberShown, type SheetStop, settle, sheetFrame, sheetStops } from './
 
 import s from './Sheet.module.css';
 
-/** The share of the screen's height a sheet fills at its medium detent. */
-const MEDIUM_SHARE = 0.33;
-
 /** The height of each detent, within the room the sheet may fill. */
 const DETENT_HEIGHT: Record<Detent, string> = {
-  medium: `min(${MEDIUM_SHARE * 100}dvh, 100%)`,
+  medium: 'min(var(--sheet-medium), 100%)',
   large: '100%',
 };
 
@@ -31,7 +28,8 @@ type Frame = ReturnType<typeof sheetFrame>;
 /** What a drag needs to know of the sheet when it starts: how much of it shows, and where it may rest. */
 function measure(sheet: Element, detents: Detents) {
   const room = sheet.parentElement?.getBoundingClientRect() ?? sheet.getBoundingClientRect();
-  const heights = { medium: Math.min(MEDIUM_SHARE * innerHeight, room.height), large: room.height };
+  const medium = Number.parseFloat(getComputedStyle(sheet).getPropertyValue('--sheet-medium'));
+  const heights = { medium: Math.min(medium, room.height), large: room.height };
   return {
     shown: room.bottom - sheet.getBoundingClientRect().top,
     smallest: heights[detents[0]],

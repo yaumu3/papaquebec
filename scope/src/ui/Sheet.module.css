@@ -1,3 +1,9 @@
+/* A length, so that a drag reads in px the medium detent CSS sizes the sheet by. */
+@property --sheet-medium {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
 /* Two classes, to outrank the display of whatever box it is. */
 .sheet.hidden {
   display: none;
@@ -8,6 +14,7 @@
 @media (max-width: 720px) {
   /* At the foot of the room it may fill, as tall as its detent. */
   .sheet {
+    --sheet-medium: 33dvh;
     flex: none;
     height: var(--sheet-height);
     transform: translateY(var(--sheet-shift, 0px));
