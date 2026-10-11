@@ -5,6 +5,8 @@
 
 use std::str::FromStr;
 
+use tracker::position::toward;
+
 use crate::fleet::Leg;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -91,8 +93,7 @@ const RWY_16R: Runway = Runway {
 impl Runway {
     /// Unit vector of its bearing.
     fn heading(self) -> (f64, f64) {
-        let rad = self.bearing_deg.to_radians();
-        (rad.sin(), rad.cos())
+        toward(self.bearing_deg, 1.0)
     }
 
     /// The point `nm` out on final, before the threshold.
@@ -141,10 +142,8 @@ const fn leg(x: f64, y: f64, alt: f64, gs: f64) -> Leg {
 
 /// The point `nm` from `from` along a heading of `deg`.
 fn ahead(from: (f64, f64), deg: f64, nm: f64) -> (f64, f64) {
-    (
-        from.0 + nm * deg.to_radians().sin(),
-        from.1 + nm * deg.to_radians().cos(),
-    )
+    let (east, north) = toward(deg, nm);
+    (from.0 + east, from.1 + north)
 }
 
 /// A route onto `runway`: a leg `nm` long at `side_deg` off the final, flown at `entry_kt`

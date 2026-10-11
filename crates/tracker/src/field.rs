@@ -6,6 +6,7 @@
 use crate::bits::Bits;
 use crate::code::{altitude, altitude_code, identity, mode_a_code, without_m};
 use crate::cpr::Cpr;
+use crate::position::{bearing_of, toward};
 use crate::proto::{
     EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
     resolution_advisory::{Advisory, Corrections},
@@ -371,8 +372,8 @@ fn steps(value: Option<i32>, step: u32) -> (bool, u32) {
 fn over_ground(me: Bits, step: f64) -> Option<(f64, f64)> {
     let east = f64::from(stepped(me.flag(14), me.get(15, 24), 1)?) * step;
     let north = f64::from(stepped(me.flag(25), me.get(26, 35), 1)?) * step;
-    let track = east.atan2(north).to_degrees().rem_euclid(360.0);
-    Some((east.hypot(north), track))
+    let (track, speed) = bearing_of(east, north);
+    Some((speed, track))
 }
 
 /// The subtype and the 22 bits of a ground speed along a track, as the
@@ -381,10 +382,7 @@ fn along_ground(velocity: Option<(f64, f64)>) -> (u32, Bits) {
     let Some((speed, track)) = velocity else {
         return (1, Bits::default().filled(22));
     };
-    let (east, north) = (
-        speed * track.to_radians().sin(),
-        speed * track.to_radians().cos(),
-    );
+    let (east, north) = toward(track, speed);
     let supersonic = east.abs().max(north.abs()) > SUBSONIC_KT;
     let step = if supersonic { 4.0 } else { 1.0 };
     let toward = |velocity: f64| {

@@ -5,7 +5,6 @@
 //! addresses come from `D00000` to `DFFFFF`, a block ICAO Annex 10 Vol III
 //! reserves for future use.
 
-use std::f64::consts::TAU;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -19,7 +18,7 @@ use tracker::field::{
     SurfacePosition, TargetStateAndStatus, Velocity,
 };
 use tracker::message::{comm_b_reply, squitter};
-use tracker::position::Position;
+use tracker::position::{Position, bearing_of, toward};
 use tracker::proto::{
     EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
     resolution_advisory::Advisory, target_state::Modes,
@@ -83,10 +82,7 @@ pub struct State {
 
 /// True bearing from one point to another, degrees.
 fn bearing(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> f64 {
-    (to_x - from_x)
-        .atan2(to_y - from_y)
-        .to_degrees()
-        .rem_euclid(360.0)
+    bearing_of(to_x - from_x, to_y - from_y).0
 }
 
 /// One aircraft as it starts out.
@@ -246,10 +242,10 @@ fn scattered(
     numbers
         .map(|number| {
             let range = radius_nm * random().sqrt();
-            let bearing = random() * TAU;
+            let (x, y) = toward(random() * 360.0, range);
             Plan {
-                x: range * bearing.sin(),
-                y: range * bearing.cos(),
+                x,
+                y,
                 alt: 1000.0 * (levels.0 + random() * levels.1).round(),
                 gs: (speeds.0 + random() * speeds.1).round(),
                 track: (random() * 360.0).round(),
@@ -384,9 +380,9 @@ impl Flying {
     /// Flies on along its track at its speed for `elapsed` seconds; returns how far, NM.
     fn fly_straight(&mut self, elapsed: f64) -> f64 {
         let distance = self.plan.gs * elapsed / 3600.0;
-        let track = self.plan.track.to_radians();
-        self.x += distance * track.sin();
-        self.y += distance * track.cos();
+        let (east, north) = toward(self.plan.track, distance);
+        self.x += east;
+        self.y += north;
         distance
     }
 

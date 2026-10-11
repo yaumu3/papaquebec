@@ -25,7 +25,7 @@ use placer::placement::place_blocks;
 use placer::rng::mulberry32;
 use placer::score::{Metrics, score};
 use sim::{Fleet, Runway, Scenario, State};
-use tracker::position::Position;
+use tracker::position::{Position, toward};
 
 /// RJTT
 const SITE: Position = Position {
@@ -156,12 +156,12 @@ fn subjects_of(
             past.push((t, cx, cy));
             past.retain(|p| p.0 >= t - HISTORY_SEC);
             let was = state.get(&a.address);
-            let rad = a.track_deg.to_radians();
+            let (east, north) = toward(a.track_deg, a.gs_kt);
             Subject {
                 cx,
                 cy,
-                vx: a.gs_kt * rad.sin() * k / 3600.0,
-                vy: -a.gs_kt * rad.cos() * k / 3600.0,
+                vx: east * k / 3600.0,
+                vy: -north * k / 3600.0,
                 extra_lines: 0,
                 dir: was.map(|w| w.0),
                 since_move: was.map_or(f64::INFINITY, |w| t - w.1),

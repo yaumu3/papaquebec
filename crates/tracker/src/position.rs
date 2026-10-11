@@ -1,4 +1,4 @@
-//! Places on the globe.
+//! Places on the globe, and vectors told apart east and north or by their bearing.
 
 use std::str::FromStr;
 
@@ -37,6 +37,22 @@ impl FromStr for Position {
         }
         Ok(Self { lat_deg, lon_deg })
     }
+}
+
+/// The components east and north of a length on a bearing.
+#[must_use]
+pub fn toward(bearing_deg: f64, length: f64) -> (f64, f64) {
+    let (sin, cos) = bearing_deg.to_radians().sin_cos();
+    (length * sin, length * cos)
+}
+
+/// The bearing and the length of the components east and north.
+#[must_use]
+pub fn bearing_of(east: f64, north: f64) -> (f64, f64) {
+    (
+        east.atan2(north).to_degrees().rem_euclid(360.0),
+        east.hypot(north),
+    )
 }
 
 #[cfg(test)]
