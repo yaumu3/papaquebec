@@ -16,7 +16,6 @@ use std::process::ExitCode;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use feeder::position::Position;
 use placer::BATCH;
 use placer::cost::{Scene, Subject};
 use placer::geometry::{DB_HEIGHT, Vec2, block_rect};
@@ -26,6 +25,7 @@ use placer::placement::place_blocks;
 use placer::rng::mulberry32;
 use placer::score::{Metrics, score};
 use sim::{Fleet, Runway, Scenario, State};
+use tracker::position::Position;
 
 /// RJTT
 const SITE: Position = Position {

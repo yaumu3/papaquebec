@@ -221,17 +221,18 @@ flowchart LR
     end
     subgraph p["papaquebec"]
         web[("web<br/>scope build, map data, feed info")]
+        tracker
         feeder
     end
     subgraph b["browser"]
         feed[feed worker] --> store[main thread<br/>track store] --> render[render worker<br/>WebGPU]
     end
     web -- https --> store
-    readsb -- "Beast: each message as heard" --> feeder -- "WebTransport, protobuf" --> feed
+    readsb -- "Beast: each message as heard" --> tracker --> feeder -- "WebTransport, protobuf" --> feed
     feeder -. "port, certificate hash" .-> web
 ```
 
-**Data.** The receiver passes on every Mode S message it hears, in the Beast format. The feeder
+**Data.** The receiver passes on every Mode S message it hears, in the Beast format. The tracker
 reads what each says (`message`, by ICAO Annex 10 Volume IV) and keeps what is said of each
 aircraft until it lapses (`traffic`).
 
@@ -278,24 +279,13 @@ through the design tokens. `scripts/` holds the data tools and the headless brow
 `proto/` holds the schema both sides generate their types from. `crates/` holds the server's Rust
 crates:
 
-- `web/`: the server, the `papaquebec` binary. It reads the environment (`config`), answers for
-  the scope's files and the feed's info (`site`) at a door that speaks https or plain http
-  (`door`), and runs the feed.
-- `authority/`: the local certificate authority behind the door.
-- `feeder/`: the feed as a library.
-  - The Beast format (`beast`); Mode S messages (`message`) with the fields of their extended
-    squitters (`field`) and the Comm-B registers (`register`), over `bits`, and the positions in
-    them (`cpr`), each read and written in one place.
-  - The aircraft they tell of (`traffic`), with the standard atmosphere (`air`) they are read by,
-    and the aircraft database (`registry`).
-  - The following of a receiver (`follow`), what every session is served from (`feed`), the wire
-    contract (`proto`) and the WebTransport endpoint (`transport`).
-- `sim/`: a receiver stood in for: a synthetic fleet, sent as the messages it would broadcast and
-  answer, written with the same fields.
-- `placer/`: places the data blocks, annealing over the cost of every bearing each could take; the
-  scope runs it as WebAssembly in a worker, the benchmark natively on the sim's scenarios.
-- `wmm/`: the World Magnetic Model, WMM2025. The feeder reads it to make headings true; the scope
-  runs it as WebAssembly to make bearings magnetic where each is measured.
+- `web/`: the server, the `papaquebec` binary.
+- `authority/`: the server's local certificate authority.
+- `tracker/`: reads the receiver's messages and keeps track of each aircraft.
+- `feeder/`: serves the feed over WebTransport.
+- `sim/`: a synthetic fleet that stands in for a receiver.
+- `placer/`: places the data blocks; WebAssembly in the scope, native in the benchmark.
+- `wmm/`: the World Magnetic Model; native in the tracker, WebAssembly in the scope.
 
 **Stack.**
 

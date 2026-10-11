@@ -11,7 +11,7 @@ const testdata = (name: string) => Bun.file(`${import.meta.dir}/../../../proto/t
 const snapshotAt = (now: number) => ({ now, messages: 0, aircraft: [{ hex: 'd00001' }] });
 
 describe('messageOf', () => {
-  it("reads the feeder's pinned bytes as the aircraft they were made from", async () => {
+  it("reads the tracker's pinned bytes as the aircraft they were made from", async () => {
     // Arrange
     const frame = fromBinary(FrameSchema, await testdata('snapshot.bin').bytes());
 

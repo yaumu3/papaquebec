@@ -8,7 +8,6 @@ use std::time::{Duration, Instant};
 
 use authority::{Authority, Subject};
 use axum::Router;
-use feeder::Failure;
 use hyper_util::rt::{TokioExecutor, TokioIo};
 use hyper_util::server::conn::auto::Builder;
 use hyper_util::service::TowerToHyperService;
@@ -17,6 +16,7 @@ use rustls::server::Acceptor;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::LazyConfigAcceptor;
+use tracker::Failure;
 
 /// A third of the ninety days a certificate lasts.
 const REISSUE_AFTER: Duration = Duration::from_hours(30 * 24);

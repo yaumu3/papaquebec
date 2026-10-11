@@ -6,7 +6,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use prost::Message;
 
-use crate::proto::{Frame, Hello, Receiver, Snapshot};
+use tracker::proto::{Frame, Hello, Receiver, Snapshot};
 
 /// How far apart the snapshots of the history are kept.
 const CADENCE_S: f64 = 8.0;
@@ -95,7 +95,7 @@ mod tests {
     use prost::Message;
 
     use super::{History, Published};
-    use crate::proto::{
+    use tracker::proto::{
         Address, AirGroundState, Aircraft, Frame, Hello, Receiver, Reception, Registry, Snapshot,
         Source, TargetState, frame::Body,
     };

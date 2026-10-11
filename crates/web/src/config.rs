@@ -5,9 +5,9 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use authority::Subject;
-use feeder::Failure;
-use feeder::position::Position;
 use sim::Scenario;
+use tracker::Failure;
+use tracker::position::Position;
 
 /// Where the traffic comes from.
 #[derive(Debug, PartialEq)]
@@ -199,8 +199,8 @@ mod tests {
     use std::path::PathBuf;
 
     use authority::Subject;
-    use feeder::position::Position;
     use sim::Scenario;
+    use tracker::position::Position;
 
     use super::{Config, Door, Origin};
 

@@ -501,7 +501,7 @@ describe('createTrackStore remembering', () => {
     ]);
   });
 
-  it('starts a target anew fifteen minutes after it was last heard, as the feeder does', () => {
+  it('starts a target anew fifteen minutes after it was last heard, as the tracker does', () => {
     // Arrange
     const store = createTrackStore(project);
     store.ingest(snapshot(1000, [live('a')]));
