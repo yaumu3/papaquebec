@@ -350,8 +350,7 @@ impl Tracked {
                 self.qualify(said.nac_p_of_version_0(), now_s);
                 let nic = said.nic(self.nic_supplement_a, self.nic_supplement_c);
                 // A receiver hears an aircraft on the ground only from nearby.
-                let reference = self.fix.at(now_s).map_or(site, |fix| fix.position);
-                let position = cpr::surface_near(said.cpr, reference);
+                let position = cpr::surface_near(said.cpr, self.whereabouts(now_s, site));
                 self.place(position, nic, observation.source, now_s, site);
             }
             Report::Reply(said) => {
@@ -491,11 +490,15 @@ impl Tracked {
         self.wind.keep(wind, now_s);
     }
 
+    /// Where the aircraft is, or else the site.
+    fn whereabouts(&self, now_s: f64, site: Position) -> Position {
+        self.fix.at(now_s).map_or(site, |fix| fix.position)
+    }
+
     /// How far east of true north magnetic north lies where the aircraft is,
     /// or else at the site.
     fn declination(&self, now_s: f64, site: Position) -> f64 {
-        let at = self.fix.at(now_s).map_or(site, |fix| fix.position);
-        at.declination_deg(now_s)
+        self.whereabouts(now_s, site).declination_deg(now_s)
     }
 
     /// Takes the accuracy that a position message stands for, from an aircraft
