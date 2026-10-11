@@ -48,8 +48,8 @@ pub struct Reply {
     /// Whether the flight status of a surveillance reply carries the special
     /// position identification: the crew pressed IDENT.
     pub ident: Option<bool>,
-    /// The message field of a Comm-B reply, read as the register it fits
-    /// with what else is known of the aircraft.
+    /// The message field of a Comm-B reply, unread: the traffic reads it as
+    /// the register it fits with what else it knows of the aircraft.
     pub comm_b: Option<Bits>,
 }
 

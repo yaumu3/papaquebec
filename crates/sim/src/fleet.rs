@@ -300,7 +300,7 @@ struct Flying {
     leg: usize,
     /// Degrees per second, as it last turned.
     turning: f64,
-    /// How many times it has reached the end of its route.
+    /// Whether it has reached the end of its route.
     landed: bool,
 }
 
