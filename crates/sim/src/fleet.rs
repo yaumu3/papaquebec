@@ -188,22 +188,28 @@ fn fleet() -> Vec<Plan> {
     ]
 }
 
-/// An arrival of a scenario, numbered on from the streams before it.
-fn arrival(number: u32) -> Plan {
+/// A generic airliner, its address `number` on from `block`.
+fn generic(block: u32, number: u32, kind: &'static str) -> Plan {
     Plan {
-        address: 0x00d2_0000 + number,
+        address: block + number,
         number,
         digits: 4,
         callsign: true,
         category: EmitterCategory::A3Large,
         squawk: 0o1000 + number % 0o6000,
-        kind: if number.is_multiple_of(2) {
-            "A320"
-        } else {
-            "B738"
-        },
+        kind,
         ..Plan::default()
     }
+}
+
+/// An arrival of a scenario, numbered on from the streams before it.
+fn arrival(number: u32) -> Plan {
+    let kind = if number.is_multiple_of(2) {
+        "A320"
+    } else {
+        "B738"
+    };
+    generic(0x00d2_0000, number, kind)
 }
 
 /// `count` aircraft crossing within `radius_nm` of the site on straight tracks between FL050
@@ -257,23 +263,13 @@ fn scattered(
 
 /// `count` generic en-route targets spread over the area, for load testing.
 fn extra_fleet(count: u32) -> Vec<Plan> {
-    let plan = |number| Plan {
-        address: 0x00d1_0000 + number,
-        number,
-        digits: 4,
-        callsign: true,
-        category: EmitterCategory::A3Large,
-        squawk: 0o1000 + number % 0o6000,
-        kind: "A320",
-        ..Plan::default()
-    };
     scattered(
         &mut mulberry32(count),
         0..count,
         50.0,
         (3.0, 35.0),
         (180.0, 300.0),
-        plan,
+        |number| generic(0x00d1_0000, number, "A320"),
     )
 }
 
