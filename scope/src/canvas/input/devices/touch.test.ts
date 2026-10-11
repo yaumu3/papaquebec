@@ -25,8 +25,8 @@ const finger = (
   timeStamp,
 });
 
-/** Handlers that record every call by name, in order. */
-function recorder() {
+/** Handlers that record every call by name, in order; a press starts an RBL when `rbl` is set. */
+function recorder({ rbl = false } = {}) {
   const calls: [string, ...unknown[]][] = [];
   const h: TouchHandlers = {
     press: (e) => calls.push(['press', e.pointerId]),
@@ -35,6 +35,7 @@ function recorder() {
     zoomStart: () => calls.push(['zoomStart']),
     zoom: (anchor, factor, to) => calls.push(['zoom', anchor, factor, to]),
     zoomEnd: () => calls.push(['zoomEnd']),
+    startsRbl: () => rbl,
   };
   return { calls, t: trackTouches(h, LONG_PRESS_MS) };
 }
@@ -150,6 +151,21 @@ describe('trackTouches', () => {
     ]);
   });
 
+  it('leaves the second touch of a double tap to drag out an RBL when it lands on one', () => {
+    // Arrange
+    const { calls, t } = recorder({ rbl: true });
+    t.down(finger(1, 100, 200, 0));
+    t.up(finger(1, 100, 200, 60));
+    t.down(finger(2, 105, 195, 180));
+
+    // Act
+    const consumed = t.move(finger(2, 105, 135, 220));
+
+    // Assert
+    expect(consumed).toBe(false);
+    expect(calls.slice(2)).toEqual([['press', 2]]);
+  });
+
   it('ends the drag zoom when the finger lifts', () => {
     // Arrange
     const { calls, t } = recorder();
@@ -250,7 +266,7 @@ describe('trackTouches', () => {
     // Assert
     expect(calls.slice(-2).map(([name]) => name)).toEqual(['zoomEnd', 'zoomStart']);
   });
-  it('is zooming from the second touch of a double tap until that finger lifts', () => {
+  it('holds a double tap from its second touch until that finger lifts, zooming or dragging an RBL', () => {
     // Arrange
     const steps: ((t: ReturnType<typeof trackTouches>) => void)[] = [
       (t) => t.down(finger(1, 100, 200, 0)),
@@ -258,16 +274,21 @@ describe('trackTouches', () => {
       (t) => t.down(finger(2, 100, 200, 180)),
       (t) => t.up(finger(2, 100, 200, 240)),
     ];
-    const { t } = recorder();
+    const runs = [recorder(), recorder({ rbl: true })];
 
     // Act
-    const zooming = steps.map((step) => {
-      step(t);
-      return t.zooming();
-    });
+    const held = runs.map(({ t }) =>
+      steps.map((step) => {
+        step(t);
+        return t.holdingDoubleTap();
+      }),
+    );
 
     // Assert
-    expect(zooming).toEqual([false, false, true, false]);
+    expect(held).toEqual([
+      [false, false, true, false],
+      [false, false, true, false],
+    ]);
   });
 
   it('taps where a lone finger lifts, unless it dragged first', () => {
@@ -373,6 +394,22 @@ describe('touchBindings', () => {
       ['zoomTo', p, 0.5, p],
       ['zoomEnd'],
     ]);
+  });
+});
+
+describe('touchBindings startsRbl', () => {
+  it('asks whether a press starts an RBL at the precision of what pressed', () => {
+    // Arrange
+    const p = { x: 10, y: 20 };
+    const { calls, actions } = recordActions({ rbl: true });
+    const b = touchBindings(actions, () => PEN);
+
+    // Act
+    const out = b.startsRbl(p);
+
+    // Assert
+    expect(out).toBe(true);
+    expect(calls).toEqual([['startsRbl', p, PEN]]);
   });
 });
 

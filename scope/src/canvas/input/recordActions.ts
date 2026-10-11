@@ -2,9 +2,9 @@ import type { ScopeActions } from './actions';
 
 /**
  * Scope actions that only record each call by name, to test which action a device asks for.
- * `release` reports a drag when `dragged` is set.
+ * `release` reports a drag when `dragged` is set, and `startsRbl` an RBL when `rbl` is.
  */
-export function recordActions({ dragged = false } = {}) {
+export function recordActions({ dragged = false, rbl = false } = {}) {
   const calls: [keyof ScopeActions, ...unknown[]][] = [];
   const rec =
     (name: keyof ScopeActions) =>
@@ -13,6 +13,10 @@ export function recordActions({ dragged = false } = {}) {
     };
   const actions: ScopeActions = {
     grab: rec('grab'),
+    startsRbl: (at, precision) => {
+      calls.push(['startsRbl', at, precision]);
+      return rbl;
+    },
     dragTo: rec('dragTo'),
     release: (at) => {
       calls.push(['release', at]);

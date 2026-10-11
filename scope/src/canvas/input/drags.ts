@@ -45,10 +45,18 @@ export function trackDrags(host: DragHost) {
   /** A drag that began on the selected target; once it moves it is a pending RBL anchored there. */
   let rblDrag: (Drag & { hex: string; precision: Precision }) | null = null;
 
+  /** The selected target under `at`, which a press there drags an RBL out of. */
+  const rblTargetAt = (at: Point, precision: Precision) => {
+    const t = targetAt(host.view(), at.x, at.y, precision.reach);
+    return t && selected() === t.hex ? t : null;
+  };
+
+  const startsRbl = (at: Point, precision: Precision) => rblTargetAt(at, precision) !== null;
+
   const start = (at: Point, precision: Precision) => {
     const v = host.view();
-    const t = targetAt(v, at.x, at.y, precision.reach);
-    if (t && selected() === t.hex) {
+    const t = rblTargetAt(at, precision);
+    if (t) {
       rblDrag = { hex: t.hex, from: at, moved: false, precision };
       return;
     }
@@ -159,5 +167,5 @@ export function trackDrags(host: DragHost) {
     host.setCursor('crosshair');
   };
 
-  return { start, move, end, cancel };
+  return { start, startsRbl, move, end, cancel };
 }
