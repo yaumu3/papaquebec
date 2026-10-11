@@ -721,26 +721,13 @@ fn ticks(seconds: f64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use tracker::position::Position;
-
     use super::Fleet;
-
-    /// RJFF
-    const SITE: Position = Position {
-        lat_deg: 33.5844,
-        lon_deg: 130.4517,
-    };
+    use crate::testing::{SITE, hand_clock};
 
     /// A fleet at second 1000 and the hand that moves its clock.
     fn fleet(extra: u32) -> (Fleet, impl Fn(f64)) {
-        let now = Arc::new(Mutex::new(1000.0));
-        let hand = Arc::clone(&now);
-        let fleet = Fleet::new(SITE, move || *now.lock().expect("clock"), extra);
-        (fleet, move |seconds| {
-            *hand.lock().expect("clock") += seconds;
-        })
+        let (clock, hand) = hand_clock(1000.0);
+        (Fleet::new(SITE, clock, extra), hand)
     }
 
     #[test]

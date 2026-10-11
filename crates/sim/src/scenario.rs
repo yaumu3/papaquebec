@@ -316,19 +316,10 @@ impl Scenario {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use tracker::position::Position;
-
     use super::{RWY_05, RWY_16L, RWY_16R, RWY_22, RWY_23, RWY_34L, RWY_34R, Runway};
+    use crate::testing::{SITE, hand_clock};
     use crate::{Fleet, Scenario, State};
     use placer::rng::mulberry32;
-
-    /// RJFF
-    const SITE: Position = Position {
-        lat_deg: 33.5844,
-        lon_deg: 130.4517,
-    };
 
     /// A scenario fleet at second 1000 and the hand that moves its clock.
     fn fleet(scenario: Scenario, seed: u32) -> (Fleet, impl Fn(f64)) {
@@ -337,18 +328,8 @@ mod tests {
 
     /// The same with `extra` background aircraft.
     fn fleet_with(scenario: Scenario, seed: u32, extra: u32) -> (Fleet, impl Fn(f64)) {
-        let now = Arc::new(Mutex::new(1000.0));
-        let hand = Arc::clone(&now);
-        let fleet = Fleet::scenario(
-            SITE,
-            move || *now.lock().expect("clock"),
-            scenario,
-            seed,
-            extra,
-        );
-        (fleet, move |seconds| {
-            *hand.lock().expect("clock") += seconds;
-        })
+        let (clock, hand) = hand_clock(1000.0);
+        (Fleet::scenario(SITE, clock, scenario, seed, extra), hand)
     }
 
     /// Whether a point is established on `runway`'s final, within `out_nm`.
