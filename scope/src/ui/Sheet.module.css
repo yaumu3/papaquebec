@@ -1,0 +1,19 @@
+.grip {
+  display: none;
+}
+@media (max-width: 720px) {
+  .grip {
+    display: block;
+    flex-shrink: 0;
+    width: 100%;
+    padding: var(--space-3) 0 var(--space-5);
+    touch-action: none;
+  }
+  .handle {
+    display: block;
+    width: 36px;
+    height: 3px;
+    margin: 0 auto;
+    background: var(--text-muted);
+  }
+}
