@@ -17,6 +17,18 @@ impl Position {
         geodesy::inverse(self.into(), other.into()).distance_nm
     }
 
+    /// The position `distance_nm` along the geodesic that leaves this one on
+    /// the true course `bearing_deg`.
+    #[must_use]
+    pub fn ahead(self, bearing_deg: f64, distance_nm: f64) -> Self {
+        let leg = geodesy::Leg {
+            distance_nm,
+            bearing_deg,
+        };
+        let (lat_deg, lon_deg) = geodesy::direct(self.into(), leg);
+        Self { lat_deg, lon_deg }
+    }
+
     /// How far east of true north magnetic north lies here at `now_s`, in
     /// seconds since the epoch, by the World Magnetic Model.
     #[must_use]
@@ -95,6 +107,24 @@ mod tests {
         let expected = [59.705, 60.310, 0.0];
         for (distance, expected) in distances.iter().zip(expected) {
             assert!((distance - expected).abs() < 0.005, "{distances:?}");
+        }
+    }
+
+    #[test]
+    fn position_ahead_lies_the_distance_away_on_the_bearing() {
+        // Arrange: north, east and south-west of the site
+        let legs = [(0.0, 60.0), (90.0, 30.0), (225.0, 120.0)];
+
+        // Act
+        let ahead = legs.map(|(bearing_deg, distance_nm)| SITE.ahead(bearing_deg, distance_nm));
+
+        // Assert
+        let away = ahead.map(|at| SITE.distance_nm(at));
+        let north =
+            ahead[0].lat_deg > SITE.lat_deg && (ahead[0].lon_deg - SITE.lon_deg).abs() < 1e-9;
+        assert!(north, "{ahead:?}");
+        for (away, (_, distance_nm)) in away.iter().zip(legs) {
+            assert!((away - distance_nm).abs() < 1e-6, "{away}");
         }
     }
 

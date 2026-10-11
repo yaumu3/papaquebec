@@ -467,10 +467,9 @@ impl Flying {
     /// Where it is and how it moves: one message on the ground, two in the air.
     fn moving(&self, site: Position, odd: bool) -> Vec<Bits> {
         let plan = &self.plan;
-        let at = Position {
-            lat_deg: site.lat_deg + self.y / 60.0,
-            lon_deg: site.lon_deg + self.x / (60.0 * site.lat_deg.to_radians().cos()),
-        };
+        // The plane is laid on the globe as bearings and distances from the site.
+        let (bearing_deg, distance_nm) = bearing_of(self.x, self.y);
+        let at = site.ahead(bearing_deg, distance_nm);
         if plan.ground {
             let position = SurfacePosition {
                 cpr: cpr::surface(at, odd),
