@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  contentMovesSheet,
   FLING_PX_PER_MS,
   grabberShown,
   projectFlick,
@@ -127,6 +128,26 @@ describe('sheetStops', () => {
       { detent: 'medium', extent: 400 },
       { detent: 'large', extent: 800 },
     ]);
+  });
+});
+
+describe('contentMovesSheet', () => {
+  it('moves the sheet up short of its largest detent and down from the top of its content, else scrolls', () => {
+    // Arrange
+    const cases = [
+      { up: 3, across: 0, atLargest: false, atTop: false },
+      { up: 3, across: 0, atLargest: true, atTop: true },
+      { up: -3, across: 0, atLargest: true, atTop: true },
+      { up: -3, across: 0, atLargest: false, atTop: false },
+      { up: 2, across: 3, atLargest: false, atTop: true },
+      { up: 0, across: 0, atLargest: false, atTop: true },
+    ];
+
+    // Act
+    const out = cases.map(contentMovesSheet);
+
+    // Assert
+    expect(out).toEqual([true, false, true, false, false, false]);
   });
 });
 

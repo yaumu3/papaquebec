@@ -79,6 +79,21 @@ export function sheetStops(
   ];
 }
 
+/**
+ * Whether a finger's first move on a sheet's content moves the sheet rather than scrolling the
+ * content, as SwiftUI's sheets grow before they scroll: up while the sheet is short of its largest
+ * detent, down while the content is scrolled to its top. A sideways move is the content's.
+ */
+export function contentMovesSheet(move: {
+  up: number;
+  across: number;
+  atLargest: boolean;
+  atTop: boolean;
+}): boolean {
+  if (Math.abs(move.across) >= Math.abs(move.up)) return false;
+  return move.up > 0 ? !move.atLargest : move.atTop;
+}
+
 /** Whether a sheet shows its grabber, as SwiftUI's automatic drag indicator: only with detents to go between. */
 export function grabberShown(detents: readonly Detent[]): boolean {
   return detents.length > 1;

@@ -1,4 +1,4 @@
-import { createSignal, type JSX } from 'solid-js';
+import { createSignal, type JSX, onCleanup } from 'solid-js';
 
 import { cx } from '../design/cx';
 import {
@@ -11,6 +11,7 @@ import {
   sheetDetent,
   sheetSlides,
 } from '../state/layout';
+import { dragFromContent } from './contentDrag';
 import { trackPull } from './pull';
 import { grabberShown, type SheetStop, settle, sheetFrame, sheetStops } from './sheetMotion';
 
@@ -94,8 +95,9 @@ function Grip(props: { drag: SheetDrag }) {
 
 /**
  * On a phone, a bottom sheet that rests at its detents, as SwiftUI's presentation detents: it
- * slides up when shown and down when hidden, its grabber drags it, and it settles at the detent
- * its flick carries it to. Elsewhere a plain box.
+ * slides up when shown and down when hidden, its grabber drags it, and so does its content where
+ * the content would not scroll, and it settles at the detent its flick carries it to. Elsewhere a
+ * plain box.
  */
 export function Sheet(props: {
   detents: Detents;
@@ -105,6 +107,7 @@ export function Sheet(props: {
 }) {
   const [frame, setFrame] = createSignal<Frame | null>(null);
   const drag = dragSheet(() => props.detents, setFrame);
+  const atLargest = () => sheetDetent() === largestDetent(props.detents);
   const grabber = () => grabberShown(props.detents);
   const style = () => {
     const f = frame();
@@ -114,6 +117,7 @@ export function Sheet(props: {
   };
   return (
     <div
+      ref={(node) => onCleanup(dragFromContent(node, drag, atLargest))}
       class={cx(
         s.sheet,
         props.class,
