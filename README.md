@@ -286,6 +286,7 @@ crates:
 - `sim/`: a synthetic fleet that stands in for a receiver.
 - `placer/`: places the data blocks; WebAssembly in the scope, native in the benchmark.
 - `wmm/`: the World Magnetic Model; native in the tracker, WebAssembly in the scope.
+- `geodesy/`: geodesics on the WGS-84 ellipsoid; native in the tracker and the sim, WebAssembly in the scope.
 
 **Stack.**
 
