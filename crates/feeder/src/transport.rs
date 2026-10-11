@@ -239,7 +239,7 @@ mod tests {
 
     use super::{MAX_SESSIONS, Server, renewing, same_host, since};
     use crate::feed::Published;
-    use crate::proto::{Frame, Hello, Receiver, Snapshot, frame::Body};
+    use tracker::proto::{Frame, Hello, Receiver, Snapshot, frame::Body};
 
     const RECEIVER: Receiver = Receiver {
         lat_deg: Some(33.5844),

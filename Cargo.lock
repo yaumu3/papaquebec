@@ -392,18 +392,12 @@ version = "0.1.0"
 dependencies = [
  "bytes",
  "prost",
- "prost-build",
- "protox",
- "reqwest",
- "rustls",
  "serde",
  "serde_json",
- "tempfile",
  "tokio",
+ "tracker",
  "url",
- "wmm",
  "wtransport",
- "zip",
 ]
 
 [[package]]
@@ -1742,6 +1736,7 @@ dependencies = [
  "placer",
  "prost",
  "tokio",
+ "tracker",
  "wmm",
 ]
 
@@ -2070,6 +2065,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracker"
+version = "0.1.0"
+dependencies = [
+ "prost",
+ "prost-build",
+ "protox",
+ "serde",
+ "serde_json",
+ "wmm",
+ "zip",
+]
+
+[[package]]
 name = "try-lock"
 version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2219,6 +2227,7 @@ dependencies = [
  "feeder",
  "http-body-util",
  "hyper-util",
+ "reqwest",
  "rustls",
  "sim",
  "tempfile",
@@ -2226,6 +2235,8 @@ dependencies = [
  "tokio-rustls",
  "tower",
  "tower-http",
+ "tracker",
+ "zip",
 ]
 
 [[package]]

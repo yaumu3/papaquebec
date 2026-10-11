@@ -1,6 +1,6 @@
 [package]
 name = "wmm"
-description = "The World Magnetic Model: how far magnetic north lies from true north, by NOAA's WMM2025; in the feeder natively and in the scope as WebAssembly"
+description = "The World Magnetic Model: how far magnetic north lies from true north, by NOAA's WMM2025; in the tracker natively and in the scope as WebAssembly"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

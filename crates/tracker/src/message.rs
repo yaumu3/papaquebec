@@ -5,9 +5,10 @@
 
 use crate::beast::Frame;
 use crate::bits::Bits;
+use crate::code::{altitude, altitude_code, mode_a_code};
 use crate::field::{
     AirbornePosition, Field, Identification, OperationalStatus, RaBroadcast, Status,
-    SurfacePosition, TargetStateAndStatus, Velocity, altitude, altitude_code, mode_a_code,
+    SurfacePosition, TargetStateAndStatus, Velocity,
 };
 use crate::proto::{Address, AddressType, Source};
 
@@ -278,7 +279,8 @@ mod tests {
     use crate::beast::Frame;
     use crate::bits::Bits;
     use crate::bits::published::{bytes, field};
-    use crate::field::{Field, Identification, OperationalStatus, RaBroadcast, altitude_code};
+    use crate::code::altitude_code;
+    use crate::field::{Field, Identification, OperationalStatus, RaBroadcast};
     use crate::proto::{
         Address, AddressType, EmitterCategory, ResolutionAdvisory, Source,
         resolution_advisory::Advisory,

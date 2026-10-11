@@ -1,4 +1,6 @@
 //! The feed's wire contract, generated from `proto/papaquebec/feed/v1/feed.proto`.
+//!
+//! The tracker keeps what it hears in these types, so the feeder sends them as they are.
 
 #[allow(clippy::pedantic)]
 mod generated {

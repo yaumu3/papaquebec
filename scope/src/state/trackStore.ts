@@ -4,7 +4,7 @@ import type { Fix, OperatorState, Position, Readings, Sample, Track } from './tr
 
 export const HISTORY_RETENTION_SEC = 3600;
 /**
- * What a dropped target left is kept this long after it was last heard, as long as the feeder
+ * What a dropped target left is kept this long after it was last heard, as long as the tracker
  * keeps its callsign.
  */
 export const REMEMBERED_SEC = 15 * 60;
@@ -163,7 +163,7 @@ function toTrack(
 /**
  * The track store is rebuilt from every snapshot. Only position history, samples and operator
  * state carry over, because the feed does not carry them; of a target the feed drops they are
- * kept for when it is heard again, as long as the feeder keeps its callsign: any longer, and the
+ * kept for when it is heard again, as long as the tracker keeps its callsign: any longer, and the
  * airframe's next flight would carry on from its last.
  */
 export function createTrackStore(initialProject: ProjectFn): TrackStore {
