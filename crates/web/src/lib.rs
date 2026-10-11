@@ -1,6 +1,7 @@
 //! Serves the scope and its feed.
 
 pub mod config;
+pub mod database;
 pub mod door;
 pub mod site;
 

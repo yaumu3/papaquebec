@@ -2071,12 +2071,8 @@ dependencies = [
  "prost",
  "prost-build",
  "protox",
- "reqwest",
- "rustls",
  "serde",
  "serde_json",
- "tempfile",
- "tokio",
  "wmm",
  "zip",
 ]
@@ -2231,6 +2227,7 @@ dependencies = [
  "feeder",
  "http-body-util",
  "hyper-util",
+ "reqwest",
  "rustls",
  "sim",
  "tempfile",
@@ -2239,6 +2236,7 @@ dependencies = [
  "tower",
  "tower-http",
  "tracker",
+ "zip",
 ]
 
 [[package]]

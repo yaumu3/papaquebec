@@ -11,9 +11,10 @@ use feeder::transport::Server;
 use sim::Fleet;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
-use tracker::registry::{DATABASE, Registry, keep_current};
+use tracker::registry::Registry;
 use web::Failure;
 use web::config::{Config, Door, Origin};
+use web::database::{DATABASE, keep_current};
 use web::door::{self, Certificates};
 use web::site::{Site, router};
 
