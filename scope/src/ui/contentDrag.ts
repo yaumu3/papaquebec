@@ -51,10 +51,15 @@ function scrolledToTop(target: Element, sheet: Element): boolean {
   return true;
 }
 
+/** The finger `id` among `list`, if it is there. */
+const fingerOf = (list: ArrayLike<Finger>, id: number) =>
+  Array.from(list).find((f) => f.identifier === id);
+
 /**
  * Tells which fingers on a sheet's content pull the sheet: a lone finger whose first move goes
- * where the content would not scroll. `move` returns true when the move is the sheet's, so that
- * the content must not scroll.
+ * where the content would not scroll, followed by its identifier until it lifts, whatever other
+ * fingers do meanwhile. `move` returns true when the move is the sheet's, so that the content
+ * must not scroll.
  */
 export function trackContentTouches(
   pull: {
@@ -64,39 +69,44 @@ export function trackContentTouches(
   },
   read: ContentReads,
 ) {
-  let landed: { x: number; y: number; t: number } | null = null;
-  let moving = false;
+  let landed: { id: number; x: number; y: number; t: number } | null = null;
+  /** The finger pulling the sheet. */
+  let pulling: number | null = null;
   return {
     start(e: Fingers): void {
+      if (pulling !== null) return;
       const touch = e.touches[0];
       landed =
         touch && e.touches.length === 1 && read.free(e.target)
-          ? { x: touch.clientX, y: touch.clientY, t: e.timeStamp }
+          ? { id: touch.identifier, x: touch.clientX, y: touch.clientY, t: e.timeStamp }
           : null;
-      moving = false;
     },
     move(e: Fingers): boolean {
-      const touch = e.touches[0];
-      if (!touch) return false;
-      if (landed) {
-        moving = contentMovesSheet({
-          up: landed.y - touch.clientY,
-          across: touch.clientX - landed.x,
+      const first = landed && fingerOf(e.changedTouches, landed.id);
+      if (landed && first) {
+        const moves = contentMovesSheet({
+          up: landed.y - first.clientY,
+          across: first.clientX - landed.x,
           atLargest: read.atLargest(),
           atTop: read.atTop(e.target),
         });
-        if (moving) pull.down(landed.y, landed.t);
+        if (moves) {
+          pulling = landed.id;
+          pull.down(landed.y, landed.t);
+        }
         landed = null;
       }
-      if (!moving) return false;
-      pull.move(touch.clientY, e.timeStamp);
+      if (pulling === null) return false;
+      const touch = fingerOf(e.changedTouches, pulling);
+      if (touch) pull.move(touch.clientY, e.timeStamp);
       return true;
     },
     end(e: Fingers): void {
-      const touch = e.changedTouches[0];
-      if (moving && touch) pull.up(touch.clientY, e.timeStamp);
-      landed = null;
-      moving = false;
+      if (landed && fingerOf(e.changedTouches, landed.id)) landed = null;
+      const touch = pulling === null ? undefined : fingerOf(e.changedTouches, pulling);
+      if (!touch) return;
+      pull.up(touch.clientY, e.timeStamp);
+      pulling = null;
     },
   };
 }

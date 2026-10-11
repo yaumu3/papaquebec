@@ -61,6 +61,66 @@ describe('trackContentTouches', () => {
     expect(claimed).toBe(true);
   });
 
+  it('keeps pulling with the finger that started when a second lands, wherever it is listed', () => {
+    // Arrange
+    const { pulls, t } = subject();
+    t.start(fingers(0, [finger(1, 500)]));
+    t.move(fingers(10, [finger(1, 480)]));
+    t.start(fingers(20, [finger(2, 300), finger(1, 480)], [finger(2, 300)]));
+
+    // Act
+    const claimed = t.move(fingers(30, [finger(2, 300), finger(1, 450)], [finger(1, 450)]));
+
+    // Assert
+    expect(claimed).toBe(true);
+    expect(pulls.at(-1)).toEqual(['move', 450, 30]);
+  });
+
+  it('lets a second finger move without pulling the sheet', () => {
+    // Arrange
+    const { pulls, t } = subject();
+    t.start(fingers(0, [finger(1, 500)]));
+    t.move(fingers(10, [finger(1, 480)]));
+    t.start(fingers(20, [finger(1, 480), finger(2, 300)], [finger(2, 300)]));
+
+    // Act
+    t.move(fingers(30, [finger(1, 480), finger(2, 250)], [finger(2, 250)]));
+
+    // Assert
+    expect(pulls).toEqual([
+      ['down', 500, 0],
+      ['move', 480, 10],
+    ]);
+  });
+
+  it('lets a second finger lift without releasing the sheet', () => {
+    // Arrange
+    const { pulls, t } = subject();
+    t.start(fingers(0, [finger(1, 500)]));
+    t.move(fingers(10, [finger(1, 480)]));
+    t.start(fingers(20, [finger(1, 480), finger(2, 300)], [finger(2, 300)]));
+
+    // Act
+    t.end(fingers(30, [finger(1, 480)], [finger(2, 300)]));
+
+    // Assert
+    expect(pulls.some(([name]) => name === 'up')).toBe(false);
+  });
+
+  it('releases the sheet when the finger that pulls it lifts after a second landed', () => {
+    // Arrange
+    const { pulls, t } = subject();
+    t.start(fingers(0, [finger(1, 500)]));
+    t.move(fingers(10, [finger(1, 480)]));
+    t.start(fingers(20, [finger(1, 480), finger(2, 300)], [finger(2, 300)]));
+
+    // Act
+    t.end(fingers(30, [finger(2, 300)], [finger(1, 470)]));
+
+    // Assert
+    expect(pulls.at(-1)).toEqual(['up', 470, 30]);
+  });
+
   it('leaves the content to scroll where the sheet would not move that way', () => {
     // Arrange
     const runs = [
