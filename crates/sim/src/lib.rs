@@ -5,7 +5,7 @@ mod scenario;
 
 use std::time::Duration;
 
-pub use fleet::{Fleet, State};
+pub use fleet::{Fleet, MOST_EXTRA, State};
 pub use scenario::{Runway, Scenario};
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpListener, TcpStream};

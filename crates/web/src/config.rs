@@ -7,7 +7,7 @@ use std::str::FromStr;
 
 use crate::Failure;
 use authority::Subject;
-use sim::Scenario;
+use sim::{MOST_EXTRA, Scenario};
 use tracker::position::Position;
 
 /// Where the traffic comes from.
@@ -166,11 +166,6 @@ fn parsed<T: FromStr<Err: Display>>(
 /// The sim is asked once per sim second, so any faster would mean asking more
 /// often than every millisecond.
 const FASTEST_SIM: f64 = 1000.0;
-
-/// Far beyond a real receiver's traffic, which is what a load test wants; the
-/// sim builds every target up front, and more would also run their addresses out
-/// of the block reserved for them.
-const MOST_EXTRA: u32 = 10_000;
 
 fn sim_extra(extra: u32) -> Result<u32, Failure> {
     if extra <= MOST_EXTRA {

@@ -261,6 +261,11 @@ fn scattered(
         .collect()
 }
 
+/// The most extra targets the sim flies: far beyond a real receiver's traffic,
+/// which is what a load test wants; every target is built up front, and more
+/// would also run their addresses out of the block reserved for them.
+pub const MOST_EXTRA: u32 = 10_000;
+
 /// `count` generic en-route targets spread over the area, for load testing.
 fn extra_fleet(count: u32) -> Vec<Plan> {
     scattered(
