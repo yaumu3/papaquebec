@@ -366,7 +366,44 @@ impl Tracked {
                     self.answer(&register, now_s, site);
                 }
             }
-            said => self.note(said, now_s),
+            Report::Identification(said) => self.remembered.keep(said, now_s),
+            Report::Velocity(said) => {
+                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
+                self.track_deg.keep(said.track_deg, now_s);
+                self.magnetic_heading_deg
+                    .keep(said.magnetic_heading_deg, now_s);
+                self.baro_vertical_rate_fpm
+                    .keep(said.baro_vertical_rate_fpm, now_s);
+                self.geometric_vertical_rate_fpm
+                    .keep(said.geometric_vertical_rate_fpm, now_s);
+                self.geometric_minus_baro_ft
+                    .keep(said.geometric_minus_baro_ft, now_s);
+                match said.airspeed {
+                    Some(Airspeed::Indicated(kt)) => {
+                        self.indicated_airspeed_kt.keep(Some(kt), now_s);
+                    }
+                    Some(Airspeed::True(kt)) => self.true_airspeed_kt.keep(Some(kt), now_s),
+                    None => {}
+                }
+            }
+            Report::Status(said) => {
+                self.emergency_priority_status
+                    .keep(Some(said.emergency_priority_status), now_s);
+                self.mode_a_code.keep(said.mode_a_code, now_s);
+            }
+            Report::TargetStateAndStatus(said) => {
+                self.target_state.keep(&said.target, now_s);
+                self.nac_p.keep(Some(said.nac_p), now_s);
+            }
+            Report::ResolutionAdvisory(said) => {
+                self.resolution_advisory.keep(Some(said.advisory), now_s);
+            }
+            Report::OperationalStatus(said) => {
+                self.nac_p.keep(said.nac_p, now_s);
+                self.version = said.version;
+                self.nic_supplement_a = said.nic_supplement_a;
+                self.nic_supplement_c = said.nic_supplement_c;
+            }
         }
     }
 
@@ -459,51 +496,6 @@ impl Tracked {
     fn declination(&self, now_s: f64, site: Position) -> f64 {
         let at = self.fix.at(now_s).map_or(site, |fix| fix.position);
         wmm::declination_deg(at.lat_deg, at.lon_deg, wmm::year_of(now_s))
-    }
-
-    /// Takes what a message says other than where the aircraft is.
-    fn note(&mut self, report: &Report, now_s: f64) {
-        match report {
-            Report::Identification(said) => self.remembered.keep(said, now_s),
-            Report::Velocity(said) => {
-                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
-                self.track_deg.keep(said.track_deg, now_s);
-                self.magnetic_heading_deg
-                    .keep(said.magnetic_heading_deg, now_s);
-                self.baro_vertical_rate_fpm
-                    .keep(said.baro_vertical_rate_fpm, now_s);
-                self.geometric_vertical_rate_fpm
-                    .keep(said.geometric_vertical_rate_fpm, now_s);
-                self.geometric_minus_baro_ft
-                    .keep(said.geometric_minus_baro_ft, now_s);
-                match said.airspeed {
-                    Some(Airspeed::Indicated(kt)) => {
-                        self.indicated_airspeed_kt.keep(Some(kt), now_s);
-                    }
-                    Some(Airspeed::True(kt)) => self.true_airspeed_kt.keep(Some(kt), now_s),
-                    None => {}
-                }
-            }
-            Report::Status(said) => {
-                self.emergency_priority_status
-                    .keep(Some(said.emergency_priority_status), now_s);
-                self.mode_a_code.keep(said.mode_a_code, now_s);
-            }
-            Report::TargetStateAndStatus(said) => {
-                self.target_state.keep(&said.target, now_s);
-                self.nac_p.keep(Some(said.nac_p), now_s);
-            }
-            Report::ResolutionAdvisory(said) => {
-                self.resolution_advisory.keep(Some(said.advisory), now_s);
-            }
-            Report::OperationalStatus(said) => {
-                self.nac_p.keep(said.nac_p, now_s);
-                self.version = said.version;
-                self.nic_supplement_a = said.nic_supplement_a;
-                self.nic_supplement_c = said.nic_supplement_c;
-            }
-            Report::AirbornePosition(_) | Report::SurfacePosition(_) | Report::Reply(_) => {}
-        }
     }
 
     /// Takes the accuracy that a position message stands for, from an aircraft
