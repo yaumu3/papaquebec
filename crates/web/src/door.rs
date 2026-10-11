@@ -121,7 +121,7 @@ async fn secure(
     let reached = stream.local_addr()?.ip().to_canonical();
     let hello = LazyConfigAcceptor::new(Acceptor::default(), stream).await?;
     let subject = match hello.client_hello().server_name() {
-        Some(name) => Subject::Name(name.to_ascii_lowercase()),
+        Some(name) => Subject::of_host(name),
         None => certificates.unnamed(reached),
     };
     let config = certificates.config_for(subject)?;

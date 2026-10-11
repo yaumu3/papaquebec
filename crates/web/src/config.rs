@@ -67,7 +67,7 @@ impl FromStr for Door {
         match (secure, host) {
             (true, only) => Ok(Self::Secure {
                 port: port.unwrap_or(443),
-                only: only.map(subject),
+                only: only.map(Subject::of_host),
             }),
             (false, None) => Ok(Self::Plain {
                 port: port.unwrap_or(80),
@@ -98,13 +98,6 @@ fn host_and_port(rest: &str) -> Result<(Option<&str>, Option<u16>), Failure> {
         Some(host).filter(|host| !host.is_empty()),
         port.map(NonZeroU16::get),
     ))
-}
-
-fn subject(host: &str) -> Subject {
-    match host.parse() {
-        Ok(address) => Subject::Address(address),
-        Err(_) => Subject::Name(host.to_ascii_lowercase()),
-    }
 }
 
 impl Config {
