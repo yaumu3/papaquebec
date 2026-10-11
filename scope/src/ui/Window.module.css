@@ -19,7 +19,6 @@
 @media (max-width: 720px) {
   /* A sheet: edge to edge and opaque over the scope. */
   .win {
-    flex: 1;
     background: var(--panel-bg);
     border-width: 1px 0 0;
     box-shadow: none;

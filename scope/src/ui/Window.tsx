@@ -1,7 +1,7 @@
 import type { JSX } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { activeSheet, isPhone, isShown } from '../state/layout';
+import { activeSheet, DETENTS, isPhone, isShown } from '../state/layout';
 import { type PanelId, panels } from '../state/scope';
 import { Sheet } from './Sheet';
 
@@ -16,7 +16,7 @@ export function Window(props: {
 }) {
   const shown = () => isShown(isPhone(), activeSheet(), props.id, panels()[props.id]);
   return (
-    <Sheet class={cx(s.win, props.class, !shown() && s.hidden)}>
+    <Sheet detents={DETENTS[props.id]} class={cx(s.win, props.class, !shown() && s.hidden)}>
       <div class={cx(s.body, props.bodyClass)}>{props.children}</div>
     </Sheet>
   );

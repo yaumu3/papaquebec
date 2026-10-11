@@ -2,6 +2,23 @@
   display: none;
 }
 @media (max-width: 720px) {
+  /* At the foot of the room it may fill, as tall as its detent. */
+  .sheet {
+    flex: none;
+    height: var(--sheet-height);
+    transform: translateY(var(--sheet-shift, 0px));
+    transition-property: height, transform;
+    transition-duration: var(--sheet-ms);
+    transition-timing-function: var(--sheet-ease);
+  }
+  /* After .sheet: a drag moves it straight to the finger. */
+  .dragging {
+    transition: none;
+  }
+  /* Room above the content where a grabber would be. */
+  .bare {
+    padding-top: var(--space-6);
+  }
   .grip {
     display: block;
     flex-shrink: 0;

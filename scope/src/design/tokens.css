@@ -61,6 +61,10 @@
   --z-topbar: 15;
   --z-overlay: 20;
   --z-menu: 1000;
+
+  /* Motion: a sheet sets off at speed and eases into rest. */
+  --sheet-ms: 180ms;
+  --sheet-ease: cubic-bezier(0.33, 1, 0.68, 1);
 }
 /* Phone breakpoint: 720px, repeated in each module's media query (custom properties cannot be). */
 @media (max-width: 720px) {
