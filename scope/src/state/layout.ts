@@ -41,16 +41,64 @@ export function keepUnscrolled(win: ScrollHost): () => void {
 /** The panel that holds the sheet on a phone; null when the sheet is closed. Not persisted. */
 export const [activeSheet, setActiveSheet] = createSignal<PanelId | null>(null);
 
+/** A height the sheet rests at, as SwiftUI's presentation detents: a third of the screen, or all of it. */
+export type Detent = 'medium' | 'large';
+
+/** The detents a sheet rests at, smallest first; never none. */
+export type Detents = readonly [Detent, ...Detent[]];
+
+/** The detents each panel's sheet rests at, smallest first; settings fill the screen or nothing. */
+export const DETENTS: Record<PanelId, Detents> = {
+  list: ['medium', 'large'],
+  detail: ['medium', 'large'],
+  display: ['large'],
+  maps: ['large'],
+};
+
+/** True when the sheet slides up from closed or down to it; false when it passes between panels. */
+export const [sheetSlides, setSheetSlides] = createSignal(true);
+
+/** The detent the open sheet rests at. */
+export const [sheetDetent, setSheetDetent] = createSignal<Detent>('medium');
+
+/** The detent a panel takes the sheet at: the one it rests at, if the panel has it, else the panel's smallest. */
+export function detentFor(detents: Detents, resting: Detent | null): Detent {
+  return resting !== null && detents.includes(resting) ? resting : detents[0];
+}
+
+export function largestDetent(detents: Detents): Detent {
+  return detents.at(-1) ?? detents[0];
+}
+
+/** One detent up, and from the largest back to the smallest, as a tap on the grabber goes. */
+export function cycleDetent(detents: Detents, current: Detent): Detent {
+  return detents[(detents.indexOf(current) + 1) % detents.length] ?? detents[0];
+}
+
 /** Tapping the open panel's tab closes the sheet; any other tab swaps to that panel. */
 export function nextSheet<T extends string>(current: T | null, tapped: T): T | null {
   return current === tapped ? null : tapped;
 }
 
 export function toggleSheet(id: PanelId): void {
-  setActiveSheet((cur) => nextSheet(cur, id));
+  const current = activeSheet();
+  const next = nextSheet(current, id);
+  if (next === null) {
+    closeSheet();
+    return;
+  }
+  setSheetDetent(detentFor(DETENTS[next], current === null ? null : sheetDetent()));
+  setSheetSlides(current === null);
+  setActiveSheet(next);
+}
+
+export function cycleSheet(): void {
+  const id = activeSheet();
+  if (id !== null) setSheetDetent(cycleDetent(DETENTS[id], sheetDetent()));
 }
 
 export function closeSheet(): void {
+  setSheetSlides(true);
   setActiveSheet(null);
 }
 

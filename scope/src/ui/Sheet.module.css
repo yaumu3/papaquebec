@@ -1,0 +1,66 @@
+/* A length, so that a drag reads in px the medium detent CSS sizes the sheet by. */
+@property --sheet-medium {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+/* Two classes, to outrank the display of whatever box it is. */
+.sheet.hidden {
+  display: none;
+}
+.grip {
+  display: none;
+}
+@media (max-width: 720px) {
+  /* At the foot of the room it may fill, as tall as its detent. */
+  .sheet {
+    --sheet-medium: 33dvh;
+    flex: none;
+    height: var(--sheet-height);
+    transform: translateY(var(--sheet-shift, 0px));
+    transition-property: height, transform;
+    transition-duration: var(--sheet-ms);
+    transition-timing-function: var(--sheet-ease);
+  }
+  /* Under Reduce Motion too, as an iOS sheet: its motion shows where it went. */
+  @media (prefers-reduced-motion: reduce) {
+    .sheet {
+      transition-duration: var(--sheet-ms);
+    }
+  }
+  /* Off the foot of the screen before it shows, and again until it hides. */
+  .slides {
+    transition-property: height, transform, display;
+    transition-behavior: allow-discrete;
+  }
+  @starting-style {
+    .slides {
+      transform: translateY(100%);
+    }
+  }
+  .slides.hidden {
+    transform: translateY(100%);
+  }
+  /* After .sheet and .slides: a drag moves it straight to the finger. */
+  .dragging {
+    transition: none;
+  }
+  /* Room above the content where a grabber would be. */
+  .bare {
+    padding-top: var(--space-6);
+  }
+  .grip {
+    display: block;
+    flex-shrink: 0;
+    width: 100%;
+    padding: var(--space-3) 0 var(--space-5);
+    touch-action: none;
+  }
+  .handle {
+    display: block;
+    width: 36px;
+    height: 3px;
+    margin: 0 auto;
+    background: var(--text-muted);
+  }
+}

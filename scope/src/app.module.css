@@ -33,14 +33,14 @@
   justify-content: space-between;
 }
 @media (max-width: 720px) {
+  /* The room a sheet may fill. */
   .column {
-    top: auto;
+    top: var(--topbar-bottom);
     left: env(safe-area-inset-left);
     right: env(safe-area-inset-right);
     bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
     width: auto;
-    max-height: 55vh;
-    max-height: 55dvh;
+    justify-content: flex-end;
     gap: 0;
     flex-wrap: nowrap;
   }
