@@ -2,7 +2,7 @@
 .column {
   position: fixed;
   top: var(--panel-top);
-  bottom: var(--edge);
+  bottom: calc(var(--edge) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
@@ -12,7 +12,7 @@
 /* Two panel widths: when Maps does not fit under Display it wraps into a second column. */
 .left {
   --panel-width: 220px;
-  left: var(--edge);
+  left: calc(var(--edge) + env(safe-area-inset-left));
   width: calc(2 * var(--panel-width) + var(--space-4));
   flex-wrap: wrap;
   align-content: flex-start;
@@ -28,15 +28,15 @@
   }
 }
 .right {
-  right: var(--edge);
+  right: calc(var(--edge) + env(safe-area-inset-right));
   width: 370px;
   justify-content: space-between;
 }
 @media (max-width: 720px) {
   .column {
     top: auto;
-    left: 0;
-    right: 0;
+    left: env(safe-area-inset-left);
+    right: env(safe-area-inset-right);
     bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
     width: auto;
     max-height: 55vh;
