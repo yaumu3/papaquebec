@@ -9,6 +9,7 @@
 use crate::air;
 use crate::bits::Bits;
 use crate::field::{Field, Identification, advised, advisory, count, rounded};
+use crate::position::signed_bearing;
 use crate::proto::{EmitterCategory, ResolutionAdvisory, TargetState, target_state::Modes};
 
 /// The envelope within which a field is taken for a track and turn report or
@@ -147,11 +148,6 @@ fn off(said: Option<f64>, known: Option<f64>, tolerance: f64) -> Option<f64> {
 /// How far a bearing is from the known one, the short way round.
 fn apart(said: Option<f64>, known: Option<f64>) -> Option<f64> {
     Some(signed_bearing(said? - known?).abs() / BEARING_TOLERANCE_DEG)
-}
-
-/// A bearing as the angle from north, -180 up to 180.
-fn signed_bearing(bearing_deg: f64) -> f64 {
-    (bearing_deg + 180.0).rem_euclid(360.0) - 180.0
 }
 
 /// The callsign of the aircraft identification register, which is laid out as

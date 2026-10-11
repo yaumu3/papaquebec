@@ -18,7 +18,7 @@ use tracker::field::{
     SurfacePosition, TargetStateAndStatus, Velocity,
 };
 use tracker::message::{comm_b_reply, squitter};
-use tracker::position::{Position, bearing_of, toward};
+use tracker::position::{Position, bearing_of, signed_bearing, toward};
 use tracker::proto::{
     EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
     resolution_advisory::Advisory, target_state::Modes,
@@ -353,7 +353,7 @@ impl Flying {
         };
         let to_go = (target.x - self.x).hypot(target.y - self.y);
         let wanted = bearing(self.x, self.y, target.x, target.y);
-        let off = (wanted - self.plan.track + 540.0).rem_euclid(360.0) - 180.0;
+        let off = signed_bearing(wanted - self.plan.track);
         let most = TURN_DEG_PER_S * elapsed;
         let turn = off.clamp(-most, most);
         self.plan.track = (self.plan.track + turn).rem_euclid(360.0);

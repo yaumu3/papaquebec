@@ -1,6 +1,6 @@
 //! Compact Position Reporting: the format positions are broadcast in.
 
-use crate::position::Position;
+use crate::position::{Position, signed_bearing};
 
 /// A position as one message carries it: 17 bits of each coordinate, in the
 /// even or the odd format.
@@ -122,7 +122,7 @@ fn near(cpr: Cpr, reference: Position, span: f64) -> Option<Position> {
     let lon_deg = closest(reference.lon_deg, lon_zone, fraction(cpr.lon));
     Some(Position {
         lat_deg,
-        lon_deg: (lon_deg + 180.0).rem_euclid(360.0) - 180.0,
+        lon_deg: signed_bearing(lon_deg),
     })
 }
 

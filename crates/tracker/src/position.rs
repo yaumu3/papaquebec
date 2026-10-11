@@ -46,6 +46,12 @@ pub fn toward(bearing_deg: f64, length: f64) -> (f64, f64) {
     (length * sin, length * cos)
 }
 
+/// A bearing as the angle from north, -180 up to 180.
+#[must_use]
+pub fn signed_bearing(bearing_deg: f64) -> f64 {
+    (bearing_deg + 180.0).rem_euclid(360.0) - 180.0
+}
+
 /// The bearing and the length of the components east and north.
 #[must_use]
 pub fn bearing_of(east: f64, north: f64) -> (f64, f64) {
