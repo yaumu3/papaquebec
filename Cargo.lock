@@ -1737,7 +1737,6 @@ dependencies = [
  "prost",
  "tokio",
  "tracker",
- "wmm",
 ]
 
 [[package]]

@@ -495,7 +495,7 @@ impl Tracked {
     /// or else at the site.
     fn declination(&self, now_s: f64, site: Position) -> f64 {
         let at = self.fix.at(now_s).map_or(site, |fix| fix.position);
-        wmm::declination_deg(at.lat_deg, at.lon_deg, wmm::year_of(now_s))
+        at.declination_deg(now_s)
     }
 
     /// Takes the accuracy that a position message stands for, from an aircraft
@@ -1850,7 +1850,7 @@ mod tests {
         // Arrange: east at 480 kt over the ground and 450 kt through the air
         // on the same heading, which the report carries as magnetic
         let now_s = 1_780_000_000.0;
-        let magnetic = 90.0 - wmm::declination_deg(SITE.lat_deg, SITE.lon_deg, wmm::year_of(now_s));
+        let magnetic = 90.0 - SITE.declination_deg(now_s);
         let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
             magnetic_heading_deg: Some(magnetic),
             mach: Some(0.78),

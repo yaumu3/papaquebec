@@ -22,6 +22,13 @@ impl Position {
             + across * haversine(other.lon_deg - self.lon_deg);
         2.0 * RADIUS_NM * between.sqrt().asin()
     }
+
+    /// How far east of true north magnetic north lies here at `now_s`, in
+    /// seconds since the epoch, by the World Magnetic Model.
+    #[must_use]
+    pub fn declination_deg(self, now_s: f64) -> f64 {
+        wmm::declination_deg(self.lat_deg, self.lon_deg, wmm::year_of(now_s))
+    }
 }
 
 impl FromStr for Position {

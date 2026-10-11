@@ -657,8 +657,7 @@ impl Fleet {
         let elapsed = (now - self.last).max(0.0);
         self.last = now;
         let timestamp = ticks(now - self.started);
-        let declination =
-            wmm::declination_deg(self.site.lat_deg, self.site.lon_deg, wmm::year_of(now));
+        let declination = self.site.declination_deg(now);
         let mut frames = Vec::new();
         for flying in &mut self.flying {
             flying.advance(now, elapsed);
