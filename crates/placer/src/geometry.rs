@@ -24,9 +24,10 @@ impl Vec2 {
         self.x * o.y - self.y * o.x
     }
 
+    /// Not `hypot`, a slow library call guarding against overflow pixels never reach.
     #[must_use]
     pub fn len(self) -> f64 {
-        self.x.hypot(self.y)
+        self.dot(self).sqrt()
     }
 
     /// How far the point is from segment `ab`.
