@@ -58,40 +58,39 @@ fn delta(tables: &Tables, links: &[Link], dirs: &[usize], i: usize, c: usize) ->
     d
 }
 
-/// A move tried on `dirs`: its change in energy, and what to put back to undo it.
-struct Trial {
-    d: f64,
-    undo: Vec<(usize, usize)>,
-}
+/// What to put back to undo a move tried on `dirs`, kept between trials so none allocates.
+type Undo = Vec<(usize, usize)>;
 
-/// One track to one other direction, chosen uniformly.
+/// One track to one other direction, chosen uniformly. Returns the change in energy.
 fn move_one(
     tables: &Tables,
     links: &[Vec<Link>],
     dirs: &mut [usize],
     rng: &mut impl FnMut() -> f64,
-) -> Trial {
+    undo: &mut Undo,
+) -> f64 {
     let i = index(rng(), dirs.len());
     let from = dirs[i];
     let c = (from + 1 + index(rng(), DIRECTIONS - 1)) % DIRECTIONS;
     let d = delta(tables, &links[i], dirs, i, c);
     dirs[i] = c;
-    Trial {
-        d,
-        undo: vec![(i, from)],
-    }
+    undo.clear();
+    undo.push((i, from));
+    d
 }
 
-/// Every member of one chain to the other side of its stream, one after another.
+/// Every member of one chain to the other side of its stream, one after another. Returns the
+/// change in energy.
 fn flip_chain(
     tables: &Tables,
     links: &[Vec<Link>],
     dirs: &mut [usize],
     rng: &mut impl FnMut() -> f64,
-) -> Trial {
+    undo: &mut Undo,
+) -> f64 {
     let chain = &tables.chains[index(rng(), tables.chains.len())];
     let mut d = 0.0;
-    let mut undo = Vec::with_capacity(chain.len());
+    undo.clear();
     for &i in chain {
         let from = dirs[i];
         let c = tables.mirror[i * DIRECTIONS + from];
@@ -99,7 +98,7 @@ fn flip_chain(
         dirs[i] = c;
         undo.push((i, from));
     }
-    Trial { d, undo }
+    d
 }
 
 /// An index below `n` from a draw in 0 to 1.
@@ -134,6 +133,7 @@ pub fn anneal<C: FnMut() -> f64, R: FnMut() -> f64>(
     let links = links_of(tables, n);
     let temperature = &hyper.temperature;
     let cooling = (temperature.end / temperature.start).ln();
+    let mut undo = Undo::new();
     let began = (budget.now)();
     for _ in 0..MAX_BATCHES {
         let spent = ((budget.now)() - began) / budget.ms;
@@ -143,18 +143,18 @@ pub fn anneal<C: FnMut() -> f64, R: FnMut() -> f64>(
         let temp = temperature.start * (cooling * spent).exp();
         for _ in 0..BATCH {
             let flip = !tables.chains.is_empty() && rng() < hyper.chain_flip;
-            let trial = if flip {
-                flip_chain(tables, &links, &mut dirs, &mut rng)
+            let d = if flip {
+                flip_chain(tables, &links, &mut dirs, &mut rng, &mut undo)
             } else {
-                move_one(tables, &links, &mut dirs, &mut rng)
+                move_one(tables, &links, &mut dirs, &mut rng, &mut undo)
             };
-            if trial.d > 0.0 && rng() >= (-trial.d / temp).exp() {
-                for (i, from) in trial.undo {
+            if d > 0.0 && rng() >= (-d / temp).exp() {
+                for &(i, from) in &undo {
                     dirs[i] = from;
                 }
                 continue;
             }
-            energy += trial.d;
+            energy += d;
             if energy < best_energy {
                 best_energy = energy;
                 best.copy_from_slice(&dirs);
