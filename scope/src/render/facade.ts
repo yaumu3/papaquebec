@@ -118,7 +118,7 @@ export function createRenderer(
 
   const startWorker = async () => {
     onStatus({ kind: 'starting' });
-    const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+    const w = new Worker(new URL('./renderWorker.ts', import.meta.url), { type: 'module' });
     const usable = 'transferControlToOffscreen' in canvas && (await probeWorker(w));
     if (!usable || destroyed) {
       w.terminate();

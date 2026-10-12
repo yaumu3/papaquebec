@@ -1,4 +1,4 @@
-import type { FeedCommand, FeedEvent } from './worker';
+import type { FeedCommand, FeedEvent } from './feedWorker';
 
 export type FeedPlaces = Omit<FeedCommand, 'type'>;
 
@@ -8,7 +8,7 @@ export interface FeedHandle {
 
 /** Runs a feed source in its own worker and hands events to the caller. */
 export function startFeed(places: FeedPlaces, onEvent: (e: FeedEvent) => void): FeedHandle {
-  const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
+  const worker = new Worker(new URL('./feedWorker.ts', import.meta.url), { type: 'module' });
   worker.addEventListener('message', (e: MessageEvent<FeedEvent>) => onEvent(e.data));
   const cmd: FeedCommand = { type: 'start', ...places };
   worker.postMessage(cmd);
