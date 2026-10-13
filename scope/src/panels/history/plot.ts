@@ -119,6 +119,12 @@ const FULL_PX = 6;
 const HALF_PX = 3;
 const MARK_STEP_PX = 3;
 const PENNANT_STEP_PX = 4.5;
+/** At least half the widest stroke a mark is drawn with, which sticks out past its path. */
+const STROKE_HALF_PX = 1;
+
+/** How far a barb with a staff `lengthPx` long reaches round its point: a full barb at the tip. */
+export const barbReach = (lengthPx: number): number =>
+  Math.hypot(lengthPx, FULL_PX) + STROKE_HALF_PX;
 
 /**
  * A wind barb at (x, y), north up: the staff runs toward where the wind comes from, its marks
@@ -170,8 +176,8 @@ const TICK_FROM_PX = ARROW_PX + 3;
 const TICK_TO_PX = ARROW_PX + 6.5;
 /** Within this of the selected heading, the heading holds it: off by 3° or more, it is turning. */
 const HOLD_DEG = 3;
-/** How far a glyph reaches round its point at the most: the track, or the tick past its arrow. */
-export const GLYPH_REACH_PX = Math.max(VECTOR_PX, TICK_TO_PX);
+/** How far a glyph reaches round its point at the most: the track, or the tick past its arrow, with its stroke. */
+export const GLYPH_REACH_PX = Math.max(VECTOR_PX, TICK_TO_PX) + STROKE_HALF_PX;
 
 /** A point `a` out from (x, y) along `deg` and `c` across it to the right, north up. */
 const offset =

@@ -9,6 +9,7 @@ import { clearOfEnds, clockStep, ticks } from './axis';
 import {
   atTicks,
   barbPath,
+  barbReach,
   fixed,
   GLYPH_REACH_PX,
   headingGlyph,
@@ -86,7 +87,7 @@ export function Lane(props: {
     clearOfEnds(ticks(props.visible, step), x, props.width, reach);
   const barbs = createMemo(() =>
     spec.kind === 'barbs'
-      ? atTicks(props.samples, ticksAt(stepEvery(BARB_PITCH_PX), BARB_PX), spec.barb)
+      ? atTicks(props.samples, ticksAt(stepEvery(BARB_PITCH_PX), barbReach(BARB_PX)), spec.barb)
       : [],
   );
   /** What the intent plotted in the lane reads, if one is. */

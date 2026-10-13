@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'bun:test';
 
 import { makeSample as sample } from '../../state/sampleFixture';
-import { atTicks, barbPath, headingGlyph, laneRange, laneTraces, pathOf, valueAt } from './plot';
+import {
+  atTicks,
+  barbPath,
+  barbReach,
+  GLYPH_REACH_PX,
+  headingGlyph,
+  laneRange,
+  laneTraces,
+  pathOf,
+  valueAt,
+} from './plot';
 import type { Interval } from './span';
 import { GAP_SEC, type Point } from './trace';
 
@@ -242,6 +252,53 @@ describe('barbPath', () => {
     expect(calm).toContain('a');
     expect(north.startsWith('M10.0 20.0 L10.0 4.0 ')).toBe(true);
     expect(north.match(/l/g)).toHaveLength(2);
+  });
+});
+
+/** The farthest any vertex of a path of M, L, l and Z lies from (x, y). */
+function farthest(d: string, x: number, y: number): number {
+  let [ax, ay] = [x, y];
+  let most = 0;
+  for (const [, cmd, a, b] of d.matchAll(/([MLl])(-?[\d.]+) (-?[\d.]+)/g)) {
+    const [px, py] = [Number(a), Number(b)];
+    [ax, ay] = cmd === 'l' ? [ax + px, ay + py] : [px, py];
+    most = Math.max(most, Math.hypot(ax - x, ay - y));
+  }
+  return most;
+}
+
+describe('reach', () => {
+  it('holds every barb whole, its stroke too, whatever the direction and speed', () => {
+    // Arrange
+    const winds = [0, 30, 45, 60, 135, 225, 300].flatMap((dir) =>
+      [5, 10, 15, 50, 65, 100].map((speed) => ({ dir, speed })),
+    );
+
+    // Act
+    const reaches = winds.map((w) => farthest(barbPath(100, 50, w.dir, w.speed, 16), 100, 50));
+
+    // Assert: half the 1.2 px stroke the barbs are drawn with on top of the farthest vertex
+    expect(Math.max(...reaches) + 0.6).toBeLessThanOrEqual(barbReach(16));
+    expect(Math.max(...reaches)).toBeGreaterThan(16);
+  });
+
+  it('holds every heading glyph whole, its strokes too', () => {
+    // Arrange
+    const marks = [0, 45, 100, 200, 315].flatMap((deg) => [
+      { trk: deg, hdg: deg + 10, sel: deg + 90 },
+      { trk: deg, hdg: undefined, sel: deg + 90 },
+    ]);
+
+    // Act
+    const reaches = marks.map((h) => {
+      const g = headingGlyph(100, 50, h);
+      return Math.max(
+        ...[g.aircraft, g.vector, g.arrow, g.tick].map((d) => (d ? farthest(d, 100, 50) : 0)),
+      );
+    });
+
+    // Assert: half the 1.8 px stroke the widest of them is drawn with
+    expect(Math.max(...reaches) + 0.9).toBeLessThanOrEqual(GLYPH_REACH_PX);
   });
 });
 
