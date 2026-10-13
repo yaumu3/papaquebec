@@ -119,7 +119,6 @@ async fn read<P: Publication>(published: Vec<u8>) -> Result<(P, Vec<u8>), Failur
 
 #[cfg(test)]
 mod tests {
-    use std::io::{Cursor, Write};
     use std::path::PathBuf;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -129,38 +128,39 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio::sync::watch;
     use tokio::time::timeout;
-    use tracker::registry::Registry;
-    use zip::ZipWriter;
-    use zip::write::SimpleFileOptions;
 
-    use super::keep_current;
+    use super::{Publication, keep_current};
+    use crate::Failure;
 
-    /// The database as published, holding the aircraft and no types.
-    fn zipped(aircraft: &str) -> Vec<u8> {
-        let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
-        for (name, contents) in [("aircrafts.json", aircraft), ("types.json", "{}")] {
-            zip.start_file(name, SimpleFileOptions::default())
-                .expect("starts");
-            zip.write_all(contents.as_bytes()).expect("writes");
+    const DAY: Duration = Duration::from_hours(24);
+
+    /// A made-up publication: a line of text after a marker, refused without it.
+    #[derive(Default)]
+    struct Notice(String);
+
+    impl Publication for Notice {
+        const NAME: &str = "notice";
+        const RENEW_AT: Duration = Duration::from_hours(7 * 24);
+
+        fn read(published: &[u8]) -> Result<Self, Failure> {
+            let text = std::str::from_utf8(published)?;
+            let notice = text.strip_prefix("notice: ").ok_or("not a notice")?;
+            Ok(Self(notice.to_owned()))
         }
-        zip.finish().expect("finishes").into_inner()
+
+        fn tally(&self) -> String {
+            self.0.clone()
+        }
     }
 
-    /// One made-up aircraft, from a block ICAO reserves for future use.
-    fn database() -> Vec<u8> {
-        zipped(r#"{"D00002": ["TEST-02", "B789", "00"]}"#)
-    }
-
-    /// A made-up aircraft the test database does not have, for telling a newer database apart.
-    fn newer_database() -> Vec<u8> {
-        zipped(r#"{"D00009": ["TEST-09", "B789", "00"]}"#)
-    }
+    const FIRST: &[u8] = b"notice: first";
+    const NEWER: &[u8] = b"notice: newer";
 
     /// A web server that answers every request with the status and the body,
     /// and counts the requests: its URL and the count.
-    async fn answering(status: &'static str, body: Vec<u8>) -> (String, Arc<AtomicUsize>) {
+    async fn answering(status: &'static str, body: &'static [u8]) -> (String, Arc<AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.expect("binds");
-        let url = format!("http://{}/db.zip", listener.local_addr().expect("bound"));
+        let url = format!("http://{}/notice", listener.local_addr().expect("bound"));
         let asked = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asked);
         tokio::spawn(async move {
@@ -172,17 +172,17 @@ mod tests {
                     "HTTP/1.1 {status}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
                     body.len()
                 );
-                let _ = stream.write_all(&[head.as_bytes(), &body].concat()).await;
+                let _ = stream.write_all(&[head.as_bytes(), body].concat()).await;
             }
         });
         (url, asked)
     }
 
-    /// A file for the database in a directory that does not exist yet, holding
+    /// A file for the copy in a directory that does not exist yet, holding
     /// the contents as if written so long ago when given.
     fn kept(contents: Option<(&[u8], Duration)>) -> (tempfile::TempDir, PathBuf) {
         let directory = tempfile::tempdir().expect("a directory");
-        let path = directory.path().join("papaquebec/aircraft-database.zip");
+        let path = directory.path().join("papaquebec/notice.txt");
         if let Some((contents, age)) = contents {
             std::fs::create_dir_all(path.parent().expect("a parent")).expect("a directory");
             std::fs::write(&path, contents).expect("written");
@@ -195,118 +195,107 @@ mod tests {
         (directory, path)
     }
 
-    /// The registries published within a moment of starting to keep one current.
-    async fn published(url: String, kept: PathBuf) -> Vec<Arc<Registry>> {
-        let (sender, mut registry) = watch::channel(Arc::new(Registry::default()));
+    /// The notices published within a moment of starting to keep one current.
+    async fn published(url: String, kept: PathBuf) -> Vec<String> {
+        let (sender, mut notice) = watch::channel(Arc::new(Notice::default()));
         tokio::spawn(keep_current(url, kept, sender));
         let mut published = Vec::new();
-        while let Ok(Ok(())) = timeout(Duration::from_millis(500), registry.changed()).await {
-            published.push(Arc::clone(&registry.borrow_and_update()));
+        while let Ok(Ok(())) = timeout(Duration::from_millis(500), notice.changed()).await {
+            published.push(notice.borrow_and_update().0.clone());
         }
         published
     }
 
-    fn knows(registry: &Registry, address: u32) -> bool {
-        registry.registered(address).is_some()
-    }
-
-    const DAY: Duration = Duration::from_hours(24);
-
     #[tokio::test]
     async fn kept_copy_that_is_recent_is_read_without_asking_again() {
         // Arrange
-        let (url, asked) = answering("200 OK", newer_database()).await;
-        let (_directory, path) = kept(Some((&database(), 6 * DAY)));
+        let (url, asked) = answering("200 OK", NEWER).await;
+        let (_directory, path) = kept(Some((FIRST, 6 * DAY)));
 
         // Act
         let published = published(url, path).await;
 
         // Assert
-        let known: Vec<_> = published.iter().map(|r| knows(r, 0x00d0_0002)).collect();
-        assert_eq!(known, [true]);
+        assert_eq!(published, ["first"]);
         assert_eq!(asked.load(Ordering::SeqCst), 0);
     }
 
     #[tokio::test]
-    async fn database_is_downloaded_when_none_is_kept_and_then_kept() {
+    async fn publication_is_downloaded_when_no_copy_is_kept_and_then_kept() {
         // Arrange
-        let (url, _) = answering("200 OK", database()).await;
+        let (url, _) = answering("200 OK", FIRST).await;
         let (_directory, path) = kept(None);
 
         // Act
         let published = published(url, path.clone()).await;
 
         // Assert
-        let known: Vec<_> = published.iter().map(|r| knows(r, 0x00d0_0002)).collect();
-        assert_eq!(known, [true]);
-        assert_eq!(std::fs::read(path).ok(), Some(database()));
+        assert_eq!(published, ["first"]);
+        assert_eq!(std::fs::read(path).ok().as_deref(), Some(FIRST));
     }
 
     #[tokio::test]
-    async fn kept_copy_a_week_old_is_read_and_then_replaced_by_the_published_one() {
+    async fn kept_copy_due_for_renewal_is_read_and_then_replaced_by_the_published_one() {
         // Arrange
-        let (url, asked) = answering("200 OK", newer_database()).await;
-        let (_directory, path) = kept(Some((&database(), 8 * DAY)));
+        let (url, asked) = answering("200 OK", NEWER).await;
+        let (_directory, path) = kept(Some((FIRST, 8 * DAY)));
 
         // Act
         let published = published(url, path.clone()).await;
 
         // Assert
-        let known: Vec<_> = published
-            .iter()
-            .map(|r| (knows(r, 0x00d0_0002), knows(r, 0x00d0_0009)))
-            .collect();
-        assert_eq!(known, [(true, false), (false, true)]);
-        assert_eq!(std::fs::read(path).ok(), Some(newer_database()));
+        assert_eq!(published, ["first", "newer"]);
+        assert_eq!(std::fs::read(path).ok().as_deref(), Some(NEWER));
         assert_eq!(asked.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
     async fn kept_copy_that_does_not_read_is_replaced_at_once_however_recent() {
         // Arrange
-        let (url, asked) = answering("200 OK", database()).await;
-        let (_directory, path) = kept(Some((b"not the database", DAY)));
+        let (url, asked) = answering("200 OK", FIRST).await;
+        let (_directory, path) = kept(Some((b"not a notice", DAY)));
 
         // Act
         let published = published(url, path.clone()).await;
 
         // Assert
-        let known: Vec<_> = published.iter().map(|r| knows(r, 0x00d0_0002)).collect();
-        assert_eq!(known, [true]);
-        assert_eq!(std::fs::read(path).ok(), Some(database()));
+        assert_eq!(published, ["first"]);
+        assert_eq!(std::fs::read(path).ok().as_deref(), Some(FIRST));
         assert_eq!(asked.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
-    async fn kept_copy_stays_when_what_is_downloaded_is_not_the_database() {
+    async fn kept_copy_stays_when_what_is_downloaded_is_not_the_publication() {
         // Arrange: a server that fails, and one that answers with something else
         let servers = [
-            answering("404 Not Found", Vec::new()).await,
-            answering("200 OK", b"<html>sorry</html>".to_vec()).await,
+            answering("404 Not Found", b"").await,
+            answering("200 OK", b"<html>sorry</html>").await,
         ];
-        let copies = [(); 2].map(|()| kept(Some((&database(), 8 * DAY))));
+        let copies = [(); 2].map(|()| kept(Some((FIRST, 8 * DAY))));
+        let mut published_by_each = Vec::new();
 
         // Act
-        let mut published_by_each = Vec::new();
         for ((url, _), (_, path)) in servers.iter().zip(&copies) {
-            published_by_each.push(published(url.clone(), path.clone()).await.len());
+            published_by_each.push(published(url.clone(), path.clone()).await);
         }
 
         // Assert
-        let kept = copies.map(|(_directory, path)| std::fs::read(path).ok());
-        assert_eq!(published_by_each, [1, 1]);
-        assert_eq!(kept, [Some(database()), Some(database())]);
+        assert_eq!(published_by_each, [["first"], ["first"]]);
+        assert_eq!(
+            copies.map(|(_directory, path)| std::fs::read(path).ok()),
+            [Some(FIRST.to_vec()), Some(FIRST.to_vec())]
+        );
     }
 
     #[tokio::test]
-    async fn keeping_current_ends_once_nobody_reads_the_registry() {
+    async fn keeping_current_ends_once_nobody_reads_the_publication() {
         // Arrange
-        let (url, _) = answering("200 OK", database()).await;
+        let (url, _) = answering("200 OK", FIRST).await;
         let (_directory, path) = kept(None);
-        let (sender, registry) = watch::channel(Arc::new(Registry::default()));
+        let (sender, notice) = watch::channel(Arc::new(Notice::default()));
 
         // Act
-        drop(registry);
+        drop(notice);
         let ended = timeout(Duration::from_secs(5), keep_current(url, path, sender)).await;
 
         // Assert
