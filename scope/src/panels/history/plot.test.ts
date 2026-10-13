@@ -237,6 +237,22 @@ describe('atTicks', () => {
     // Assert: the one with a heading ten seconds off, else the nearest
     expect(reads).toEqual([[{ t: 100, trk: 92, hdg: 85 }], [{ t: 100, trk: 90, hdg: undefined }]]);
   });
+
+  it('reads the nearest instead of a preferred sample a gap away, however far the reach', () => {
+    // Arrange
+    const samples = [
+      sample(100, { track: 90 }),
+      sample(100 + GAP_SEC + 5, { track: 92, heading: 85 }),
+    ];
+    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
+    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
+
+    // Act
+    const reads = atTicks(samples, [100], read, { has, withinSec: 10 * GAP_SEC });
+
+    // Assert
+    expect(reads).toEqual([{ t: 100, trk: 90, hdg: undefined }]);
+  });
 });
 
 describe('barbPath', () => {

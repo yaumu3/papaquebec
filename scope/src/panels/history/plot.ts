@@ -96,7 +96,8 @@ export interface Preference {
 
 /**
  * One reading per tick, from the sample nearest it or the nearest one preferred, unless that lies
- * a gap away or lacks it.
+ * a gap away or lacks it. A preferred sample a gap away gives way to the nearest, however far
+ * the preference reaches.
  */
 export function atTicks<T extends object>(
   samples: readonly Sample[],
@@ -105,10 +106,10 @@ export function atTicks<T extends object>(
   prefer?: Preference,
 ): (T & { t: number })[] {
   const preferred = prefer ? samples.filter(prefer.has) : [];
+  const reach = Math.min(prefer?.withinSec ?? 0, GAP_SEC);
   return ticks.flatMap((t) => {
     const near = nearestInTime(preferred, t);
-    const s =
-      prefer && near && Math.abs(near.t - t) <= prefer.withinSec ? near : nearestInTime(samples, t);
+    const s = near && Math.abs(near.t - t) <= reach ? near : nearestInTime(samples, t);
     const value = s && Math.abs(s.t - t) <= GAP_SEC ? read(s) : undefined;
     return value ? [{ ...value, t }] : [];
   });
