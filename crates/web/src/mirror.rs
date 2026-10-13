@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use tokio::sync::watch;
 
-use crate::Failure;
+use crate::{Failure, client};
 
 const RETRY_AFTER: Duration = Duration::from_hours(1);
 const DOWNLOAD_WITHIN: Duration = Duration::from_mins(5);
@@ -80,13 +80,6 @@ async fn refresh<P: Publication>(url: &str, kept: Option<&Path>, sender: &watch:
         };
         tokio::time::sleep(wait).await;
     }
-}
-
-/// A client that speaks https by the system's certificates.
-fn client() -> reqwest::Client {
-    // Refused only when the process has a provider already, which serves as well.
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    reqwest::Client::new()
 }
 
 /// How long ago the copy was written; none when there is none, or when it is
