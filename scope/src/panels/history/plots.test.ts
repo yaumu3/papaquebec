@@ -92,6 +92,21 @@ describe('PLOTS', () => {
     expect(ys).toEqual([1.5, 40]);
   });
 
+  it('reads the selected heading only while it steers, as the data block does', () => {
+    // Arrange
+    const samples = [
+      makeSample(1, { selHeading: 270, navModes: ['autopilot'] }),
+      makeSample(2, { selHeading: 270, navModes: ['autopilot', 'lnav'] }),
+    ];
+    const selHdg = PLOTS.selHdg;
+
+    // Act
+    const sels = samples.map((s) => (selHdg.kind === 'intent' ? selHdg.y(s) : null));
+
+    // Assert
+    expect(sels).toEqual([270, undefined]);
+  });
+
   it('plots the message rate, and the wind as barbs from its direction and speed', () => {
     // Arrange
     const s = makeSample(1, { messageRate: 1.3, windDir: 300, windSpeed: 12 });

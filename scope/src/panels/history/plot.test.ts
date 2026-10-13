@@ -119,6 +119,49 @@ describe('headingGlyph', () => {
   });
 });
 
+describe('headingGlyph with a selected heading', () => {
+  it('arcs from the nose round to the selected heading, the way the turn goes', () => {
+    // Arrange
+    const turns = [
+      { trk: 90, hdg: 90, sel: 180 },
+      { trk: 90, hdg: 90, sel: 0 },
+    ];
+
+    // Act
+    const arcs = turns.map((h) => headingGlyph(100, 50, h).toGo);
+
+    // Assert: right round the south to 180, left round the north to 360
+    expect(arcs).toEqual([
+      'M113.5 50.0 A13.5 13.5 0 0 1 100.0 63.5',
+      'M113.5 50.0 A13.5 13.5 0 0 0 100.0 36.5',
+    ]);
+  });
+
+  it('puts a dot ahead of the nose instead once the heading holds the selection', () => {
+    // Arrange
+    const heading = { trk: 175, hdg: 180, sel: 180.5 };
+
+    // Act
+    const glyph = headingGlyph(100, 50, heading);
+
+    // Assert
+    expect(glyph.held).toEqual({ cx: 100, cy: 64, r: 2.2 });
+    expect(glyph.toGo).toBeUndefined();
+  });
+
+  it('marks the selection past the arrow head when the heading is unknown, with nothing held', () => {
+    // Arrange
+    const heading = { trk: 2, hdg: undefined, sel: 0 };
+
+    // Act
+    const glyph = headingGlyph(100, 50, heading);
+
+    // Assert
+    expect(glyph.tick).toBe('M100.0 34.0 L100.0 30.5');
+    expect([glyph.toGo, glyph.held]).toEqual([undefined, undefined]);
+  });
+});
+
 describe('laneTraces on the ground', () => {
   it('draws the stretch on the ground along the floor, apart from the altitudes', () => {
     // Arrange

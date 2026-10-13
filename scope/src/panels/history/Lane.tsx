@@ -20,7 +20,7 @@ import {
 } from './plot';
 import { type Dash, PLOTS } from './plots';
 import { type Interval, xOf } from './span';
-import { barsOf, gapsIn, yOf } from './trace';
+import { barsOf, gapsIn, type Read, yOf } from './trace';
 
 import s from './History.module.css';
 
@@ -89,13 +89,26 @@ export function Lane(props: {
       ? atTicks(props.samples, ticksAt(stepEvery(BARB_PITCH_PX), BARB_PX), spec.barb)
       : [],
   );
+  /** What the intent plotted in the lane reads, if one is. */
+  const intentRead = (): Read | undefined => {
+    const intent = props.keys
+      .slice(1)
+      .map((key) => PLOTS[key])
+      .find((p) => p.kind === 'intent');
+    return intent?.kind === 'intent' ? intent.y : undefined;
+  };
   const glyphs = createMemo(() => {
     if (spec.kind !== 'heading') return [];
+    const sel = intentRead();
+    const read = (sample: Sample) => {
+      const h = spec.heading(sample);
+      return h && { ...h, sel: sel?.(sample) };
+    };
     // A tick takes a sample with a heading a little off it over the nearest without, so that
     // the aircraft does not come and go with the replies that carry its heading.
     const step = stepEvery(GLYPH_PITCH_PX);
     const has = (sample: Sample) => spec.heading(sample)?.hdg !== undefined;
-    return atTicks(props.samples, ticksAt(step, GLYPH_REACH_PX), spec.heading, {
+    return atTicks(props.samples, ticksAt(step, GLYPH_REACH_PX), read, {
       has,
       withinSec: step / 2,
     }).map((h) => headingGlyph(x(h.t), props.height / 2, h));
@@ -180,6 +193,11 @@ export function Lane(props: {
                 <Show when={g().vector}>{(d) => <path class={s.vector} d={d()} />}</Show>
                 <Show when={g().aircraft}>{(d) => <path class={s.aircraft} d={d()} />}</Show>
                 <Show when={g().arrow}>{(d) => <path class={s.arrow} d={d()} />}</Show>
+                <Show when={g().toGo}>{(d) => <path class={s.toGo} d={d()} />}</Show>
+                <Show when={g().tick}>{(d) => <path class={s.tick} d={d()} />}</Show>
+                <Show when={g().held}>
+                  {(at) => <circle class={s.held} cx={at().cx} cy={at().cy} r={at().r} />}
+                </Show>
               </>
             )}
           </Index>

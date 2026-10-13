@@ -1,4 +1,5 @@
 import { crewAltitudeFt } from '../../lib/altitude';
+import { steeringHeading } from '../../lib/autopilot';
 import { modeNames, sourceName } from '../../lib/format';
 import { magneticTrack } from '../../state/magnetic';
 import { laneOf, type ReadingKey } from '../../state/plotted';
@@ -21,8 +22,8 @@ export type Dash = 'dashed' | 'dotted';
 
 /**
  * How a reading is drawn: a lane of its own, as a line, a pair of lines with the second dashed or
- * dotted, gantt bars, wind barbs or heading glyphs; or an intent, a dashed line in its parent's
- * lane on that lane's scale.
+ * dotted, gantt bars, wind barbs or heading glyphs; or an intent, in its parent's lane: a line
+ * with its dash on that lane's scale, or on the lane's glyphs, where the dash goes unused.
  */
 export type PlotSpec =
   | {
@@ -64,7 +65,7 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   fmsAlt: { kind: 'intent', y: (s) => s.fmsAlt, dash: 'dotted' },
   vs: { kind: 'line', y: (s) => s.verticalRate, minSpan: 1000 },
   trk: { kind: 'heading', heading },
-  selHdg: { kind: 'intent', y: (s) => s.selHeading, dash: 'dashed' },
+  selHdg: { kind: 'intent', y: steeringHeading, dash: 'dashed' },
   gs: { kind: 'line', y: (s) => s.gs, minSpan: 20 },
   qnh: { kind: 'line', y: (s) => s.navQnh, minSpan: 4 },
   modes: { kind: 'gantt', names: (s) => s.navModes && modeNames(s.navModes) },

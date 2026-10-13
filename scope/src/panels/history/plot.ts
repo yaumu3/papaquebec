@@ -161,8 +161,17 @@ const VECTOR_PX = 19;
 const ARROW_PX = 13;
 const HEAD_PX = 5;
 const HEAD_HALF_PX = 3.2;
-/** How far a glyph reaches round its point at the most: the track out of the aircraft. */
-export const GLYPH_REACH_PX = VECTOR_PX;
+/** The arc to the selected heading, just clear of the nose, and the dot there once it holds. */
+const TO_GO_PX = AIRCRAFT_PX / 2 + 2.5;
+const HELD_PX = TO_GO_PX + 0.5;
+const HELD_DOT_PX = 2.2;
+/** The selection's tick past the head of the track's own arrow, from and to. */
+const TICK_FROM_PX = ARROW_PX + 3;
+const TICK_TO_PX = ARROW_PX + 6.5;
+/** Within this of the selected heading, the heading holds it: off by 3° or more, it is turning. */
+const HOLD_DEG = 3;
+/** How far a glyph reaches round its point at the most: the track, or the tick past its arrow. */
+export const GLYPH_REACH_PX = Math.max(VECTOR_PX, TICK_TO_PX);
 
 /** A point `a` out from (x, y) along `deg` and `c` across it to the right, north up. */
 const offset =
@@ -179,6 +188,17 @@ const toward = (x: number, y: number, deg: number) => {
   return (a: number, c = 0): string => at(a, c).map(fixed).join(' ');
 };
 
+/** To a tenth, as precise as the drawing. */
+const tenth = (n: number): number => Math.round(n * 10) / 10;
+
+/** Degrees from `from` round to `to` the short way, to the right positive. */
+const turn = (from: number, to: number): number => ((to - from + 540) % 360) - 180;
+
+/** The heading glyph's readings: the track and heading, and the selected heading while it steers. */
+export interface HeadingMark extends Heading {
+  sel?: number | undefined;
+}
+
 export interface HeadingGlyph {
   /** The aircraft along its heading, when known. */
   aircraft?: string;
@@ -186,15 +206,27 @@ export interface HeadingGlyph {
   vector?: string;
   /** The track as an arrow of its own, without the aircraft. */
   arrow?: string;
+  /** The turn left to the selected heading, round from the nose. */
+  toGo?: string;
+  /** Ahead of the nose, once the heading holds the selection. */
+  held?: { cx: number; cy: number; r: number };
+  /** The selection past the arrow's head, when the heading is unknown and so is whether it holds. */
+  tick?: string;
 }
 
 /**
  * Where the aircraft points and where it goes, at (x, y): the aircraft along the heading with the
- * track running out of it, so a crab shows as the nose off the track; the track alone as an arrow.
+ * track running out of it, so a crab shows as the nose off the track, and the turn left to the
+ * selected heading; the track alone as an arrow, the selection a tick past its head.
  */
-export function headingGlyph(x: number, y: number, h: Heading): HeadingGlyph {
-  if (h.hdg !== undefined) return aircraftOf(x, y, h.hdg, h.trk);
-  return h.trk === undefined ? {} : { arrow: arrowOf(x, y, h.trk) };
+export function headingGlyph(x: number, y: number, h: HeadingMark): HeadingGlyph {
+  if (h.hdg !== undefined)
+    return { ...aircraftOf(x, y, h.hdg, h.trk), ...selectionOf(x, y, h.hdg, h.sel) };
+  if (h.trk === undefined) return {};
+  const arrow = arrowOf(x, y, h.trk);
+  if (h.sel === undefined) return { arrow };
+  const at = toward(x, y, h.sel);
+  return { arrow, tick: `M${at(TICK_FROM_PX)} L${at(TICK_TO_PX)}` };
 }
 
 function arrowOf(x: number, y: number, trk: number): string {
@@ -211,4 +243,17 @@ function aircraftOf(x: number, y: number, hdg: number, trk: number | undefined):
   const aircraft = `M${of(5.5)} L${of(-5.5)} M${of(1, -5)} L${of(1, 5)} M${of(-4.5, -2.2)} L${of(-4.5, 2.2)}`;
   if (trk === undefined) return { aircraft };
   return { aircraft, vector: `M${at(0)} L${toward(x, y, trk)(VECTOR_PX)}` };
+}
+
+function selectionOf(x: number, y: number, hdg: number, sel: number | undefined): HeadingGlyph {
+  if (sel === undefined) return {};
+  const go = turn(hdg, sel);
+  if (Math.abs(go) < HOLD_DEG) {
+    const [cx, cy] = offset(x, y, hdg)(HELD_PX);
+    return { held: { cx: tenth(cx), cy: tenth(cy), r: HELD_DOT_PX } };
+  }
+  const r = TO_GO_PX;
+  return {
+    toGo: `M${toward(x, y, hdg)(r)} A${r} ${r} 0 0 ${go > 0 ? 1 : 0} ${toward(x, y, sel)(r)}`,
+  };
 }
