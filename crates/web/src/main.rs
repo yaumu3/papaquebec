@@ -100,8 +100,10 @@ async fn main() -> Result<(), Failure> {
             tokio::spawn(follow(connect, site, clock, every, registry, feed));
         }
     }
+    // The weather, once something reports it.
+    let (_weather, weather) = watch::channel(None);
     tokio::spawn(server.clone().keep_renewed(RENEW_EVERY, RENEW_RETRY));
-    server.serve(listening).await;
+    server.serve(listening, weather).await;
     Ok(())
 }
 
