@@ -72,7 +72,7 @@ async fn main() -> Result<(), Failure> {
             match config.data {
                 Some(data) => {
                     let kept = data.join(aircraft::FILE);
-                    tokio::spawn(keep_current(aircraft::URL.into(), kept, registered));
+                    tokio::spawn(keep_current(aircraft::URL.into(), Some(kept), registered));
                 }
                 None => eprintln!("aircraft database: no XDG_DATA_HOME or HOME to keep it in"),
             }
