@@ -2242,6 +2242,7 @@ version = "0.1.0"
 dependencies = [
  "authority",
  "axum",
+ "bytes",
  "feeder",
  "flate2",
  "http-body-util",

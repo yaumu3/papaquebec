@@ -28,6 +28,12 @@ impl Station {
 #[derive(Default)]
 pub struct Stations(Vec<Station>);
 
+impl FromIterator<Station> for Stations {
+    fn from_iter<I: IntoIterator<Item = Station>>(stations: I) -> Self {
+        Self(stations.into_iter().collect())
+    }
+}
+
 /// One site of the list, which has sites of every kind, some without an
 /// ICAO identifier or a position.
 #[derive(Deserialize)]

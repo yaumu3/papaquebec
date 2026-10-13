@@ -8,6 +8,7 @@ use std::time::Duration;
 use authority::{Authority, How};
 use feeder::follow::{follow, wall};
 use feeder::transport::Server;
+use metar::stations::Stations;
 use sim::Fleet;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
@@ -15,8 +16,9 @@ use tracker::registry::Registry;
 use web::Failure;
 use web::config::{Config, Door, Origin};
 use web::door::{self, Certificates};
-use web::mirror::{aircraft, keep_current};
+use web::mirror::{aircraft, keep_current, metar_stations};
 use web::site::{Site, router};
+use web::weather::{self, METAR};
 
 /// How often the scope is told what the receiver hears.
 const PUBLISH_EVERY: Duration = Duration::from_secs(1);
@@ -66,6 +68,20 @@ async fn main() -> Result<(), Failure> {
     eprintln!("serving the scope over {secure} on tcp/{port}");
     tokio::spawn(door::serve(listener, certificates, router(&site)));
 
+    let (listed, stations) = watch::channel(Arc::new(Stations::default()));
+    let kept = config
+        .data
+        .as_ref()
+        .map(|data| data.join(metar_stations::FILE));
+    tokio::spawn(keep_current(metar_stations::URL.into(), kept, listed));
+    let (told, weather) = watch::channel(None);
+    let client = web::client();
+    let fetch = move |stations| weather::fetch(client.clone(), METAR.to_owned(), stations);
+    let position = match &config.origin {
+        Origin::Beast { site, .. } | Origin::Sim { site, .. } => (site.lat_deg, site.lon_deg),
+    };
+    tokio::spawn(weather::poll(stations, position, fetch, wall, told));
+
     let (registered, registry) = watch::channel(Arc::new(Registry::default()));
     match config.origin {
         Origin::Beast { address, site } => {
@@ -100,8 +116,6 @@ async fn main() -> Result<(), Failure> {
             tokio::spawn(follow(connect, site, clock, every, registry, feed));
         }
     }
-    // The weather, once something reports it.
-    let (_weather, weather) = watch::channel(None);
     tokio::spawn(server.clone().keep_renewed(RENEW_EVERY, RENEW_RETRY));
     server.serve(listening, weather).await;
     Ok(())

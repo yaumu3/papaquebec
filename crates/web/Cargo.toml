@@ -16,6 +16,7 @@ workspace = true
 
 [dependencies]
 authority = { path = "../authority" }
+bytes = "1.12.1"
 axum = { version = "0.8.9", default-features = false, features = [
   "http1",
   "http2",
@@ -37,6 +38,6 @@ tracker = { path = "../tracker" }
 flate2 = "1.1.10"
 http-body-util = "0.1.5"
 tempfile = "3.27.0"
-tokio = { version = "1.53.1", features = ["io-util"] }
+tokio = { version = "1.53.1", features = ["io-util", "test-util"] }
 tower = { version = "0.5.3", features = ["util"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
