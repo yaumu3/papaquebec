@@ -22,6 +22,16 @@ export function ticks(i: Interval, step: number): number[] {
   return out;
 }
 
+/** The ticks at which a mark reaching `reachPx` round each fits whole inside a plot `width` across. */
+export function clearOfEnds(
+  at: readonly number[],
+  x: (t: number) => number,
+  width: number,
+  reachPx: number,
+): number[] {
+  return at.filter((t) => x(t) >= reachPx && x(t) <= width - reachPx);
+}
+
 /** The clock time to the minute, or to the second when the step is shorter than a minute. */
 export function clockLabel(t: number, step: number): string {
   const full = clockTime(t);

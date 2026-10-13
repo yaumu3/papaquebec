@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { axisStep, clockLabel, clockStep, ticks } from './axis';
+import { axisStep, clockLabel, clockStep, clearOfEnds, ticks } from './axis';
 
 /** 12:36:10Z on the first day of the epoch. */
 const T = 12 * 3600 + 36 * 60 + 10;
@@ -58,5 +58,19 @@ describe('clockLabel', () => {
 
     // Assert
     expect(labels).toEqual(['12:36', '12:36:10']);
+  });
+});
+
+describe('clearOfEnds', () => {
+  it('keeps the ticks a mark reaching round each fits whole inside the plot at', () => {
+    // Arrange
+    const at = [0, 10, 50, 90, 100];
+    const x = (t: number) => t * 2;
+
+    // Act
+    const kept = clearOfEnds(at, x, 200, 20);
+
+    // Assert
+    expect(kept).toEqual([10, 50, 90]);
   });
 });

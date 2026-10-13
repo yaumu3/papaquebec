@@ -5,7 +5,7 @@ import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
-import { clockStep, ticks } from './axis';
+import { clearOfEnds, clockStep, ticks } from './axis';
 import {
   atTicks,
   barbPath,
@@ -77,9 +77,12 @@ export function Lane(props: {
   /** The shortest round clock step that keeps glyphs at least `pitch` apart across the visible span. */
   const stepEvery = (pitch: number) =>
     clockStep(props.visible.to - props.visible.from, Math.max(1, Math.floor(props.width / pitch)));
+  /** The ticks of `step` at which a mark reaching `reach` round each fits whole in the plot. */
+  const ticksAt = (step: number, reach: number) =>
+    clearOfEnds(ticks(props.visible, step), x, props.width, reach);
   const barbs = createMemo(() =>
     spec.kind === 'barbs'
-      ? atTicks(props.samples, ticks(props.visible, stepEvery(BARB_PITCH_PX)), spec.barb)
+      ? atTicks(props.samples, ticksAt(stepEvery(BARB_PITCH_PX), BARB_PX), spec.barb)
       : [],
   );
   const dots = () => {
