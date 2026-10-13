@@ -39,7 +39,7 @@ services:
       - 443:443
       - 4433:4433/udp # the feed
     volumes:
-      - pq_data:/data # the certificate authority and the aircraft database
+      - pq_data:/data # the certificate authority, the aircraft database and the METAR stations
       - map_data:/app/public/map
     depends_on:
       - readsb
@@ -114,8 +114,6 @@ builds the map around the same site). The server flies it whenever `PQ_SIM` is s
 Query parameters:
 
 - `?site=<lat>,<lon>` overrides the receiver position.
-- `?wx=<base>` reads METARs from your own [Aviation Weather Center](https://aviationweather.gov)
-  proxy.
 
 GitHub Actions runs the same checks and builds the image on every push to `main` and every pull
 request. Two headless scripts describe their flags in their headers:
@@ -134,11 +132,18 @@ the sim's tests enforce this for the fleet.
 
 ## Altimeter
 
-The QNH follows the METAR of the station named on the Display panel (blank means the nearest airport
-with a report), re-read periodically and shown in the top bar with the observation time. Typing
-a QNH switches to manual until AUTO is turned back on. Reports come from the [Iowa Environmental
-Mesonet](https://mesonet.agron.iastate.edu), which relays NOAA's worldwide METAR feed with browser
-access allowed; NOAA's own Aviation Weather Center does not, hence the `?wx=` proxy option.
+The QNH follows the METAR of the station named on the Display panel, or of the reporting station
+nearest the site when it is blank, and the top bar shows it with the observation time. Typing a
+QNH switches to manual until AUTO is turned back on.
+
+The server reads the METARs from NOAA's [Aviation Weather Center](https://aviationweather.gov)
+and sends them to every scope over the feed:
+
+- Stations are those the Center lists as issuing METARs within 150 NM of the receiver, the
+  radius the map is drawn for. The list is kept in the data directory and renewed daily.
+- Their reports are polled every 5 minutes. A report older than 90 minutes, an hourly
+  report half an hour overdue, is dropped, so a station that stops reporting shows `····`.
+- A station typed on the Display panel must be one of those; any other shows `····`.
 
 ## Map data
 
@@ -316,5 +321,6 @@ The code is MIT licensed. The generated aeronautical data is openAIP's, [CC BY-N
 copy of `aero.json` passed on keeps that license. Registrations and types are from the [Mictronics
 aircraft database](https://github.com/Mictronics/aircraft-database), made available under the [Open
 Data Commons Attribution License](https://opendatacommons.org/licenses/by/1-0/); the server
-downloads it, and none of it is in this repository. The coastline is public domain and JetBrains
+downloads it, and none of it is in this repository. METARs and the station list are public domain
+from NOAA's Aviation Weather Center, which the server reads. The coastline is public domain and JetBrains
 Mono is under the [SIL Open Font License](https://openfontlicense.org), shipped in `public/fonts`.
