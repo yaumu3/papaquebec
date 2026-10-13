@@ -4,6 +4,8 @@ pub mod config;
 pub mod door;
 pub mod mirror;
 pub mod site;
+#[cfg(test)]
+pub(crate) mod testing;
 
 /// What went wrong, for the log.
 pub type Failure = Box<dyn std::error::Error + Send + Sync>;

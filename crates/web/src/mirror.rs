@@ -121,16 +121,14 @@ async fn read<P: Publication>(published: Vec<u8>) -> Result<(P, Vec<u8>), Failur
 mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, SystemTime};
 
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
     use tokio::sync::watch;
     use tokio::time::timeout;
 
     use super::{Publication, keep_current};
     use crate::Failure;
+    use crate::testing::{Asked, answering as answering_at};
 
     const DAY: Duration = Duration::from_hours(24);
 
@@ -160,26 +158,9 @@ mod tests {
     const FIRST: &[u8] = b"notice: first";
     const NEWER: &[u8] = b"notice: newer";
 
-    /// A web server that answers every request with the status and the body,
-    /// and counts the requests: its URL and the count.
-    async fn answering(status: &'static str, body: &'static [u8]) -> (String, Arc<AtomicUsize>) {
-        let listener = TcpListener::bind("127.0.0.1:0").await.expect("binds");
-        let url = format!("http://{}/notice", listener.local_addr().expect("bound"));
-        let asked = Arc::new(AtomicUsize::new(0));
-        let count = Arc::clone(&asked);
-        tokio::spawn(async move {
-            while let Ok((mut stream, _)) = listener.accept().await {
-                count.fetch_add(1, Ordering::SeqCst);
-                let mut request = [0; 1024];
-                let _ = stream.read(&mut request).await;
-                let head = format!(
-                    "HTTP/1.1 {status}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
-                    body.len()
-                );
-                let _ = stream.write_all(&[head.as_bytes(), body].concat()).await;
-            }
-        });
-        (url, asked)
+    /// A web server publishing the body at `/notice`, and what it is asked.
+    async fn answering(status: &'static str, body: &'static [u8]) -> (String, Asked) {
+        answering_at("/notice", status, body).await
     }
 
     /// A file for the copy in a directory that does not exist yet, holding
@@ -221,7 +202,7 @@ mod tests {
 
         // Assert
         assert_eq!(published, ["first"]);
-        assert_eq!(asked.load(Ordering::SeqCst), 0);
+        assert_eq!(asked.count(), 0);
     }
 
     #[tokio::test]
@@ -248,7 +229,7 @@ mod tests {
 
         // Assert
         assert_eq!(published, ["first"]);
-        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
@@ -263,7 +244,7 @@ mod tests {
         // Assert
         assert_eq!(published, ["first", "newer"]);
         assert_eq!(std::fs::read(path).ok().as_deref(), Some(NEWER));
-        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
@@ -278,7 +259,7 @@ mod tests {
         // Assert
         assert_eq!(published, ["first", "newer"]);
         assert_eq!(std::fs::read(path).ok().as_deref(), Some(NEWER));
-        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
@@ -293,7 +274,7 @@ mod tests {
         // Assert
         assert_eq!(published, ["first"]);
         assert_eq!(std::fs::read(path).ok().as_deref(), Some(FIRST));
-        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
