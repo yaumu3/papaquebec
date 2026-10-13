@@ -134,6 +134,10 @@ mod tests {
 
     const DAY: Duration = Duration::from_hours(24);
 
+    fn ago(age: Duration) -> SystemTime {
+        SystemTime::now() - age
+    }
+
     /// A made-up publication: a line of text after a marker, refused without it.
     #[derive(Default)]
     struct Notice(String);
@@ -179,18 +183,18 @@ mod tests {
     }
 
     /// A file for the copy in a directory that does not exist yet, holding
-    /// the contents as if written so long ago when given.
-    fn kept(contents: Option<(&[u8], Duration)>) -> (tempfile::TempDir, PathBuf) {
+    /// the contents as if written at the time when given.
+    fn kept(contents: Option<(&[u8], SystemTime)>) -> (tempfile::TempDir, PathBuf) {
         let directory = tempfile::tempdir().expect("a directory");
         let path = directory.path().join("papaquebec/notice.txt");
-        if let Some((contents, age)) = contents {
+        if let Some((contents, written)) = contents {
             std::fs::create_dir_all(path.parent().expect("a parent")).expect("a directory");
             std::fs::write(&path, contents).expect("written");
             let file = std::fs::File::options()
                 .write(true)
                 .open(&path)
                 .expect("opens");
-            file.set_modified(SystemTime::now() - age).expect("dated");
+            file.set_modified(written).expect("dated");
         }
         (directory, path)
     }
@@ -210,7 +214,7 @@ mod tests {
     async fn kept_copy_that_is_recent_is_read_without_asking_again() {
         // Arrange
         let (url, asked) = answering("200 OK", NEWER).await;
-        let (_directory, path) = kept(Some((FIRST, 6 * DAY)));
+        let (_directory, path) = kept(Some((FIRST, ago(6 * DAY))));
 
         // Act
         let published = published(url, path).await;
@@ -238,7 +242,7 @@ mod tests {
     async fn kept_copy_due_for_renewal_is_read_and_then_replaced_by_the_published_one() {
         // Arrange
         let (url, asked) = answering("200 OK", NEWER).await;
-        let (_directory, path) = kept(Some((FIRST, 8 * DAY)));
+        let (_directory, path) = kept(Some((FIRST, ago(8 * DAY))));
 
         // Act
         let published = published(url, path.clone()).await;
@@ -253,7 +257,7 @@ mod tests {
     async fn kept_copy_that_does_not_read_is_replaced_at_once_however_recent() {
         // Arrange
         let (url, asked) = answering("200 OK", FIRST).await;
-        let (_directory, path) = kept(Some((b"not a notice", DAY)));
+        let (_directory, path) = kept(Some((b"not a notice", ago(DAY))));
 
         // Act
         let published = published(url, path.clone()).await;
@@ -271,7 +275,7 @@ mod tests {
             answering("404 Not Found", b"").await,
             answering("200 OK", b"<html>sorry</html>").await,
         ];
-        let copies = [(); 2].map(|()| kept(Some((FIRST, 8 * DAY))));
+        let copies = [(); 2].map(|()| kept(Some((FIRST, ago(8 * DAY)))));
         let mut published_by_each = Vec::new();
 
         // Act
