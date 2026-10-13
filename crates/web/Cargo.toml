@@ -23,6 +23,7 @@ axum = { version = "0.8.9", default-features = false, features = [
   "tokio",
 ] }
 feeder = { path = "../feeder" }
+metar = { path = "../metar" }
 hyper-util = { version = "0.1.21", features = ["server-auto", "tokio", "service"] }
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"] }
 rustls = { version = "0.23.45", default-features = false, features = ["ring", "std", "tls12"] }
@@ -33,6 +34,7 @@ tower-http = { version = "0.6.11", features = ["fs", "compression-gzip"] }
 tracker = { path = "../tracker" }
 
 [dev-dependencies]
+flate2 = "1.1.10"
 http-body-util = "0.1.5"
 tempfile = "3.27.0"
 tokio = { version = "1.53.1", features = ["io-util"] }

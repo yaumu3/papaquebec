@@ -2,6 +2,7 @@
 //! the server uses.
 
 pub mod aircraft;
+pub mod metar_stations;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
