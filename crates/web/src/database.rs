@@ -10,51 +10,86 @@ use tracker::registry::Registry;
 use crate::Failure;
 
 /// Where Mictronics publishes the database, which it renews every week.
-pub const DATABASE: &str =
+pub const URL: &str =
     "https://github.com/Mictronics/aircraft-database/raw/refs/heads/main/indexedDB.zip";
+/// Where the copy is kept, within the data directory.
+pub const FILE: &str = "papaquebec/aircraft-database.zip";
 
-/// Mictronics renews the database every week.
-const REFRESH_EVERY: Duration = Duration::from_hours(7 * 24);
 const RETRY_AFTER: Duration = Duration::from_hours(1);
 const DOWNLOAD_WITHIN: Duration = Duration::from_mins(5);
 
-/// Keeps the registry as the database is published at `url`, for as long as
-/// anyone reads the registry: starts from the copy kept in the file, and
-/// downloads the database whenever that copy is a week old, missing or unreadable.
-pub async fn keep_current(url: String, kept: PathBuf, registry: watch::Sender<Arc<Registry>>) {
-    tokio::select! {
-        () = refresh(&url, &kept, &registry) => {}
-        () = registry.closed() => {}
+/// A file someone publishes and renews, read into what the server uses.
+pub trait Publication: Sized + Send + Sync + 'static {
+    /// What the log calls it.
+    const NAME: &str;
+    /// How old a kept copy may grow before it is downloaded again.
+    const RENEW_AT: Duration;
+
+    /// Reads the file as published.
+    ///
+    /// # Errors
+    ///
+    /// When the bytes do not read as the publication.
+    fn read(published: &[u8]) -> Result<Self, Failure>;
+
+    /// What the log says of it once read.
+    fn tally(&self) -> String;
+}
+
+impl Publication for Registry {
+    const NAME: &str = "aircraft database";
+    /// Mictronics renews the database every week.
+    const RENEW_AT: Duration = Duration::from_hours(7 * 24);
+
+    fn read(published: &[u8]) -> Result<Self, Failure> {
+        Registry::read(published)
+    }
+
+    fn tally(&self) -> String {
+        format!("{} aircraft", self.known())
     }
 }
 
-async fn refresh(url: &str, kept: &Path, registry: &watch::Sender<Arc<Registry>>) {
-    let publish = |read: Result<Registry, Failure>| match read {
-        Ok(read) => {
-            eprintln!("aircraft database: {} aircraft", read.known());
+/// Keeps the publication as it is published at `url`, for as long as anyone
+/// reads it: starts from the copy kept in the file, and downloads the
+/// publication whenever that copy is too old, missing or unreadable.
+pub async fn keep_current<P: Publication>(
+    url: String,
+    kept: PathBuf,
+    sender: watch::Sender<Arc<P>>,
+) {
+    tokio::select! {
+        () = refresh(&url, &kept, &sender) => {}
+        () = sender.closed() => {}
+    }
+}
 
-            registry.send_replace(Arc::new(read));
+async fn refresh<P: Publication>(url: &str, kept: &Path, sender: &watch::Sender<Arc<P>>) {
+    let publish = |read: Result<P, Failure>| match read {
+        Ok(read) => {
+            eprintln!("{}: {}", P::NAME, read.tally());
+            sender.send_replace(Arc::new(read));
         }
-        Err(failure) => eprintln!("aircraft database: {failure}"),
+        Err(failure) => eprintln!("{}: {failure}", P::NAME),
     };
-    // A copy that does not read as the database is no better than none.
+    // A copy that does not read as the publication is no better than none.
     let mut usable = false;
-    if let Ok(zip) = std::fs::read(kept) {
-        let copy = read(zip).await.map(|(read, _)| read);
+    if let Ok(published) = std::fs::read(kept) {
+        let copy = read::<P>(published).await.map(|(read, _)| read);
         usable = copy.is_ok();
         publish(copy);
     }
     let client = client();
     loop {
-        // What is left of the week of the kept copy, when it is that recent.
+        // What is left before the kept copy is due for renewal, when it is that recent.
         let age = age(kept).filter(|_| usable);
-        let left = age.and_then(|age| REFRESH_EVERY.checked_sub(age));
+        let left = age.and_then(|age| P::RENEW_AT.checked_sub(age));
         let wait = if let Some(left) = left.filter(|left| !left.is_zero()) {
             left
         } else {
-            let downloaded = download(&client, url, kept).await;
+            let downloaded = download::<P>(&client, url, kept).await;
             usable |= downloaded.is_ok();
-            let wait = downloaded.as_ref().map_or(RETRY_AFTER, |_| REFRESH_EVERY);
+            let wait = downloaded.as_ref().map_or(RETRY_AFTER, |_| P::RENEW_AT);
             publish(downloaded);
             wait
         };
@@ -75,22 +110,28 @@ fn age(kept: &Path) -> Option<Duration> {
     Some(written.elapsed().unwrap_or_default())
 }
 
-/// The database as published, kept in the file once it reads as one.
-async fn download(client: &reqwest::Client, url: &str, kept: &Path) -> Result<Registry, Failure> {
+/// The publication as published, kept in the file once it reads as one.
+async fn download<P: Publication>(
+    client: &reqwest::Client,
+    url: &str,
+    kept: &Path,
+) -> Result<P, Failure> {
     let answer = client.get(url).timeout(DOWNLOAD_WITHIN).send().await?;
-    let zip = answer.error_for_status()?.bytes().await?;
-    let (registry, zip) = read(zip.into()).await?;
+    let published = answer.error_for_status()?.bytes().await?;
+    let (read, published) = read::<P>(published.into()).await?;
     // Written aside first, so that a copy is never kept in part.
     let aside = kept.with_extension("part");
     std::fs::create_dir_all(kept.parent().ok_or("the copy has no directory")?)?;
-    std::fs::write(&aside, zip)?;
+    std::fs::write(&aside, published)?;
     std::fs::rename(aside, kept)?;
-    Ok(registry)
+    Ok(read)
 }
 
-/// Reads the zip off the threads that serve, since it takes a while, and gives it back.
-async fn read(zip: Vec<u8>) -> Result<(Registry, Vec<u8>), Failure> {
-    let reading = tokio::task::spawn_blocking(move || Registry::read(&zip).map(|read| (read, zip)));
+/// Reads the publication off the threads that serve, since it may take a while,
+/// and gives the bytes back.
+async fn read<P: Publication>(published: Vec<u8>) -> Result<(P, Vec<u8>), Failure> {
+    let reading =
+        tokio::task::spawn_blocking(move || P::read(&published).map(|read| (read, published)));
     reading.await?
 }
 

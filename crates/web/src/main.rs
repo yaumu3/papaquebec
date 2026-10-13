@@ -14,7 +14,7 @@ use tokio::sync::watch;
 use tracker::registry::Registry;
 use web::Failure;
 use web::config::{Config, Door, Origin};
-use web::database::{DATABASE, keep_current};
+use web::database::{FILE, URL, keep_current};
 use web::door::{self, Certificates};
 use web::site::{Site, router};
 
@@ -71,8 +71,8 @@ async fn main() -> Result<(), Failure> {
         Origin::Beast { address, site } => {
             match config.data {
                 Some(data) => {
-                    let kept = data.join("papaquebec/aircraft-database.zip");
-                    tokio::spawn(keep_current(DATABASE.into(), kept, registered));
+                    let kept = data.join(FILE);
+                    tokio::spawn(keep_current(URL.into(), kept, registered));
                 }
                 None => eprintln!("aircraft database: no XDG_DATA_HOME or HOME to keep it in"),
             }
