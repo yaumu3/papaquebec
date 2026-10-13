@@ -48,17 +48,20 @@ describe('PLOTS', () => {
     expect(floored).toEqual([true, false, false]);
   });
 
-  it('pairs the track in magnetic, as the table reads it, with the heading as sent', () => {
+  it('reads the track in magnetic, as the table does, with the heading as sent, none without either', () => {
     // Arrange
     setDeclinationAt(() => () => 7);
-    const s = makeSample(1, { track: 235, heading: 240, at: { lat: 33.6, lon: 130.5 } });
+    const samples = [
+      makeSample(1, { track: 235, heading: 240, at: { lat: 33.6, lon: 130.5 } }),
+      makeSample(2),
+    ];
     const trk = PLOTS.trk;
 
     // Act
-    const ys = trk.kind === 'pair' ? [trk.y(s), trk.y2(s)] : null;
+    const headings = samples.map((s) => (trk.kind === 'heading' ? trk.heading(s) : null));
 
     // Assert
-    expect(ys).toEqual([228, 240]);
+    expect(headings).toEqual([{ trk: 228, hdg: 240 }, undefined]);
     setDeclinationAt(() => () => 0);
   });
 
@@ -106,7 +109,7 @@ describe('PLOTS', () => {
 });
 
 describe('minSpanOf', () => {
-  it('spans an intent like the lane it is drawn in, and a lane of bars or barbs not at all', () => {
+  it('spans an intent like the lane it is drawn in, and a lane of glyphs, bars or barbs not at all', () => {
     // Arrange
     const keys = ['selAlt', 'alt', 'selHdg', 'trk', 'modes', 'wind'] as const;
 
@@ -114,6 +117,6 @@ describe('minSpanOf', () => {
     const spans = keys.map(minSpanOf);
 
     // Assert
-    expect(spans).toEqual([1000, 1000, 20, 20, undefined, undefined]);
+    expect(spans).toEqual([1000, 1000, undefined, undefined, undefined, undefined]);
   });
 });

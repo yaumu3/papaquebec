@@ -10,6 +10,8 @@ import {
   atTicks,
   barbPath,
   fixed,
+  GLYPH_REACH_PX,
+  headingGlyph,
   laneRange,
   type LaneTrace,
   laneTraces,
@@ -33,6 +35,8 @@ const DOT_PX = 3;
 const BARB_PX = 16;
 /** How far apart barbs stand at the least, on round clock times of their own. */
 const BARB_PITCH_PX = 32;
+/** The same for heading glyphs, which are wider: about 30 px across at the most. */
+const GLYPH_PITCH_PX = 36;
 
 /** The class that dashes a trace, if any. */
 export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
@@ -85,6 +89,17 @@ export function Lane(props: {
       ? atTicks(props.samples, ticksAt(stepEvery(BARB_PITCH_PX), BARB_PX), spec.barb)
       : [],
   );
+  const glyphs = createMemo(() => {
+    if (spec.kind !== 'heading') return [];
+    // A tick takes a sample with a heading a little off it over the nearest without, so that
+    // the aircraft does not come and go with the replies that carry its heading.
+    const step = stepEvery(GLYPH_PITCH_PX);
+    const has = (sample: Sample) => spec.heading(sample)?.hdg !== undefined;
+    return atTicks(props.samples, ticksAt(step, GLYPH_REACH_PX), spec.heading, {
+      has,
+      withinSec: step / 2,
+    }).map((h) => headingGlyph(x(h.t), props.height / 2, h));
+  });
   const dots = () => {
     const h = props.hover;
     if (!h) return [];
@@ -157,6 +172,15 @@ export function Lane(props: {
                 class={s.barb}
                 d={barbPath(x(b().t), props.height / 2, b().dir, b().speed, BARB_PX)}
               />
+            )}
+          </Index>
+          <Index each={glyphs()}>
+            {(g) => (
+              <>
+                <Show when={g().vector}>{(d) => <path class={s.vector} d={d()} />}</Show>
+                <Show when={g().aircraft}>{(d) => <path class={s.aircraft} d={d()} />}</Show>
+                <Show when={g().arrow}>{(d) => <path class={s.arrow} d={d()} />}</Show>
+              </>
             )}
           </Index>
           <Index each={bars()}>

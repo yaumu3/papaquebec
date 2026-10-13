@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { makeSample as sample } from '../../state/sampleFixture';
-import { atTicks, barbPath, laneRange, laneTraces, pathOf, valueAt } from './plot';
+import { atTicks, barbPath, headingGlyph, laneRange, laneTraces, pathOf, valueAt } from './plot';
 import type { Interval } from './span';
 import { GAP_SEC, type Point } from './trace';
 
@@ -20,24 +20,6 @@ describe('laneTraces', () => {
       ['alt', undefined, false, [[{ t: 1, v: 11000 }]]],
       ['fmsAlt', 'dotted', true, [[{ t: 1, v: 13000 }]]],
       ['selAlt', 'dashed', true, [[{ t: 1, v: 12000 }]]],
-    ]);
-  });
-
-  it('unwraps degrees and aligns the heading and an intent in the lane to them', () => {
-    // Arrange
-    const samples = [
-      sample(1, { track: 350, heading: 355, selHeading: 340 }),
-      sample(2, { track: 5, heading: 8, selHeading: 10 }),
-    ];
-
-    // Act
-    const traces = laneTraces(samples, ['trk', 'selHdg'], ALL);
-
-    // Assert: the heading dotted, the intent dashed
-    expect(traces.map((tr) => [tr.dash, tr.runs.flat().map((p) => p.v)])).toEqual([
-      [undefined, [350, 365]],
-      ['dotted', [355, 368]],
-      ['dashed', [340, 370]],
     ]);
   });
 
@@ -80,15 +62,60 @@ describe('pathOf', () => {
 });
 
 describe('laneTraces', () => {
-  it('draws nothing for a lane of gantt bars or wind barbs', () => {
+  it('draws nothing for a lane of gantt bars, wind barbs or heading glyphs', () => {
     // Arrange
-    const samples = [sample(1, { navModes: ['autopilot'], windDir: 300, windSpeed: 12 })];
+    const samples = [
+      sample(1, { navModes: ['autopilot'], windDir: 300, windSpeed: 12, track: 90, heading: 85 }),
+    ];
 
     // Act
-    const traces = [laneTraces(samples, ['modes'], ALL), laneTraces(samples, ['wind'], ALL)];
+    const traces = [
+      laneTraces(samples, ['modes'], ALL),
+      laneTraces(samples, ['wind'], ALL),
+      laneTraces(samples, ['trk'], ALL),
+    ];
 
     // Assert
-    expect(traces).toEqual([[], []]);
+    expect(traces).toEqual([[], [], []]);
+  });
+});
+
+describe('headingGlyph', () => {
+  it('points the aircraft along the heading and the vector along the track, north up', () => {
+    // Arrange
+    const heading = { trk: 180, hdg: 90 };
+
+    // Act
+    const glyph = headingGlyph(100, 50, heading);
+
+    // Assert: the fuselage runs nose east to tail west, the vector due south
+    expect(glyph.aircraft?.startsWith('M111.0 50.0 L89.0 50.0 ')).toBe(true);
+    expect(glyph.vector).toBe('M100.0 50.0 L100.0 69.0');
+    expect(glyph.arrow).toBeUndefined();
+  });
+
+  it('draws the track alone as an arrow centred on the point when the heading is unknown', () => {
+    // Arrange
+    const heading = { trk: 0, hdg: undefined };
+
+    // Act
+    const glyph = headingGlyph(100, 50, heading);
+
+    // Assert
+    expect(glyph.arrow).toBe('M100.0 63.0 L100.0 42.0 M100.0 37.0 L96.8 42.0 L103.2 42.0 Z');
+    expect([glyph.aircraft, glyph.vector]).toEqual([undefined, undefined]);
+  });
+
+  it('draws the aircraft alone when the track is unknown', () => {
+    // Arrange
+    const heading = { trk: undefined, hdg: 0 };
+
+    // Act
+    const glyph = headingGlyph(100, 50, heading);
+
+    // Assert
+    expect(glyph.aircraft?.startsWith('M100.0 39.0 L100.0 61.0 ')).toBe(true);
+    expect([glyph.vector, glyph.arrow]).toEqual([undefined, undefined]);
   });
 });
 
@@ -143,6 +170,19 @@ describe('atTicks', () => {
 
     // Assert
     expect(barbs).toEqual([{ t: 100, dir: 300, speed: 12 }]);
+  });
+
+  it('reads a sample the preference holds for instead, while one lies within its reach', () => {
+    // Arrange
+    const samples = [sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })];
+    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
+    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
+
+    // Act
+    const reads = [15, 5].map((withinSec) => atTicks(samples, [100], read, { has, withinSec }));
+
+    // Assert: the one with a heading ten seconds off, else the nearest
+    expect(reads).toEqual([[{ t: 100, trk: 92, hdg: 85 }], [{ t: 100, trk: 90, hdg: undefined }]]);
   });
 });
 

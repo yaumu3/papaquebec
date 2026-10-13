@@ -2,10 +2,9 @@ import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Dash, minSpanOf, PLOTS } from './plots';
+import { type Dash, type Heading, minSpanOf, PLOTS } from './plots';
 import type { Interval } from './span';
 import {
-  alignTo,
   barbMarks,
   GAP_SEC,
   type Point,
@@ -13,7 +12,6 @@ import {
   rangeOf,
   type Read,
   runsOf,
-  unwrap,
   widened,
 } from './trace';
 
@@ -33,8 +31,7 @@ export interface LaneTrace {
 /**
  * The traces of a lane, `keys` being its own reading then the intents drawn in it: the own
  * reading first, its stretches along the floor, the second line of a pair with its dash, then each
- * intent with its dash. Degrees are unwrapped and the intents aligned to them. None for a lane
- * of another kind.
+ * intent with its dash. None for a lane of another kind.
  */
 export function laneTraces(
   samples: readonly Sample[],
@@ -46,36 +43,17 @@ export function laneTraces(
   const own = PLOTS[lane];
   if (own.kind !== 'line' && own.kind !== 'pair') return [];
   const read = (y: Read) => runsOf(samples, y, visible);
-  const angular = (own.kind === 'line' || own.kind === 'pair') && own.angular === true;
-  const ownRuns = angular ? unwrap(read(own.y)) : read(own.y);
   const floor = own.kind === 'line' ? own.floor : undefined;
   const floorRuns = floor ? read((s) => (floor(s) ? 0 : undefined)) : [];
   const floored: LaneTrace[] =
     floorRuns.length > 0 ? [{ key: lane, runs: floorRuns, floor: true }] : [];
-  const second =
-    own.kind === 'pair'
-      ? [
-          {
-            key: lane,
-            runs: angular ? alignTo(read(own.y2), ownRuns) : read(own.y2),
-            dash: own.dash,
-          },
-        ]
-      : [];
+  const second = own.kind === 'pair' ? [{ key: lane, runs: read(own.y2), dash: own.dash }] : [];
   const drawn = intents.flatMap((key) => {
     const spec = PLOTS[key];
     if (spec.kind !== 'intent') return [];
-    const runs = read(spec.y);
-    return [
-      {
-        key,
-        runs: angular ? alignTo(runs, ownRuns) : runs,
-        dash: spec.dash,
-        intent: true as const,
-      },
-    ];
+    return [{ key, runs: read(spec.y), dash: spec.dash, intent: true as const }];
   });
-  return [{ key: lane, runs: ownRuns }, ...floored, ...second, ...drawn];
+  return [{ key: lane, runs: read(own.y) }, ...floored, ...second, ...drawn];
 }
 
 /** The one scale of a lane's traces off its floor over the interval, at least its least span; null without any. */
@@ -110,14 +88,27 @@ export function valueAt(runs: readonly Point[][], t: number): number | undefined
   return undefined;
 }
 
-/** One reading per tick, from the sample nearest it, unless that lies a gap away or lacks it. */
+/** Samples to read a tick from rather than the nearest, while one lies within reach of it. */
+export interface Preference {
+  has: (s: Sample) => boolean;
+  withinSec: number;
+}
+
+/**
+ * One reading per tick, from the sample nearest it or the nearest one preferred, unless that lies
+ * a gap away or lacks it.
+ */
 export function atTicks<T extends object>(
   samples: readonly Sample[],
   ticks: readonly number[],
   read: (s: Sample) => T | undefined,
+  prefer?: Preference,
 ): (T & { t: number })[] {
+  const preferred = prefer ? samples.filter(prefer.has) : [];
   return ticks.flatMap((t) => {
-    const s = nearestInTime(samples, t);
+    const near = nearestInTime(preferred, t);
+    const s =
+      prefer && near && Math.abs(near.t - t) <= prefer.withinSec ? near : nearestInTime(samples, t);
     const value = s && Math.abs(s.t - t) <= GAP_SEC ? read(s) : undefined;
     return value ? [{ ...value, t }] : [];
   });
@@ -160,4 +151,64 @@ export function barbPath(x: number, y: number, dirDeg: number, speedKt: number, 
     pos -= MARK_STEP_PX;
   }
   return d.trim();
+}
+
+/** The aircraft, nose to tail, in px. */
+const AIRCRAFT_PX = 22;
+/** How far the track runs out of the aircraft's centre, past its nose. */
+const VECTOR_PX = 19;
+/** Half the length of the track's own arrow, and its head's length and half width. */
+const ARROW_PX = 13;
+const HEAD_PX = 5;
+const HEAD_HALF_PX = 3.2;
+/** How far a glyph reaches round its point at the most: the track out of the aircraft. */
+export const GLYPH_REACH_PX = VECTOR_PX;
+
+/** A point `a` out from (x, y) along `deg` and `c` across it to the right, north up. */
+const offset =
+  (x: number, y: number, deg: number) =>
+  (a: number, c = 0): [number, number] => {
+    const ux = Math.sin(deg * RAD);
+    const uy = -Math.cos(deg * RAD);
+    return [x + ux * a - uy * c, y + uy * a + ux * c];
+  };
+
+/** The same as an SVG pair. */
+const toward = (x: number, y: number, deg: number) => {
+  const at = offset(x, y, deg);
+  return (a: number, c = 0): string => at(a, c).map(fixed).join(' ');
+};
+
+export interface HeadingGlyph {
+  /** The aircraft along its heading, when known. */
+  aircraft?: string;
+  /** The track out of the aircraft's centre. */
+  vector?: string;
+  /** The track as an arrow of its own, without the aircraft. */
+  arrow?: string;
+}
+
+/**
+ * Where the aircraft points and where it goes, at (x, y): the aircraft along the heading with the
+ * track running out of it, so a crab shows as the nose off the track; the track alone as an arrow.
+ */
+export function headingGlyph(x: number, y: number, h: Heading): HeadingGlyph {
+  if (h.hdg !== undefined) return aircraftOf(x, y, h.hdg, h.trk);
+  return h.trk === undefined ? {} : { arrow: arrowOf(x, y, h.trk) };
+}
+
+function arrowOf(x: number, y: number, trk: number): string {
+  const at = toward(x, y, trk);
+  const base = ARROW_PX - HEAD_PX;
+  return `M${at(-ARROW_PX)} L${at(base)} M${at(ARROW_PX)} L${at(base, -HEAD_HALF_PX)} L${at(base, HEAD_HALF_PX)} Z`;
+}
+
+function aircraftOf(x: number, y: number, hdg: number, trk: number | undefined): HeadingGlyph {
+  // In elevenths of its length: the fuselage, the wings a little ahead of the centre, the tailplane.
+  const unit = AIRCRAFT_PX / 11;
+  const at = toward(x, y, hdg);
+  const of = (a: number, c = 0) => at(a * unit, c * unit);
+  const aircraft = `M${of(5.5)} L${of(-5.5)} M${of(1, -5)} L${of(1, 5)} M${of(-4.5, -2.2)} L${of(-4.5, 2.2)}`;
+  if (trk === undefined) return { aircraft };
+  return { aircraft, vector: `M${at(0)} L${toward(x, y, trk)(VECTOR_PX)}` };
 }
