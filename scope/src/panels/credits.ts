@@ -36,9 +36,9 @@ export const CREDITS: readonly Credit[] = [
   },
   {
     subject: 'QNH',
-    source: 'Iowa Environmental Mesonet',
-    terms: 'METARs of NOAA',
-    url: 'https://mesonet.agron.iastate.edu',
+    source: 'NOAA Aviation Weather Center',
+    terms: 'public domain',
+    url: 'https://aviationweather.gov',
   },
   {
     subject: 'TYPEFACE',
