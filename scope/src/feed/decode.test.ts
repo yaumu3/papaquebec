@@ -107,7 +107,7 @@ describe('messageOf', () => {
     const message = messageOf(frame);
 
     // Assert
-    const read = message.kind === 'snapshot' ? message.snapshot.aircraft : [];
+    const read = message?.kind === 'snapshot' ? message.snapshot.aircraft : [];
     expect(read.map((a) => a.verticalRate)).toEqual([-1200, 1856, undefined]);
   });
 
@@ -121,19 +121,19 @@ describe('messageOf', () => {
     const message = messageOf(frame);
 
     // Assert
-    const read = message.kind === 'snapshot' ? message.snapshot.aircraft : [];
+    const read = message?.kind === 'snapshot' ? message.snapshot.aircraft : [];
     expect(read.map((a) => a.alt)).toEqual([undefined]);
   });
 
-  it('refuses a frame that carries nothing', () => {
+  it('reads a frame that carries nothing it knows as nothing', () => {
     // Arrange
     const frame = create(FrameSchema);
 
     // Act
-    const read = () => messageOf(frame);
+    const message = messageOf(frame);
 
     // Assert
-    expect(read).toThrow(/empty/);
+    expect(message).toBeNull();
   });
 
   it('reads a hello as the receiver it greets with', () => {
@@ -177,5 +177,50 @@ describe('messageOf', () => {
 
     // Assert
     expect(message).toStrictEqual({ kind: 'hello', receiver: {}, history: [] });
+  });
+
+  it("reads the weather as the stations' reports, observed in milliseconds", () => {
+    // Arrange
+    const qnh = [
+      {
+        station: 'RJTT',
+        latDeg: 35.553,
+        lonDeg: 139.781,
+        observedS: 1_790_074_800,
+        qnhInHg: 29.94,
+      },
+      {
+        station: 'RJAA',
+        latDeg: 35.765,
+        lonDeg: 140.386,
+        observedS: 1_790_074_800,
+        qnhInHg: 29.92,
+      },
+    ];
+    const frame = create(FrameSchema, { body: { case: 'weather', value: { qnh } } });
+
+    // Act
+    const message = messageOf(frame);
+
+    // Assert
+    expect(message).toEqual({
+      kind: 'weather',
+      reports: [
+        {
+          station: 'RJTT',
+          lat: 35.553,
+          lon: 139.781,
+          observedAt: 1_790_074_800_000,
+          qnhInHg: 29.94,
+        },
+        {
+          station: 'RJAA',
+          lat: 35.765,
+          lon: 140.386,
+          observedAt: 1_790_074_800_000,
+          qnhInHg: 29.92,
+        },
+      ],
+    });
   });
 });

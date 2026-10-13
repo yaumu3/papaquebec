@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import type { AircraftSnapshot, ReceiverPosition } from '../lib/aircraft';
+import type { StationReport } from '../lib/metar';
 import type { FeedMessage } from './decode';
 import { type FeedDown, followFeed, openWebTransport } from './push';
 
@@ -14,6 +15,7 @@ export type FeedEvent =
   /** The history a session brings, in time order, before its first snapshot. */
   | { type: 'backfill'; snapshots: AircraftSnapshot[] }
   | { type: 'snapshot'; snapshot: AircraftSnapshot; receivedAt: number }
+  | { type: 'weather'; reports: StationReport[] }
   | { type: 'down'; reason: FeedDown };
 
 const RETRY_MS = 2000;
@@ -32,6 +34,10 @@ function run(cmd: FeedCommand): void {
       if (message.history.length > 0) post({ type: 'backfill', snapshots: message.history });
       // The history stops short of the latest snapshot, which follows in full.
       lastNow = Math.max(lastNow, message.history.at(-1)?.now ?? 0);
+      return;
+    }
+    if (message.kind === 'weather') {
+      post({ type: 'weather', reports: message.reports });
       return;
     }
     // A new session starts with the latest snapshot, which may be the last one taken.

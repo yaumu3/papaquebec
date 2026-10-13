@@ -8,6 +8,7 @@ use std::io;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
+use bytes::Bytes;
 use serde::Serialize;
 use tokio::sync::{Semaphore, watch};
 use url::Url;
@@ -17,7 +18,7 @@ use wtransport::tls::Sha256DigestFmt;
 use wtransport::{Endpoint, Identity, ServerConfig};
 
 use crate::Failure;
-use crate::feed::Published;
+use crate::feed::{Published, weather as framed_weather};
 
 /// A household's screens with room to spare: every session costs up to an hour
 /// of history, and a client on the network can claim any origin.
@@ -92,17 +93,23 @@ impl Server {
     }
 
     /// Greets every session, up to the limit, once the feed has started, with the history after the
-    /// `since` it asks for, sends it the latest snapshot, then each one published,
-    /// all on one stream so they arrive in order.
-    pub async fn serve(self, feed: watch::Receiver<Option<Published>>) {
+    /// `since` it asks for, sends it the latest snapshot and the weather, or that
+    /// there is none yet, then each
+    /// one published, all on one stream so they arrive in order.
+    pub async fn serve(
+        self,
+        feed: watch::Receiver<Option<Published>>,
+        weather: watch::Receiver<Option<Bytes>>,
+    ) {
         loop {
             let incoming = self.endpoint.accept().await;
             let feed = feed.clone();
+            let weather = weather.clone();
             let permit = Arc::clone(&self.sessions).try_acquire_owned();
             tokio::spawn(async move {
                 let served = match permit {
                     Ok(permit) => {
-                        let served = session(incoming, feed).await;
+                        let served = session(incoming, feed, weather).await;
                         drop(permit);
                         served
                     }
@@ -190,6 +197,7 @@ async fn refuse_busy(incoming: IncomingSession) -> Result<(), Failure> {
 async fn session(
     incoming: IncomingSession,
     mut feed: watch::Receiver<Option<Published>>,
+    mut weather: watch::Receiver<Option<Bytes>>,
 ) -> Result<(), Failure> {
     let request = incoming.await?;
     if !same_host(request.origin(), request.authority()) {
@@ -213,17 +221,26 @@ async fn session(
     };
     stream.write_all(&hello).await?;
     stream.write_all(&latest).await?;
+    // Told even when there is none yet, so that the scope drops what an earlier session told it.
+    let current = weather.borrow_and_update().clone();
+    let current = current.unwrap_or_else(|| framed_weather(Vec::new()));
+    stream.write_all(&current).await?;
+    // The traffic goes on without the weather, should whoever tells it give up.
+    let mut told = true;
     loop {
-        tokio::select! {
-            changed = feed.changed() => changed?,
+        let frame = tokio::select! {
+            changed = feed.changed() => {
+                changed?;
+                feed.borrow_and_update().as_ref().map(|p| p.latest().clone())
+            }
+            changed = weather.changed(), if told => {
+                told = changed.is_ok();
+                weather.borrow_and_update().clone().filter(|_| told)
+            }
             _ = connection.closed() => return Ok(()),
-        }
-        let latest = feed
-            .borrow_and_update()
-            .as_ref()
-            .map(|p| p.latest().clone());
-        if let Some(latest) = latest {
-            stream.write_all(&latest).await?;
+        };
+        if let Some(frame) = frame {
+            stream.write_all(&frame).await?;
         }
     }
 }
@@ -241,8 +258,9 @@ mod tests {
     use wtransport::{ClientConfig, Connection, Endpoint, RecvStream};
 
     use super::{MAX_SESSIONS, Server, renewing, same_host, since};
-    use crate::feed::Published;
-    use tracker::proto::{Frame, Hello, Receiver, Snapshot, frame::Body};
+    use crate::feed::{Published, weather};
+    use bytes::Bytes;
+    use tracker::proto::{Frame, Hello, Qnh, Receiver, Snapshot, Weather, frame::Body};
 
     const RECEIVER: Receiver = Receiver {
         lat_deg: Some(33.5844),
@@ -286,9 +304,29 @@ mod tests {
         })
     }
 
-    /// A server bound to a free port.
+    /// One station's report, at the altimeter setting.
+    fn qnh(in_hg: f64) -> Vec<Qnh> {
+        vec![Qnh {
+            station: "RJFF".to_owned(),
+            lat_deg: 33.5844,
+            lon_deg: 130.4517,
+            observed_s: 10.0,
+            qnh_in_hg: in_hg,
+        }]
+    }
+
+    fn weather_of(in_hg: f64) -> Body {
+        Body::Weather(Weather { qnh: qnh(in_hg) })
+    }
+
+    fn no_weather() -> Body {
+        Body::Weather(Weather::default())
+    }
+
+    /// A server bound to a free port, and the weather it is told.
     struct Started {
         server: Server,
+        weather: watch::Sender<Option<Bytes>>,
     }
 
     fn started(feed: &Feed) -> Started {
@@ -297,8 +335,9 @@ mod tests {
 
     fn started_with(feed: &Feed, sessions: usize) -> Started {
         let server = Server::bind_for(0, sessions).expect("binds");
-        tokio::spawn(server.clone().serve(feed.subscribe()));
-        Started { server }
+        let (weather, told) = watch::channel(None);
+        tokio::spawn(server.clone().serve(feed.subscribe(), told));
+        Started { server, weather }
     }
 
     impl Started {
@@ -434,10 +473,14 @@ mod tests {
         let started = started(&feed);
         let connection = started.connect(&started.hash()).await.expect("connects");
         let mut stream = stream_of(&connection).await.expect("opens");
-        let caught_up = [next(&mut stream).await, next(&mut stream).await];
+        let caught_up = [
+            next(&mut stream).await,
+            next(&mut stream).await,
+            next(&mut stream).await,
+        ];
         assert_eq!(
             caught_up,
-            [Some(hello()), Some(snapshot(10.0))],
+            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())],
             "precondition"
         );
         feed.send_replace(Some(at(11.0)));
@@ -447,6 +490,131 @@ mod tests {
 
         // Assert
         assert_eq!(frame, Some(snapshot(11.0)));
+    }
+
+    #[tokio::test]
+    async fn newcomer_is_given_the_weather_after_the_latest_snapshot() {
+        // Arrange
+        let (feed, _) = watch::channel(Some(at(10.0)));
+        let started = started(&feed);
+        started.weather.send_replace(Some(weather(qnh(29.92))));
+        let connection = started.connect(&started.hash()).await.expect("connects");
+        let mut stream = stream_of(&connection).await.expect("opens");
+
+        // Act
+        let frames = [
+            next(&mut stream).await,
+            next(&mut stream).await,
+            next(&mut stream).await,
+        ];
+
+        // Assert
+        assert_eq!(
+            frames,
+            [Some(hello()), Some(snapshot(10.0)), Some(weather_of(29.92))]
+        );
+    }
+
+    #[tokio::test]
+    async fn weather_follows_as_it_changes() {
+        // Arrange
+        let (feed, _) = watch::channel(Some(at(10.0)));
+        let started = started(&feed);
+        started.weather.send_replace(Some(weather(qnh(29.92))));
+        let connection = started.connect(&started.hash()).await.expect("connects");
+        let mut stream = stream_of(&connection).await.expect("opens");
+        let caught_up = [
+            next(&mut stream).await,
+            next(&mut stream).await,
+            next(&mut stream).await,
+        ];
+        assert_eq!(
+            caught_up,
+            [Some(hello()), Some(snapshot(10.0)), Some(weather_of(29.92))],
+            "precondition"
+        );
+        started.weather.send_replace(Some(weather(qnh(29.95))));
+
+        // Act
+        let frame = next(&mut stream).await;
+
+        // Assert
+        assert_eq!(frame, Some(weather_of(29.95)));
+    }
+
+    #[tokio::test]
+    async fn snapshots_keep_coming_once_the_weather_ends() {
+        // Arrange
+        let (feed, _) = watch::channel(Some(at(10.0)));
+        let started = started(&feed);
+        let connection = started.connect(&started.hash()).await.expect("connects");
+        let mut stream = stream_of(&connection).await.expect("opens");
+        let caught_up = [
+            next(&mut stream).await,
+            next(&mut stream).await,
+            next(&mut stream).await,
+        ];
+        assert_eq!(
+            caught_up,
+            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())],
+            "precondition"
+        );
+        drop(started.weather);
+        feed.send_replace(Some(at(11.0)));
+
+        // Act
+        let frame = next(&mut stream).await;
+
+        // Assert
+        assert_eq!(frame, Some(snapshot(11.0)));
+    }
+
+    #[tokio::test]
+    async fn newcomer_before_any_weather_is_told_there_is_none() {
+        // Arrange
+        let (feed, _) = watch::channel(Some(at(10.0)));
+        let started = started(&feed);
+        let connection = started.connect(&started.hash()).await.expect("connects");
+        let mut stream = stream_of(&connection).await.expect("opens");
+
+        // Act
+        let frames = [
+            next(&mut stream).await,
+            next(&mut stream).await,
+            next(&mut stream).await,
+        ];
+
+        // Assert
+        assert_eq!(
+            frames,
+            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())]
+        );
+    }
+
+    #[tokio::test]
+    async fn newcomer_before_any_weather_gets_it_once_it_is_told() {
+        // Arrange
+        let (feed, _) = watch::channel(Some(at(10.0)));
+        let started = started(&feed);
+        let connection = started.connect(&started.hash()).await.expect("connects");
+        let mut stream = stream_of(&connection).await.expect("opens");
+        let caught_up = [
+            next(&mut stream).await,
+            next(&mut stream).await,
+            next(&mut stream).await,
+        ];
+        assert_eq!(
+            caught_up,
+            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())],
+            "precondition"
+        );
+        started.weather.send_replace(Some(weather(qnh(29.92))));
+
+        // Act
+        let frame = next(&mut stream).await;
+
+        // Assert
+        assert_eq!(frame, Some(weather_of(29.92)));
     }
 
     #[tokio::test]

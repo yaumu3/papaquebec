@@ -1,0 +1,18 @@
+[package]
+name = "metar"
+description = "METARs as the Aviation Weather Center publishes them: which stations issue them, and the QNH each reports"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+flate2 = "1.1.10"
+geodesy = { path = "../geodesy" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.151"
+time = "0.3.55"

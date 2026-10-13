@@ -2,6 +2,7 @@
 //! the server uses.
 
 pub mod aircraft;
+pub mod metar_stations;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -9,7 +10,7 @@ use std::time::Duration;
 
 use tokio::sync::watch;
 
-use crate::Failure;
+use crate::{Failure, client};
 
 const RETRY_AFTER: Duration = Duration::from_hours(1);
 const DOWNLOAD_WITHIN: Duration = Duration::from_mins(5);
@@ -34,19 +35,21 @@ pub trait Publication: Sized + Send + Sync + 'static {
 
 /// Keeps the publication as it is published at `url`, for as long as anyone
 /// reads it: starts from the copy kept in the file, and downloads the
-/// publication whenever that copy is too old, missing or unreadable.
+/// publication whenever that copy is too old, missing or unreadable. With
+/// nowhere to keep a copy, downloads it at start and again whenever a copy
+/// would have been due for renewal.
 pub async fn keep_current<P: Publication>(
     url: String,
-    kept: PathBuf,
+    kept: Option<PathBuf>,
     sender: watch::Sender<Arc<P>>,
 ) {
     tokio::select! {
-        () = refresh(&url, &kept, &sender) => {}
+        () = refresh(&url, kept.as_deref(), &sender) => {}
         () = sender.closed() => {}
     }
 }
 
-async fn refresh<P: Publication>(url: &str, kept: &Path, sender: &watch::Sender<Arc<P>>) {
+async fn refresh<P: Publication>(url: &str, kept: Option<&Path>, sender: &watch::Sender<Arc<P>>) {
     let publish = |read: Result<P, Failure>| match read {
         Ok(read) => {
             eprintln!("{}: {}", P::NAME, read.tally());
@@ -56,7 +59,7 @@ async fn refresh<P: Publication>(url: &str, kept: &Path, sender: &watch::Sender<
     };
     // A copy that does not read as the publication is no better than none.
     let mut usable = false;
-    if let Ok(published) = std::fs::read(kept) {
+    if let Some(published) = kept.and_then(|kept| std::fs::read(kept).ok()) {
         let copy = read::<P>(published).await.map(|(read, _)| read);
         usable = copy.is_ok();
         publish(copy);
@@ -64,7 +67,7 @@ async fn refresh<P: Publication>(url: &str, kept: &Path, sender: &watch::Sender<
     let client = client();
     loop {
         // What is left before the kept copy is due for renewal, when it is that recent.
-        let age = age(kept).filter(|_| usable);
+        let age = kept.and_then(age).filter(|_| usable);
         let left = age.and_then(|age| P::RENEW_AT.checked_sub(age));
         let wait = if let Some(left) = left.filter(|left| !left.is_zero()) {
             left
@@ -79,13 +82,6 @@ async fn refresh<P: Publication>(url: &str, kept: &Path, sender: &watch::Sender<
     }
 }
 
-/// A client that speaks https by the system's certificates.
-fn client() -> reqwest::Client {
-    // Refused only when the process has a provider already, which serves as well.
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    reqwest::Client::new()
-}
-
 /// How long ago the copy was written; none when there is none, or when it is
 /// dated later than now, as a clock set back since leaves it.
 fn age(kept: &Path) -> Option<Duration> {
@@ -93,20 +89,23 @@ fn age(kept: &Path) -> Option<Duration> {
     written.elapsed().ok()
 }
 
-/// The publication as published, kept in the file once it reads as one.
+/// The publication as published, kept in the file, when there is one, once it
+/// reads as one.
 async fn download<P: Publication>(
     client: &reqwest::Client,
     url: &str,
-    kept: &Path,
+    kept: Option<&Path>,
 ) -> Result<P, Failure> {
     let answer = client.get(url).timeout(DOWNLOAD_WITHIN).send().await?;
     let published = answer.error_for_status()?.bytes().await?;
     let (read, published) = read::<P>(published.into()).await?;
-    // Written aside first, so that a copy is never kept in part.
-    let aside = kept.with_extension("part");
-    std::fs::create_dir_all(kept.parent().ok_or("the copy has no directory")?)?;
-    std::fs::write(&aside, published)?;
-    std::fs::rename(aside, kept)?;
+    if let Some(kept) = kept {
+        // Written aside first, so that a copy is never kept in part.
+        let aside = kept.with_extension("part");
+        std::fs::create_dir_all(kept.parent().ok_or("the copy has no directory")?)?;
+        std::fs::write(&aside, published)?;
+        std::fs::rename(aside, kept)?;
+    }
     Ok(read)
 }
 
@@ -122,16 +121,14 @@ async fn read<P: Publication>(published: Vec<u8>) -> Result<(P, Vec<u8>), Failur
 mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, SystemTime};
 
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
     use tokio::sync::watch;
     use tokio::time::timeout;
 
     use super::{Publication, keep_current};
     use crate::Failure;
+    use crate::testing::{Asked, answering as answering_at};
 
     const DAY: Duration = Duration::from_hours(24);
 
@@ -161,26 +158,9 @@ mod tests {
     const FIRST: &[u8] = b"notice: first";
     const NEWER: &[u8] = b"notice: newer";
 
-    /// A web server that answers every request with the status and the body,
-    /// and counts the requests: its URL and the count.
-    async fn answering(status: &'static str, body: &'static [u8]) -> (String, Arc<AtomicUsize>) {
-        let listener = TcpListener::bind("127.0.0.1:0").await.expect("binds");
-        let url = format!("http://{}/notice", listener.local_addr().expect("bound"));
-        let asked = Arc::new(AtomicUsize::new(0));
-        let count = Arc::clone(&asked);
-        tokio::spawn(async move {
-            while let Ok((mut stream, _)) = listener.accept().await {
-                count.fetch_add(1, Ordering::SeqCst);
-                let mut request = [0; 1024];
-                let _ = stream.read(&mut request).await;
-                let head = format!(
-                    "HTTP/1.1 {status}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
-                    body.len()
-                );
-                let _ = stream.write_all(&[head.as_bytes(), body].concat()).await;
-            }
-        });
-        (url, asked)
+    /// A web server publishing the body at `/notice`, and what it is asked.
+    async fn answering(status: &'static str, body: &'static [u8]) -> (String, Asked) {
+        answering_at("/notice", status, body).await
     }
 
     /// A file for the copy in a directory that does not exist yet, holding
@@ -201,7 +181,7 @@ mod tests {
     }
 
     /// The notices published within a moment of starting to keep one current.
-    async fn published(url: String, kept: PathBuf) -> Vec<String> {
+    async fn published(url: String, kept: Option<PathBuf>) -> Vec<String> {
         let (sender, mut notice) = watch::channel(Arc::new(Notice::default()));
         tokio::spawn(keep_current(url, kept, sender));
         let mut published = Vec::new();
@@ -218,11 +198,11 @@ mod tests {
         let (_directory, path) = kept(Some((FIRST, ago(6 * DAY))));
 
         // Act
-        let published = published(url, path).await;
+        let published = published(url, Some(path)).await;
 
         // Assert
         assert_eq!(published, ["first"]);
-        assert_eq!(asked.load(Ordering::SeqCst), 0);
+        assert_eq!(asked.count(), 0);
     }
 
     #[tokio::test]
@@ -232,11 +212,24 @@ mod tests {
         let (_directory, path) = kept(None);
 
         // Act
-        let published = published(url, path.clone()).await;
+        let published = published(url, Some(path.clone())).await;
 
         // Assert
         assert_eq!(published, ["first"]);
         assert_eq!(std::fs::read(path).ok().as_deref(), Some(FIRST));
+    }
+
+    #[tokio::test]
+    async fn publication_is_downloaded_and_not_kept_when_there_is_nowhere_to_keep_it() {
+        // Arrange
+        let (url, asked) = answering("200 OK", FIRST).await;
+
+        // Act
+        let published = published(url, None).await;
+
+        // Assert
+        assert_eq!(published, ["first"]);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
@@ -246,12 +239,12 @@ mod tests {
         let (_directory, path) = kept(Some((FIRST, ago(8 * DAY))));
 
         // Act
-        let published = published(url, path.clone()).await;
+        let published = published(url, Some(path.clone())).await;
 
         // Assert
         assert_eq!(published, ["first", "newer"]);
         assert_eq!(std::fs::read(path).ok().as_deref(), Some(NEWER));
-        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
@@ -261,12 +254,12 @@ mod tests {
         let (_directory, path) = kept(Some((FIRST, SystemTime::now() + DAY)));
 
         // Act
-        let published = published(url, path.clone()).await;
+        let published = published(url, Some(path.clone())).await;
 
         // Assert
         assert_eq!(published, ["first", "newer"]);
         assert_eq!(std::fs::read(path).ok().as_deref(), Some(NEWER));
-        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
@@ -276,12 +269,12 @@ mod tests {
         let (_directory, path) = kept(Some((b"not a notice", ago(DAY))));
 
         // Act
-        let published = published(url, path.clone()).await;
+        let published = published(url, Some(path.clone())).await;
 
         // Assert
         assert_eq!(published, ["first"]);
         assert_eq!(std::fs::read(path).ok().as_deref(), Some(FIRST));
-        assert_eq!(asked.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.count(), 1);
     }
 
     #[tokio::test]
@@ -296,7 +289,7 @@ mod tests {
 
         // Act
         for ((url, _), (_, path)) in servers.iter().zip(&copies) {
-            published_by_each.push(published(url.clone(), path.clone()).await);
+            published_by_each.push(published(url.clone(), Some(path.clone())).await);
         }
 
         // Assert
@@ -313,10 +306,14 @@ mod tests {
         let (url, _) = answering("200 OK", FIRST).await;
         let (_directory, path) = kept(None);
         let (sender, notice) = watch::channel(Arc::new(Notice::default()));
+        drop(notice);
 
         // Act
-        drop(notice);
-        let ended = timeout(Duration::from_secs(5), keep_current(url, path, sender)).await;
+        let ended = timeout(
+            Duration::from_secs(5),
+            keep_current(url, Some(path), sender),
+        )
+        .await;
 
         // Assert
         assert_eq!(ended, Ok(()));

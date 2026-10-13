@@ -3,7 +3,7 @@ import { createMemo, Show } from 'solid-js';
 import { cx } from '../design/cx';
 import { clockTime } from '../lib/format';
 import { feedNotice, type Tone } from '../state/feedLine';
-import { qnhError, qnhReport, qnhStation } from '../state/qnh';
+import { qnhReport, qnhStation } from '../state/qnh';
 import { qnhStatus } from '../state/qnhStatus';
 import {
   aboutVisible,
@@ -51,8 +51,6 @@ export function TopBar() {
       auto: settings.qnh.auto,
       station: qnhStation(),
       report: qnhReport(),
-      error: qnhError(),
-      now: tick(),
     }),
   );
   const notice = createMemo(() => feedNotice(feedStatus(), tick()));

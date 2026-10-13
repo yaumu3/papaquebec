@@ -10,12 +10,6 @@ export default defineConfig({
   server: {
     proxy: {
       '/feed': { target: WEB, changeOrigin: true },
-      // An Aviation Weather Center proxy for trying the ?wx=/wx path locally.
-      '/wx/metar': {
-        target: 'https://aviationweather.gov',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/wx\/metar/, '/api/data/metar'),
-      },
     },
   },
   worker: { format: 'es' },

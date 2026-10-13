@@ -6,7 +6,7 @@ use std::sync::Arc;
 use bytes::Bytes;
 use prost::Message;
 
-use tracker::proto::{Frame, Hello, Receiver, Snapshot};
+use tracker::proto::{Frame, Hello, Qnh, Receiver, Snapshot, Weather};
 
 /// How far apart the snapshots of the history are kept.
 const CADENCE_S: f64 = 8.0;
@@ -90,6 +90,12 @@ impl Published {
     }
 }
 
+/// The stations' current reports as a frame after its length, for every session.
+#[must_use]
+pub fn weather(qnh: Vec<Qnh>) -> Bytes {
+    framed(Weather { qnh })
+}
+
 /// The frame after its length, as a session's stream carries it.
 fn framed(frame: impl Into<Frame>) -> Bytes {
     frame.into().encode_length_delimited_to_vec().into()
@@ -101,10 +107,10 @@ mod tests {
 
     use prost::Message;
 
-    use super::{History, Published};
+    use super::{History, Published, weather};
     use tracker::proto::{
-        Address, AirGroundState, Aircraft, Frame, Hello, Receiver, Reception, Registry, Snapshot,
-        Source, TargetState, frame::Body,
+        Address, AirGroundState, Aircraft, Frame, Hello, Qnh, Receiver, Reception, Registry,
+        Snapshot, Source, TargetState, Weather, frame::Body,
     };
 
     const RECEIVER: Receiver = Receiver {
@@ -247,5 +253,23 @@ mod tests {
 
         // Assert
         assert_eq!(history.shared()[0].aircraft, [positioned, positionless]);
+    }
+
+    #[test]
+    fn weather_frame_carries_the_stations_reports() {
+        // Arrange
+        let qnh = vec![Qnh {
+            station: "RJTT".to_owned(),
+            lat_deg: 35.553,
+            lon_deg: 139.781,
+            observed_s: 1_790_074_800.0,
+            qnh_in_hg: 29.94,
+        }];
+
+        // Act
+        let frame = weather(qnh.clone());
+
+        // Assert
+        assert_eq!(body(frame), Some(Body::Weather(Weather { qnh })));
     }
 }

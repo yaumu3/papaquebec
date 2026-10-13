@@ -35,6 +35,14 @@ impl From<Hello> for Frame {
     }
 }
 
+impl From<Weather> for Frame {
+    fn from(weather: Weather) -> Self {
+        Self {
+            body: Some(frame::Body::Weather(weather)),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use prost::Message;

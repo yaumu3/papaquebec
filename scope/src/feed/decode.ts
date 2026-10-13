@@ -1,10 +1,12 @@
 import type { ResolutionAdvisory } from '../lib/acas';
 import type { AircraftReport, AircraftSnapshot, ReceiverPosition } from '../lib/aircraft';
+import type { StationReport } from '../lib/metar';
 import {
   AddressType,
   type Aircraft,
   AirGroundState,
   type Frame,
+  type Qnh,
   type Snapshot,
   Source,
   type TargetState_Modes,
@@ -131,13 +133,26 @@ function withoutUnknown<T extends object>(record: Loose<T>): T {
 /** A frame of the feed as the scope reads it. */
 export type FeedMessage =
   | { kind: 'hello'; receiver: ReceiverPosition; history: AircraftSnapshot[] }
-  | { kind: 'snapshot'; snapshot: AircraftSnapshot };
+  | { kind: 'snapshot'; snapshot: AircraftSnapshot }
+  /** The current reports of the stations around the receiver, all of them, every time. */
+  | { kind: 'weather'; reports: StationReport[] };
 
 function toSnapshot({ nowS, messages, aircraft }: Snapshot): AircraftSnapshot {
   return { now: nowS, messages: Number(messages), aircraft: aircraft.map(toReport) };
 }
 
-export function messageOf({ body }: Frame): FeedMessage {
+function toStationReport(q: Qnh): StationReport {
+  return {
+    station: q.station,
+    lat: q.latDeg,
+    lon: q.lonDeg,
+    observedAt: q.observedS * 1000,
+    qnhInHg: q.qnhInHg,
+  };
+}
+
+/** The frame as the scope reads it; null for one it does not know, as a later feeder may send. */
+export function messageOf({ body }: Frame): FeedMessage | null {
   switch (body.case) {
     case 'hello': {
       const { receiver, history } = body.value;
@@ -149,7 +164,9 @@ export function messageOf({ body }: Frame): FeedMessage {
     }
     case 'snapshot':
       return { kind: 'snapshot', snapshot: toSnapshot(body.value) };
+    case 'weather':
+      return { kind: 'weather', reports: body.value.qnh.map(toStationReport) };
     default:
-      throw new Error('feed: empty frame');
+      return null;
   }
 }
