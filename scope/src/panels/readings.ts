@@ -1,4 +1,5 @@
 import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
+import { steeringHeading } from '../lib/autopilot';
 import {
   climbArrow,
   formatAge,
@@ -104,7 +105,7 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   fmsAlt: { label: 'FMS ALT', format: (r) => selectedReading(r.fmsAlt) },
   vs: { label: 'VS', format: (r) => signed(r.verticalRate, 'fpm') },
   trk: { label: 'TRK / HDG', format: trackReading },
-  selHdg: { label: 'SEL HDG', format: (r) => bearing(r.selHeading) },
+  selHdg: { label: 'SEL HDG', format: (r) => bearing(steeringHeading(r)) },
   gs: { label: 'GS', format: (r) => num(r.gs, 'kt') },
   qnh: { label: 'QNH', format: (r) => num(inHg(r.navQnh), 'inHg', 2) },
   modes: { label: 'MODES', format: (r) => plain(formatModes(r.navModes)) },
