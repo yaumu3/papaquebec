@@ -57,30 +57,21 @@ pub async fn poll<F, Fut>(
     let mut reports = Reports::default();
     let mut reporting = 0;
     let mut asked = in_range(&mut stations, site);
+    // Whether the stations in range differ from those the weather was last told for.
+    let mut moved = false;
     loop {
-        if !asked.is_empty() {
-            let now_s = clock();
-            let changed = match fetch(asked.keys().cloned().collect()).await {
-                Ok(raw) => {
-                    let heard = raw.lines().filter_map(|line| qnh::parse(line, now_s));
-                    reports.record(heard, now_s)
-                }
-                Err(failure) => {
-                    eprintln!("weather: {failure}");
-                    reports.expire(now_s)
-                }
-            };
-            if changed || weather.borrow().is_none() {
-                let current = current(&reports, &asked);
-                if current.len() != reporting {
-                    reporting = current.len();
-                    eprintln!(
-                        "weather: {reporting} of {} stations within {RANGE_NM} NM report",
-                        asked.len()
-                    );
-                }
-                weather.send_replace(Some(feeder::feed::weather(current)));
+        let changed = !asked.is_empty() && ask(&fetch, &asked, &mut reports, clock()).await;
+        if changed || moved || (!asked.is_empty() && weather.borrow().is_none()) {
+            let current = current(&reports, &asked);
+            if current.len() != reporting {
+                reporting = current.len();
+                eprintln!(
+                    "weather: {reporting} of {} stations within {RANGE_NM} NM report",
+                    asked.len()
+                );
             }
+            weather.send_replace(Some(feeder::feed::weather(current)));
+            moved = false;
         }
         // Until the next poll, or until a list names other stations in range.
         let next_poll = tokio::time::sleep(POLL_EVERY);
@@ -95,11 +86,37 @@ pub async fn poll<F, Fut>(
                     let listed = in_range(&mut stations, site);
                     if listed != asked {
                         asked = listed;
+                        moved = true;
                         break;
                     }
                 }
                 () = weather.closed() => return,
             }
+        }
+    }
+}
+
+/// Asks for the stations' METARs and records what they report at `now_s`,
+/// forgetting what has gone stale even when the asking fails; whether the
+/// reports changed.
+async fn ask<F, Fut>(
+    fetch: &F,
+    stations: &BTreeMap<String, Station>,
+    reports: &mut Reports,
+    now_s: f64,
+) -> bool
+where
+    F: Fn(Vec<String>) -> Fut,
+    Fut: Future<Output = Result<String, Failure>>,
+{
+    match fetch(stations.keys().cloned().collect()).await {
+        Ok(raw) => {
+            let heard = raw.lines().filter_map(|line| qnh::parse(line, now_s));
+            reports.record(heard, now_s)
+        }
+        Err(failure) => {
+            eprintln!("weather: {failure}");
+            reports.expire(now_s)
         }
     }
 }
@@ -393,6 +410,44 @@ mod tests {
                 qnh("RJTT", 35.553, 139.781, NOW_S, 29.91),
             ]))
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn stations_leaving_range_are_no_longer_told_even_when_the_poll_fails() {
+        // Arrange
+        let center = Center::answering(&[Ok(METARS), Err("HTTP 503")]);
+        let polled = polling(&center, listed());
+        settled().await;
+        let haneda_only = [station("RJTT", 35.553, 139.781)];
+        polled
+            .stations
+            .send_replace(Arc::new(haneda_only.into_iter().collect()));
+
+        // Act
+        settled().await;
+
+        // Assert
+        assert_eq!(
+            *polled.weather.borrow(),
+            Some(framed(vec![qnh(
+                "RJTT", 35.553, 139.781, OBSERVED_S, 29.91
+            )]))
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn list_without_stations_in_range_tells_that_none_reports() {
+        // Arrange
+        let center = Center::answering(&[Ok(METARS)]);
+        let polled = polling(&center, listed());
+        settled().await;
+        polled.stations.send_replace(Arc::new(Stations::default()));
+
+        // Act
+        settled().await;
+
+        // Assert
+        assert_eq!(*polled.weather.borrow(), Some(framed(vec![])));
     }
 
     #[tokio::test(start_paused = true)]
