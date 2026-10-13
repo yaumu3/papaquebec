@@ -5,7 +5,7 @@ import { clamp } from '../../lib/math';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { dashClass } from './Lane';
-import { fixed, laneTraces, pathOf } from './plot';
+import { fixed, laneRange, laneTraces, pathOf } from './plot';
 import {
   dragBase,
   dragInterval,
@@ -19,7 +19,7 @@ import {
   WHOLE,
   xOf,
 } from './span';
-import { rangeOf, yOf } from './trace';
+import { yOf } from './trace';
 
 import s from './History.module.css';
 
@@ -58,18 +58,17 @@ export function Timeline(props: {
     timeAt(e.clientX - (el?.getBoundingClientRect().left ?? 0), props.contact, props.width);
   const secPerPx = () => (props.contact.to - props.contact.from) / Math.max(1, props.width);
 
-  /** Each line of the contact on its own scale. */
+  /** The lines of the contact, each lane's on its own scale as in the bay. */
   const paths = createMemo(() =>
-    props.lanes
-      .flatMap((keys) => laneTraces(props.samples, keys, props.contact))
-      .map((tr) => {
-        const r = tr.floor ? null : rangeOf([tr.runs], props.contact);
-        const y = (v: number) => {
-          if (tr.floor) return HEIGHT_PX - PAD_PX;
-          return r ? yOf(v, r, HEIGHT_PX, PAD_PX, PAD_PX) : HEIGHT_PX / 2;
-        };
-        return { d: pathOf(tr.runs, x, y), dash: tr.dash };
-      }),
+    props.lanes.flatMap((keys) => {
+      const traces = laneTraces(props.samples, keys, props.contact);
+      const r = keys[0] === undefined ? null : laneRange(traces, keys[0], props.contact);
+      const y = (v: number) => (r ? yOf(v, r, HEIGHT_PX, PAD_PX, PAD_PX) : HEIGHT_PX / 2);
+      return traces.map((tr) => ({
+        d: pathOf(tr.runs, x, tr.floor ? () => HEIGHT_PX - PAD_PX : y),
+        dash: tr.dash,
+      }));
+    }),
   );
 
   const [selection, setSelection] = createSignal<Interval | null>(null);
