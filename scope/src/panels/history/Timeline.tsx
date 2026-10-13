@@ -67,6 +67,7 @@ export function Timeline(props: {
       return traces.map((tr) => ({
         d: pathOf(tr.runs, x, tr.floor ? () => HEIGHT_PX - PAD_PX : y),
         dash: tr.dash,
+        intent: tr.intent,
       }));
     }),
   );
@@ -149,7 +150,7 @@ export function Timeline(props: {
         height={HEIGHT_PX - 1}
       />
       <Index each={paths()}>
-        {(p) => <path class={cx(s.mini, dashClass(p().dash))} d={p().d} />}
+        {(p) => <path class={cx(s.mini, dashClass(p().dash), p().intent && s.intent)} d={p().d} />}
       </Index>
       <path
         class={s.dim}

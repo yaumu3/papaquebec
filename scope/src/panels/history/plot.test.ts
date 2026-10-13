@@ -8,7 +8,7 @@ import { GAP_SEC, type Point } from './trace';
 const ALL: Interval = { from: 0, to: 10_000 };
 
 describe('laneTraces', () => {
-  it('draws the lane its own reading first, then each intent plotted in it with its dash', () => {
+  it('draws the lane its own reading first, then each intent plotted in it with its dash, marked as one', () => {
     // Arrange
     const samples = [sample(1, { alt: 11000, selAlt: 12000, fmsAlt: 13000 })];
 
@@ -16,10 +16,10 @@ describe('laneTraces', () => {
     const traces = laneTraces(samples, ['alt', 'fmsAlt', 'selAlt'], ALL);
 
     // Assert
-    expect(traces.map((tr) => [tr.key, tr.dash, tr.runs])).toEqual([
-      ['alt', undefined, [[{ t: 1, v: 11000 }]]],
-      ['fmsAlt', 'dotted', [[{ t: 1, v: 13000 }]]],
-      ['selAlt', 'dashed', [[{ t: 1, v: 12000 }]]],
+    expect(traces.map((tr) => [tr.key, tr.dash, tr.intent ?? false, tr.runs])).toEqual([
+      ['alt', undefined, false, [[{ t: 1, v: 11000 }]]],
+      ['fmsAlt', 'dotted', true, [[{ t: 1, v: 13000 }]]],
+      ['selAlt', 'dashed', true, [[{ t: 1, v: 12000 }]]],
     ]);
   });
 

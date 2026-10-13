@@ -30,6 +30,7 @@
   /* Hairlines inside a plot, and the shade of a stretch with no report. */
   --plot-grid: #2c2c2a;
   --plot-gap: #262624;
+  --plot-intent: #e864e8;
 
   /* Type */
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;

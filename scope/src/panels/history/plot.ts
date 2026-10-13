@@ -26,6 +26,8 @@ export interface LaneTrace {
   dash?: Dash | undefined;
   /** Drawn along the lane's floor, off its scale: the values of its points mean nothing. */
   floor?: true;
+  /** What the aircraft is set to do, not what it does. */
+  intent?: true;
 }
 
 /**
@@ -64,7 +66,14 @@ export function laneTraces(
     const spec = PLOTS[key];
     if (spec.kind !== 'intent') return [];
     const runs = read(spec.y);
-    return [{ key, runs: angular ? alignTo(runs, ownRuns) : runs, dash: spec.dash }];
+    return [
+      {
+        key,
+        runs: angular ? alignTo(runs, ownRuns) : runs,
+        dash: spec.dash,
+        intent: true as const,
+      },
+    ];
   });
   return [{ key: lane, runs: ownRuns }, ...floored, ...second, ...drawn];
 }

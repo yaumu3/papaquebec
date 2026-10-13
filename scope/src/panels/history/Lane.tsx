@@ -141,7 +141,7 @@ export function Lane(props: {
           <Index each={traces()}>
             {(tr) => (
               <path
-                class={cx(s.trace, dashClass(tr().dash))}
+                class={cx(s.trace, dashClass(tr().dash), tr().intent && s.intent)}
                 d={pathOf(tr().runs, x, yFor(tr()))}
               />
             )}

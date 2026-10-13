@@ -92,7 +92,7 @@
   fill: none;
   stroke: var(--plot-grid);
 }
-/* Traces are the text color; the only hue is the cursor. */
+/* Traces are the text color; the only hues are the cursor and the intents. */
 .trace {
   fill: none;
   stroke: var(--text);
@@ -215,6 +215,10 @@
   fill: none;
   stroke: var(--text-dim);
   stroke-width: 1;
+}
+/* What the aircraft is set to do, in the lanes and the minimap alike. */
+.intent {
+  stroke: var(--plot-intent);
 }
 .dim {
   fill: var(--panel-bg);
