@@ -2,7 +2,7 @@ import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Dash, minSpanOf, PLOTS, type Wind } from './plots';
+import { type Dash, minSpanOf, PLOTS } from './plots';
 import type { Interval } from './span';
 import {
   alignTo,
@@ -101,20 +101,16 @@ export function valueAt(runs: readonly Point[][], t: number): number | undefined
   return undefined;
 }
 
-export interface Barb extends Wind {
-  t: number;
-}
-
-/** One wind per tick, read from the sample nearest it, unless that lies a gap away. */
-export function barbsAt(
+/** One reading per tick, from the sample nearest it, unless that lies a gap away or lacks it. */
+export function atTicks<T extends object>(
   samples: readonly Sample[],
   ticks: readonly number[],
-  barb: (s: Sample) => Wind | undefined,
-): Barb[] {
+  read: (s: Sample) => T | undefined,
+): (T & { t: number })[] {
   return ticks.flatMap((t) => {
     const s = nearestInTime(samples, t);
-    const wind = s && Math.abs(s.t - t) <= GAP_SEC ? barb(s) : undefined;
-    return wind ? [{ t, ...wind }] : [];
+    const value = s && Math.abs(s.t - t) <= GAP_SEC ? read(s) : undefined;
+    return value ? [{ ...value, t }] : [];
   });
 }
 

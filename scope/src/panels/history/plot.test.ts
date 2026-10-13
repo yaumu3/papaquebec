@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { makeSample as sample } from '../../state/sampleFixture';
-import { barbPath, barbsAt, laneRange, laneTraces, pathOf, valueAt } from './plot';
+import { atTicks, barbPath, laneRange, laneTraces, pathOf, valueAt } from './plot';
 import type { Interval } from './span';
 import { GAP_SEC, type Point } from './trace';
 
@@ -125,8 +125,8 @@ describe('valueAt', () => {
   });
 });
 
-describe('barbsAt', () => {
-  it('reads one wind per tick from the sample nearest it, none when that is a gap away', () => {
+describe('atTicks', () => {
+  it('reads one value per tick from the sample nearest it, none when that is a gap away', () => {
     // Arrange
     const samples = [
       sample(98, { windDir: 300, windSpeed: 12 }),
@@ -135,7 +135,7 @@ describe('barbsAt', () => {
     const ticks = [100, 150 + GAP_SEC + 1];
 
     // Act
-    const barbs = barbsAt(samples, ticks, (s) =>
+    const barbs = atTicks(samples, ticks, (s) =>
       s.windDir === undefined || s.windSpeed === undefined
         ? undefined
         : { dir: s.windDir, speed: s.windSpeed },

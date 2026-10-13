@@ -7,8 +7,8 @@ import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
 import { clockStep, ticks } from './axis';
 import {
+  atTicks,
   barbPath,
-  barbsAt,
   fixed,
   laneRange,
   type LaneTrace,
@@ -78,7 +78,7 @@ export function Lane(props: {
     if (spec.kind !== 'barbs') return [];
     const most = Math.max(1, Math.floor(props.width / BARB_PITCH_PX));
     const step = clockStep(props.visible.to - props.visible.from, most);
-    return barbsAt(props.samples, ticks(props.visible, step), spec.barb);
+    return atTicks(props.samples, ticks(props.visible, step), spec.barb);
   });
   const dots = () => {
     const h = props.hover;
