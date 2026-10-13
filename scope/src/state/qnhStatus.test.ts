@@ -28,8 +28,8 @@ describe('qnhStatus', () => {
     // Assert
     expect(out).toEqual([
       { value: '29.92', source: 'MAN', cls: null },
-      { value: '29.92', source: 'RJAA ····', cls: 'warn' },
-      { value: '29.92', source: '····', cls: 'warn' },
+      { value: '29.92', source: 'RJAA --.--', cls: 'warn' },
+      { value: '29.92', source: '--.--', cls: 'warn' },
     ]);
   });
 });

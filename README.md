@@ -142,8 +142,8 @@ and sends them to every scope over the feed:
 - Stations are those the Center lists as issuing METARs within 150 NM of the receiver, the
   radius the map is drawn for. The list is kept in the data directory and renewed daily.
 - Their reports are polled every 5 minutes. A report older than 90 minutes, an hourly
-  report half an hour overdue, is dropped, so a station that stops reporting shows `····`.
-- A station typed on the Display panel must be one of those; any other shows `····`.
+  report half an hour overdue, is dropped, so a station that stops reporting shows `--.--`.
+- A station typed on the Display panel must be one of those; any other shows `--.--`.
 
 ## Map data
 

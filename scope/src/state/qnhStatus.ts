@@ -27,6 +27,6 @@ export interface QnhStatus {
 export function qnhStatus(s: QnhStatusInput): QnhStatus {
   const value = s.qnhInHg.toFixed(2);
   if (!s.auto) return { value, source: 'MAN', cls: null };
-  if (!s.report) return { value, source: `${s.station} ····`.trim(), cls: 'warn' };
+  if (!s.report) return { value, source: `${s.station} --.--`.trim(), cls: 'warn' };
   return { value, source: `${s.station} ${zulu(s.report.observedAt)}`, cls: null };
 }
