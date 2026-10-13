@@ -5,7 +5,7 @@ import { HPA_PER_INHG } from '../../lib/units';
 import { setDeclinationAt } from '../../state/magnetic';
 import { laneOf, READING_KEYS } from '../../state/plotted';
 import { makeSample } from '../../state/sampleFixture';
-import { PLOTS } from './plots';
+import { minSpanOf, PLOTS } from './plots';
 
 describe('PLOTS', () => {
   it('draws an intent inside the lane plotted.ts says it belongs to, and nothing else as one', () => {
@@ -102,5 +102,18 @@ describe('PLOTS', () => {
 
     // Assert
     expect(out).toEqual([1.3, { dir: 300, speed: 12 }]);
+  });
+});
+
+describe('minSpanOf', () => {
+  it('spans an intent like the lane it is drawn in, and a lane of bars or barbs not at all', () => {
+    // Arrange
+    const keys = ['selAlt', 'alt', 'selHdg', 'trk', 'modes', 'wind'] as const;
+
+    // Act
+    const spans = keys.map(minSpanOf);
+
+    // Assert
+    expect(spans).toEqual([1000, 1000, 20, 20, undefined, undefined]);
   });
 });

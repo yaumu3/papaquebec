@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { makeSample as sample } from '../../state/sampleFixture';
-import { barbPath, barbsAt, laneTraces, pathOf, valueAt } from './plot';
+import { barbPath, barbsAt, laneRange, laneTraces, pathOf, valueAt } from './plot';
 import type { Interval } from './span';
 import { GAP_SEC, type Point } from './trace';
 
@@ -159,5 +159,23 @@ describe('barbPath', () => {
     expect(calm).toContain('a');
     expect(north.startsWith('M10.0 20.0 L10.0 4.0 ')).toBe(true);
     expect(north.match(/l/g)).toHaveLength(2);
+  });
+});
+
+describe('laneRange', () => {
+  it('spans the own reading and its intents on one scale, off the floor, at least the lane span', () => {
+    // Arrange
+    const samples = [
+      sample(1, { alt: 'ground' }),
+      sample(2, { alt: 35_000, selAlt: 35_100 }),
+      sample(3, { alt: 35_020, selAlt: 35_100 }),
+    ];
+    const traces = laneTraces(samples, ['alt', 'selAlt'], ALL);
+
+    // Act
+    const range = laneRange(traces, 'alt', ALL);
+
+    // Assert
+    expect(range).toEqual({ lo: 34_550, hi: 35_550 });
   });
 });

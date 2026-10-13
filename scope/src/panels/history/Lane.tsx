@@ -6,10 +6,19 @@ import type { Sample } from '../../state/track';
 import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
 import { clockStep, ticks } from './axis';
-import { barbPath, barbsAt, fixed, type LaneTrace, laneTraces, pathOf, valueAt } from './plot';
+import {
+  barbPath,
+  barbsAt,
+  fixed,
+  laneRange,
+  type LaneTrace,
+  laneTraces,
+  pathOf,
+  valueAt,
+} from './plot';
 import { type Dash, PLOTS } from './plots';
 import { type Interval, xOf } from './span';
-import { barsOf, gapsIn, rangeOf, yOf } from './trace';
+import { barsOf, gapsIn, yOf } from './trace';
 
 import s from './History.module.css';
 
@@ -55,14 +64,7 @@ export function Lane(props: {
   const x = (t: number) => xOf(t, props.visible, props.width);
 
   const traces = createMemo(() => laneTraces(props.samples, props.keys, props.visible));
-  const range = createMemo(() =>
-    rangeOf(
-      traces()
-        .filter((tr) => !tr.floor)
-        .map((tr) => tr.runs),
-      props.visible,
-    ),
-  );
+  const range = createMemo(() => laneRange(traces(), props.lane, props.visible));
   /** Where a trace's values fall: on the lane's scale, or all of them along its floor. */
   const yFor = (tr: LaneTrace) => (tr.floor ? () => props.height - PAD_BOTTOM_PX : y);
   const y = (v: number) => {
