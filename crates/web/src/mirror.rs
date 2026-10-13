@@ -86,10 +86,11 @@ fn client() -> reqwest::Client {
     reqwest::Client::new()
 }
 
-/// How long ago the copy was written; none when there is none.
+/// How long ago the copy was written; none when there is none, or when it is
+/// dated later than now, as a clock set back since leaves it.
 fn age(kept: &Path) -> Option<Duration> {
     let written = std::fs::metadata(kept).ok()?.modified().ok()?;
-    Some(written.elapsed().unwrap_or_default())
+    written.elapsed().ok()
 }
 
 /// The publication as published, kept in the file once it reads as one.
@@ -243,6 +244,21 @@ mod tests {
         // Arrange
         let (url, asked) = answering("200 OK", NEWER).await;
         let (_directory, path) = kept(Some((FIRST, ago(8 * DAY))));
+
+        // Act
+        let published = published(url, path.clone()).await;
+
+        // Assert
+        assert_eq!(published, ["first", "newer"]);
+        assert_eq!(std::fs::read(path).ok().as_deref(), Some(NEWER));
+        assert_eq!(asked.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn kept_copy_dated_in_the_future_is_read_and_then_replaced_at_once() {
+        // Arrange: as a clock set back leaves a copy
+        let (url, asked) = answering("200 OK", NEWER).await;
+        let (_directory, path) = kept(Some((FIRST, SystemTime::now() + DAY)));
 
         // Act
         let published = published(url, path.clone()).await;
