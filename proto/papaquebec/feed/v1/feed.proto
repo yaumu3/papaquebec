@@ -7,11 +7,13 @@ syntax = "proto3";
 package papaquebec.feed.v1;
 
 // Every frame of a session travels on its one unidirectional stream, each after
-// its length as a varint. The first is a Hello; snapshots follow.
+// its length as a varint. The first is a Hello; snapshots follow, and the
+// weather whenever it changes.
 message Frame {
   oneof body {
     Snapshot snapshot = 1;
     Hello hello = 2;
+    Weather weather = 3;
   }
 }
 
@@ -28,6 +30,24 @@ message Hello {
 message Receiver {
   optional double lat_deg = 1;
   optional double lon_deg = 2;
+}
+
+// The current reports of the stations around the receiver, all of them, every
+// time; none when no station in range has a current report.
+message Weather {
+  repeated Qnh qnh = 1;
+}
+
+// The altimeter setting a station reported, and when.
+message Qnh {
+  // ICAO identifier.
+  string station = 1;
+  double lat_deg = 2;
+  double lon_deg = 3;
+  // Unix seconds.
+  double observed_s = 4;
+  // Rounded to a hundredth.
+  double qnh_in_hg = 5;
 }
 
 // Every aircraft the receiver knows at one instant.
