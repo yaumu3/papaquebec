@@ -2,6 +2,7 @@
 //! them, and the QNH each reports.
 
 pub mod qnh;
+pub mod reports;
 pub mod stations;
 
 /// What went wrong, for the log.
