@@ -1,19 +1,15 @@
-//! The aircraft database, kept current from where Mictronics publishes it.
+//! Files others publish, each kept current in a copy on disk and read into what
+//! the server uses.
+
+pub mod aircraft;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::watch;
-use tracker::registry::Registry;
 
 use crate::Failure;
-
-/// Where Mictronics publishes the database, which it renews every week.
-pub const URL: &str =
-    "https://github.com/Mictronics/aircraft-database/raw/refs/heads/main/indexedDB.zip";
-/// Where the copy is kept, within the data directory.
-pub const FILE: &str = "papaquebec/aircraft-database.zip";
 
 const RETRY_AFTER: Duration = Duration::from_hours(1);
 const DOWNLOAD_WITHIN: Duration = Duration::from_mins(5);
@@ -34,20 +30,6 @@ pub trait Publication: Sized + Send + Sync + 'static {
 
     /// What the log says of it once read.
     fn tally(&self) -> String;
-}
-
-impl Publication for Registry {
-    const NAME: &str = "aircraft database";
-    /// Mictronics renews the database every week.
-    const RENEW_AT: Duration = Duration::from_hours(7 * 24);
-
-    fn read(published: &[u8]) -> Result<Self, Failure> {
-        Registry::read(published)
-    }
-
-    fn tally(&self) -> String {
-        format!("{} aircraft", self.known())
-    }
 }
 
 /// Keeps the publication as it is published at `url`, for as long as anyone

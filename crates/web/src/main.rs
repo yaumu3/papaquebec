@@ -14,8 +14,8 @@ use tokio::sync::watch;
 use tracker::registry::Registry;
 use web::Failure;
 use web::config::{Config, Door, Origin};
-use web::database::{FILE, URL, keep_current};
 use web::door::{self, Certificates};
+use web::mirror::{aircraft, keep_current};
 use web::site::{Site, router};
 
 /// How often the scope is told what the receiver hears.
@@ -71,8 +71,8 @@ async fn main() -> Result<(), Failure> {
         Origin::Beast { address, site } => {
             match config.data {
                 Some(data) => {
-                    let kept = data.join(FILE);
-                    tokio::spawn(keep_current(URL.into(), kept, registered));
+                    let kept = data.join(aircraft::FILE);
+                    tokio::spawn(keep_current(aircraft::URL.into(), kept, registered));
                 }
                 None => eprintln!("aircraft database: no XDG_DATA_HOME or HOME to keep it in"),
             }
