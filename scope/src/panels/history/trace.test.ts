@@ -4,7 +4,6 @@ import { makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
 import type { Interval } from './span';
 import {
-  alignTo,
   barbMarks,
   barsOf,
   GAP_SEC,
@@ -13,7 +12,6 @@ import {
   type Point,
   rangeOf,
   runsOf,
-  unwrap,
   widened,
   yOf,
 } from './trace';
@@ -72,57 +70,6 @@ describe('runsOf', () => {
 
     // Assert
     expect(runs.flat().map((p) => p.t)).toEqual([2, 3, 4, 5]);
-  });
-});
-
-describe('unwrap', () => {
-  it('carries a turn through north on past 360 rather than back to zero', () => {
-    // Arrange
-    const runs: Point[][] = [
-      [
-        { t: 1, v: 350 },
-        { t: 2, v: 5 },
-        { t: 3, v: 20 },
-      ],
-      [
-        { t: 5, v: 10 },
-        { t: 6, v: 340 },
-      ],
-    ];
-
-    // Act
-    const out = unwrap(runs);
-
-    // Assert
-    expect(out.map((run) => run.map((p) => p.v))).toEqual([
-      [350, 365, 380],
-      [10, -20],
-    ]);
-  });
-});
-
-describe('alignTo', () => {
-  it('moves each point by whole turns to within half a turn of the reference at its time', () => {
-    // Arrange
-    const reference: Point[][] = [
-      [
-        { t: 1, v: 350 },
-        { t: 2, v: 365 },
-      ],
-    ];
-    const runs: Point[][] = [
-      [
-        { t: 1, v: 340 },
-        { t: 2, v: 10 },
-        { t: 3, v: 15 },
-      ],
-    ];
-
-    // Act
-    const out = alignTo(runs, reference);
-
-    // Assert
-    expect(out.map((run) => run.map((p) => p.v))).toEqual([[340, 370, 375]]);
   });
 });
 

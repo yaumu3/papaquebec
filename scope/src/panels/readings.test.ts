@@ -32,6 +32,21 @@ describe('READINGS', () => {
     setDeclinationAt(() => () => 0);
   });
 
+  it('reads the selected heading only while it steers, as the lane and the data block do', () => {
+    // Arrange
+    const samples = [
+      makeSample(1000, { selHeading: 270, navModes: ['autopilot'] }),
+      makeSample(1000, { selHeading: 270, navModes: ['autopilot', 'lnav'] }),
+    ];
+
+    // Act
+    const readings = samples.map((s) => READINGS.selHdg.format(s));
+
+    // Assert
+    expect(readings[0]).not.toEqual(NONE);
+    expect(readings[1]).toEqual(NONE);
+  });
+
   it('reads the wind as where from, then how fast', () => {
     // Arrange
     const s = makeSample(1000, { windDir: 269.4, windSpeed: 35.6 });

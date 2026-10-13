@@ -5,11 +5,14 @@ import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { stepFromKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
-import { clockStep, ticks } from './axis';
+import { clearOfEnds, clockStep, ticks } from './axis';
 import {
+  atTicks,
   barbPath,
-  barbsAt,
+  barbReach,
   fixed,
+  GLYPH_REACH_PX,
+  headingGlyph,
   laneRange,
   type LaneTrace,
   laneTraces,
@@ -18,7 +21,7 @@ import {
 } from './plot';
 import { type Dash, PLOTS } from './plots';
 import { type Interval, xOf } from './span';
-import { barsOf, gapsIn, yOf } from './trace';
+import { barsOf, gapsIn, type Read, yOf } from './trace';
 
 import s from './History.module.css';
 
@@ -33,6 +36,8 @@ const DOT_PX = 3;
 const BARB_PX = 16;
 /** How far apart barbs stand at the least, on round clock times of their own. */
 const BARB_PITCH_PX = 32;
+/** The same for heading glyphs, which are wider: about 30 px across at the most. */
+const GLYPH_PITCH_PX = 36;
 
 /** The class that dashes a trace, if any. */
 export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
@@ -74,11 +79,40 @@ export function Lane(props: {
   const gaps = createMemo(() => gapsIn(props.samples, props.visible));
   const bars = createMemo(() => (spec.kind === 'gantt' ? barsOf(props.samples, spec.names) : []));
   const rowHeight = () => props.height / Math.max(1, bars().length);
-  const barbs = createMemo(() => {
-    if (spec.kind !== 'barbs') return [];
-    const most = Math.max(1, Math.floor(props.width / BARB_PITCH_PX));
-    const step = clockStep(props.visible.to - props.visible.from, most);
-    return barbsAt(props.samples, ticks(props.visible, step), spec.barb);
+  /** The shortest round clock step that keeps glyphs at least `pitch` apart across the visible span. */
+  const stepEvery = (pitch: number) =>
+    clockStep(props.visible.to - props.visible.from, Math.max(1, Math.floor(props.width / pitch)));
+  /** The ticks of `step` at which a mark reaching `reach` round each fits whole in the plot. */
+  const ticksAt = (step: number, reach: number) =>
+    clearOfEnds(ticks(props.visible, step), x, props.width, reach);
+  const barbs = createMemo(() =>
+    spec.kind === 'barbs'
+      ? atTicks(props.samples, ticksAt(stepEvery(BARB_PITCH_PX), barbReach(BARB_PX)), spec.barb)
+      : [],
+  );
+  /** What the intent plotted in the lane reads, if one is. */
+  const intentRead = (): Read | undefined => {
+    const intent = props.keys
+      .slice(1)
+      .map((key) => PLOTS[key])
+      .find((p) => p.kind === 'intent');
+    return intent?.kind === 'intent' ? intent.y : undefined;
+  };
+  const glyphs = createMemo(() => {
+    if (spec.kind !== 'heading') return [];
+    const sel = intentRead();
+    const read = (sample: Sample) => {
+      const h = spec.heading(sample);
+      return h && { ...h, sel: sel?.(sample) };
+    };
+    // A tick takes a sample with a heading a little off it over the nearest without, so that
+    // the aircraft does not come and go with the replies that carry its heading.
+    const step = stepEvery(GLYPH_PITCH_PX);
+    const has = (sample: Sample) => spec.heading(sample)?.hdg !== undefined;
+    return atTicks(props.samples, ticksAt(step, GLYPH_REACH_PX), read, {
+      has,
+      withinSec: step / 2,
+    }).map((h) => headingGlyph(x(h.t), props.height / 2, h));
   });
   const dots = () => {
     const h = props.hover;
@@ -141,7 +175,7 @@ export function Lane(props: {
           <Index each={traces()}>
             {(tr) => (
               <path
-                class={cx(s.trace, dashClass(tr().dash))}
+                class={cx(s.trace, dashClass(tr().dash), tr().intent && s.intent)}
                 d={pathOf(tr().runs, x, yFor(tr()))}
               />
             )}
@@ -152,6 +186,20 @@ export function Lane(props: {
                 class={s.barb}
                 d={barbPath(x(b().t), props.height / 2, b().dir, b().speed, BARB_PX)}
               />
+            )}
+          </Index>
+          <Index each={glyphs()}>
+            {(g) => (
+              <>
+                <Show when={g().vector}>{(d) => <path class={s.vector} d={d()} />}</Show>
+                <Show when={g().aircraft}>{(d) => <path class={s.aircraft} d={d()} />}</Show>
+                <Show when={g().arrow}>{(d) => <path class={s.arrow} d={d()} />}</Show>
+                <Show when={g().toGo}>{(d) => <path class={s.toGo} d={d()} />}</Show>
+                <Show when={g().tick}>{(d) => <path class={s.tick} d={d()} />}</Show>
+                <Show when={g().held}>
+                  {(at) => <circle class={s.held} cx={at().cx} cy={at().cy} r={at().r} />}
+                </Show>
+              </>
             )}
           </Index>
           <Index each={bars()}>

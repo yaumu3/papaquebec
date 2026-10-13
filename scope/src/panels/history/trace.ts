@@ -63,29 +63,6 @@ export function runsOf(samples: readonly Sample[], read: Read, i: Interval): Poi
   return runs;
 }
 
-/** `v` moved by whole turns to within half a turn of `near`. */
-const turnNear = (v: number, near: number): number => v + Math.round((near - v) / 360) * 360;
-
-/**
- * Degrees moved by whole turns to within half a turn of the reference reading at the same time,
- * or of the point before where the reference has none, for an intent drawn on an unwrapped scale.
- */
-export function alignTo(runs: readonly Point[][], reference: readonly Point[][]): Point[][] {
-  const at = new Map(reference.flat().map((p) => [p.t, p.v]));
-  return runs.map((run) => {
-    let previous: number | undefined;
-    return run.map((p) => {
-      const near = at.get(p.t) ?? previous;
-      const v = near === undefined ? p.v : turnNear(p.v, near);
-      previous = v;
-      return { t: p.t, v };
-    });
-  });
-}
-
-/** Degrees made continuous: each point moved by whole turns to within half a turn of the one before it. */
-export const unwrap = (runs: readonly Point[][]): Point[][] => alignTo(runs, []);
-
 /** The value at time `t` along the segment from `a` to `b`. */
 const crossing = (a: Point, b: Point, t: number): number =>
   a.v + ((b.v - a.v) * (t - a.t)) / (b.t - a.t);

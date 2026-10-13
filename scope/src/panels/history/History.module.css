@@ -92,7 +92,7 @@
   fill: none;
   stroke: var(--plot-grid);
 }
-/* Traces are the text color; the only hue is the cursor. */
+/* Traces are the text color; the only hues are the cursor and the intents. */
 .trace {
   fill: none;
   stroke: var(--text);
@@ -110,6 +110,40 @@
   stroke: var(--text);
   stroke-width: 1.2;
   stroke-linejoin: round;
+}
+/* The aircraft along its heading, the track out of it dimmed, or the track alone as an arrow. */
+.aircraft {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.vector {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 1;
+  stroke-linecap: round;
+}
+.arrow {
+  fill: var(--text);
+  stroke: var(--text);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+/* The selected heading on the glyph: the turn still to go to it, the dot once held, or a tick. */
+.toGo {
+  fill: none;
+  stroke: var(--plot-intent);
+  stroke-width: 1.5;
+}
+.held {
+  fill: var(--plot-intent);
+}
+.tick {
+  stroke: var(--plot-intent);
+  stroke-width: 1.8;
+  stroke-linecap: round;
 }
 .bar {
   fill: var(--text-dim);
@@ -215,6 +249,10 @@
   fill: none;
   stroke: var(--text-dim);
   stroke-width: 1;
+}
+/* What the aircraft is set to do, in the lanes and the minimap alike. */
+.intent {
+  stroke: var(--plot-intent);
 }
 .dim {
   fill: var(--panel-bg);
