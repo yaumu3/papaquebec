@@ -213,7 +213,7 @@ export interface HeadingGlyph {
   vector?: string;
   /** The track as an arrow of its own, without the aircraft. */
   arrow?: string;
-  /** The turn left to the selected heading, round from the nose. */
+  /** The turn still to go to the selected heading, round from the nose either way. */
   toGo?: string;
   /** Ahead of the nose, once the heading holds the selection. */
   held?: { cx: number; cy: number; r: number };
@@ -223,8 +223,8 @@ export interface HeadingGlyph {
 
 /**
  * Where the aircraft points and where it goes, at (x, y): the aircraft along the heading with the
- * track running out of it, so a crab shows as the nose off the track, and the turn left to the
- * selected heading; the track alone as an arrow, the selection a tick past its head.
+ * track running out of it, so a crab shows as the nose off the track, and the turn still to go
+ * to the selected heading; the track alone as an arrow, the selection a tick past its head.
  */
 export function headingGlyph(x: number, y: number, h: HeadingMark): HeadingGlyph {
   if (h.hdg !== undefined)

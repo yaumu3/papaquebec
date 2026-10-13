@@ -131,7 +131,7 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-/* The selected heading on the glyph: the turn left to it, the dot once held, or a tick. */
+/* The selected heading on the glyph: the turn still to go to it, the dot once held, or a tick. */
 .toGo {
   fill: none;
   stroke: var(--plot-intent);
