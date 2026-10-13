@@ -1,31 +1,29 @@
 import { createSignal } from 'solid-js';
 
-import { rankByDistance } from '../lib/geo';
+import { nearest } from '../lib/geo';
 import type { MetarQnh, StationReport } from '../lib/metar';
-import { aero, site } from './scope';
+import { type Site, site } from './scope';
 import { settings } from './settings';
-
-/** Re-ask the METAR source this often; reports change half-hourly at most. */
-export const QNH_POLL_MS = 10 * 60_000;
-/** How many airports around the site to try before giving up on an automatic station. */
-const NEAREST_TRIED = 5;
 
 /** The current reports of the stations around the receiver, as the feed last told them. */
 export const [qnhReports, setQnhReports] = createSignal<StationReport[]>([]);
-export const [qnhReport, setQnhReport] = createSignal<MetarQnh | null>(null);
-export const [qnhError, setQnhError] = createSignal<string | null>(null);
 
-/** Stations to ask, in order: the operator's choice alone, else the nearest airports. */
-export function stationCandidates(): string[] {
-  if (settings.qnh.station) return [settings.qnh.station];
-  const s = site();
-  if (!s) return [];
-  return rankByDistance(s.lat, s.lon, aero().airports)
-    .slice(0, NEAREST_TRIED)
-    .map((a) => a.id);
+/** The chosen station's report, else the one nearest the site; none while neither is in. */
+export function reportFor(
+  station: string,
+  at: Site | null,
+  reports: readonly StationReport[],
+): StationReport | null {
+  if (station) return reports.find((r) => r.station === station) ?? null;
+  return at ? nearest(at.lat, at.lon, reports) : null;
 }
 
-/** The station currently answering, else the chosen one; empty until either is known. */
+/** The report the altimeter follows. */
+export function qnhReport(): MetarQnh | null {
+  return reportFor(settings.qnh.station, site(), qnhReports());
+}
+
+/** The station currently reporting, else the chosen one; empty until either is known. */
 export function qnhStation(): string {
   return settings.qnh.station || (qnhReport()?.station ?? '');
 }

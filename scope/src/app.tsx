@@ -3,7 +3,6 @@ import { createEffect, onCleanup, onMount } from 'solid-js';
 import { ScopeCanvas } from './canvas/ScopeCanvas';
 import { cx } from './design/cx';
 import { connectFeed, feedOptionsFromUrl } from './feed/connect';
-import { fetchQnhFrom, qnhSourceFromUrl } from './feed/qnh';
 import { parseAero, parseCoast } from './lib/mapdata';
 import { loadDeclination } from './lib/wmm';
 import { About } from './panels/About';
@@ -19,7 +18,7 @@ import { historyOpen, plotted } from './state/history';
 import { keepUnscrolled } from './state/layout';
 import { setDeclinationAt } from './state/magnetic';
 import { setBuiltinAero } from './state/mapsets';
-import { QNH_POLL_MS, qnhReport, setQnhError, setQnhReport, stationCandidates } from './state/qnh';
+import { qnhReport } from './state/qnh';
 import { listSort, panels, setCoast, setTick } from './state/scope';
 import { persist, setSettings, settings } from './state/settings';
 
@@ -32,7 +31,6 @@ async function loadJson(url: string): Promise<unknown> {
 }
 
 export function App() {
-  const wx = qnhSourceFromUrl(location.search);
   onMount(() => {
     const clock = setInterval(() => setTick(Date.now()), 1000);
     const disconnect = connectFeed(feedOptionsFromUrl(location.search));
@@ -61,29 +59,6 @@ export function App() {
       historyOpen: historyOpen(),
     }),
   );
-
-  // METAR polling over the candidate stations; answers for a superseded list are dropped.
-  createEffect(() => {
-    const stations = stationCandidates();
-    const key = stations.join(',');
-    setQnhReport(null);
-    setQnhError(null);
-    if (!key) return;
-    const current = () => stationCandidates().join(',') === key;
-    const refresh = () =>
-      fetchQnhFrom(stations, wx)
-        .then((report) => {
-          if (!current()) return;
-          setQnhReport(report);
-          setQnhError(null);
-        })
-        .catch((err: unknown) => {
-          if (current()) setQnhError(err instanceof Error ? err.message : 'failed');
-        });
-    void refresh();
-    const timer = setInterval(() => void refresh(), QNH_POLL_MS);
-    onCleanup(() => clearInterval(timer));
-  });
 
   // The latest report becomes the altimeter setting whenever automatic mode is on.
   createEffect(() => {
