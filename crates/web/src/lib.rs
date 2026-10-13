@@ -1,8 +1,8 @@
 //! Serves the scope and its feed.
 
 pub mod config;
-pub mod database;
 pub mod door;
+pub mod mirror;
 pub mod site;
 
 /// What went wrong, for the log.
