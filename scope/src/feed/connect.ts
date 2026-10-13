@@ -1,3 +1,4 @@
+import { setQnhReports } from '../state/qnh';
 import {
   bumpSnapshot,
   setFeedStatus,
@@ -65,6 +66,9 @@ export function connectFeed(opts: FeedOptions): () => void {
         trackStore.ingest(e.snapshot);
         setFeedStatus((s) => ({ ...s, lastAt: e.receivedAt, reason: null }));
         bumpSnapshot();
+        break;
+      case 'weather':
+        setQnhReports(e.reports);
         break;
       case 'down':
         setFeedStatus((s) => ({ ...s, reason: e.reason }));

@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js';
 
 import { rankByDistance } from '../lib/geo';
-import type { MetarQnh } from '../lib/metar';
+import type { MetarQnh, StationReport } from '../lib/metar';
 import { aero, site } from './scope';
 import { settings } from './settings';
 
@@ -10,6 +10,8 @@ export const QNH_POLL_MS = 10 * 60_000;
 /** How many airports around the site to try before giving up on an automatic station. */
 const NEAREST_TRIED = 5;
 
+/** The current reports of the stations around the receiver, as the feed last told them. */
+export const [qnhReports, setQnhReports] = createSignal<StationReport[]>([]);
 export const [qnhReport, setQnhReport] = createSignal<MetarQnh | null>(null);
 export const [qnhError, setQnhError] = createSignal<string | null>(null);
 

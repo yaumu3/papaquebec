@@ -170,7 +170,7 @@ describe('followFeed', () => {
 
     // Assert
     const handed = followed.messages.map((m) =>
-      m.kind === 'hello' ? m.receiver.lat : m.snapshot.now,
+      m.kind === 'hello' ? m.receiver.lat : m.kind === 'snapshot' ? m.snapshot.now : undefined,
     );
     expect(handed).toEqual([1.5, 1700000000.5, 1700000000.5]);
   });
