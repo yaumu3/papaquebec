@@ -2,9 +2,20 @@ import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Dash, PLOTS, type Wind } from './plots';
+import { type Dash, minSpanOf, PLOTS, type Wind } from './plots';
 import type { Interval } from './span';
-import { alignTo, barbMarks, GAP_SEC, type Point, type Read, runsOf, unwrap } from './trace';
+import {
+  alignTo,
+  barbMarks,
+  GAP_SEC,
+  type Point,
+  type Range,
+  rangeOf,
+  type Read,
+  runsOf,
+  unwrap,
+  widened,
+} from './trace';
 
 /** A number as an SVG attribute: a tenth of a pixel is precision enough. */
 export const fixed = (n: number): string => n.toFixed(1);
@@ -56,6 +67,19 @@ export function laneTraces(
     return [{ key, runs: angular ? alignTo(runs, ownRuns) : runs, dash: spec.dash }];
   });
   return [{ key: lane, runs: ownRuns }, ...floored, ...second, ...drawn];
+}
+
+/** The one scale of a lane's traces off its floor over the interval, at least its least span; null without any. */
+export function laneRange(
+  traces: readonly LaneTrace[],
+  lane: ReadingKey,
+  visible: Interval,
+): Range | null {
+  const r = rangeOf(
+    traces.filter((tr) => !tr.floor).map((tr) => tr.runs),
+    visible,
+  );
+  return r && widened(r, minSpanOf(lane) ?? 0);
 }
 
 /** The path of the runs across a lane, each run its own subpath. */

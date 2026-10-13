@@ -1,7 +1,7 @@
 import { crewAltitudeFt } from '../../lib/altitude';
 import { modeNames, sourceName } from '../../lib/format';
 import { magneticTrack } from '../../state/magnetic';
-import type { ReadingKey } from '../../state/plotted';
+import { laneOf, type ReadingKey } from '../../state/plotted';
 import { settings } from '../../state/settings';
 import type { Sample } from '../../state/track';
 import type { Read } from './trace';
@@ -22,11 +22,13 @@ export type PlotSpec =
   | {
       kind: 'line';
       y: Read;
+      /** The least range the lane's scale spans, in the reading's unit. */
+      minSpan: number;
       angular?: true;
       /** Whether a sample has no value yet a state to show, drawn along the lane's floor. */
       floor?: (s: Sample) => boolean;
     }
-  | { kind: 'pair'; y: Read; y2: Read; dash: Dash; angular?: true }
+  | { kind: 'pair'; y: Read; y2: Read; dash: Dash; minSpan: number; angular?: true }
   | { kind: 'gantt'; names: (s: Sample) => readonly string[] | undefined }
   | { kind: 'barbs'; barb: (s: Sample) => Wind | undefined }
   | { kind: 'intent'; y: Read; dash: Dash; angular?: true };
@@ -42,26 +44,40 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   alt: {
     kind: 'line',
     y: (s) => crewAltitudeFt(s, settings.altimeter),
+    minSpan: 1000,
     floor: (s) => s.alt === 'ground',
   },
   selAlt: { kind: 'intent', y: (s) => s.selAlt, dash: 'dashed' },
   fmsAlt: { kind: 'intent', y: (s) => s.fmsAlt, dash: 'dotted' },
-  vs: { kind: 'line', y: (s) => s.verticalRate },
-  trk: { kind: 'pair', y: magneticTrack, y2: (s) => s.heading, dash: 'dotted', angular: true },
+  vs: { kind: 'line', y: (s) => s.verticalRate, minSpan: 1000 },
+  trk: {
+    kind: 'pair',
+    y: magneticTrack,
+    y2: (s) => s.heading,
+    dash: 'dotted',
+    minSpan: 20,
+    angular: true,
+  },
   selHdg: { kind: 'intent', y: (s) => s.selHeading, dash: 'dashed', angular: true },
-  gs: { kind: 'line', y: (s) => s.gs },
-  qnh: { kind: 'line', y: (s) => s.navQnh },
+  gs: { kind: 'line', y: (s) => s.gs, minSpan: 20 },
+  qnh: { kind: 'line', y: (s) => s.navQnh, minSpan: 4 },
   modes: { kind: 'gantt', names: (s) => s.navModes && modeNames(s.navModes) },
-  ias: { kind: 'line', y: (s) => s.ias },
-  tas: { kind: 'line', y: (s) => s.tas },
-  mach: { kind: 'line', y: (s) => s.mach },
+  ias: { kind: 'line', y: (s) => s.ias, minSpan: 20 },
+  tas: { kind: 'line', y: (s) => s.tas, minSpan: 20 },
+  mach: { kind: 'line', y: (s) => s.mach, minSpan: 0.04 },
   wind: { kind: 'barbs', barb: wind },
-  oat: { kind: 'line', y: (s) => s.oat },
-  tat: { kind: 'line', y: (s) => s.tat },
-  nic: { kind: 'line', y: (s) => s.nic },
-  nacp: { kind: 'line', y: (s) => s.nacP },
+  oat: { kind: 'line', y: (s) => s.oat, minSpan: 5 },
+  tat: { kind: 'line', y: (s) => s.tat, minSpan: 5 },
+  nic: { kind: 'line', y: (s) => s.nic, minSpan: 4 },
+  nacp: { kind: 'line', y: (s) => s.nacP, minSpan: 4 },
   src: { kind: 'gantt', names: (s) => [sourceName(s.source)] },
-  rssi: { kind: 'line', y: (s) => s.rssi },
-  msgs: { kind: 'line', y: (s) => s.messageRate },
-  age: { kind: 'pair', y: (s) => s.seen, y2: (s) => s.seenPos, dash: 'dashed' },
+  rssi: { kind: 'line', y: (s) => s.rssi, minSpan: 6 },
+  msgs: { kind: 'line', y: (s) => s.messageRate, minSpan: 4 },
+  age: { kind: 'pair', y: (s) => s.seen, y2: (s) => s.seenPos, dash: 'dashed', minSpan: 5 },
 };
+
+/** The least span of the scale `key` is drawn on: its lane's, none for a lane of bars or barbs. */
+export function minSpanOf(key: ReadingKey): number | undefined {
+  const spec = PLOTS[laneOf(key)];
+  return spec.kind === 'line' || spec.kind === 'pair' ? spec.minSpan : undefined;
+}
