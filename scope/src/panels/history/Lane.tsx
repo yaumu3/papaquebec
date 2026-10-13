@@ -74,12 +74,14 @@ export function Lane(props: {
   const gaps = createMemo(() => gapsIn(props.samples, props.visible));
   const bars = createMemo(() => (spec.kind === 'gantt' ? barsOf(props.samples, spec.names) : []));
   const rowHeight = () => props.height / Math.max(1, bars().length);
-  const barbs = createMemo(() => {
-    if (spec.kind !== 'barbs') return [];
-    const most = Math.max(1, Math.floor(props.width / BARB_PITCH_PX));
-    const step = clockStep(props.visible.to - props.visible.from, most);
-    return atTicks(props.samples, ticks(props.visible, step), spec.barb);
-  });
+  /** The shortest round clock step that keeps glyphs at least `pitch` apart across the visible span. */
+  const stepEvery = (pitch: number) =>
+    clockStep(props.visible.to - props.visible.from, Math.max(1, Math.floor(props.width / pitch)));
+  const barbs = createMemo(() =>
+    spec.kind === 'barbs'
+      ? atTicks(props.samples, ticks(props.visible, stepEvery(BARB_PITCH_PX)), spec.barb)
+      : [],
+  );
   const dots = () => {
     const h = props.hover;
     if (!h) return [];
