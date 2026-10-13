@@ -151,7 +151,8 @@ function toStationReport(q: Qnh): StationReport {
   };
 }
 
-export function messageOf({ body }: Frame): FeedMessage {
+/** The frame as the scope reads it; null for one it does not know, as a later feeder may send. */
+export function messageOf({ body }: Frame): FeedMessage | null {
   switch (body.case) {
     case 'hello': {
       const { receiver, history } = body.value;
@@ -166,6 +167,6 @@ export function messageOf({ body }: Frame): FeedMessage {
     case 'weather':
       return { kind: 'weather', reports: body.value.qnh.map(toStationReport) };
     default:
-      throw new Error('feed: empty frame');
+      return null;
   }
 }

@@ -107,7 +107,7 @@ describe('messageOf', () => {
     const message = messageOf(frame);
 
     // Assert
-    const read = message.kind === 'snapshot' ? message.snapshot.aircraft : [];
+    const read = message?.kind === 'snapshot' ? message.snapshot.aircraft : [];
     expect(read.map((a) => a.verticalRate)).toEqual([-1200, 1856, undefined]);
   });
 
@@ -121,19 +121,19 @@ describe('messageOf', () => {
     const message = messageOf(frame);
 
     // Assert
-    const read = message.kind === 'snapshot' ? message.snapshot.aircraft : [];
+    const read = message?.kind === 'snapshot' ? message.snapshot.aircraft : [];
     expect(read.map((a) => a.alt)).toEqual([undefined]);
   });
 
-  it('refuses a frame that carries nothing', () => {
+  it('reads a frame that carries nothing it knows as nothing', () => {
     // Arrange
     const frame = create(FrameSchema);
 
     // Act
-    const read = () => messageOf(frame);
+    const message = messageOf(frame);
 
     // Assert
-    expect(read).toThrow(/empty/);
+    expect(message).toBeNull();
   });
 
   it('reads a hello as the receiver it greets with', () => {

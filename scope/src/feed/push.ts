@@ -123,7 +123,8 @@ export function followFeed(o: PushOptions): () => void {
     for await (const frame of frames) {
       if (stopped) return;
       delivered = true;
-      o.onMessage(messageOf(frame));
+      const message = messageOf(frame);
+      if (message) o.onMessage(message);
     }
   };
   /** One session, then the next, each run started afresh so none waits on the last. */

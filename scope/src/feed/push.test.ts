@@ -16,6 +16,8 @@ const HELLO = toBinary(
   FrameSchema,
   create(FrameSchema, { body: { case: 'hello', value: { receiver: { latDeg: 1.5 } } } }),
 );
+/** A frame of a kind a later feeder may send: only a field this scope has no name for. */
+const UNKNOWN = new Uint8Array([0x78, 0x01]);
 const info: FetchLike = () => Promise.resolve(Response.json({ port: 4433, certificateHash: HASH }));
 
 function streamOf<T>(items: T[]): ReadableStream<T> {
@@ -173,6 +175,19 @@ describe('followFeed', () => {
       m.kind === 'hello' ? m.receiver.lat : m.kind === 'snapshot' ? m.snapshot.now : undefined,
     );
     expect(handed).toEqual([1.5, 1700000000.5, 1700000000.5]);
+  });
+
+  it('passes over a frame of a kind it does not know and follows on', async () => {
+    // Arrange
+    const frame = await testdata('snapshot.bin').bytes();
+    const transports = [() => delivering([HELLO, UNKNOWN, frame])];
+
+    // Act
+    const followed = await follow(transports);
+
+    // Assert
+    expect(followed.messages.map((m) => m.kind)).toEqual(['hello', 'snapshot']);
+    expect(followed.downs).toEqual([ENDED]);
   });
 
   it('connects again after bytes it cannot read', async () => {
