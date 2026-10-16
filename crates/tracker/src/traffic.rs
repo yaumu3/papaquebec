@@ -261,15 +261,20 @@ impl Remembered {
     }
 }
 
-/// The target state, each field as it was last said: the broadcast and the
-/// reply each leave out what the other says.
+/// The target state, each field and each mode as it was last said: the
+/// broadcast and the reply each leave out what the other says.
 #[derive(Default)]
 struct Target {
     selected_altitude_mcp_ft: Said<i32>,
     selected_altitude_fms_ft: Said<i32>,
     selected_heading_deg: Said<f64>,
     baro_setting_hpa: Said<f64>,
-    modes: Said<Modes>,
+    autopilot: Said<bool>,
+    vnav: Said<bool>,
+    altitude_hold: Said<bool>,
+    approach: Said<bool>,
+    lnav: Said<bool>,
+    tcas: Said<bool>,
 }
 
 impl Target {
@@ -282,7 +287,42 @@ impl Target {
         self.selected_heading_deg
             .keep(said.selected_heading_deg, now_s);
         self.baro_setting_hpa.keep(said.baro_setting_hpa, now_s);
-        self.modes.keep(said.modes, now_s);
+        self.autopilot.keep(said.modes.autopilot, now_s);
+        self.vnav.keep(said.modes.vnav, now_s);
+        self.altitude_hold.keep(said.modes.altitude_hold, now_s);
+        self.approach.keep(said.modes.approach, now_s);
+        self.lnav.keep(said.modes.lnav, now_s);
+        self.tcas.keep(said.modes.tcas, now_s);
+    }
+
+    /// The modes as last said, while any is: heard when the latest was, a
+    /// mode that has lapsed as not engaged.
+    fn modes(&self, now_s: f64) -> Option<Modes> {
+        let said_lately = [
+            &self.autopilot,
+            &self.vnav,
+            &self.altitude_hold,
+            &self.approach,
+            &self.lnav,
+            &self.tcas,
+        ]
+        .map(|mode| mode.at(now_s));
+        let latest = said_lately
+            .iter()
+            .flatten()
+            .map(|heard| heard.at_s)
+            .reduce(f64::max)?;
+        let [autopilot, vnav, altitude_hold, approach, lnav, tcas] =
+            said_lately.map(|mode| mode.is_some_and(said));
+        Some(Modes {
+            autopilot,
+            vnav,
+            altitude_hold,
+            approach,
+            lnav,
+            tcas,
+            heard_ms: ms(latest),
+        })
     }
 }
 
@@ -586,10 +626,7 @@ impl Tracked {
                 rc_m: fix.said.integrity.rc_m,
                 heard_ms: ms(fix.at_s),
             }),
-            modes: target.modes.at(now_s).map(|modes| Modes {
-                heard_ms: ms(modes.at_s),
-                ..modes.said
-            }),
+            modes: target.modes(now_s),
             advisory: self.advisory.at(now_s).map(|advisory| Advisory {
                 heard_ms: ms(advisory.at_s),
                 ..advisory.said
@@ -673,14 +710,14 @@ mod tests {
     use crate::bits::Bits;
     use crate::cpr;
     use crate::field::{
-        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, RaBroadcast, Status,
-        SurfacePosition, TargetState, TargetStateAndStatus, Velocity,
+        AirbornePosition, Airspeed, Field, Identification, ModesReported, OperationalStatus,
+        RaBroadcast, Status, SurfacePosition, TargetState, TargetStateAndStatus, Velocity,
     };
     use crate::message::{Reply, Report, Trust, squitter};
     use crate::position::Position;
     use crate::proto::{
         self, Address, AddressType, Advisory, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Flag, Int, Real, Reception, Snapshot, Source, advisory::Resolution,
+        Flag, Int, Modes, Real, Reception, Snapshot, Source, advisory::Resolution,
     };
     use crate::register::{HeadingAndSpeed, Register, SelectedVerticalIntention, TrackAndTurn};
 
@@ -1983,6 +2020,52 @@ mod tests {
             (Some(6000), None, Some(270.0), Some(1013.6)),
         ];
         assert_eq!(known.map(|a| selected(&a)), expected);
+    }
+
+    #[test]
+    fn selected_intention_register_leaves_the_modes_it_does_not_carry() {
+        // Arrange: every mode engaged in the broadcast, then the register
+        // with VNAV off
+        let engaged = Modes {
+            autopilot: true,
+            vnav: true,
+            altitude_hold: true,
+            approach: true,
+            lnav: true,
+            tcas: true,
+            ..Modes::default()
+        };
+        let broadcast = Report::TargetStateAndStatus(TargetStateAndStatus {
+            target: TargetState {
+                modes: engaged.into(),
+                ..TargetState::default()
+            },
+            nac_p: 9,
+        });
+        let intention = TargetState {
+            modes: ModesReported {
+                vnav: Some(false),
+                altitude_hold: Some(true),
+                approach: Some(true),
+                ..ModesReported::default()
+            },
+            ..TargetState::default()
+        };
+        let answered = answered(&Register::SelectedVerticalIntention(
+            SelectedVerticalIntention { target: intention },
+        ));
+
+        // Act
+        let traffic = after([broadcast, answered]);
+
+        // Assert: the reply's three as it says them, heard with it; the
+        // broadcast's others as they were
+        let expected = Modes {
+            vnav: false,
+            heard_ms: 101_000,
+            ..engaged
+        };
+        assert_eq!(known(traffic).modes, Some(expected));
     }
 
     #[test]

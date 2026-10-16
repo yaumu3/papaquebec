@@ -249,10 +249,11 @@ enum Source {
   SOURCE_MLAT = 5;
 }
 
-// The autopilot modes, from the Target State and Status message or the Comm-B
-// selected vertical intention register, which reports only vnav, altitude_hold
-// and approach. Present and all false when the aircraft reports that none is
-// engaged.
+// The autopilot modes, each as last reported: by the Target State and Status
+// message, or by the Comm-B selected vertical intention register, which
+// reports only vnav, altitude_hold and approach and leaves the others as they
+// were. Present and all false when the aircraft reports that none is engaged;
+// a mode not reported within the minute is false.
 message Modes {
   bool autopilot = 1;
   bool vnav = 2;

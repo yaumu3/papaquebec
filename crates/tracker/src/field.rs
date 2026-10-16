@@ -629,10 +629,33 @@ pub struct TargetState {
     pub selected_heading_deg: Option<f64>,
     /// QNH or QFE, as the crew set it.
     pub baro_setting_hpa: Option<f64>,
-    /// None when the aircraft does not report its modes; all false when it
-    /// reports that none is engaged. When they were heard is the traffic's
-    /// to say.
-    pub modes: Option<Modes>,
+    pub modes: ModesReported,
+}
+
+/// The autopilot modes as a report carries them: each engaged or not, or
+/// none where the report does not say.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ModesReported {
+    pub autopilot: Option<bool>,
+    pub vnav: Option<bool>,
+    pub altitude_hold: Option<bool>,
+    pub approach: Option<bool>,
+    pub lnav: Option<bool>,
+    pub tcas: Option<bool>,
+}
+
+impl From<Modes> for ModesReported {
+    /// Every mode, as the Target State and Status message carries them.
+    fn from(modes: Modes) -> Self {
+        Self {
+            autopilot: Some(modes.autopilot),
+            vnav: Some(modes.vnav),
+            altitude_hold: Some(modes.altitude_hold),
+            approach: Some(modes.approach),
+            lnav: Some(modes.lnav),
+            tcas: Some(modes.tcas),
+        }
+    }
 }
 
 /// Target State and Status message, of ADS-B version 2.
@@ -670,7 +693,7 @@ impl Field for TargetStateAndStatus {
                 .then(|| f64::from(me.get(31, 39)) * 180.0 / 256.0),
             // In steps of 0.8 hPa from 800 hPa.
             baro_setting_hpa: steps(21, 29).map(|steps| f64::from(8000 + steps * 8) / 10.0),
-            modes,
+            modes: modes.map(ModesReported::from).unwrap_or_default(),
         };
         Some(Self {
             target,
@@ -684,7 +707,8 @@ impl Field for TargetStateAndStatus {
         let altitude = target
             .selected_altitude_fms_ft
             .or(target.selected_altitude_mcp_ft);
-        let modes = target.modes.unwrap_or_default();
+        let modes = target.modes;
+        let flag = |mode: Option<bool>| mode.unwrap_or(false);
         // Zero is no data; the first step follows it.
         let stepped = |value: Option<f64>| value.map_or(0, |steps| count(steps) + 1);
         Bits::default()
@@ -705,15 +729,15 @@ impl Field for TargetStateAndStatus {
             .put(self.nac_p, 4)
             // NIC baro and SIL
             .put(0, 3)
-            .put_flag(target.modes.is_some())
-            .put_flag(modes.autopilot)
-            .put_flag(modes.vnav)
-            .put_flag(modes.altitude_hold)
+            .put_flag(modes != ModesReported::default())
+            .put_flag(flag(modes.autopilot))
+            .put_flag(flag(modes.vnav))
+            .put_flag(flag(modes.altitude_hold))
             // Reserved for the rebroadcast flag
             .put_flag(false)
-            .put_flag(modes.approach)
-            .put_flag(modes.tcas)
-            .put_flag(modes.lnav)
+            .put_flag(flag(modes.approach))
+            .put_flag(flag(modes.tcas))
+            .put_flag(flag(modes.lnav))
             .filled(ME_LEN)
     }
 }
@@ -1305,7 +1329,7 @@ mod tests {
             selected_altitude_fms_ft: None,
             selected_heading_deg: Some(66.796_875),
             baro_setting_hpa: Some(1012.8),
-            modes: Some(Modes {
+            modes: Modes {
                 autopilot: true,
                 vnav: true,
                 altitude_hold: false,
@@ -1313,7 +1337,8 @@ mod tests {
                 lnav: true,
                 tcas: true,
                 ..Modes::default()
-            }),
+            }
+            .into(),
         };
         assert_eq!(read, Some(TargetStateAndStatus { target, nac_p: 9 }));
     }
@@ -1327,11 +1352,12 @@ mod tests {
             selected_altitude_fms_ft: Some(20_992),
             selected_heading_deg: Some(270.0),
             baro_setting_hpa: Some(1013.6),
-            modes: Some(Modes {
+            modes: Modes {
                 altitude_hold: true,
                 approach: true,
                 ..Modes::default()
-            }),
+            }
+            .into(),
         };
         let written = [
             TargetStateAndStatus { target, nac_p: 10 },

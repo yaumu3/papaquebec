@@ -8,9 +8,11 @@
 
 use crate::air;
 use crate::bits::Bits;
-use crate::field::{Field, Identification, TargetState, advised, advisory, count, rounded};
+use crate::field::{
+    Field, Identification, ModesReported, TargetState, advised, advisory, count, rounded,
+};
 use crate::position::signed_bearing;
-use crate::proto::{Advisory, EmitterCategory, Modes};
+use crate::proto::{Advisory, EmitterCategory};
 
 /// The envelope within which a field is taken for a track and turn report or
 /// a heading and speed one, after "The 1090 Megahertz Riddle" (BDS code
@@ -247,11 +249,11 @@ impl Field for SelectedVerticalIntention {
             selected_heading_deg: None,
             // In steps of 0.1 hPa from 800 hPa.
             baro_setting_hpa: baro.map(|bits| f64::from(8000 + bits.get(1, 12)) / 10.0),
-            modes: modes.map(|bits| Modes {
-                vnav: bits.flag(1),
-                altitude_hold: bits.flag(2),
-                approach: bits.flag(3),
-                ..Modes::default()
+            modes: modes.map_or(ModesReported::default(), |bits| ModesReported {
+                vnav: Some(bits.flag(1)),
+                altitude_hold: Some(bits.flag(2)),
+                approach: Some(bits.flag(3)),
+                ..ModesReported::default()
             }),
         };
         (target != TargetState::default()).then_some(Self { target })
@@ -260,7 +262,8 @@ impl Field for SelectedVerticalIntention {
     fn write(&self) -> Bits {
         let target = &self.target;
         let altitude = |ft: Option<i32>| counted(ft.map(|ft| f64::from(ft) / 16.0), 12);
-        let modes = target.modes.unwrap_or_default();
+        let modes = target.modes;
+        let flag = |mode: Option<bool>| mode.unwrap_or(false);
         Bits::default()
             .then(altitude(target.selected_altitude_mcp_ft))
             .then(altitude(target.selected_altitude_fms_ft))
@@ -269,10 +272,10 @@ impl Field for SelectedVerticalIntention {
                 12,
             ))
             .put(0, 8)
-            .put_flag(target.modes.is_some())
-            .put_flag(modes.vnav)
-            .put_flag(modes.altitude_hold)
-            .put_flag(modes.approach)
+            .put_flag(modes != ModesReported::default())
+            .put_flag(flag(modes.vnav))
+            .put_flag(flag(modes.altitude_hold))
+            .put_flag(flag(modes.approach))
             // Reserved, then the source of the target altitude
             .put(0, 2 + 3)
     }
@@ -405,8 +408,8 @@ mod tests {
     use super::{HeadingAndSpeed, Known, Register, SelectedVerticalIntention, TrackAndTurn};
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
-    use crate::field::TargetState;
-    use crate::proto::{Advisory, Modes, advisory::Resolution};
+    use crate::field::{ModesReported, TargetState};
+    use crate::proto::{Advisory, advisory::Resolution};
 
     /// What the message field of a published Comm-B reply reads as, with
     /// nothing known of the aircraft.
@@ -502,9 +505,15 @@ mod tests {
                 },
             ))
         };
+        let none_engaged = ModesReported {
+            vnav: Some(false),
+            altitude_hold: Some(false),
+            approach: Some(false),
+            ..ModesReported::default()
+        };
         let expected = [
-            selected(24_000, 1013.2, Some(Modes::default())),
-            selected(3008, 1020.0, None),
+            selected(24_000, 1013.2, none_engaged),
+            selected(3008, 1020.0, ModesReported::default()),
         ];
         assert_eq!(read, expected);
     }
@@ -603,11 +612,12 @@ mod tests {
                 selected_altitude_fms_ft: None,
                 selected_heading_deg: None,
                 baro_setting_hpa: Some(1013.6),
-                modes: Some(Modes {
-                    vnav: true,
-                    approach: true,
-                    ..Modes::default()
-                }),
+                modes: ModesReported {
+                    vnav: Some(true),
+                    altitude_hold: Some(false),
+                    approach: Some(true),
+                    ..ModesReported::default()
+                },
             }),
             intention(TargetState {
                 selected_altitude_fms_ft: Some(0),
