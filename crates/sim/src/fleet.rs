@@ -46,8 +46,13 @@ const WIND: Wind = Wind {
 const AIRBORNE_TYPE_CODE: u32 = 11;
 const SURFACE_TYPE_CODE: u32 = 7;
 const NAC_P: u32 = 9;
-/// Standard rate of turn, degrees per second.
+/// Standard rate of turn, degrees per second: how fast an aircraft turns
+/// where that banks it no further than the most.
 const TURN_DEG_PER_S: f64 = 3.0;
+/// The most an airliner banks in a turn, which sets how fast it turns at speed.
+const BANK_MOST_DEG: f64 = 25.0;
+const GRAVITY_M_PER_S2: f64 = 9.806_65;
+const KNOT_M_PER_S: f64 = 1852.0 / 3600.0;
 /// Within this of a waypoint the next leg begins, NM.
 const AT_NM: f64 = 0.15;
 const STEEPEST_FPM: f64 = 2500.0;
@@ -83,6 +88,20 @@ pub struct State {
 /// True bearing from one point to another, degrees.
 fn bearing(from_x: f64, from_y: f64, to_x: f64, to_y: f64) -> f64 {
     bearing_of(to_x - from_x, to_y - from_y).0
+}
+
+/// How fast an aircraft at the airspeed turns: at the standard rate, or as
+/// fast as the most bank turns it in a coordinated turn when that is slower.
+fn turn_rate_deg_per_s(true_airspeed_kt: f64) -> f64 {
+    let at_most_bank =
+        GRAVITY_M_PER_S2 * BANK_MOST_DEG.to_radians().tan() / (true_airspeed_kt * KNOT_M_PER_S);
+    at_most_bank.to_degrees().min(TURN_DEG_PER_S)
+}
+
+/// The bank of a coordinated turn at the airspeed and the rate, positive to the right.
+fn bank_deg(true_airspeed_kt: f64, turn_deg_per_s: f64) -> f64 {
+    let centripetal = true_airspeed_kt * KNOT_M_PER_S * turn_deg_per_s.to_radians();
+    (centripetal / GRAVITY_M_PER_S2).atan().to_degrees()
 }
 
 /// One aircraft as it starts out.
@@ -352,21 +371,22 @@ impl Flying {
         self.leg = 1;
     }
 
-    /// Turns toward the leg's waypoint at the standard rate, flies at the speed of the one it
-    /// left, and climbs or descends so as to be at its level there; past the last waypoint it
-    /// starts over.
+    /// Turns toward the leg's waypoint as fast as its speed allows, flies at the speed of the
+    /// one it left, and climbs or descends so as to be at its level there; past the last
+    /// waypoint it starts over.
     fn follow(&mut self, route: &Route, elapsed: f64) {
         let Some(target) = route.get(self.leg) else {
             return;
         };
+        self.plan.gs = route.get(self.leg - 1).map_or(target.gs, |from| from.gs);
         let to_go = (target.x - self.x).hypot(target.y - self.y);
         let wanted = bearing(self.x, self.y, target.x, target.y);
         let off = signed_bearing(wanted - self.plan.track);
-        let most = TURN_DEG_PER_S * elapsed;
+        let (_, airspeed) = air::through_air(self.plan.track, self.plan.gs, WIND);
+        let most = turn_rate_deg_per_s(airspeed) * elapsed;
         let turn = off.clamp(-most, most);
         self.plan.track = (self.plan.track + turn).rem_euclid(360.0);
         self.turning = if elapsed > 0.0 { turn / elapsed } else { 0.0 };
-        self.plan.gs = route.get(self.leg - 1).map_or(target.gs, |from| from.gs);
         let distance = self.fly_straight(elapsed);
         let minutes = (to_go / self.plan.gs.max(1.0) * 60.0).max(elapsed / 60.0);
         self.baro_rate = ((target.alt - self.alt) / minutes).clamp(-STEEPEST_FPM, STEEPEST_FPM);
@@ -524,7 +544,8 @@ impl Flying {
 
     /// What it answers to a radar's interrogations in the air: the track and
     /// turn report and the heading and speed report, flying through the
-    /// standard air in the wind, the heading as magnetic by the declination.
+    /// standard air in the wind, banked as its turn needs, the heading as
+    /// magnetic by the declination.
     fn answers(&self, declination_deg: f64) -> Vec<Bits> {
         let plan = &self.plan;
         if plan.ground {
@@ -533,7 +554,7 @@ impl Flying {
         let (heading, airspeed) = air::through_air(plan.track, plan.gs, WIND);
         let mach = air::mach(airspeed, self.alt);
         let track_and_turn = TrackAndTurn {
-            roll_deg: None,
+            roll_deg: Some(bank_deg(airspeed, self.turning)),
             track_deg: Some(plan.track),
             ground_speed_kt: Some(plan.gs),
             track_rate_deg_per_s: Some(self.turning),
@@ -727,13 +748,55 @@ fn ticks(seconds: f64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::Fleet;
+    use super::{Fleet, Flying, Plan, turn_rate_deg_per_s};
     use crate::testing::{SITE, hand_clock};
+    use tracker::field::Field;
+    use tracker::register::TrackAndTurn;
 
     /// A fleet at second 1000 and the hand that moves its clock.
     fn fleet(extra: u32) -> (Fleet, impl Fn(f64)) {
         let (clock, hand) = hand_clock(1000.0);
         (Fleet::new(SITE, clock, extra), hand)
+    }
+
+    #[test]
+    fn aircraft_turns_at_the_standard_rate_when_slow_and_at_the_most_bank_when_fast() {
+        // Arrange: on final, and en route
+        let airspeeds = [140.0, 300.0];
+
+        // Act
+        let rates = airspeeds.map(turn_rate_deg_per_s);
+
+        // Assert: 25° of bank at 300 kt turns 1.7° a second
+        assert!((rates[0] - 3.0).abs() < 1e-9, "{rates:?}");
+        assert!((rates[1] - 1.7).abs() < 0.01, "{rates:?}");
+    }
+
+    #[test]
+    fn turning_aircraft_answers_with_the_bank_of_a_coordinated_turn() {
+        // Arrange: east at 200 kt, 165 kt through the air in the fleet's wind,
+        // turning right and left at the standard rate
+        let plan = Plan {
+            gs: 200.0,
+            track: 90.0,
+            alt: 5000.0,
+            ..Plan::default()
+        };
+        let turning = [3.0, -3.0].map(|rate| {
+            let mut flying = Flying::new(plan, 0.0);
+            flying.turning = rate;
+            flying
+        });
+
+        // Act
+        let answered = turning.map(|flying| TrackAndTurn::read(flying.answers(0.0)[0]));
+
+        // Assert: 24.4° either way, to the step of the field
+        let rolls = answered.map(|report| report.and_then(|report| report.roll_deg));
+        let near = |roll: Option<f64>, expected: f64| {
+            roll.is_some_and(|roll| (roll - expected).abs() < 0.2)
+        };
+        assert!(near(rolls[0], 24.4) && near(rolls[1], -24.4), "{rolls:?}");
     }
 
     #[test]

@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use feeder::follow::{follow, wall};
 use prost::Message;
-use sim::Fleet;
+use sim::{Fleet, Scenario};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 use tracker::beast::Reader;
@@ -36,9 +36,14 @@ struct Heard {
 
 impl Heard {
     fn new(extra: u32) -> Self {
+        Self::of(|clock| Fleet::new(SITE, clock, extra))
+    }
+
+    /// The fleet `make` flies by a clock from second 1000 on.
+    fn of(make: impl FnOnce(Box<dyn Fn() -> f64 + Send>) -> Fleet) -> Self {
         let now = Arc::new(Mutex::new(1000.0));
         let clock = Arc::clone(&now);
-        let fleet = Fleet::new(SITE, move || *clock.lock().expect("clock"), extra);
+        let fleet = make(Box::new(move || *clock.lock().expect("clock")));
         Self {
             registry: fleet.registered().collect(),
             fleet,
@@ -316,6 +321,36 @@ fn level_it_came_from_is_set_once_the_selected_one_was_held() {
         intent(numbered(&snapshot, 3)),
         [Some(7000), Some(4992), Some(0)]
     );
+}
+
+#[test]
+fn turning_arrivals_carry_their_roll_and_track_rate() {
+    // Arrange: arrivals merging onto one final
+    let mut heard = Heard::of(|clock| Fleet::scenario(SITE, clock, Scenario::Merge, 1, 0));
+    heard.after(0.0);
+
+    // Act: two minutes of them, each as it was heard while it turned
+    let turning: Vec<_> = (0..120)
+        .flat_map(|_| {
+            let snapshot = heard.after(1.0);
+            let turning: Vec<_> = snapshot
+                .aircraft
+                .iter()
+                .filter_map(|a| {
+                    let rate = a.track_rate_deg_per_s?.value;
+                    (rate.abs() > 0.5).then(|| (rate, a.roll_deg.map(|roll| roll.value)))
+                })
+                .collect();
+            turning
+        })
+        .collect();
+
+    // Assert: whoever turns rolls the same way, within what an airliner banks
+    assert!(!turning.is_empty());
+    let banked = |(rate, roll): &(f64, Option<f64>)| {
+        roll.is_some_and(|roll| roll.signum() == rate.signum() && roll.abs() <= 35.0)
+    };
+    assert!(turning.iter().all(banked), "{turning:?}");
 }
 
 #[test]
