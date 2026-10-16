@@ -1,3 +1,4 @@
+import { epuM } from '../../lib/accuracy';
 import { crewAltitudeFt } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { modeNames, sourceName } from '../../lib/format';
@@ -29,7 +30,7 @@ export type PlotSpec =
   | {
       kind: 'line';
       y: Read;
-      /** The least range the lane's scale spans, in the reading's unit. */
+      /** The least range the lane's scale spans, in what `y` reads. */
       minSpan: number;
       /** Whether a sample has no value yet a state to show, drawn along the lane's floor. */
       floor?: (s: Sample) => boolean;
@@ -51,6 +52,10 @@ const heading = (s: Sample): Heading | undefined => {
   const hdg = s.heading;
   return trk === undefined && hdg === undefined ? undefined : { trk, hdg };
 };
+
+/** A bound in metres on a log scale: its power of ten, so each factor of ten takes the same height. */
+const logOf = (m: number | undefined): number | undefined =>
+  m === undefined ? undefined : Math.log10(m);
 
 /** How each reading is drawn; `laneOf` in `state/plotted.ts` says which lane an intent goes in. */
 export const PLOTS: Record<ReadingKey, PlotSpec> = {
@@ -75,8 +80,12 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   wind: { kind: 'barbs', barb: wind },
   oat: { kind: 'line', y: (s) => s.oat, minSpan: 5 },
   tat: { kind: 'line', y: (s) => s.tat, minSpan: 5 },
-  nic: { kind: 'line', y: (s) => s.nic, minSpan: 4 },
-  nacp: { kind: 'line', y: (s) => s.nacP, minSpan: 4 },
+  nic: { kind: 'line', y: (s) => logOf(s.rc), minSpan: 1 },
+  nacp: {
+    kind: 'line',
+    y: (s) => logOf(s.nacP === undefined ? undefined : epuM(s.nacP)),
+    minSpan: 1,
+  },
   src: { kind: 'gantt', names: (s) => [sourceName(s.source)] },
   rssi: { kind: 'line', y: (s) => s.rssi, minSpan: 6 },
   msgs: { kind: 'line', y: (s) => s.messageRate, minSpan: 4 },

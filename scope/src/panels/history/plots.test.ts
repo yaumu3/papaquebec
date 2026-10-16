@@ -121,6 +121,31 @@ describe('PLOTS', () => {
     // Assert
     expect(out).toEqual([1.3, { dir: 300, speed: 12 }]);
   });
+
+  it('plots the NIC and NACp as the powers of ten of their bounds, none where they bound nothing', () => {
+    // Arrange
+    const samples = [
+      makeSample(1, { nic: 8, rc: 186, nacP: 9 }),
+      makeSample(2, { nic: 6, nacP: 0 }),
+      makeSample(3, { nic: 0 }),
+      makeSample(4),
+    ];
+    const [nic, nacp] = [PLOTS.nic, PLOTS.nacp];
+
+    // Act
+    const ys = samples.map((s) => [
+      nic.kind === 'line' ? nic.y(s) : null,
+      nacp.kind === 'line' ? nacp.y(s) : null,
+    ]);
+
+    // Assert
+    expect(ys).toEqual([
+      [Math.log10(186), Math.log10(30)],
+      [undefined, undefined],
+      [undefined, undefined],
+      [undefined, undefined],
+    ]);
+  });
 });
 
 describe('minSpanOf', () => {
