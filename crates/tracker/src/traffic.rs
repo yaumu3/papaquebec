@@ -1183,11 +1183,12 @@ mod tests {
             ),
         ];
 
-        // Act
         let mut traffic = hearing(messages);
 
-        // Assert
+        // Act
         let known = traffic.snapshot(106.0).aircraft.remove(0);
+
+        // Assert
         let expected = proto::Identification {
             callsign: Some("TEST02".into()),
             emitter_category: Some(EmitterCategory::A3Large.into()),

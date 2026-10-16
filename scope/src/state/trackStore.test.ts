@@ -177,14 +177,8 @@ describe('createTrackStore', () => {
     store.ingest(snapshot(1000, aircraft));
 
     // Assert
-    const ages = ['a', 'b'].map((hex) => {
-      const t = store.tracks.get(hex);
-      return [t?.seen, t?.seenPos];
-    });
-    expect(ages).toEqual([
-      [0.25, 2.5],
-      [2, undefined],
-    ]);
+    expect([store.tracks.get('a')?.seen, store.tracks.get('a')?.seenPos]).toEqual([0.25, 2.5]);
+    expect([store.tracks.get('b')?.seen, store.tracks.get('b')?.seenPos]).toEqual([2, undefined]);
   });
 
   it('shows the ident while it is reported true and its report is fresh', () => {
@@ -200,8 +194,11 @@ describe('createTrackStore', () => {
     store.ingest(snapshot(1000, aircraft));
 
     // Assert
-    const shown = ['fresh', 'lapsed', 'ended'].map((hex) => store.tracks.get(hex)?.ident);
-    expect(shown).toEqual([true, false, false]);
+    expect(['fresh', 'lapsed', 'ended'].map((hex) => store.tracks.get(hex)?.ident)).toEqual([
+      true,
+      false,
+      false,
+    ]);
   });
 
   it('shows the advisory while its report is fresh', () => {
@@ -219,8 +216,10 @@ describe('createTrackStore', () => {
     store.ingest(snapshot(1000, aircraft));
 
     // Assert
-    const shown = ['fresh', 'lapsed'].map((hex) => store.tracks.get(hex)?.ra);
-    expect(shown).toEqual([ra, undefined]);
+    expect([store.tracks.get('fresh')?.ra, store.tracks.get('lapsed')?.ra]).toEqual([
+      ra,
+      undefined,
+    ]);
   });
 
   it('derives the message rate from the snapshot message counter', () => {
