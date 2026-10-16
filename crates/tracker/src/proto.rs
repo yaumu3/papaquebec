@@ -9,6 +9,8 @@ mod generated {
 
 pub use generated::*;
 
+use crate::position;
+
 /// An instant as the feed carries it: the seconds since the epoch as whole
 /// milliseconds, to the nearest; nothing before the epoch.
 #[must_use]
@@ -24,6 +26,62 @@ impl Address {
             value,
             r#type: r#type.into(),
         }
+    }
+}
+
+/// A value the feed carries with when it was heard.
+pub trait Reported: Copy {
+    type Value;
+
+    /// The value, without when.
+    fn reported(self) -> Self::Value;
+}
+
+impl Reported for Int {
+    type Value = i32;
+
+    fn reported(self) -> i32 {
+        self.value
+    }
+}
+
+impl Reported for Real {
+    type Value = f64;
+
+    fn reported(self) -> f64 {
+        self.value
+    }
+}
+
+impl Reported for Flag {
+    type Value = bool;
+
+    fn reported(self) -> bool {
+        self.value
+    }
+}
+
+/// What a field carries, without when; none when it carries nothing.
+#[must_use]
+pub fn reported<R: Reported>(field: Option<R>) -> Option<R::Value> {
+    field.map(Reported::reported)
+}
+
+impl Aircraft {
+    /// The callsign, when the identification carries one.
+    #[must_use]
+    pub fn callsign(&self) -> Option<&str> {
+        self.identification.as_ref()?.callsign.as_deref()
+    }
+
+    /// Where it is placed, when it is.
+    #[must_use]
+    pub fn place(&self) -> Option<position::Position> {
+        let position = self.position.as_ref()?;
+        Some(position::Position {
+            lat_deg: position.lat_deg,
+            lon_deg: position.lon_deg,
+        })
     }
 }
 

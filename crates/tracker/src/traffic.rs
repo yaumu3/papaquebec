@@ -799,7 +799,7 @@ mod tests {
     use crate::position::Position;
     use crate::proto::{
         self, Address, AddressType, Advisory, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Flag, Int, Modes, Real, Reception, Snapshot, Source, advisory::Resolution,
+        Flag, Int, Modes, Real, Reception, Snapshot, Source, advisory::Resolution, reported,
     };
     use crate::register::{HeadingAndSpeed, Register, SelectedVerticalIntention, TrackAndTurn};
 
@@ -924,34 +924,10 @@ mod tests {
         traffic
     }
 
-    /// Where the aircraft is known to be.
-    fn place(known: &Aircraft) -> Option<Position> {
-        let position = known.position.as_ref()?;
-        Some(Position {
-            lat_deg: position.lat_deg,
-            lon_deg: position.lon_deg,
-        })
-    }
-
     fn is_at(known: &Aircraft, at: Position) -> bool {
-        place(known).is_some_and(|place| place.distance_nm(at) < 0.01)
-    }
-
-    /// What is carried, without when.
-    fn int(carried: Option<Int>) -> Option<i32> {
-        carried.map(|carried| carried.value)
-    }
-
-    fn real(carried: Option<Real>) -> Option<f64> {
-        carried.map(|carried| carried.value)
-    }
-
-    fn flag(carried: Option<Flag>) -> Option<bool> {
-        carried.map(|carried| carried.value)
-    }
-
-    fn callsign(known: &Aircraft) -> Option<&str> {
-        known.identification.as_ref()?.callsign.as_deref()
+        known
+            .place()
+            .is_some_and(|place| place.distance_nm(at) < 0.01)
     }
 
     fn category(known: &Aircraft) -> Option<EmitterCategory> {
@@ -962,20 +938,20 @@ mod tests {
     /// The target state: the altitudes, the heading and the setting.
     fn selected(known: &Aircraft) -> (Option<i32>, Option<i32>, Option<f64>, Option<f64>) {
         (
-            int(known.selected_altitude_mcp_ft),
-            int(known.selected_altitude_fms_ft),
-            real(known.selected_heading_deg),
-            real(known.baro_setting_hpa),
+            reported(known.selected_altitude_mcp_ft),
+            reported(known.selected_altitude_fms_ft),
+            reported(known.selected_heading_deg),
+            reported(known.baro_setting_hpa),
         )
     }
 
     /// What is derived: the wind's direction and speed, and the temperatures.
     fn derived(known: &Aircraft) -> [Option<f64>; 4] {
         [
-            real(known.wind_dir_deg),
-            real(known.wind_speed_kt),
-            real(known.oat_c),
-            real(known.tat_c),
+            reported(known.wind_dir_deg),
+            reported(known.wind_speed_kt),
+            reported(known.oat_c),
+            reported(known.tat_c),
         ]
     }
 
@@ -1075,7 +1051,7 @@ mod tests {
 
         // Assert
         let snapshot = traffic.snapshot(100.0);
-        let callsigns: Vec<_> = snapshot.aircraft.iter().map(callsign).collect();
+        let callsigns: Vec<_> = snapshot.aircraft.iter().map(Aircraft::callsign).collect();
         assert_eq!((snapshot.messages, callsigns), (2, vec![Some("TEST01")]));
     }
 
@@ -1132,7 +1108,7 @@ mod tests {
         let known: Vec<_> = snapshot
             .aircraft
             .iter()
-            .map(|a| (a.address, int(a.baro_altitude_ft)))
+            .map(|a| (a.address, reported(a.baro_altitude_ft)))
             .collect();
         assert_eq!(known, [(Some(icao(ADDRESS)), Some(2500))]);
         assert_eq!(snapshot.messages, 2);
@@ -1165,11 +1141,11 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(callsign(&known), Some("TEST01"));
+        assert_eq!(known.callsign(), Some("TEST01"));
         assert_eq!(category(&known), Some(EmitterCategory::A5Heavy));
-        assert_eq!(real(known.ground_speed_kt), Some(300.0));
-        assert_eq!(real(known.track_deg), Some(240.0));
-        assert_eq!(int(known.baro_vertical_rate_fpm), Some(-1216));
+        assert_eq!(reported(known.ground_speed_kt), Some(300.0));
+        assert_eq!(reported(known.track_deg), Some(240.0));
+        assert_eq!(reported(known.baro_vertical_rate_fpm), Some(-1216));
     }
 
     #[test]
@@ -1215,8 +1191,8 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(int(known.baro_vertical_rate_fpm), Some(-1216));
-        assert_eq!(int(known.geometric_vertical_rate_fpm), Some(-832));
+        assert_eq!(reported(known.baro_vertical_rate_fpm), Some(-1216));
+        assert_eq!(reported(known.geometric_vertical_rate_fpm), Some(-832));
     }
 
     #[test]
@@ -1245,7 +1221,12 @@ mod tests {
         let known = reports.map(|reports| known(after(reports)));
 
         // Assert
-        let altitudes = known.map(|a| (int(a.baro_altitude_ft), int(a.geometric_altitude_ft)));
+        let altitudes = known.map(|a| {
+            (
+                reported(a.baro_altitude_ft),
+                reported(a.geometric_altitude_ft),
+            )
+        });
         assert_eq!(
             altitudes,
             [(Some(2525), None), (Some(2550), None), (None, Some(2650))]
@@ -1270,7 +1251,7 @@ mod tests {
 
         // Assert: heard with the difference, the older of the two
         let known = known(traffic);
-        assert_eq!(int(known.baro_altitude_ft), Some(38_000));
+        assert_eq!(reported(known.baro_altitude_ft), Some(38_000));
         let height = Int {
             value: 38_550,
             heard_ms: 100_000,
@@ -1290,7 +1271,7 @@ mod tests {
         let known = reports.map(|reports| known(after(reports)));
 
         // Assert
-        let states = known.map(|a| (flag(a.on_ground), int(a.baro_altitude_ft)));
+        let states = known.map(|a| (reported(a.on_ground), reported(a.baro_altitude_ft)));
         assert_eq!(states, [(Some(true), None), (Some(false), Some(25))]);
     }
 
@@ -1309,7 +1290,7 @@ mod tests {
         let known = reports.map(|report| known(after([identification("TEST01"), report])));
 
         // Assert
-        assert_eq!(known.map(|a| flag(a.on_ground)), [Some(true); 2]);
+        assert_eq!(known.map(|a| reported(a.on_ground)), [Some(true); 2]);
     }
 
     #[test]
@@ -1333,7 +1314,7 @@ mod tests {
         let known = reports.map(|reports| known(after(reports)));
 
         // Assert
-        let statuses = known.map(|a| (int(a.mode_a_code), a.emergency.map(|e| e.status())));
+        let statuses = known.map(|a| (reported(a.mode_a_code), a.emergency.map(|e| e.status())));
         let expected = [
             (
                 Some(0o7700),
@@ -1369,8 +1350,8 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(real(known.indicated_airspeed_kt), Some(250.0));
-        assert_eq!(real(known.true_airspeed_kt), Some(375.0));
+        assert_eq!(reported(known.indicated_airspeed_kt), Some(250.0));
+        assert_eq!(reported(known.true_airspeed_kt), Some(375.0));
     }
 
     #[test]
@@ -1406,7 +1387,7 @@ mod tests {
         let known = known(traffic);
         assert_eq!(selected(&known), (Some(6000), None, None, Some(1013.6)));
         assert_eq!(known.modes, None);
-        assert_eq!(int(known.nac_p), Some(9));
+        assert_eq!(reported(known.nac_p), Some(9));
         assert_eq!(known.position, None);
     }
 
@@ -1466,7 +1447,7 @@ mod tests {
 
         // Assert: with the integrity of type code 11, heard with the pair's second
         let known = known(traffic);
-        assert!(is_at(&known, NORTH), "{:?}", place(&known));
+        assert!(is_at(&known, NORTH), "{:?}", known.place());
         let position = known.position.expect("placed");
         assert_eq!(position.source(), Source::Unspecified);
         assert_eq!(
@@ -1502,7 +1483,7 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        assert_eq!(place(&known(traffic)), None);
+        assert_eq!(known(traffic).place(), None);
     }
 
     #[test]
@@ -1518,7 +1499,7 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert!(is_at(&known, FURTHER), "{:?}", place(&known));
+        assert!(is_at(&known, FURTHER), "{:?}", known.place());
         assert_eq!(known.position.map(|p| p.heard_ms), Some(105_000));
     }
 
@@ -1535,7 +1516,7 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert!(!is_at(&known, FURTHER), "{:?}", place(&known));
+        assert!(!is_at(&known, FURTHER), "{:?}", known.place());
     }
 
     #[test]
@@ -1551,7 +1532,7 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        assert_eq!(place(&known(traffic)), None);
+        assert_eq!(known(traffic).place(), None);
     }
 
     #[test]
@@ -1571,10 +1552,10 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert!(is_at(&known, apron), "{:?}", place(&known));
-        assert_eq!(flag(known.on_ground), Some(true));
-        assert_eq!(real(known.ground_speed_kt), Some(18.0));
-        assert_eq!(real(known.track_deg), Some(340.3125));
+        assert!(is_at(&known, apron), "{:?}", known.place());
+        assert_eq!(reported(known.on_ground), Some(true));
+        assert_eq!(reported(known.ground_speed_kt), Some(18.0));
+        assert_eq!(reported(known.track_deg), Some(340.3125));
     }
 
     #[test]
@@ -1589,7 +1570,7 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        assert_eq!(flag(known(traffic).on_ground), Some(false));
+        assert_eq!(reported(known(traffic).on_ground), Some(false));
     }
 
     #[test]
@@ -1641,7 +1622,7 @@ mod tests {
         let known = known(traffic);
         let position = known.position.expect("placed");
         assert_eq!((position.nic, position.rc_m), (9, Some(75)));
-        assert_eq!(int(known.nac_p), Some(10));
+        assert_eq!(reported(known.nac_p), Some(10));
     }
 
     #[test]
@@ -1658,7 +1639,7 @@ mod tests {
         // Assert: type code 11 stands for an accuracy category of 8
         let known = known(traffic);
         let nic = known.position.map(|p| p.nic);
-        assert_eq!((nic, int(known.nac_p)), (Some(8), Some(8)));
+        assert_eq!((nic, reported(known.nac_p)), (Some(8), Some(8)));
     }
 
     #[test]
@@ -1708,7 +1689,7 @@ mod tests {
         // Assert: all else starts anew
         assert_eq!(forgetting.aircraft, vec![]);
         let known = snapshot.aircraft.remove(0);
-        assert_eq!(callsign(&known), Some("TEST01"));
+        assert_eq!(known.callsign(), Some("TEST01"));
         assert_eq!(category(&known), Some(EmitterCategory::A3Large));
         assert_eq!(known.reception.map(|r| r.messages), Some(2));
     }
@@ -1743,7 +1724,7 @@ mod tests {
 
         // Assert
         let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
-        let said = known.map(|a| (int(a.mode_a_code), real(a.ground_speed_kt)));
+        let said = known.map(|a| (reported(a.mode_a_code), reported(a.ground_speed_kt)));
         assert_eq!(said, [(None, Some(290.0)), (None, None)]);
     }
 
@@ -1760,7 +1741,7 @@ mod tests {
 
         // Assert
         let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
-        let kept = known.map(|a| (callsign(&a).map(String::from), category(&a)));
+        let kept = known.map(|a| (a.callsign().map(String::from), category(&a)));
         let said = (Some("TEST01".into()), Some(EmitterCategory::A3Large));
         assert_eq!(kept, [said, (None, None)]);
     }
@@ -1821,7 +1802,7 @@ mod tests {
         let traffic = after([identing(true), identing(false)]);
 
         // Assert
-        assert_eq!(flag(known(traffic).ident), Some(false));
+        assert_eq!(reported(known(traffic).ident), Some(false));
     }
 
     #[test]
@@ -1841,7 +1822,10 @@ mod tests {
         let traffic = after([through_the_air.clone(), through_the_air]);
 
         // Assert
-        assert_eq!(real(known(traffic).magnetic_heading_deg), Some(243.984_375));
+        assert_eq!(
+            reported(known(traffic).magnetic_heading_deg),
+            Some(243.984_375)
+        );
     }
 
     #[test]
@@ -1860,8 +1844,8 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(real(known.roll_deg), Some(-9.667_968_75));
-        assert_eq!(real(known.track_rate_deg_per_s), Some(-0.406_25));
+        assert_eq!(reported(known.roll_deg), Some(-9.667_968_75));
+        assert_eq!(reported(known.track_rate_deg_per_s), Some(-0.406_25));
     }
 
     #[test]
@@ -1985,7 +1969,7 @@ mod tests {
 
         // Assert: which says nothing of the category
         let known = known(traffic);
-        assert_eq!(callsign(&known), Some("TEST01"));
+        assert_eq!(known.callsign(), Some("TEST01"));
         assert_eq!(category(&known), None);
     }
 
@@ -2009,17 +1993,17 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        let over_ground = (real(known.track_deg), real(known.ground_speed_kt));
+        let over_ground = (reported(known.track_deg), reported(known.ground_speed_kt));
         assert_eq!(over_ground, (Some(225.0), Some(290.0)));
         let through_air = (
-            real(known.true_airspeed_kt),
-            real(known.indicated_airspeed_kt),
-            real(known.mach),
+            reported(known.true_airspeed_kt),
+            reported(known.indicated_airspeed_kt),
+            reported(known.mach),
         );
         assert_eq!(through_air, (Some(300.0), Some(250.0), Some(0.78)));
         let rates = (
-            int(known.baro_vertical_rate_fpm),
-            int(known.geometric_vertical_rate_fpm),
+            reported(known.baro_vertical_rate_fpm),
+            reported(known.geometric_vertical_rate_fpm),
         );
         assert_eq!(rates, (Some(-1216), Some(-1856)));
     }
@@ -2053,7 +2037,7 @@ mod tests {
         let known = reports.map(|reports| known(after(reports)));
 
         // Assert
-        let read = known.map(|a| real(a.indicated_airspeed_kt));
+        let read = known.map(|a| reported(a.indicated_airspeed_kt));
         assert_eq!(read, [Some(255.0), Some(250.0)]);
     }
 
@@ -2075,9 +2059,9 @@ mod tests {
         // Assert: the airspeed, which only the report says, stays either way
         let read = known.map(|a| {
             (
-                real(a.ground_speed_kt),
-                real(a.track_deg),
-                real(a.true_airspeed_kt),
+                reported(a.ground_speed_kt),
+                reported(a.track_deg),
+                reported(a.true_airspeed_kt),
             )
         });
         assert_eq!(read, [(Some(290.0), Some(236.25), Some(310.0)); 2]);
@@ -2161,7 +2145,7 @@ mod tests {
         // Assert
         let known = traffic.snapshot(171.0).aircraft.remove(0);
         assert_eq!(
-            (real(known.ground_speed_kt), real(known.track_deg)),
+            (reported(known.ground_speed_kt), reported(known.track_deg)),
             (Some(300.0), Some(270.0))
         );
     }
@@ -2263,7 +2247,7 @@ mod tests {
         // Assert
         let known = known(traffic);
         assert_eq!(
-            (real(known.true_airspeed_kt), real(known.mach)),
+            (reported(known.true_airspeed_kt), reported(known.mach)),
             (Some(228.0), None)
         );
     }
@@ -2417,7 +2401,7 @@ mod tests {
         // Act: just short of a minute after the Mach number, and a minute after it
         let derived = [159.9, 160.0].map(|now_s| {
             let known = traffic.snapshot(now_s).aircraft.remove(0);
-            (real(known.true_airspeed_kt), real(known.oat_c))
+            (reported(known.true_airspeed_kt), reported(known.oat_c))
         });
 
         // Assert: the airspeed, said later, is still known

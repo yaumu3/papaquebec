@@ -154,7 +154,9 @@ mod tests {
     use tracker::field::{Field, Identification};
     use tracker::message::squitter;
     use tracker::position::Position;
-    use tracker::proto::{EmitterCategory, Frame, Hello, Receiver, Snapshot, frame::Body};
+    use tracker::proto::{
+        Aircraft, EmitterCategory, Frame, Hello, Receiver, Snapshot, frame::Body,
+    };
     use tracker::registry::Registry;
 
     /// RJFF
@@ -261,11 +263,7 @@ mod tests {
             lon_deg: Some(SITE.lon_deg),
         };
         assert_eq!(hello.receiver, Some(receiver));
-        let known: Vec<_> = snapshot
-            .aircraft
-            .iter()
-            .map(|a| a.identification.as_ref()?.callsign.as_deref())
-            .collect();
+        let known: Vec<_> = snapshot.aircraft.iter().map(Aircraft::callsign).collect();
         assert_eq!(known, [Some("TEST02")]);
         assert_eq!(snapshot.messages, 2);
     }
