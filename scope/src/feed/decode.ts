@@ -75,7 +75,9 @@ function threatOf(threat: NonNullable<Aircraft['advisory']>['threat']): Threat |
       return { address: threat.value.toString(16).padStart(6, '0') };
     case 'threatPosition': {
       const { altitudeFt, rangeNm, bearingDeg } = threat.value;
-      return withoutUnknown({ altitude: altitudeFt, range: rangeNm, bearing: bearingDeg });
+      const placed = withoutUnknown({ altitude: altitudeFt, range: rangeNm, bearing: bearingDeg });
+      // Placed, but with no estimate at all, it is as good as not identified.
+      return Object.keys(placed).length === 0 ? undefined : placed;
     }
     default:
       return undefined;

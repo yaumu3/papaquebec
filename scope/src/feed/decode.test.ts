@@ -227,6 +227,20 @@ describe('messageOf', () => {
     expect(read.map((a) => a.ra?.threat)).toEqual([{ address: '4840d6' }]);
   });
 
+  it('reads a threat placed without any estimate as no threat', () => {
+    // Arrange
+    const advisory = { threat: { case: 'threatPosition' as const, value: {} } };
+    const frame = create(FrameSchema, {
+      body: { case: 'snapshot', value: { aircraft: [{ advisory }] } },
+    });
+
+    // Act
+    const read = aircraftOf(frame);
+
+    // Assert
+    expect(read.map((a) => [a.ra !== undefined, a.ra?.threat])).toEqual([[true, undefined]]);
+  });
+
   it('reads a frame that carries nothing it knows as nothing', () => {
     // Arrange
     const frame = create(FrameSchema);
