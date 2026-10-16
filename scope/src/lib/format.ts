@@ -1,4 +1,5 @@
 import type { PositionSource } from './aircraft';
+import { NM_IN_METERS } from './geo';
 
 export type ClimbState = 'climbing' | 'descending' | 'level';
 
@@ -119,11 +120,18 @@ export function formatMach(m: number | undefined): string {
   return m === undefined ? '---' : `M${m.toFixed(2)}`;
 }
 
-/** A quantity in tenths while those read below `wholeFrom`, whole from there on. */
-function formatTenthsBelow(value: number | undefined, wholeFrom: number): string {
+/**
+ * A quantity in tenths while those read below `wholeFrom`, whole from there on, either rounded by
+ * `round`: to the nearest unless told otherwise.
+ */
+function formatTenthsBelow(
+  value: number | undefined,
+  wholeFrom: number,
+  round: (n: number) => number = Math.round,
+): string {
   if (value === undefined) return '---';
-  const tenths = Math.round(value * 10) / 10;
-  return tenths < wholeFrom ? tenths.toFixed(1) : String(Math.round(value));
+  const tenths = round(value * 10) / 10;
+  return tenths < wholeFrom ? tenths.toFixed(1) : String(round(value));
 }
 
 /** Seconds since something was last heard: in tenths up to ten seconds. */
@@ -131,3 +139,22 @@ export const formatAge = (seconds: number | undefined): string => formatTenthsBe
 
 /** A distance in nautical miles: in tenths up to a hundred miles. */
 export const formatDistance = (nm: number | undefined): string => formatTenthsBelow(nm, 100);
+
+/** Where a bound in metres starts to read in nautical miles: a tenth of a mile. */
+const BOUND_NM_FROM_M = NM_IN_METERS / 10;
+
+/**
+ * How far a bound may run past a step of the miles and still read as that step: the tracker
+ * sends each radius rounded up to whole metres, 0.1 NM (185.2 m) as 186.
+ */
+const BOUND_ROUNDED_UP_BY_M = 1;
+
+/**
+ * An upper bound in metres, such as a radius of containment, rounded up: in whole metres below a
+ * tenth of a mile, and in nautical miles from there, in tenths below one mile.
+ */
+export function formatBoundM(m: number): { v: string; unit: string } {
+  if (m < BOUND_NM_FROM_M) return { v: `<${Math.ceil(m)}`, unit: 'm' };
+  const nm = (m - BOUND_ROUNDED_UP_BY_M) / NM_IN_METERS;
+  return { v: `<${formatTenthsBelow(nm, 1, Math.ceil)}`, unit: 'NM' };
+}

@@ -5,6 +5,7 @@ import {
   climbState,
   emergencyCode,
   formatAge,
+  formatBoundM,
   formatDistance,
   formatGsWake,
   formatMmSs,
@@ -199,5 +200,86 @@ describe('formatDistance', () => {
 
     // Assert
     expect(out).toEqual(['0.4', '14.5', '99.9', '100', '123', '---']);
+  });
+});
+
+describe('formatBoundM', () => {
+  it('reads every radius of containment the tracker sends', () => {
+    // Arrange
+    const radii = [8, 25, 75, 186, 371, 556, 926, 1112, 1852, 3704, 7408, 14816, 18520, 37040];
+
+    // Act
+    const out = radii.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { v: '<8', unit: 'm' },
+      { v: '<25', unit: 'm' },
+      { v: '<75', unit: 'm' },
+      { v: '<0.1', unit: 'NM' },
+      { v: '<0.2', unit: 'NM' },
+      { v: '<0.3', unit: 'NM' },
+      { v: '<0.5', unit: 'NM' },
+      { v: '<0.6', unit: 'NM' },
+      { v: '<1', unit: 'NM' },
+      { v: '<2', unit: 'NM' },
+      { v: '<4', unit: 'NM' },
+      { v: '<8', unit: 'NM' },
+      { v: '<10', unit: 'NM' },
+      { v: '<20', unit: 'NM' },
+    ]);
+  });
+
+  it('reads every position error bound of the NACp categories', () => {
+    // Arrange
+    const bounds = [3, 10, 30, 92.6, 185.2, 555.6, 926, 1852, 3704, 7408, 18520];
+
+    // Act
+    const out = bounds.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { v: '<3', unit: 'm' },
+      { v: '<10', unit: 'm' },
+      { v: '<30', unit: 'm' },
+      { v: '<93', unit: 'm' },
+      { v: '<0.1', unit: 'NM' },
+      { v: '<0.3', unit: 'NM' },
+      { v: '<0.5', unit: 'NM' },
+      { v: '<1', unit: 'NM' },
+      { v: '<2', unit: 'NM' },
+      { v: '<4', unit: 'NM' },
+      { v: '<10', unit: 'NM' },
+    ]);
+  });
+
+  it('rounds a bound between the steps of the miles up to the next', () => {
+    // Arrange
+    const bounds = [200, 1500, 1800, 2700];
+
+    // Act
+    const out = bounds.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { v: '<0.2', unit: 'NM' },
+      { v: '<0.9', unit: 'NM' },
+      { v: '<1', unit: 'NM' },
+      { v: '<2', unit: 'NM' },
+    ]);
+  });
+
+  it('reads a bound in miles from a tenth of a mile, in metres below', () => {
+    // Arrange
+    const bounds = [185.1, 185.2];
+
+    // Act
+    const out = bounds.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { v: '<186', unit: 'm' },
+      { v: '<0.1', unit: 'NM' },
+    ]);
   });
 });

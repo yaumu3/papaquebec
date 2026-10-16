@@ -1,8 +1,10 @@
+import { epuM } from '../lib/accuracy';
 import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
 import { steeringHeading } from '../lib/autopilot';
 import {
   climbArrow,
   formatAge,
+  formatBoundM,
   formatMach,
   formatModes,
   padBearing,
@@ -90,6 +92,25 @@ const ageReading = (r: Readout): Reading => ({
   unit: 's',
 });
 
+/** An upper bound in metres; a query when the category bounds nothing. */
+function boundReading(m: number | undefined): Reading {
+  return m === undefined ? { v: '?' } : formatBoundM(m);
+}
+
+/**
+ * The radius of containment the position's NIC stands for, or the category itself where the
+ * standard assigns its combination no radius; blank without a position, and for NIC 0, which is
+ * no category: the integrity of an MLAT or TIS-B fix, or one not known.
+ */
+function nicReading(r: Readout): Reading {
+  if (!r.nic) return NONE;
+  return r.rc === undefined ? { v: String(r.nic) } : boundReading(r.rc);
+}
+
+/** The position error bound the NACp stands for; blank without a NACp. */
+const nacpReading = (r: Readout): Reading =>
+  r.nacP === undefined ? NONE : boundReading(epuM(r.nacP));
+
 export interface ReadingSpec {
   label: string;
   format: (r: Readout) => Reading;
@@ -112,8 +133,8 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   wind: { label: 'WIND', format: windReading },
   oat: { label: 'OAT', format: (r) => signed(r.oat, '°C') },
   tat: { label: 'TAT', format: (r) => signed(r.tat, '°C') },
-  nic: { label: 'NIC', format: (r) => num(r.nic, '') },
-  nacp: { label: 'NACP', format: (r) => num(r.nacP, '') },
+  nic: { label: 'NIC', format: nicReading },
+  nacp: { label: 'NACP', format: nacpReading },
   src: { label: 'SRC', format: (r) => ({ v: sourceName(r.source) }) },
   rssi: { label: 'RSSI', format: (r) => num(r.rssi, 'dB', 1) },
   msgs: { label: 'MSGS', format: (r) => num(r.messageRate, '/s', 1) },
