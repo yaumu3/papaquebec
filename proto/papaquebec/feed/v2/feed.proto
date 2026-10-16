@@ -8,8 +8,10 @@ syntax = "proto3";
 //
 // An instant is milliseconds since the Unix epoch: when the batch of messages
 // that carried the report was heard. A report keeps its instant in every
-// snapshot that carries it, and is carried for a minute after it at most. A
-// value derived from others is reported when the oldest of them was.
+// snapshot that carries it, and is carried for a minute after it at most, but
+// for the identification, which stays true of the flight and is carried for
+// fifteen minutes. A value derived from others is reported when the oldest of
+// them was.
 package papaquebec.feed.v2;
 
 // Every frame of a session travels on its one unidirectional stream, each after
