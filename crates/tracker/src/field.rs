@@ -571,11 +571,16 @@ fn threatened(threat: Option<&Threat>) -> Bits {
         Some(Threat::ThreatPosition(placed)) => Bits::default()
             .put(2, 2)
             .put(placed.altitude_ft.map_or(0, altitude_code), 13)
-            .put(placed.range_nm.map_or(0, |nm| count(nm * 10.0) + 1), 7)
+            .put(
+                placed
+                    .range_nm
+                    .map_or(0, |nm| (count(nm * 10.0) + 1).min(127)),
+                7,
+            )
             .put(
                 placed
                     .bearing_deg
-                    .map_or(0, |deg| count((deg - 3.0) / 6.0) + 1),
+                    .map_or(0, |deg| (count((deg - 3.0) / 6.0) + 1).min(60)),
                 6,
             ),
     }
@@ -1520,6 +1525,34 @@ mod tests {
 
         // Assert
         assert_eq!(read, None);
+    }
+
+    #[test]
+    fn threat_estimates_beyond_their_fields_are_written_as_their_most() {
+        // Arrange: a range beyond 12.55 NM, and a bearing of a full circle
+        let placed = ThreatPosition {
+            altitude_ft: None,
+            range_nm: Some(13.0),
+            bearing_deg: Some(360.0),
+        };
+        let written = RaBroadcast {
+            advisory: Advisory {
+                resolution: Some(Resolution::default()),
+                threat: Some(Threat::ThreatPosition(placed)),
+                ..Advisory::default()
+            },
+        };
+
+        // Act
+        let read = reread(&written).and_then(|read| read.advisory.threat);
+
+        // Assert: beyond 12.55 NM, and the last step of 6°
+        let most = ThreatPosition {
+            altitude_ft: None,
+            range_nm: Some(12.6),
+            bearing_deg: Some(357.0),
+        };
+        assert_eq!(read, Some(Threat::ThreatPosition(most)));
     }
 
     #[test]
