@@ -10,7 +10,7 @@ use metar::qnh;
 use metar::reports::Reports;
 use metar::stations::{Station, Stations};
 use tokio::sync::watch;
-use tracker::proto::Qnh;
+use tracker::proto::{Qnh, ms};
 
 use crate::Failure;
 
@@ -147,7 +147,7 @@ fn current(reports: &Reports, stations: &BTreeMap<String, Station>) -> Vec<Qnh> 
                 station: report.station.clone(),
                 lat_deg: station.lat_deg,
                 lon_deg: station.lon_deg,
-                observed_s: report.observed_s,
+                observed_ms: ms(report.observed_s),
                 qnh_in_hg: report.qnh_in_hg,
             })
         })
@@ -167,7 +167,7 @@ mod tests {
     use metar::stations::{Station, Stations};
     use tokio::sync::watch;
     use tokio::time::timeout;
-    use tracker::proto::Qnh;
+    use tracker::proto::{Qnh, ms};
 
     use super::{POLL_EVERY, fetch, poll};
     use crate::testing::answering;
@@ -207,7 +207,7 @@ mod tests {
             station: station.to_owned(),
             lat_deg,
             lon_deg,
-            observed_s,
+            observed_ms: ms(observed_s),
             qnh_in_hg,
         }
     }

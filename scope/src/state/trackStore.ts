@@ -1,5 +1,6 @@
 import type { AircraftReport, AircraftSnapshot } from '../lib/aircraft';
 import type { ProjectFn } from '../lib/geo';
+import { ADVISORY_SEC, holds, IDENT_SEC } from '../lib/reports';
 import type { Fix, OperatorState, Position, Readings, Sample, Track } from './track';
 
 export const HISTORY_RETENTION_SEC = 3600;
@@ -29,9 +30,6 @@ function positionOf(a: AircraftReport, project: ProjectFn): Position {
   if (a.position) {
     return { kind: 'live', ...a.position, ...project(a.position.lat, a.position.lon) };
   }
-  if (a.lastPosition) {
-    return { kind: 'last', ...a.lastPosition, ...project(a.lastPosition.lat, a.lastPosition.lon) };
-  }
   return { kind: 'none' };
 }
 
@@ -40,14 +38,22 @@ export function freshOps(): OperatorState {
   return { dir: null, movedAt: null, manual: false };
 }
 
-function readingsOf(a: AircraftReport): Readings {
+/** How long before `now` a report was heard; unknown without one. */
+function ageOf(heardAt: number | undefined, now: number): number | undefined {
+  return heardAt === undefined ? undefined : now - heardAt;
+}
+
+function readingsOf(a: AircraftReport, now: number): Readings {
   return {
     alt: a.alt,
     gs: a.gs,
     track: a.track,
     heading: a.heading,
     verticalRate: a.verticalRate,
+    roll: a.roll,
+    trackRate: a.trackRate,
     nic: a.nic,
+    rc: a.rc,
     nacP: a.nacP,
     messages: a.messages,
     rssi: a.rssi,
@@ -64,9 +70,10 @@ function readingsOf(a: AircraftReport): Readings {
     navQnh: a.navQnh,
     navModes: a.navModes,
     source: a.source ?? 'adsb',
-    seen: a.seen ?? 0,
-    seenPos: a.seenPos,
-    at: a.position ?? a.lastPosition,
+    seen: ageOf(a.heard.messages, now) ?? 0,
+    seenPos: ageOf(a.heard.position, now),
+    heard: a.heard,
+    at: a.position,
   };
 }
 
@@ -132,7 +139,7 @@ function toTrack(
   now: number,
   project: ProjectFn,
 ): Track {
-  const readings = readingsOf(a);
+  const readings = readingsOf(a, now);
   const position = positionOf(a, project);
   const history = previous?.history ?? [];
   appendFix(history, position, now, a.alt);
@@ -151,8 +158,8 @@ function toTrack(
     registration: a.registration,
     description: a.description,
     emergency: a.emergency,
-    ident: a.ident ?? false,
-    ra: a.ra,
+    ident: a.ident === true && holds(a.heard.ident, now, IDENT_SEC),
+    ra: holds(a.heard.ra, now, ADVISORY_SEC) ? a.ra : undefined,
     position,
     history,
     samples,
@@ -164,7 +171,8 @@ function toTrack(
  * The track store is rebuilt from every snapshot. Only position history, samples and operator
  * state carry over, because the feed does not carry them; of a target the feed drops they are
  * kept for when it is heard again, as long as the tracker keeps its callsign: any longer, and the
- * airframe's next flight would carry on from its last.
+ * airframe's next flight would carry on from its last. The ident and the advisory are shown for
+ * as long as a transponder reports them, from when the feed heard them.
  */
 export function createTrackStore(initialProject: ProjectFn): TrackStore {
   let project = initialProject;
@@ -198,7 +206,7 @@ export function createTrackStore(initialProject: ProjectFn): TrackStore {
       project = next;
       for (const t of tracks.values()) {
         const p = t.position;
-        if (p.kind === 'live' || p.kind === 'last') Object.assign(p, project(p.lat, p.lon));
+        if (p.kind === 'live') Object.assign(p, project(p.lat, p.lon));
         reprojectFixes(t.history, project);
       }
       for (const c of remembered.values()) reprojectFixes(c.history, project);

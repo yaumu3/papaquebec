@@ -11,7 +11,10 @@ export function makeSample(t: number, over: Partial<Sample> = {}): Sample {
     track: undefined,
     heading: undefined,
     verticalRate: undefined,
+    roll: undefined,
+    trackRate: undefined,
     nic: undefined,
+    rc: undefined,
     nacP: undefined,
     rssi: undefined,
     tas: undefined,
@@ -29,6 +32,7 @@ export function makeSample(t: number, over: Partial<Sample> = {}): Sample {
     source: 'adsb',
     seen: 0,
     seenPos: undefined,
+    heard: {},
     at: undefined,
     ...over,
   };

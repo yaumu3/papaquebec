@@ -2,7 +2,7 @@ import { sizeDelimitedDecodeStream } from '@bufbuild/protobuf/wire';
 
 import { isRecord } from '../lib/guards';
 import { type FeedMessage, messageOf } from './decode';
-import { FrameSchema } from './gen/papaquebec/feed/v1/feed_pb';
+import { FrameSchema } from './gen/papaquebec/feed/v2/feed_pb';
 import { type FetchLike, getJson } from './http';
 
 /** A wait on a session, each under its own deadline. */

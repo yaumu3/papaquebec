@@ -233,10 +233,10 @@ mod tests {
         Heard::new(0, 128, &message).expect("a message").write()
     }
 
-    fn instants(published: &[(Hello, Snapshot)]) -> Vec<f64> {
+    fn instants(published: &[(Hello, Snapshot)]) -> Vec<u64> {
         published
             .iter()
-            .map(|(_, snapshot)| snapshot.now_s)
+            .map(|(_, snapshot)| snapshot.now_ms)
             .collect()
     }
 
@@ -254,7 +254,7 @@ mod tests {
         let published = followed.published(Duration::from_millis(2500)).await;
 
         // Assert
-        assert_eq!(instants(&published), [1001.0, 1002.0]);
+        assert_eq!(instants(&published), [1_001_000, 1_002_000]);
         let (hello, snapshot) = &published[1];
         let receiver = Receiver {
             lat_deg: Some(SITE.lat_deg),
@@ -264,7 +264,7 @@ mod tests {
         let known: Vec<_> = snapshot
             .aircraft
             .iter()
-            .map(|a| a.identification.as_deref())
+            .map(|a| a.identification.as_ref()?.callsign.as_deref())
             .collect();
         assert_eq!(known, [Some("TEST02")]);
         assert_eq!(snapshot.messages, 2);
@@ -328,9 +328,9 @@ mod tests {
         let kept: Vec<_> = hello
             .history
             .iter()
-            .map(|snapshot| snapshot.now_s)
+            .map(|snapshot| snapshot.now_ms)
             .collect();
-        assert_eq!(kept, [1001.0, 1009.0, 1017.0]);
+        assert_eq!(kept, [1_001_000, 1_009_000, 1_017_000]);
     }
 
     #[tokio::test(start_paused = true)]
@@ -353,7 +353,7 @@ mod tests {
         let published = followed.published(Duration::from_millis(6200)).await;
 
         // Assert: it is tried again every second, and ticks again from when it is back
-        assert_eq!(instants(&published), [1001.0, 1002.0, 1005.5]);
+        assert_eq!(instants(&published), [1_001_000, 1_002_000, 1_005_500]);
         assert_eq!(followed.connections(), 3);
     }
 
@@ -371,7 +371,10 @@ mod tests {
         let instants = instants(&published);
         assert_eq!(followed.connections(), 2);
         assert_eq!(instants.len(), 149 + 3);
-        assert_eq!(instants[148..], [1149.0, 1152.0, 1153.0, 1154.0]);
+        assert_eq!(
+            instants[148..],
+            [1_149_000, 1_152_000, 1_153_000, 1_154_000]
+        );
     }
 
     #[tokio::test(start_paused = true)]

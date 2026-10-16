@@ -209,7 +209,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     drawnBlocks.clear();
     for (const t of trackStore.tracks.values()) {
       const p = t.position;
-      if (p.kind === 'live' || p.kind === 'last') {
+      if (p.kind === 'live') {
         drawnBlocks.set(t.hex, drawnOffset(t, drag, moves, now));
       }
     }

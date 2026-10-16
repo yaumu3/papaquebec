@@ -1,16 +1,15 @@
 import type { ResolutionAdvisory } from '../lib/acas';
-import type { AircraftReport, AircraftSnapshot, ReceiverPosition } from '../lib/aircraft';
+import type { AircraftReport, AircraftSnapshot, Heard, ReceiverPosition } from '../lib/aircraft';
 import type { StationReport } from '../lib/metar';
 import {
   AddressType,
   type Aircraft,
-  AirGroundState,
   type Frame,
+  type Position,
   type Qnh,
   type Snapshot,
   Source,
-  type TargetState_Modes,
-} from './gen/papaquebec/feed/v1/feed_pb';
+} from './gen/papaquebec/feed/v2/feed_pb';
 
 /** The names the scope knows the emergency/priority status codes 0 to 7 by. */
 const EMERGENCIES = [
@@ -24,8 +23,10 @@ const EMERGENCIES = [
   'reserved',
 ];
 
+type Mode = 'autopilot' | 'vnav' | 'altitudeHold' | 'approach' | 'lnav' | 'tcas';
+
 /** The names the scope knows the modes by, in the order it lists them. */
-const MODES: [keyof TargetState_Modes, string][] = [
+const MODES: [Mode, string][] = [
   ['autopilot', 'autopilot'],
   ['vnav', 'vnav'],
   ['altitudeHold', 'althold'],
@@ -44,17 +45,20 @@ function category(code: number): string {
   return `${'ABCD'[code >> 3] ?? '?'}${code & 7}`;
 }
 
-/** Where the aircraft reports being, when it reports both coordinates. */
-function position(a: Aircraft): AircraftReport['position'] {
-  return a.latDeg === undefined || a.lonDeg === undefined
-    ? undefined
-    : { lat: a.latDeg, lon: a.lonDeg };
+function source(p: Position | undefined): AircraftReport['source'] {
+  if (p?.source === Source.MLAT) return 'mlat';
+  if (p?.source === Source.TISB) return 'tisb';
+  return undefined;
 }
 
-function source(a: Aircraft): AircraftReport['source'] {
-  if (a.positionSource === Source.MLAT) return 'mlat';
-  if (a.positionSource === Source.TISB) return 'tisb';
-  return undefined;
+/** A report's instant as the scope keeps time: seconds since the epoch; unknown without a report. */
+function heardAt(report: { heardMs: bigint } | undefined): number | undefined {
+  return report === undefined ? undefined : Number(report.heardMs) / 1000;
+}
+
+/** When a value of a group was reported: with the group, as long as the value is known. */
+function when(value: unknown, group: { heardMs: bigint } | undefined): number | undefined {
+  return value === undefined ? undefined : heardAt(group);
 }
 
 /** A message as plain data, without the type name protobuf-es stamps on it. */
@@ -65,12 +69,13 @@ function plain<T extends { $typeName: string }>(message: T): Omit<T, '$typeName'
 }
 
 /** The advisory as the scope reads it, its nested messages plain too. */
-function advisoryOf(ra: Aircraft['resolutionAdvisory']): ResolutionAdvisory | undefined {
+function advisoryOf(ra: Aircraft['advisory']): ResolutionAdvisory | undefined {
   if (ra === undefined) return undefined;
-  const { advisory, corrections, ...rest } = plain(ra);
+  const { resolution, corrections, multipleThreats, terminated } = ra;
   return {
-    ...rest,
-    ...(advisory && { advisory: plain(advisory) }),
+    multipleThreats,
+    terminated,
+    ...(resolution && { advisory: plain(resolution) }),
     ...(corrections && { corrections: plain(corrections) }),
   };
 }
@@ -79,49 +84,85 @@ function advisoryOf(ra: Aircraft['resolutionAdvisory']): ResolutionAdvisory | un
 type Loose<T> = { [K in keyof T]-?: T[K] | undefined };
 
 function toReport(a: Aircraft): AircraftReport {
-  const target = a.targetState;
-  const modes = target?.modes;
-  const last = a.lastPosition;
-  const report: Loose<AircraftReport> = {
+  const id = a.identification;
+  const p = a.position;
+  const modes = a.modes;
+  const reception = a.reception;
+  const grounded = a.onGround?.value === true;
+  const altitude = grounded ? a.onGround : a.baroAltitudeFt;
+  const verticalRate = a.baroVerticalRateFpm ?? a.geometricVerticalRateFpm;
+  const report: Loose<Omit<AircraftReport, 'heard'>> = {
     hex: hex(a),
-    flight: a.identification,
-    squawk: a.modeACode?.toString(8).padStart(4, '0'),
-    category: a.emitterCategory === undefined ? undefined : category(a.emitterCategory),
-    emergency:
-      a.emergencyPriorityStatus === undefined ? undefined : EMERGENCIES[a.emergencyPriorityStatus],
-    ident: a.ident ? true : undefined,
-    ra: advisoryOf(a.resolutionAdvisory),
-    position: position(a),
-    lastPosition: last && { lat: last.latDeg, lon: last.lonDeg },
-    source: source(a),
-    alt: a.airGroundState === AirGroundState.ON_GROUND ? 'ground' : a.baroAltitudeFt,
-    gs: a.groundSpeedKt,
-    track: a.trackDeg,
-    heading: a.magneticHeadingDeg,
-    verticalRate: a.baroVerticalRateFpm ?? a.geometricVerticalRateFpm,
-    ias: a.indicatedAirspeedKt,
-    tas: a.trueAirspeedKt,
-    mach: a.mach,
-    selAlt: target?.selectedAltitudeMcpFt,
-    fmsAlt: target?.selectedAltitudeFmsFt,
-    selHeading: target?.selectedHeadingDeg,
-    navQnh: target?.baroSettingHpa,
+    flight: id?.callsign,
+    squawk: a.modeACode?.value.toString(8).padStart(4, '0'),
+    category: id?.emitterCategory === undefined ? undefined : category(id.emitterCategory),
+    emergency: a.emergency === undefined ? undefined : EMERGENCIES[a.emergency.status],
+    ident: a.ident?.value,
+    ra: advisoryOf(a.advisory),
+    position: p && { lat: p.latDeg, lon: p.lonDeg },
+    source: source(p),
+    alt: grounded ? 'ground' : a.baroAltitudeFt?.value,
+    gs: a.groundSpeedKt?.value,
+    track: a.trackDeg?.value,
+    heading: a.magneticHeadingDeg?.value,
+    verticalRate: verticalRate?.value,
+    roll: a.rollDeg?.value,
+    trackRate: a.trackRateDegPerS?.value,
+    ias: a.indicatedAirspeedKt?.value,
+    tas: a.trueAirspeedKt?.value,
+    mach: a.mach?.value,
+    selAlt: a.selectedAltitudeMcpFt?.value,
+    fmsAlt: a.selectedAltitudeFmsFt?.value,
+    selHeading: a.selectedHeadingDeg?.value,
+    navQnh: a.baroSettingHpa?.value,
     navModes: modes && MODES.filter(([mode]) => modes[mode]).map(([, name]) => name),
-    nic: a.quality?.nic,
-    nacP: a.quality?.nacP,
-    windSpeed: a.meteo?.windSpeedKt,
-    windDir: a.meteo?.windDirDeg,
-    oat: a.meteo?.oatC,
-    tat: a.meteo?.tatC,
+    nic: p?.nic,
+    rc: p?.rcM,
+    nacP: a.nacP?.value,
+    windSpeed: a.windSpeedKt?.value,
+    windDir: a.windDirDeg?.value,
+    oat: a.oatC?.value,
+    tat: a.tatC?.value,
     registration: a.registry?.registration,
     type: a.registry?.typeDesignator,
     description: a.registry?.typeDescription,
-    messages: a.reception?.messages === undefined ? undefined : Number(a.reception.messages),
-    rssi: a.reception?.rssiDbfs,
-    seen: a.reception?.seenS,
-    seenPos: a.reception?.seenPosS,
+    messages: reception === undefined ? undefined : Number(reception.messages),
+    rssi: reception?.rssiDbfs,
   };
-  return withoutUnknown(report);
+  const heard: Loose<Heard> = {
+    flight: when(id?.callsign, id),
+    category: when(id?.emitterCategory, id),
+    squawk: heardAt(a.modeACode),
+    emergency: heardAt(a.emergency),
+    ident: heardAt(a.ident),
+    ra: heardAt(a.advisory),
+    position: heardAt(p),
+    nic: heardAt(p),
+    rc: when(p?.rcM, p),
+    alt: heardAt(altitude),
+    gs: heardAt(a.groundSpeedKt),
+    track: heardAt(a.trackDeg),
+    heading: heardAt(a.magneticHeadingDeg),
+    verticalRate: heardAt(verticalRate),
+    roll: heardAt(a.rollDeg),
+    trackRate: heardAt(a.trackRateDegPerS),
+    ias: heardAt(a.indicatedAirspeedKt),
+    tas: heardAt(a.trueAirspeedKt),
+    mach: heardAt(a.mach),
+    selAlt: heardAt(a.selectedAltitudeMcpFt),
+    fmsAlt: heardAt(a.selectedAltitudeFmsFt),
+    selHeading: heardAt(a.selectedHeadingDeg),
+    navQnh: heardAt(a.baroSettingHpa),
+    navModes: heardAt(modes),
+    nacP: heardAt(a.nacP),
+    windSpeed: heardAt(a.windSpeedKt),
+    windDir: heardAt(a.windDirDeg),
+    oat: heardAt(a.oatC),
+    tat: heardAt(a.tatC),
+    messages: heardAt(reception),
+    rssi: when(reception?.rssiDbfs, reception),
+  };
+  return { ...withoutUnknown(report), heard: withoutUnknown(heard) };
 }
 
 /** Drops the keys whose value is unknown, so that what is not known is absent. */
@@ -137,8 +178,12 @@ export type FeedMessage =
   /** The current reports of the stations around the receiver, all of them, every time. */
   | { kind: 'weather'; reports: StationReport[] };
 
-function toSnapshot({ nowS, messages, aircraft }: Snapshot): AircraftSnapshot {
-  return { now: nowS, messages: Number(messages), aircraft: aircraft.map(toReport) };
+function toSnapshot({ nowMs, messages, aircraft }: Snapshot): AircraftSnapshot {
+  return {
+    now: Number(nowMs) / 1000,
+    messages: Number(messages),
+    aircraft: aircraft.map(toReport),
+  };
 }
 
 function toStationReport(q: Qnh): StationReport {
@@ -146,7 +191,7 @@ function toStationReport(q: Qnh): StationReport {
     station: q.station,
     lat: q.latDeg,
     lon: q.lonDeg,
-    observedAt: q.observedS * 1000,
+    observedAt: Number(q.observedMs),
     qnhInHg: q.qnhInHg,
   };
 }

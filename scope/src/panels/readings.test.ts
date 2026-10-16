@@ -73,22 +73,16 @@ describe('READINGS', () => {
 });
 
 describe('positionReading', () => {
-  it('names a live fix, owns up to one no longer live, and dashes none', () => {
+  it('names a live fix and dashes none', () => {
     // Arrange
     const live = { kind: 'live', lat: 35.73266, lon: 139.99644, x: 1, y: 2 } as const;
-    const last = { ...live, kind: 'last' } as const;
 
     // Act
-    const readings = [
-      positionReading(live),
-      positionReading(last),
-      positionReading({ kind: 'none' }),
-    ];
+    const readings = [positionReading(live), positionReading({ kind: 'none' })];
 
     // Assert
     expect(readings).toEqual([
       { k: 'POSITION', r: { v: '35.73266 139.99644' } },
-      { k: 'LAST POSITION', r: { v: '35.73266 139.99644' } },
       { k: 'POSITION', r: NONE },
     ]);
   });

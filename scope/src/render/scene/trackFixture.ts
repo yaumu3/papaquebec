@@ -13,7 +13,10 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     track: 235,
     heading: undefined,
     verticalRate: 0,
+    roll: undefined,
+    trackRate: undefined,
     nic: 8,
+    rc: undefined,
     nacP: 9,
     messages: 1,
     messageRate: undefined,
@@ -39,6 +42,7 @@ export function makeTrack(over: Partial<Track> = {}): Track {
     source: 'adsb',
     seen: 0.2,
     seenPos: 0.2,
+    heard: {},
     at: { lat: 33.6, lon: 130.5 }, // RJFF
     position: { kind: 'live', lat: 33.6, lon: 130.5, x: 1, y: 2 },
     history: [],

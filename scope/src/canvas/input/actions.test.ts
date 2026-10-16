@@ -49,9 +49,8 @@ const loose: Precision = { reach: 24, snap: 24, hovers: false };
 const aircraft = (hex: string): AircraftReport => ({
   hex,
   position: { lat: 35.5, lon: 139.8 },
-  seen: 0.2,
-  seenPos: 0.2,
   alt: 11000,
+  heard: {},
 });
 
 const line = (tag: string) => ({

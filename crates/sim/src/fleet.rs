@@ -15,13 +15,12 @@ use tracker::bits::Bits;
 use tracker::cpr;
 use tracker::field::{
     AirbornePosition, Field, Identification, OperationalStatus, RaBroadcast, Status,
-    SurfacePosition, TargetStateAndStatus, Velocity,
+    SurfacePosition, TargetState, TargetStateAndStatus, Velocity,
 };
 use tracker::message::{comm_b_reply, squitter};
 use tracker::position::{Position, bearing_of, signed_bearing, toward};
 use tracker::proto::{
-    EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
-    resolution_advisory::Advisory, target_state::Modes,
+    Advisory, EmergencyPriorityStatus, EmitterCategory, Modes, advisory::Resolution,
 };
 use tracker::register::{HeadingAndSpeed, TrackAndTurn};
 
@@ -124,6 +123,7 @@ const AUTOPILOT: Modes = Modes {
     approach: false,
     lnav: false,
     tcas: false,
+    heard_ms: 0,
 };
 const MANAGED: Modes = Modes {
     vnav: true,
@@ -143,9 +143,9 @@ enum Shown {
 }
 
 /// A corrective climb against one threat.
-const CLIMB: ResolutionAdvisory = ResolutionAdvisory {
+const CLIMB: Advisory = Advisory {
     multiple_threats: false,
-    advisory: Some(Advisory {
+    resolution: Some(Resolution {
         corrective: true,
         downward: false,
         increased_rate: false,
@@ -155,6 +155,7 @@ const CLIMB: ResolutionAdvisory = ResolutionAdvisory {
     }),
     corrections: None,
     terminated: false,
+    heard_ms: 0,
 };
 
 /// A small fleet that exercises every color, glyph and prefix the scope draws.

@@ -70,7 +70,7 @@ function drawables(input: TargetInput): Drawable[] {
   const out: Drawable[] = [];
   for (const t of input.tracks) {
     const p = t.position;
-    if (p.kind !== 'live' && p.kind !== 'last') continue;
+    if (p.kind !== 'live') continue;
     out.push({
       t,
       x: p.x,

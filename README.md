@@ -255,7 +255,7 @@ aircraft until it lapses (`traffic`).
 - Added from the aircraft database: the registration and type (`registry`).
 - Not read yet: what the ground rebroadcasts (TIS-B, ADS-R).
 
-Every second the feeder publishes a snapshot as protobuf (`proto/papaquebec/feed/v1/feed.proto`,
+Every second the feeder publishes a snapshot as protobuf (`proto/papaquebec/feed/v2/feed.proto`,
 named after DO-260B), which the feed worker reads into what the scope knows of an aircraft
 (`lib/aircraft.ts`), every field optional.
 
@@ -266,10 +266,11 @@ named after DO-260B), which the feed worker reads into what the scope knows of a
   anew.
 - Every wait on a session has a deadline, and a missed one only means connecting again; the top
   bar tells the feed's state from the age of its data.
-- Each snapshot is a full one and the track store is rebuilt from it; liveness is the age of an
-  aircraft's last message, `seen`. Only position history and operator state (selection, block
-  bearing) persist across snapshots.
-- Live `lat/lon` draws normally, `lastPosition` draws stale, absent positions appear only in text.
+- Each snapshot is a full one and the track store is rebuilt from it; every value comes with the
+  instant it was heard, and liveness is the age of the last message. Only position history,
+  samples and operator state (selection, block bearing) persist across snapshots.
+- A position is drawn while the feed carries one, stale after 30 s; an aircraft whose position has
+  lapsed stays in the list and nowhere else.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has
 no adapter). The main thread owns all state and sends packed buffers; one draw per layer per frame,

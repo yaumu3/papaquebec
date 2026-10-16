@@ -14,19 +14,15 @@ import {
 import { makeTrack as track } from './trackFixture';
 
 describe('isStale', () => {
-  it('is stale after 30 s without a position or when the position is a lastPosition', () => {
+  it('is stale after 30 s without a position', () => {
     // Arrange
-    const cases = [
-      track({ seenPos: 5 }),
-      track({ seenPos: 31 }),
-      track({ position: { kind: 'last', lat: 0, lon: 0, x: 0, y: 0 } }),
-    ];
+    const cases = [track({ seenPos: 5 }), track({ seenPos: 31 })];
 
     // Act
     const out = cases.map(isStale);
 
     // Assert
-    expect(out).toEqual([false, true, true]);
+    expect(out).toEqual([false, true]);
   });
 });
 

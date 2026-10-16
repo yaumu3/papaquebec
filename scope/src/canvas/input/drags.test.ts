@@ -35,9 +35,8 @@ const precise: Precision = { reach: 14, snap: 15, hovers: true };
 const aircraft = (hex: string): AircraftReport => ({
   hex,
   position: { lat: 35.5, lon: 139.8 },
-  seen: 0.2,
-  seenPos: 0.2,
   alt: 11000,
+  heard: {},
 });
 
 /** A drag tracker over the fixed view, recording every cursor it asks for. */

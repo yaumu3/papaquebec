@@ -8,9 +8,8 @@ use crate::code::{altitude, altitude_code, identity, mode_a_code, with_m, withou
 use crate::cpr::Cpr;
 use crate::position::{bearing_of, toward};
 use crate::proto::{
-    EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
-    resolution_advisory::{Advisory, Corrections},
-    target_state::Modes,
+    Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
+    advisory::{Corrections, Resolution},
 };
 
 /// The 56 bits an extended squitter carries of one kind of message.
@@ -473,7 +472,7 @@ impl Field for Status {
 /// the active resolution advisory as the ACAS register does.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RaBroadcast {
-    pub advisory: ResolutionAdvisory,
+    pub advisory: Advisory,
 }
 
 impl Field for RaBroadcast {
@@ -498,12 +497,13 @@ impl Field for RaBroadcast {
 /// The active resolution advisory in the 48 bits after the header of the
 /// message or the register; none when no advisory was generated. Of one
 /// threat, or of several that call for one sense, the six bits after the
-/// first say the advisory; of several that differ, what is called for.
-pub(crate) fn advisory(bits: Bits) -> Option<ResolutionAdvisory> {
+/// first say the resolution; of several that differ, what is called for.
+/// When it was heard is the traffic's to say.
+pub(crate) fn advisory(bits: Bits) -> Option<Advisory> {
     let multiple_threats = bits.flag(28);
-    let (advisory, corrections) = match (bits.flag(9), multiple_threats) {
+    let (resolution, corrections) = match (bits.flag(9), multiple_threats) {
         (true, _) => (
-            Some(Advisory {
+            Some(Resolution {
                 corrective: bits.flag(10),
                 downward: bits.flag(11),
                 increased_rate: bits.flag(12),
@@ -526,18 +526,22 @@ pub(crate) fn advisory(bits: Bits) -> Option<ResolutionAdvisory> {
         ),
         (false, false) => return None,
     };
-    Some(ResolutionAdvisory {
+    Some(Advisory {
         multiple_threats,
-        advisory,
+        resolution,
         corrections,
         terminated: bits.flag(27),
+        ..Advisory::default()
     })
 }
 
 /// The 48 bits of an advisory after a header; the complements and the
 /// threat, which are not read, as zeros.
-pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
-    let flags = match (advisory.advisory, advisory.corrections.unwrap_or_default()) {
+pub(crate) fn advised(advisory: &Advisory) -> Bits {
+    let flags = match (
+        advisory.resolution,
+        advisory.corrections.unwrap_or_default(),
+    ) {
         (Some(one), _) => [
             one.corrective,
             one.downward,
@@ -555,7 +559,7 @@ pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
             several.sense_reversal,
         ],
     };
-    let head = Bits::default().put_flag(advisory.advisory.is_some());
+    let head = Bits::default().put_flag(advisory.resolution.is_some());
     flags
         .into_iter()
         .fold(head, Bits::put_flag)
@@ -565,6 +569,25 @@ pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
         .put_flag(advisory.multiple_threats)
         // The threat's type and identity
         .put(0, 2 + 26)
+}
+
+/// What the aircraft is set to fly to: the Target State and Status message,
+/// or the Comm-B selected vertical intention register, which carries no
+/// heading and three of the modes.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TargetState {
+    /// Selected on the mode control panel or flight control unit.
+    pub selected_altitude_mcp_ft: Option<i32>,
+    /// Selected by the flight management system.
+    pub selected_altitude_fms_ft: Option<i32>,
+    /// DO-260B leaves true or magnetic undefined.
+    pub selected_heading_deg: Option<f64>,
+    /// QNH or QFE, as the crew set it.
+    pub baro_setting_hpa: Option<f64>,
+    /// None when the aircraft does not report its modes; all false when it
+    /// reports that none is engaged. When they were heard is the traffic's
+    /// to say.
+    pub modes: Option<Modes>,
 }
 
 /// Target State and Status message, of ADS-B version 2.
@@ -592,6 +615,7 @@ impl Field for TargetStateAndStatus {
             approach: me.flag(52),
             tcas: me.flag(53),
             lnav: me.flag(54),
+            ..Modes::default()
         });
         let target = TargetState {
             selected_altitude_mcp_ft: altitude.filter(|_| !from_fms),
@@ -712,16 +736,15 @@ pub(crate) fn rounded(value: f64) -> i32 {
 mod tests {
     use super::{
         AirbornePosition, Airspeed, Field, Identification, Integrity, OperationalStatus,
-        RaBroadcast, Status, SurfacePosition, TargetStateAndStatus, Velocity, integrity,
-        version_0_nac_p,
+        RaBroadcast, Status, SurfacePosition, TargetState, TargetStateAndStatus, Velocity,
+        integrity, version_0_nac_p,
     };
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
     use crate::cpr::Cpr;
     use crate::proto::{
-        EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
-        resolution_advisory::{Advisory, Corrections},
-        target_state::Modes,
+        Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
+        advisory::{Corrections, Resolution},
     };
 
     /// What is read of a field of one kind and written again.
@@ -1243,6 +1266,7 @@ mod tests {
                 approach: false,
                 lnav: true,
                 tcas: true,
+                ..Modes::default()
             }),
         };
         assert_eq!(read, Some(TargetStateAndStatus { target, nac_p: 9 }));
@@ -1281,7 +1305,7 @@ mod tests {
     #[test]
     fn ra_broadcast_is_read_as_it_is_written() {
         // Arrange: one threat with every flag, several threats, and one ended
-        let advisory = Advisory {
+        let resolution = Resolution {
             corrective: true,
             downward: true,
             increased_rate: true,
@@ -1298,23 +1322,20 @@ mod tests {
             sense_reversal: true,
         };
         let written = [
-            ResolutionAdvisory {
+            Advisory {
                 multiple_threats: true,
-                advisory: Some(advisory),
-                corrections: None,
-                terminated: false,
+                resolution: Some(resolution),
+                ..Advisory::default()
             },
-            ResolutionAdvisory {
+            Advisory {
                 multiple_threats: true,
-                advisory: None,
                 corrections: Some(corrections),
-                terminated: false,
+                ..Advisory::default()
             },
-            ResolutionAdvisory {
-                multiple_threats: false,
-                advisory: Some(Advisory::default()),
-                corrections: None,
+            Advisory {
+                resolution: Some(Resolution::default()),
                 terminated: true,
+                ..Advisory::default()
             },
         ]
         .map(|advisory| RaBroadcast { advisory });

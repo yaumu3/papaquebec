@@ -24,7 +24,7 @@ export interface Point {
 
 export function trackPoint(t: Track): Point | null {
   const p = t.position;
-  if (p.kind !== 'live' && p.kind !== 'last') return null;
+  if (p.kind !== 'live') return null;
   const vel = t.gs !== undefined && t.track !== undefined ? velocityNm(t.gs, t.track) : null;
   return { pos: { x: p.x, y: p.y }, geo: { lat: p.lat, lon: p.lon }, vel, label: trackLabel(t) };
 }

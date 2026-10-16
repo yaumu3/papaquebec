@@ -25,7 +25,7 @@ export interface ListSort {
 /** Plane distance from the site (the projection origin), NM; undefined without a drawable position. */
 export function distanceFromSite(t: Track): number | undefined {
   const p = t.position;
-  return p.kind === 'live' || p.kind === 'last' ? Math.hypot(p.x, p.y) : undefined;
+  return p.kind === 'live' ? Math.hypot(p.x, p.y) : undefined;
 }
 
 type SortValue = string | number | undefined;

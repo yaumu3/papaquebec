@@ -51,7 +51,7 @@ export function airspaceColor(kind: string | undefined): string {
 export const STALE_SECONDS = 30;
 
 export function isStale(t: Track): boolean {
-  return t.position.kind === 'last' || (t.seenPos ?? 0) > STALE_SECONDS;
+  return (t.seenPos ?? 0) > STALE_SECONDS;
 }
 
 export function isEmergency(t: Track): boolean {

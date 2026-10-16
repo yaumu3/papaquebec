@@ -8,9 +8,9 @@
 
 use crate::air;
 use crate::bits::Bits;
-use crate::field::{Field, Identification, advised, advisory, count, rounded};
+use crate::field::{Field, Identification, TargetState, advised, advisory, count, rounded};
 use crate::position::signed_bearing;
-use crate::proto::{EmitterCategory, ResolutionAdvisory, TargetState, target_state::Modes};
+use crate::proto::{Advisory, EmitterCategory, Modes};
 
 /// The envelope within which a field is taken for a track and turn report or
 /// a heading and speed one, after "The 1090 Megahertz Riddle" (BDS code
@@ -38,7 +38,7 @@ pub enum Register {
     /// Aircraft identification, register 2,0: the callsign.
     Identification(String),
     /// ACAS active resolution advisory, register 3,0.
-    ResolutionAdvisory(ResolutionAdvisory),
+    ResolutionAdvisory(Advisory),
     SelectedVerticalIntention(SelectedVerticalIntention),
     TrackAndTurn(TrackAndTurn),
     HeadingAndSpeed(HeadingAndSpeed),
@@ -163,7 +163,7 @@ fn coded(mb: Bits, code: u32) -> Option<Bits> {
 }
 
 /// The advisory of the ACAS register; none without one generated.
-fn resolution_advisory(mb: Bits) -> Option<ResolutionAdvisory> {
+fn resolution_advisory(mb: Bits) -> Option<Advisory> {
     advisory(coded(mb, 0x30)?)
 }
 
@@ -405,9 +405,8 @@ mod tests {
     use super::{HeadingAndSpeed, Known, Register, SelectedVerticalIntention, TrackAndTurn};
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
-    use crate::proto::{
-        ResolutionAdvisory, TargetState, resolution_advisory::Advisory, target_state::Modes,
-    };
+    use crate::field::TargetState;
+    use crate::proto::{Advisory, Modes, advisory::Resolution};
 
     /// What the message field of a published Comm-B reply reads as, with
     /// nothing known of the aircraft.
@@ -455,22 +454,21 @@ mod tests {
         let read = fields.map(|mb| Register::read(mb, &Known::default()));
 
         // Assert: the complement is not carried
-        let advisory = |multiple_threats, advisory| {
-            Some(Register::ResolutionAdvisory(ResolutionAdvisory {
+        let advisory = |multiple_threats, resolution| {
+            Some(Register::ResolutionAdvisory(Advisory {
                 multiple_threats,
-                advisory: Some(advisory),
-                corrections: None,
-                terminated: false,
+                resolution: Some(resolution),
+                ..Advisory::default()
             }))
         };
         let expected = [
-            advisory(false, Advisory::default()),
+            advisory(false, Resolution::default()),
             advisory(
                 true,
-                Advisory {
+                Resolution {
                     corrective: true,
                     sense_reversal: true,
-                    ..Advisory::default()
+                    ..Resolution::default()
                 },
             ),
         ];
