@@ -91,17 +91,11 @@ impl AirbornePosition {
         type_code >= 20
     }
 
-    /// The Navigation Integrity Category of the position, given the NIC
-    /// supplement A and the ADS-B version that the aircraft reports in its
-    /// operational status.
+    /// The integrity of the position, given the NIC supplement A and the
+    /// ADS-B version that the aircraft reports in its operational status.
     #[must_use]
-    pub fn nic(&self, supplement_a: bool, version: u32) -> u32 {
-        // Before version 2 the bit of supplement B says something else.
-        nic(
-            self.type_code,
-            supplement_a,
-            version >= 2 && self.nic_supplement_b,
-        )
+    pub fn integrity(&self, supplement_a: bool, version: u32) -> Integrity {
+        integrity(self.type_code, version, supplement_a, self.nic_supplement_b)
     }
 
     /// The Navigation Accuracy Category for position that the message stands
@@ -204,11 +198,11 @@ impl Field for SurfacePosition {
 }
 
 impl SurfacePosition {
-    /// The Navigation Integrity Category of the position, given the NIC
-    /// supplements A and C that the aircraft reports in its operational status.
+    /// The integrity of the position, given the NIC supplements A and C and
+    /// the ADS-B version that the aircraft reports in its operational status.
     #[must_use]
-    pub fn nic(&self, supplement_a: bool, supplement_c: bool) -> u32 {
-        nic(self.type_code, supplement_a, supplement_c)
+    pub fn integrity(&self, supplement_a: bool, supplement_c: bool, version: u32) -> Integrity {
+        integrity(self.type_code, version, supplement_a, supplement_c)
     }
 
     /// The Navigation Accuracy Category for position that the message stands
@@ -254,24 +248,49 @@ fn version_0_nac_p(type_code: u32) -> u32 {
     }
 }
 
-/// The Navigation Integrity Category of a position, which DO-260B assigns by
-/// the type code of its message and the NIC supplements the aircraft reports:
-/// A, with B in the air or C on the ground.
-fn nic(type_code: u32, supplement_a: bool, supplement_b_or_c: bool) -> u32 {
-    match (type_code, supplement_a, supplement_b_or_c) {
-        (5 | 9 | 20, ..) => 11,
-        (6 | 10 | 21, ..) => 10,
-        (7, true, false) | (11, true, true) => 9,
-        (7 | 11, ..) => 8,
-        (8, true, true) | (12, ..) => 7,
-        (8, true, false) | (8, false, true) | (13, ..) => 6,
-        (14, ..) => 5,
-        (15, ..) => 4,
-        (16, true, true) => 3,
-        (16, ..) => 2,
-        (17, ..) => 1,
-        _ => 0,
-    }
+/// The integrity of a position: its Navigation Integrity Category, and the
+/// radius of containment the category stands for, in metres rounded up; none
+/// when the radius is unknown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Integrity {
+    pub nic: u32,
+    pub rc_m: Option<u32>,
+}
+
+/// The integrity of a position, by the type code of its message, the ADS-B
+/// version the aircraft reports in its operational status and the NIC
+/// supplements it reports: A, with B in the air or C on the ground. Version
+/// 2 (RTCA DO-260B) tables all three; version 1 (DO-260A) supplement A
+/// alone; version 0 (DO-260) none, and a Navigation Uncertainty Category
+/// with a horizontal protection limit in place of the category and the
+/// radius, read here as the category the type code stands for since, and
+/// the limit as the radius.
+fn integrity(
+    type_code: u32,
+    version: u32,
+    supplement_a: bool,
+    supplement_b_or_c: bool,
+) -> Integrity {
+    let (nic, rc_m) = match (type_code, version, supplement_a, supplement_b_or_c) {
+        (5 | 9 | 20, ..) => (11, Some(8)),
+        (6 | 10 | 21, ..) => (10, Some(25)),
+        (7, 1.., true, false) | (11, 1, true, _) | (11, 2.., true, true) => (9, Some(75)),
+        (7 | 11, ..) => (8, Some(186)),
+        (8, 2.., true, true) | (12, ..) => (7, Some(371)),
+        (8, 2.., true, false) | (13, 2.., false, true) => (6, Some(556)),
+        (8, 2.., false, true) | (13, 1, true, _) | (13, 2.., true, true) => (6, Some(1112)),
+        (13, 0 | 1, ..) | (13, 2.., false, false) => (6, Some(926)),
+        // Supplement A alone on type code 13 is not assigned.
+        (13, ..) => (6, None),
+        (14, ..) => (5, Some(1852)),
+        (15, ..) => (4, Some(3704)),
+        (16, 1, true, _) | (16, 2.., true, true) => (3, Some(7408)),
+        (16, 0, ..) => (2, Some(18520)),
+        (16, ..) => (2, Some(14816)),
+        (17, ..) => (1, Some(37040)),
+        _ => (0, None),
+    };
+    Integrity { nic, rc_m }
 }
 
 /// Airborne Velocity message.
@@ -692,8 +711,9 @@ pub(crate) fn rounded(value: f64) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, RaBroadcast, Status,
-        SurfacePosition, TargetStateAndStatus, Velocity, nic, version_0_nac_p,
+        AirbornePosition, Airspeed, Field, Identification, Integrity, OperationalStatus,
+        RaBroadcast, Status, SurfacePosition, TargetStateAndStatus, Velocity, integrity,
+        version_0_nac_p,
     };
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
@@ -1400,47 +1420,143 @@ mod tests {
         assert_eq!(categories, expected.collect::<Vec<_>>());
     }
 
+    /// The integrity of each row of a version's table: the type code, the
+    /// supplements A and B or C, and the category and radius they stand for.
+    type Row = (u32, bool, bool, u32, Option<u32>);
+
+    fn integrities(version: u32, rows: &[Row]) -> Vec<(Integrity, Integrity)> {
+        rows.iter()
+            .map(|&(type_code, a, b_or_c, nic, rc_m)| {
+                (
+                    integrity(type_code, version, a, b_or_c),
+                    Integrity { nic, rc_m },
+                )
+            })
+            .collect()
+    }
+
+    fn agree(integrities: &[(Integrity, Integrity)]) -> bool {
+        integrities.iter().all(|(read, expected)| read == expected)
+    }
+
     #[test]
-    fn integrity_category_is_that_of_the_type_code_and_the_supplements() {
-        // Arrange: (type code, supplement A, supplement B in the air or C on the ground)
+    fn integrity_of_version_2_is_tabled_by_the_type_code_and_the_supplements() {
+        // Arrange: in the air with supplements A and B, and on the ground
+        // with A and C, every row of DO-260B
         let airborne = [
-            (9, false, false),
-            (10, false, false),
-            (11, true, true),
-            (11, false, false),
-            (12, false, false),
-            (13, false, false),
-            (14, false, false),
-            (15, false, false),
-            (16, true, true),
-            (16, false, false),
-            (17, false, false),
-            (18, false, false),
-            (20, false, false),
-            (21, false, false),
-            (22, false, false),
+            (9, false, false, 11, Some(8)),
+            (10, false, false, 10, Some(25)),
+            (11, true, true, 9, Some(75)),
+            (11, false, false, 8, Some(186)),
+            (12, false, false, 7, Some(371)),
+            (13, false, true, 6, Some(556)),
+            (13, false, false, 6, Some(926)),
+            (13, true, true, 6, Some(1112)),
+            (14, false, false, 5, Some(1852)),
+            (15, false, false, 4, Some(3704)),
+            (16, true, true, 3, Some(7408)),
+            (16, false, false, 2, Some(14816)),
+            (17, false, false, 1, Some(37040)),
+            (18, false, false, 0, None),
+            (20, false, false, 11, Some(8)),
+            (21, false, false, 10, Some(25)),
+            (22, false, false, 0, None),
         ];
         let surface = [
-            (5, false, false),
-            (6, false, false),
-            (7, true, false),
-            (7, false, false),
-            (8, true, true),
-            (8, true, false),
-            (8, false, true),
-            (8, false, false),
+            (5, false, false, 11, Some(8)),
+            (6, false, false, 10, Some(25)),
+            (7, true, false, 9, Some(75)),
+            (7, false, false, 8, Some(186)),
+            (8, true, true, 7, Some(371)),
+            (8, true, false, 6, Some(556)),
+            (8, false, true, 6, Some(1112)),
+            (8, false, false, 0, None),
         ];
 
         // Act
-        let categories = airborne
-            .iter()
-            .chain(&surface)
-            .map(|&(type_code, a, other)| nic(type_code, a, other));
+        let read = integrities(2, &[airborne.as_slice(), &surface].concat());
 
         // Assert
-        let expected = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 11, 10, 0]
-            .into_iter()
-            .chain([11, 10, 9, 8, 7, 6, 6, 0]);
-        assert_eq!(categories.collect::<Vec<_>>(), expected.collect::<Vec<_>>());
+        assert!(agree(&read), "{read:?}");
+    }
+
+    #[test]
+    fn integrity_of_version_2_with_supplements_not_assigned_is_the_category_without_a_radius() {
+        // Arrange: type code 13 with supplement A alone
+        let rows = [(13, true, false, 6, None)];
+
+        // Act
+        let read = integrities(2, &rows);
+
+        // Assert
+        assert!(agree(&read), "{read:?}");
+    }
+
+    #[test]
+    fn integrity_of_version_1_is_tabled_by_the_type_code_and_supplement_a() {
+        // Arrange: every row of DO-260A, which knows supplement A alone
+        let airborne = [
+            (9, false, false, 11, Some(8)),
+            (10, false, false, 10, Some(25)),
+            (11, true, false, 9, Some(75)),
+            (11, false, false, 8, Some(186)),
+            (12, false, false, 7, Some(371)),
+            (13, false, false, 6, Some(926)),
+            (13, true, false, 6, Some(1112)),
+            (14, false, false, 5, Some(1852)),
+            (15, false, false, 4, Some(3704)),
+            (16, true, false, 3, Some(7408)),
+            (16, false, false, 2, Some(14816)),
+            (17, false, false, 1, Some(37040)),
+            (18, false, false, 0, None),
+            (20, false, false, 11, Some(8)),
+            (21, false, false, 10, Some(25)),
+            (22, false, false, 0, None),
+        ];
+        let surface = [
+            (5, false, false, 11, Some(8)),
+            (6, false, false, 10, Some(25)),
+            (7, true, false, 9, Some(75)),
+            (7, false, false, 8, Some(186)),
+            (8, true, false, 0, None),
+            (8, false, false, 0, None),
+        ];
+
+        // Act
+        let read = integrities(1, &[airborne.as_slice(), &surface].concat());
+
+        // Assert
+        assert!(agree(&read), "{read:?}");
+    }
+
+    #[test]
+    fn integrity_of_version_0_is_tabled_by_the_type_code_alone() {
+        // Arrange: every row of DO-260, which has no supplements; the
+        // categories are those the type codes stand for since
+        let rows = [
+            (5, false, false, 11, Some(8)),
+            (6, false, false, 10, Some(25)),
+            (7, false, false, 8, Some(186)),
+            (8, false, false, 0, None),
+            (9, false, false, 11, Some(8)),
+            (10, false, false, 10, Some(25)),
+            (11, true, true, 8, Some(186)),
+            (12, false, false, 7, Some(371)),
+            (13, true, true, 6, Some(926)),
+            (14, false, false, 5, Some(1852)),
+            (15, false, false, 4, Some(3704)),
+            (16, true, true, 2, Some(18520)),
+            (17, false, false, 1, Some(37040)),
+            (18, false, false, 0, None),
+            (20, false, false, 11, Some(8)),
+            (21, false, false, 10, Some(25)),
+            (22, false, false, 0, None),
+        ];
+
+        // Act
+        let read = integrities(0, &rows);
+
+        // Assert
+        assert!(agree(&read), "{read:?}");
     }
 }

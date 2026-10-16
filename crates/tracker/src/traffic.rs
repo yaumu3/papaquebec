@@ -322,7 +322,7 @@ impl Tracked {
                     .keep(said.geometric_altitude_ft, now_s);
                 self.on_ground.keep(Some(false), now_s);
                 self.qualify(said.nac_p_of_version_0(), now_s);
-                let nic = said.nic(self.nic_supplement_a, self.version);
+                let nic = said.integrity(self.nic_supplement_a, self.version).nic;
                 let position = self.airborne(said.cpr, now_s);
                 self.place(position, nic, observation.source, now_s, site);
             }
@@ -331,7 +331,9 @@ impl Tracked {
                 self.track_deg.keep(said.track_deg, now_s);
                 self.on_ground.keep(Some(true), now_s);
                 self.qualify(said.nac_p_of_version_0(), now_s);
-                let nic = said.nic(self.nic_supplement_a, self.nic_supplement_c);
+                let nic = said
+                    .integrity(self.nic_supplement_a, self.nic_supplement_c, self.version)
+                    .nic;
                 // A receiver hears an aircraft on the ground only from nearby.
                 let position = cpr::surface_near(said.cpr, self.whereabouts(now_s, site));
                 self.place(position, nic, observation.source, now_s, site);
