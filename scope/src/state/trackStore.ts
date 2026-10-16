@@ -142,7 +142,7 @@ function toTrack(
   const readings = readingsOf(a, now);
   const position = positionOf(a, project);
   const history = previous?.history ?? [];
-  appendFix(history, position, now, a.alt);
+  appendFix(history, position, a.heard.position ?? now, a.alt);
   trimOld(history, now);
   const samples = previous?.samples ?? [];
   appendSample(samples, readings, now);

@@ -8,16 +8,21 @@ const project = (lat: number, lon: number) => ({ x: (lon - 130) * 60, y: (lat - 
 
 const doubled = (lat: number, lon: number) => ({ x: (lon - 130) * 120, y: (lat - 33) * 120 });
 
+/** A snapshot at `now`, each report's message and position heard then unless it says when. */
 function snapshot(now: number, aircraft: AircraftReport[], messages = 0): AircraftSnapshot {
-  return { now, messages, aircraft };
+  const stamped = aircraft.map((a) => ({
+    ...a,
+    heard: { messages: now, ...(a.position && { position: now }), ...a.heard },
+  }));
+  return { now, messages, aircraft: stamped };
 }
 
-/** A target heard, with its position, at 999.75 s. */
+/** A target heard with its position. */
 const live = (hex: string, lat = 33.5, lon = 130.5): AircraftReport => ({
   hex,
   position: { lat, lon },
   alt: 11000,
-  heard: { messages: 999.75, position: 999.75, alt: 999.75 },
+  heard: {},
 });
 
 /** A target reporting the ident or its end, heard at `heardAt`. */
@@ -70,6 +75,18 @@ describe('createTrackStore', () => {
     expect(h?.[1]?.x).toBeCloseTo(30, 9);
     expect(h?.[1]?.y).toBeCloseTo(36, 9);
     expect(h?.[1]?.alt).toBe(11000);
+  });
+
+  it('dates a fix by when its position was heard, not by the snapshot', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const backfilled = { ...live('a'), heard: { messages: 1007, position: 1001.5 } };
+
+    // Act
+    store.ingest(snapshot(1008, [backfilled]));
+
+    // Assert
+    expect(store.tracks.get('a')?.history.map((f) => f.t)).toEqual([1001.5]);
   });
 
   it('trims history older than the retention window', () => {
@@ -257,8 +274,8 @@ describe('createTrackStore', () => {
       type: 'B789',
       registration: 'TEST-01',
       emergency: 'none',
-      seen: 0.25,
-      seenPos: 0.25,
+      seen: 0,
+      seenPos: 0,
     });
   });
 

@@ -14,7 +14,7 @@ export interface Fix {
   lon: number;
   x: number;
   y: number;
-  /** Snapshot time, seconds since epoch. */
+  /** When the position was heard, seconds since the epoch. */
   t: number;
   alt: number | 'ground' | undefined;
 }
