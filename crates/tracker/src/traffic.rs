@@ -125,10 +125,22 @@ impl Traffic {
     }
 }
 
-/// Something a message said, and when: the newest report of it, however it
-/// was heard.
+/// Something said, and when it was heard, in seconds since the epoch. A
+/// value derived from others is heard when the oldest of them was.
+#[derive(Clone, Copy)]
+struct Heard<T> {
+    said: T,
+    at_s: f64,
+}
+
+/// What was heard, without when.
+fn said<T>(heard: Heard<T>) -> T {
+    heard.said
+}
+
+/// The newest report of a value, however it was heard.
 struct Said<T> {
-    kept: Option<(T, f64)>,
+    kept: Option<Heard<T>>,
 }
 
 impl<T> Default for Said<T> {
@@ -140,37 +152,41 @@ impl<T> Default for Said<T> {
 impl<T: Clone> Said<T> {
     /// Takes what a message heard at `now_s` says, when it says it.
     fn keep(&mut self, said: Option<T>, now_s: f64) {
-        if let Some(said) = said {
-            self.kept = Some((said, now_s));
+        self.keep_heard(said.map(|said| Heard { said, at_s: now_s }));
+    }
+
+    /// Takes what was derived, when there is something.
+    fn keep_heard(&mut self, heard: Option<Heard<T>>) {
+        if heard.is_some() {
+            self.kept = heard;
         }
     }
 
     /// What was said, unless it has lapsed by `now_s`.
     fn at(&self, now_s: f64) -> Option<T> {
-        self.within(LAPSE_S, now_s)
+        self.within(LAPSE_S, now_s).map(said)
     }
 
-    /// What was said lately: within the seconds of each other that values
-    /// read together are taken from.
-    fn lately(&self, now_s: f64) -> Option<T> {
+    /// What was said lately, and when: within the seconds of each other that
+    /// values read together are taken from.
+    fn lately(&self, now_s: f64) -> Option<Heard<T>> {
         self.within(RELATED_S, now_s)
     }
 
-    /// What was said less than `lapse_s` before `now_s`.
-    fn within(&self, lapse_s: f64, now_s: f64) -> Option<T> {
-        self.lasting(lapse_s, now_s).map(|(said, _)| said.clone())
+    /// What was said less than `lapse_s` before `now_s`, and when.
+    fn within(&self, lapse_s: f64, now_s: f64) -> Option<Heard<T>> {
+        self.lasting(lapse_s, now_s).cloned()
     }
 
     /// How long before `now_s` it was said, unless it has lapsed.
     fn age_s(&self, now_s: f64) -> Option<f64> {
-        self.lasting(LAPSE_S, now_s)
-            .map(|(_, said_s)| now_s - said_s)
+        self.lasting(LAPSE_S, now_s).map(|heard| now_s - heard.at_s)
     }
 
-    fn lasting(&self, lapse_s: f64, now_s: f64) -> Option<&(T, f64)> {
+    fn lasting(&self, lapse_s: f64, now_s: f64) -> Option<&Heard<T>> {
         self.kept
             .as_ref()
-            .filter(|(_, said_s)| now_s - said_s < lapse_s)
+            .filter(|heard| now_s - heard.at_s < lapse_s)
     }
 }
 
@@ -201,8 +217,8 @@ impl Remembered {
     fn at(&self, now_s: f64) -> (Option<String>, Option<EmitterCategory>) {
         let lapse_s = IDENTIFICATION_LAPSE_S;
         (
-            self.identification.within(lapse_s, now_s),
-            self.emitter_category.within(lapse_s, now_s),
+            self.identification.within(lapse_s, now_s).map(said),
+            self.emitter_category.within(lapse_s, now_s).map(said),
         )
     }
 }
@@ -376,13 +392,13 @@ impl Tracked {
     /// What is known of the aircraft lately, to tell the registers apart by.
     fn known(&self, now_s: f64) -> Known {
         Known {
-            track_deg: self.track_deg.lately(now_s),
-            ground_speed_kt: self.ground_speed_kt.lately(now_s),
-            true_airspeed_kt: self.true_airspeed_kt.lately(now_s),
-            baro_altitude_ft: self.baro_altitude_ft.lately(now_s),
-            magnetic_heading_deg: self.magnetic_heading_deg.lately(now_s),
-            indicated_airspeed_kt: self.indicated_airspeed_kt.lately(now_s),
-            mach: self.mach.lately(now_s),
+            track_deg: self.track_deg.lately(now_s).map(said),
+            ground_speed_kt: self.ground_speed_kt.lately(now_s).map(said),
+            true_airspeed_kt: self.true_airspeed_kt.lately(now_s).map(said),
+            baro_altitude_ft: self.baro_altitude_ft.lately(now_s).map(said),
+            magnetic_heading_deg: self.magnetic_heading_deg.lately(now_s).map(said),
+            indicated_airspeed_kt: self.indicated_airspeed_kt.lately(now_s).map(said),
+            mach: self.mach.lately(now_s).map(said),
         }
     }
 
@@ -423,36 +439,49 @@ impl Tracked {
     }
 
     /// Derives what the air data say together, from values said within a
-    /// sweep or two of one another: the temperature from the Mach number and
-    /// the airspeed, and the wind from the ground vector and the air vector.
+    /// sweep or two of one another: the temperatures from the Mach number
+    /// and the airspeed, and the wind from the ground vector and the air
+    /// vector; each heard when the oldest of what it is derived from was.
     fn derive(&mut self, now_s: f64, site: Position) {
         let mach = self.mach.lately(now_s);
         let airspeed = self.true_airspeed_kt.lately(now_s);
-        let oat_c = mach
-            .zip(airspeed)
-            .and_then(|(mach, tas)| air::static_air_temperature_c(mach, tas));
-        let tat_c = oat_c
-            .zip(mach)
-            .map(|(oat_c, mach)| air::total_air_temperature_c(oat_c, mach));
-        self.oat_c.keep(oat_c, now_s);
-        self.tat_c.keep(tat_c, now_s);
+        let oat_c = mach.zip(airspeed).and_then(|(mach, tas)| {
+            Some(Heard {
+                said: air::static_air_temperature_c(mach.said, tas.said)?,
+                at_s: mach.at_s.min(tas.at_s),
+            })
+        });
+        let tat_c = oat_c.zip(mach).map(|(oat_c, mach)| Heard {
+            said: air::total_air_temperature_c(oat_c.said, mach.said),
+            at_s: oat_c.at_s,
+        });
+        self.oat_c.keep_heard(oat_c);
+        self.tat_c.keep_heard(tat_c);
+        let wind = self.wind(now_s, site);
+        self.wind.keep_heard(wind);
+    }
+
+    /// The wind the ground vector and the air vector say together, when both
+    /// are of one sweep and the aircraft flies straight.
+    fn wind(&self, now_s: f64, site: Position) -> Option<Heard<Wind>> {
         let straight = self
             .track_rate_deg_per_s
             .lately(now_s)
-            .is_none_or(|rate| rate.abs() <= STRAIGHT_DEG_PER_S);
-        let heading = self
-            .magnetic_heading_deg
-            .within(WIND_WITHIN_S, now_s)
-            .map(|magnetic| magnetic + self.declination(now_s, site));
-        let through_air = heading.zip(self.true_airspeed_kt.within(WIND_WITHIN_S, now_s));
-        let over_ground = self
-            .track_deg
-            .within(WIND_WITHIN_S, now_s)
-            .zip(self.ground_speed_kt.within(WIND_WITHIN_S, now_s));
-        let wind = over_ground.zip(through_air).filter(|_| straight).map(
-            |((track, speed), (heading, airspeed))| air::wind(track, speed, heading, airspeed),
-        );
-        self.wind.keep(wind, now_s);
+            .is_none_or(|rate| rate.said.abs() <= STRAIGHT_DEG_PER_S);
+        let heard = |said: &Said<f64>| said.within(WIND_WITHIN_S, now_s);
+        let track = heard(&self.track_deg)?;
+        let speed = heard(&self.ground_speed_kt)?;
+        let magnetic = heard(&self.magnetic_heading_deg)?;
+        let airspeed = heard(&self.true_airspeed_kt)?;
+        let heading = magnetic.said + self.declination(now_s, site);
+        let oldest = [track, speed, magnetic, airspeed]
+            .into_iter()
+            .map(|heard| heard.at_s)
+            .fold(f64::INFINITY, f64::min);
+        straight.then(|| Heard {
+            said: air::wind(track.said, speed.said, heading, airspeed.said),
+            at_s: oldest,
+        })
     }
 
     /// Where the aircraft is, or else the site.
@@ -534,7 +563,7 @@ impl Tracked {
             emitter_category: emitter_category.map(Into::into),
             mode_a_code: self.mode_a_code.at(now_s),
             emergency_priority_status: self.emergency_priority_status.at(now_s).map(Into::into),
-            ident: self.ident.within(IDENT_S, now_s).unwrap_or(false),
+            ident: self.ident.within(IDENT_S, now_s).is_some_and(said),
             lat_deg: fix.map(|fix| fix.position.lat_deg),
             lon_deg: fix.map(|fix| fix.position.lon_deg),
             position_source: fix.map_or(Source::Unspecified, |fix| fix.source).into(),
@@ -551,7 +580,7 @@ impl Tracked {
             mach: self.mach.at(now_s),
             magnetic_heading_deg: self.magnetic_heading_deg.at(now_s),
             target_state: self.target_state.at(now_s),
-            resolution_advisory: self.resolution_advisory.within(ADVISORY_S, now_s),
+            resolution_advisory: self.resolution_advisory.within(ADVISORY_S, now_s).map(said),
             quality: Some(quality).filter(|quality| *quality != Quality::default()),
             meteo: Some(meteo).filter(|meteo| *meteo != Meteo::default()),
             reception: Some(Reception {
@@ -566,7 +595,10 @@ impl Tracked {
 
     /// Where the aircraft was last placed, once that has lapsed.
     fn last_position(&self, now_s: f64) -> Option<LastPosition> {
-        let (fix, fixed_s) = self.fix.kept.as_ref()?;
+        let Heard {
+            said: fix,
+            at_s: fixed_s,
+        } = self.fix.kept.as_ref()?;
         self.fix.at(now_s).is_none().then(|| LastPosition {
             lat_deg: fix.position.lat_deg,
             lon_deg: fix.position.lon_deg,
@@ -1948,6 +1980,32 @@ mod tests {
         let (wind, oat) = meteo.map_or((None, None), |m| (m.wind_speed_kt, m.oat_c));
         assert_eq!(wind, None);
         assert!(oat.is_some());
+    }
+
+    #[test]
+    fn derived_value_lapses_with_the_oldest_of_its_inputs() {
+        // Arrange: the Mach number at 100 s, the airspeed the temperature is
+        // derived from it with at 112 s
+        let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
+            mach: Some(0.78),
+            ..HeadingAndSpeed::default()
+        });
+        let messages = [
+            (said(velocity(480.0, 90.0)), 100.0),
+            (said(answered(&heading_and_speed)), 100.0),
+            (said(answered(&track_and_turn(90.0, 480.0, 450.0))), 112.0),
+        ];
+        let mut traffic = hearing(messages);
+
+        // Act: just short of a minute after the Mach number, and a minute after it
+        let derived = [159.9, 160.0].map(|now_s| {
+            let known = traffic.snapshot(now_s).aircraft.remove(0);
+            (known.true_airspeed_kt, known.meteo.and_then(|m| m.oat_c))
+        });
+
+        // Assert: the airspeed, said later, is still known
+        let lapsed = derived.map(|(airspeed, oat)| (airspeed.is_some(), oat.is_some()));
+        assert_eq!(lapsed, [(true, true), (true, false)]);
     }
 
     #[test]
