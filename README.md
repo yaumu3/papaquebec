@@ -250,8 +250,8 @@ aircraft, with when it was heard, until it lapses a minute later (`traffic`).
   an active resolution advisory with the threat it names.
   - A reply does not name its register, so each is told apart by the layout it fits and by what
     the aircraft broadcasts.
-  - The newest report of a value wins, whether broadcast or answered, unless a finer one came
-    within the last sweep or two.
+  - The newest report of a value wins, whether broadcast or answered, unless it only repeats a
+    finer one of the last sweep or two within rounding.
 - Derived from them: the wind, with the magnetic heading made true by the World Magnetic Model
   (`wmm`), and the air temperature (`air`), each heard when the oldest of its inputs was.
 - Added from the aircraft database: the registration and type (`registry`).

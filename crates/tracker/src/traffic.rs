@@ -136,8 +136,9 @@ fn said<T>(heard: Heard<T>) -> T {
     heard.said
 }
 
-/// Something derived, heard when the oldest of what it is derived from was.
-fn derived<T>(said: T, at_s: f64) -> Heard<T> {
+/// Something heard exactly, in no steps: a report, at its instant, or a value
+/// derived from others, at the oldest of theirs.
+fn exact<T>(said: T, at_s: f64) -> Heard<T> {
     Heard {
         said,
         at_s,
@@ -187,8 +188,9 @@ impl Heard<bool> {
     }
 }
 
-/// The newest report of a value, however it was heard, unless a finer one
-/// came within a sweep or two: a coarser one would only jitter it.
+/// The newest report of a value, however it was heard, unless it only repeats
+/// a finer one of the last sweep or two within rounding: a coarser one would
+/// only jitter it.
 struct Said<T> {
     kept: Option<Heard<T>>,
 }
@@ -202,31 +204,13 @@ impl<T> Default for Said<T> {
 impl<T: Clone> Said<T> {
     /// Takes what a message heard at `now_s` says exactly, when it says it.
     fn keep(&mut self, said: Option<T>, now_s: f64) {
-        self.keep_in_steps(said, 0.0, now_s);
+        self.keep_heard(said.map(|said| exact(said, now_s)));
     }
 
-    /// Takes what a message heard at `now_s` says in steps of `step`, when
-    /// it says it.
-    fn keep_in_steps(&mut self, said: Option<T>, step: f64, now_s: f64) {
-        self.keep_heard(said.map(|said| Heard {
-            said,
-            at_s: now_s,
-            step,
-        }));
-    }
-
-    /// Takes what was heard, when there is something, in place of what was
-    /// kept: unless that is finer and of the last sweep or two.
+    /// Takes what was heard, when there is something, in place of what was kept.
     fn keep_heard(&mut self, heard: Option<Heard<T>>) {
-        let Some(heard) = heard else {
-            return;
-        };
-        let finer_lately = self
-            .kept
-            .as_ref()
-            .is_some_and(|kept| kept.step < heard.step && heard.at_s - kept.at_s < RELATED_S);
-        if !finer_lately {
-            self.kept = Some(heard);
+        if heard.is_some() {
+            self.kept = heard;
         }
     }
 
@@ -250,6 +234,31 @@ impl<T: Clone> Said<T> {
         self.kept
             .as_ref()
             .filter(|heard| now_s - heard.at_s < lapse_s)
+    }
+}
+
+impl<T: Copy + Into<f64>> Said<T> {
+    /// Takes what a message heard at `now_s` says in steps of `step`, when
+    /// it says it, in place of what was kept: unless that is finer, of the
+    /// last sweep or two, and the two agree within their rounding, which a
+    /// coarser report would only jitter.
+    fn keep_in_steps(&mut self, said: Option<T>, step: f64, now_s: f64) {
+        let Some(said) = said else {
+            return;
+        };
+        let repeated = self.kept.as_ref().is_some_and(|kept| {
+            let rounding = f64::midpoint(step, kept.step);
+            kept.step < step
+                && (said.into() - kept.said.into()).abs() <= rounding
+                && now_s - kept.at_s < RELATED_S
+        });
+        if !repeated {
+            self.kept = Some(Heard {
+                said,
+                at_s: now_s,
+                step,
+            });
+        }
     }
 }
 
@@ -600,10 +609,10 @@ impl Tracked {
         let airspeed = self.true_airspeed_kt.lately(now_s);
         let oat_c = mach.zip(airspeed).and_then(|(mach, tas)| {
             let oat_c = air::static_air_temperature_c(mach.said, tas.said)?;
-            Some(derived(oat_c, mach.at_s.min(tas.at_s)))
+            Some(exact(oat_c, mach.at_s.min(tas.at_s)))
         });
         let tat_c = oat_c.zip(mach).map(|(oat_c, mach)| {
-            derived(
+            exact(
                 air::total_air_temperature_c(oat_c.said, mach.said),
                 oat_c.at_s,
             )
@@ -632,7 +641,7 @@ impl Tracked {
             .map(|heard| heard.at_s)
             .fold(f64::INFINITY, f64::min);
         let wind = air::wind(track.said, speed.said, heading, airspeed.said);
-        straight.then(|| derived(wind, oldest))
+        straight.then(|| exact(wind, oldest))
     }
 
     /// Where the aircraft is, or else the site.
@@ -767,7 +776,7 @@ impl Tracked {
         let reported = self.geometric_altitude_ft.at(now_s);
         let difference = self.geometric_minus_baro_ft.at(now_s);
         let worked_out = baro.zip(difference).map(|(baro, difference)| {
-            derived(baro.said + difference.said, baro.at_s.min(difference.at_s))
+            exact(baro.said + difference.said, baro.at_s.min(difference.at_s))
         });
         [worked_out, reported]
             .into_iter()
@@ -847,12 +856,16 @@ mod tests {
     }
 
     fn velocity(ground_speed_kt: f64, track_deg: f64) -> Report {
+        velocity_at(ground_speed_kt, track_deg, -1216)
+    }
+
+    fn velocity_at(ground_speed_kt: f64, track_deg: f64, baro_vertical_rate_fpm: i32) -> Report {
         Report::Velocity(Velocity {
             ground_speed_kt: Some(ground_speed_kt),
             track_deg: Some(track_deg),
             airspeed: None,
             magnetic_heading_deg: None,
-            baro_vertical_rate_fpm: Some(-1216),
+            baro_vertical_rate_fpm: Some(baro_vertical_rate_fpm),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
         })
@@ -2042,11 +2055,11 @@ mod tests {
     }
 
     #[test]
-    fn finer_report_of_the_last_sweeps_wins_whichever_came_last() {
+    fn newest_report_wins_between_the_broadcast_and_the_register() {
         // Arrange: the velocity broadcast before the track and turn report,
-        // and after it: the speed in steps of a knot against the report's
-        // two, the track in steps of 0.2° at that speed against the report's
-        // 0.18°
+        // and after it, the two further apart than their steps: the speed
+        // in steps of a knot against the report's two, the track in steps
+        // of 0.2° at that speed against the report's 0.18°
         let report = answered(&track_and_turn(236.25, 300.0, 310.0));
         let reports = [
             vec![velocity(290.0, 235.0), report.clone()],
@@ -2064,13 +2077,18 @@ mod tests {
                 reported(a.true_airspeed_kt),
             )
         });
-        assert_eq!(read, [(Some(290.0), Some(236.25), Some(310.0)); 2]);
+        let expected = [
+            (Some(300.0), Some(236.25), Some(310.0)),
+            (Some(290.0), Some(235.0), Some(310.0)),
+        ];
+        assert_eq!(read, expected);
     }
 
-    /// The vertical rate in steps of 64 fpm from the velocity at 100 s, in
-    /// steps of 32 fpm from the heading and speed report at 101 s, then from
-    /// the velocity again at each of the seconds.
-    fn rated_at(seconds: impl IntoIterator<Item = f64>) -> Traffic {
+    /// The vertical rate of -1216 fpm in steps of 64 fpm from the velocity
+    /// at 100 s, of -1184 fpm in steps of 32 fpm from the heading and speed
+    /// report at 101 s, then from the velocity again at each of the seconds,
+    /// at the rate it says then.
+    fn rated_at(again: impl IntoIterator<Item = (f64, i32)>) -> Traffic {
         let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
             magnetic_heading_deg: Some(240.0),
             indicated_airspeed_kt: Some(250.0),
@@ -2078,9 +2096,9 @@ mod tests {
             baro_vertical_rate_fpm: Some(-1184),
             inertial_vertical_rate_fpm: Some(-1184),
         });
-        let again = seconds
+        let again = again
             .into_iter()
-            .map(|now_s| (said(velocity(290.0, 235.0)), now_s));
+            .map(|(now_s, rate_fpm)| (said(velocity_at(290.0, 235.0, rate_fpm)), now_s));
         hearing(
             [
                 (said(velocity(290.0, 235.0)), 100.0),
@@ -2092,9 +2110,10 @@ mod tests {
     }
 
     #[test]
-    fn coarser_report_does_not_replace_a_finer_one_of_the_last_sweeps() {
-        // Arrange: the velocity again a second after the report
-        let mut traffic = rated_at([102.0]);
+    fn coarser_report_that_repeats_a_finer_one_within_rounding_does_not_replace_it() {
+        // Arrange: the velocity again a second after the report, saying the
+        // same within its 64 fpm
+        let mut traffic = rated_at([(102.0, -1216)]);
 
         // Act
         let carried = traffic
@@ -2112,9 +2131,30 @@ mod tests {
     }
 
     #[test]
+    fn coarser_report_that_disagrees_with_a_finer_one_replaces_it_at_once() {
+        // Arrange: the velocity again a second after the report, levelled off
+        let mut traffic = rated_at([(102.0, 0)]);
+
+        // Act
+        let carried = traffic
+            .snapshot(103.0)
+            .aircraft
+            .remove(0)
+            .baro_vertical_rate_fpm;
+
+        // Assert
+        let levelled = Int {
+            value: 0,
+            heard_ms: 102_000,
+        };
+        assert_eq!(carried, Some(levelled));
+    }
+
+    #[test]
     fn coarser_report_replaces_a_finer_one_once_the_sweeps_have_passed() {
-        // Arrange: the velocity again within the sweeps, and beyond them
-        let mut traffic = rated_at([102.0, 117.0]);
+        // Arrange: the velocity again within the sweeps, and beyond them,
+        // saying the same within its 64 fpm each time
+        let mut traffic = rated_at([(102.0, -1216), (117.0, -1216)]);
 
         // Act
         let carried = traffic
