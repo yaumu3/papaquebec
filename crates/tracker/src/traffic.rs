@@ -125,43 +125,23 @@ impl Traffic {
     }
 }
 
-/// Something a message said, with when it did, and whether only in reply.
+/// Something a message said, and when: the newest report of it, however it
+/// was heard.
 struct Said<T> {
     kept: Option<(T, f64)>,
-    answered: bool,
 }
 
 impl<T> Default for Said<T> {
     fn default() -> Self {
-        Self {
-            kept: None,
-            answered: false,
-        }
+        Self { kept: None }
     }
 }
 
 impl<T: Clone> Said<T> {
-    /// Takes what a broadcast heard at `now_s` says, when it says it.
+    /// Takes what a message heard at `now_s` says, when it says it.
     fn keep(&mut self, said: Option<T>, now_s: f64) {
         if let Some(said) = said {
             self.kept = Some((said, now_s));
-            self.answered = false;
-        }
-    }
-
-    /// Takes what a reply heard at `now_s` says, when it says it, unless a
-    /// broadcast said it within the lapse: replies fill in what the
-    /// broadcasts leave out.
-    fn fill(&mut self, said: Option<T>, now_s: f64) {
-        self.fill_within(said, LAPSE_S, now_s);
-    }
-
-    /// Fills in what a reply says, unless a broadcast said it less than
-    /// `lapse_s` before `now_s`.
-    fn fill_within(&mut self, said: Option<T>, lapse_s: f64, now_s: f64) {
-        if said.is_some() && (self.answered || self.within(lapse_s, now_s).is_none()) {
-            self.kept = said.map(|said| (said, now_s));
-            self.answered = true;
         }
     }
 
@@ -227,8 +207,8 @@ impl Remembered {
     }
 }
 
-/// The target state, each field as it was last said: a broadcast may leave
-/// out what a reply says.
+/// The target state, each field as it was last said: the broadcast and the
+/// reply each leave out what the other says.
 #[derive(Default)]
 struct Target {
     selected_altitude_mcp_ft: Said<i32>,
@@ -239,7 +219,7 @@ struct Target {
 }
 
 impl Target {
-    /// Takes what a broadcast heard at `now_s` says of each field.
+    /// Takes what a message heard at `now_s` says of each field.
     fn keep(&mut self, said: &TargetState, now_s: f64) {
         self.selected_altitude_mcp_ft
             .keep(said.selected_altitude_mcp_ft, now_s);
@@ -249,19 +229,6 @@ impl Target {
             .keep(said.selected_heading_deg, now_s);
         self.baro_setting_hpa.keep(said.baro_setting_hpa, now_s);
         self.modes.keep(said.modes, now_s);
-    }
-
-    /// Takes what a reply heard at `now_s` says of each field the broadcasts
-    /// leave out.
-    fn fill(&mut self, said: &TargetState, now_s: f64) {
-        self.selected_altitude_mcp_ft
-            .fill(said.selected_altitude_mcp_ft, now_s);
-        self.selected_altitude_fms_ft
-            .fill(said.selected_altitude_fms_ft, now_s);
-        self.selected_heading_deg
-            .fill(said.selected_heading_deg, now_s);
-        self.baro_setting_hpa.fill(said.baro_setting_hpa, now_s);
-        self.modes.fill(said.modes, now_s);
     }
 
     /// The fields that have not lapsed by `now_s`, while any is left.
@@ -419,39 +386,37 @@ impl Tracked {
         }
     }
 
-    /// Takes what a register the aircraft answered with says, to fill in what
-    /// its broadcasts leave out, and derives what the air data say together.
+    /// Takes what a register the aircraft answered with says, and derives
+    /// what the air data say together.
     fn answer(&mut self, register: &Register, now_s: f64, site: Position) {
         match register {
-            // The callsign is the same however it is heard.
             Register::Identification(callsign) => self
                 .remembered
                 .identification
                 .keep(Some(callsign.clone()), now_s),
             Register::ResolutionAdvisory(said) => {
-                self.resolution_advisory
-                    .fill_within(Some(*said), ADVISORY_S, now_s);
+                self.resolution_advisory.keep(Some(*said), now_s);
             }
             Register::SelectedVerticalIntention(said) => {
-                self.target_state.fill(&said.target, now_s);
+                self.target_state.keep(&said.target, now_s);
             }
             Register::TrackAndTurn(said) => {
-                self.track_deg.fill(said.track_deg, now_s);
-                self.ground_speed_kt.fill(said.ground_speed_kt, now_s);
+                self.track_deg.keep(said.track_deg, now_s);
+                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
                 self.track_rate_deg_per_s
-                    .fill(said.track_rate_deg_per_s, now_s);
-                self.true_airspeed_kt.fill(said.true_airspeed_kt, now_s);
+                    .keep(said.track_rate_deg_per_s, now_s);
+                self.true_airspeed_kt.keep(said.true_airspeed_kt, now_s);
             }
             Register::HeadingAndSpeed(said) => {
                 self.magnetic_heading_deg
-                    .fill(said.magnetic_heading_deg, now_s);
+                    .keep(said.magnetic_heading_deg, now_s);
                 self.indicated_airspeed_kt
-                    .fill(said.indicated_airspeed_kt, now_s);
-                self.mach.fill(said.mach, now_s);
+                    .keep(said.indicated_airspeed_kt, now_s);
+                self.mach.keep(said.mach, now_s);
                 self.baro_vertical_rate_fpm
-                    .fill(said.baro_vertical_rate_fpm, now_s);
+                    .keep(said.baro_vertical_rate_fpm, now_s);
                 self.geometric_vertical_rate_fpm
-                    .fill(said.inertial_vertical_rate_fpm, now_s);
+                    .keep(said.inertial_vertical_rate_fpm, now_s);
             }
         }
         self.derive(now_s, site);
@@ -1679,8 +1644,8 @@ mod tests {
     }
 
     #[test]
-    fn answered_advisory_fills_in_once_the_broadcast_one_has_lapsed() {
-        // Arrange: a climb broadcast at 100 s, then a descent answered 20 s on
+    fn answered_advisory_replaces_the_broadcast_one_at_once() {
+        // Arrange: a climb broadcast at 100 s, then a descent answered a second on
         let advising = |downward| ResolutionAdvisory {
             advisory: Some(Advisory {
                 corrective: true,
@@ -1694,12 +1659,12 @@ mod tests {
             advisory: advising(false),
         });
         let descent = answered(&Register::ResolutionAdvisory(advising(true)));
-        let messages = [(said(climb), 100.0), (said(descent), 120.0)];
+        let messages = [(said(climb), 100.0), (said(descent), 101.0)];
         let mut traffic = hearing(messages);
 
         // Act
         let shown = traffic
-            .snapshot(121.0)
+            .snapshot(102.0)
             .aircraft
             .remove(0)
             .resolution_advisory;
@@ -1758,9 +1723,9 @@ mod tests {
     }
 
     #[test]
-    fn broadcast_wins_over_the_register_while_it_is_current() {
+    fn newest_report_wins_between_the_broadcast_and_the_register() {
         // Arrange: the velocity broadcast before the report, and after it
-        let report = answered(&track_and_turn(240.0, 300.0, 310.0));
+        let report = answered(&track_and_turn(236.25, 300.0, 310.0));
         let reports = [
             vec![velocity(290.0, 235.0), report.clone()],
             vec![report, velocity(290.0, 235.0)],
@@ -1769,9 +1734,13 @@ mod tests {
         // Act
         let known = reports.map(|reports| known(after(reports)));
 
-        // Assert: the airspeed, which only the report says, fills in either way
+        // Assert: the airspeed, which only the report says, stays either way
         let read = known.map(|a| (a.ground_speed_kt, a.track_deg, a.true_airspeed_kt));
-        assert_eq!(read, [(Some(290.0), Some(235.0), Some(310.0)); 2]);
+        let expected = [
+            (Some(300.0), Some(236.25), Some(310.0)),
+            (Some(290.0), Some(235.0), Some(310.0)),
+        ];
+        assert_eq!(read, expected);
     }
 
     #[test]
@@ -1794,7 +1763,7 @@ mod tests {
     }
 
     #[test]
-    fn selected_intention_register_fills_in_the_target_state_field_by_field() {
+    fn selected_intention_register_replaces_the_target_state_field_by_field() {
         // Arrange: an aircraft that only answers with it, and one that also
         // broadcasts a target state without the barometric setting
         let intention = TargetState {
@@ -1819,14 +1788,16 @@ mod tests {
         // Act
         let known = reports.map(|reports| known(after(reports)));
 
-        // Assert: the broadcast wins the altitude, the reply fills in the setting
-        let filled_in = TargetState {
+        // Assert: the reply, which came last, wins the altitude and adds the
+        // setting; the heading, which it leaves out, stays
+        let replaced = TargetState {
+            selected_altitude_mcp_ft: Some(6000),
             baro_setting_hpa: Some(1013.6),
             ..broadcast
         };
         assert_eq!(
             known.map(|a| a.target_state),
-            [Some(intention), Some(filled_in)]
+            [Some(intention), Some(replaced)]
         );
     }
 

@@ -275,10 +275,12 @@ fn newly_set_level_is_started_toward_after_a_pause() {
     // Act
     let snapshot = heard.after(30.0);
 
-    // Assert: 21000 ft selected and 1000 fpm, in the steps they are broadcast in
+    // Assert: 21000 ft selected, in the steps it is broadcast in, and 1000
+    // fpm in the steps the heading and speed report answers it in, which
+    // comes after the broadcast
     assert_eq!(
         intent(numbered(&snapshot, 7)),
-        [Some(17_000), Some(20_992), Some(1024)]
+        [Some(17_000), Some(20_992), Some(992)]
     );
 }
 

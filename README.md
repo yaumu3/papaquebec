@@ -249,7 +249,7 @@ aircraft until it lapses (`traffic`).
   advisory.
   - A reply does not name its register, so each is told apart by the layout it fits and by what
     the aircraft broadcasts.
-  - A broadcast value wins over an answered one while it is current.
+  - The newest report of a value wins, whether broadcast or answered.
 - Derived from them: the wind, with the magnetic heading made true by the World Magnetic Model
   (`wmm`), and the air temperature (`air`).
 - Added from the aircraft database: the registration and type (`registry`).
