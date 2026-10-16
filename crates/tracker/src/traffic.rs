@@ -470,8 +470,11 @@ impl Tracked {
             }
             Report::Identification(said) => self.remembered.keep(said, now_s),
             Report::Velocity(said) => {
-                self.ground_speed_kt
-                    .keep_in_steps(said.ground_speed_kt, Velocity::STEP_KT, now_s);
+                self.ground_speed_kt.keep_in_steps(
+                    said.ground_speed_kt,
+                    said.speed_step_kt(),
+                    now_s,
+                );
                 let track_step = said.track_step_deg().unwrap_or(0.0);
                 self.track_deg
                     .keep_in_steps(said.track_deg, track_step, now_s);
@@ -496,13 +499,13 @@ impl Tracked {
                     Some(Airspeed::Indicated(kt)) => {
                         self.indicated_airspeed_kt.keep_in_steps(
                             Some(kt),
-                            Velocity::STEP_KT,
+                            said.speed_step_kt(),
                             now_s,
                         );
                     }
                     Some(Airspeed::True(kt)) => {
                         self.true_airspeed_kt
-                            .keep_in_steps(Some(kt), Velocity::STEP_KT, now_s);
+                            .keep_in_steps(Some(kt), said.speed_step_kt(), now_s);
                     }
                     None => {}
                 }

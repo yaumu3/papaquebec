@@ -321,19 +321,44 @@ const SUBSONIC_KT: f64 = 1021.0;
 
 impl Velocity {
     /// The step of each component of the speed over the ground, and of the
-    /// airspeed, below the supersonic subtypes.
+    /// airspeed, in the subsonic subtypes; and in the supersonic ones.
     pub const STEP_KT: f64 = 1.0;
+    pub const SUPERSONIC_STEP_KT: f64 = 4.0;
     /// The step of the vertical rate.
     pub const RATE_STEP_FPM: f64 = 64.0;
     /// The step of the magnetic heading.
     pub const HEADING_STEP_DEG: f64 = 360.0 / 1024.0;
 
-    /// The step the track comes in at the speed over the ground: a knot
-    /// across it; none without a speed.
+    /// The step the speed over the ground and the airspeed come in: that of
+    /// the supersonic subtypes where a component outruns the subsonic ones.
+    #[must_use]
+    pub fn speed_step_kt(&self) -> f64 {
+        let over_ground = self
+            .ground_speed_kt
+            .zip(self.track_deg)
+            .map(|(speed, track)| {
+                let (east, north) = toward(track, speed);
+                east.abs().max(north.abs())
+            });
+        let through_air = self.airspeed.map(|airspeed| match airspeed {
+            Airspeed::Indicated(speed) | Airspeed::True(speed) => speed,
+        });
+        let supersonic = over_ground
+            .or(through_air)
+            .is_some_and(|fastest| fastest > SUBSONIC_KT);
+        if supersonic {
+            Self::SUPERSONIC_STEP_KT
+        } else {
+            Self::STEP_KT
+        }
+    }
+
+    /// The step the track comes in at the speed over the ground: a step of
+    /// the speed across it; none without a speed.
     #[must_use]
     pub fn track_step_deg(&self) -> Option<f64> {
         self.ground_speed_kt
-            .map(|speed| (Self::STEP_KT / speed).atan().to_degrees())
+            .map(|speed| (self.speed_step_kt() / speed).atan().to_degrees())
     }
 }
 
@@ -345,8 +370,8 @@ impl Field for Velocity {
         let subtype = me.get(6, 8);
         // Subtypes 2 and 4 are the supersonic ones.
         let step = match subtype {
-            1 | 3 => 1.0,
-            2 | 4 => 4.0,
+            1 | 3 => Self::STEP_KT,
+            2 | 4 => Self::SUPERSONIC_STEP_KT,
             _ => return None,
         };
         let over_ground = (subtype <= 2).then(|| over_ground(me, step)).flatten();
@@ -365,9 +390,10 @@ impl Field for Velocity {
     }
 
     fn write(&self) -> Bits {
+        let step = self.speed_step_kt();
         let (subtype, speeds) = match self.airspeed {
-            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg),
-            None => along_ground(self.ground_speed_kt.zip(self.track_deg)),
+            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg, step),
+            None => along_ground(self.ground_speed_kt.zip(self.track_deg), step),
         };
         let rate = self
             .baro_vertical_rate_fpm
@@ -410,21 +436,28 @@ fn over_ground(me: Bits, step: f64) -> Option<(f64, f64)> {
     Some((speed, track))
 }
 
-/// The subtype and the 22 bits of a ground speed along a track, as the
-/// velocities to the east and to the north; of none, not available.
-fn along_ground(velocity: Option<(f64, f64)>) -> (u32, Bits) {
+/// The subtype and the 22 bits of a ground speed along a track in steps of
+/// `step`, as the velocities to the east and to the north; of none, not
+/// available.
+fn along_ground(velocity: Option<(f64, f64)>, step: f64) -> (u32, Bits) {
     let Some((speed, track)) = velocity else {
         return (1, Bits::default().filled(22));
     };
     let (east, north) = toward(track, speed);
-    let supersonic = east.abs().max(north.abs()) > SUBSONIC_KT;
-    let step = if supersonic { 4.0 } else { 1.0 };
     let toward = |velocity: f64| {
         Bits::default()
             .put_flag(velocity < 0.0)
             .put(count(velocity.abs() / step) + 1, 10)
     };
-    (1 + u32::from(supersonic), toward(east).then(toward(north)))
+    (
+        1 + u32::from(supersonic(step)),
+        toward(east).then(toward(north)),
+    )
+}
+
+/// Whether a step of the speed is the supersonic subtypes'.
+fn supersonic(step: f64) -> bool {
+    step > Velocity::STEP_KT
 }
 
 fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
@@ -436,20 +469,19 @@ fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
     })
 }
 
-/// The subtype and the 22 bits of an airspeed on a magnetic heading.
-fn through_air(airspeed: Airspeed, heading_deg: Option<f64>) -> (u32, Bits) {
+/// The subtype and the 22 bits of an airspeed in steps of `step` on a
+/// magnetic heading.
+fn through_air(airspeed: Airspeed, heading_deg: Option<f64>, step: f64) -> (u32, Bits) {
     let (is_true, speed) = match airspeed {
         Airspeed::Indicated(speed) => (false, speed),
         Airspeed::True(speed) => (true, speed),
     };
-    let supersonic = speed > SUBSONIC_KT;
-    let step = if supersonic { 4.0 } else { 1.0 };
     let bits = Bits::default()
         .put_flag(heading_deg.is_some())
         .put(count(heading_deg.unwrap_or(0.0) * 1024.0 / 360.0), 10)
         .put_flag(is_true)
         .put(count(speed / step) + 1, 10);
-    (3 + u32::from(supersonic), bits)
+    (3 + u32::from(supersonic(step)), bits)
 }
 
 /// Aircraft Status message, of the emergency/priority status subtype.
@@ -1305,6 +1337,32 @@ mod tests {
         // Assert: 300 steps, counted from 1, in the last ten bits of the speeds
         let subtypes = fields.map(|me| (me.get(6, 8), me.get(26, 35)));
         assert_eq!(subtypes, [(2, 301), (4, 301)]);
+    }
+
+    #[test]
+    fn speed_comes_in_steps_of_four_knots_only_above_the_subsonic_subtypes() {
+        // Arrange: over the ground at 290 kt, and at 1200 kt due north; through
+        // the air at 1200 kt
+        let velocity = |ground_speed_kt, airspeed| Velocity {
+            ground_speed_kt,
+            track_deg: ground_speed_kt.map(|_| 0.0),
+            airspeed,
+            magnetic_heading_deg: None,
+            baro_vertical_rate_fpm: None,
+            geometric_vertical_rate_fpm: None,
+            geometric_minus_baro_ft: None,
+        };
+        let velocities = [
+            velocity(Some(290.0), None),
+            velocity(Some(1200.0), None),
+            velocity(None, Some(Airspeed::True(1200.0))),
+        ];
+
+        // Act
+        let steps = velocities.map(|velocity| velocity.speed_step_kt());
+
+        // Assert
+        assert_eq!(steps.map(f64::to_bits), [1.0, 4.0, 4.0].map(f64::to_bits));
     }
 
     #[test]
