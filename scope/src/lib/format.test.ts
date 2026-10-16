@@ -213,20 +213,20 @@ describe('formatBoundM', () => {
 
     // Assert
     expect(out).toEqual([
-      { text: '<8', unit: 'm' },
-      { text: '<25', unit: 'm' },
-      { text: '<75', unit: 'm' },
-      { text: '<0.1', unit: 'NM' },
-      { text: '<0.2', unit: 'NM' },
-      { text: '<0.3', unit: 'NM' },
-      { text: '<0.5', unit: 'NM' },
-      { text: '<0.6', unit: 'NM' },
-      { text: '<1', unit: 'NM' },
-      { text: '<2', unit: 'NM' },
-      { text: '<4', unit: 'NM' },
-      { text: '<8', unit: 'NM' },
-      { text: '<10', unit: 'NM' },
-      { text: '<20', unit: 'NM' },
+      { v: '<8', unit: 'm' },
+      { v: '<25', unit: 'm' },
+      { v: '<75', unit: 'm' },
+      { v: '<0.1', unit: 'NM' },
+      { v: '<0.2', unit: 'NM' },
+      { v: '<0.3', unit: 'NM' },
+      { v: '<0.5', unit: 'NM' },
+      { v: '<0.6', unit: 'NM' },
+      { v: '<1', unit: 'NM' },
+      { v: '<2', unit: 'NM' },
+      { v: '<4', unit: 'NM' },
+      { v: '<8', unit: 'NM' },
+      { v: '<10', unit: 'NM' },
+      { v: '<20', unit: 'NM' },
     ]);
   });
 
@@ -239,17 +239,17 @@ describe('formatBoundM', () => {
 
     // Assert
     expect(out).toEqual([
-      { text: '<3', unit: 'm' },
-      { text: '<10', unit: 'm' },
-      { text: '<30', unit: 'm' },
-      { text: '<93', unit: 'm' },
-      { text: '<0.1', unit: 'NM' },
-      { text: '<0.3', unit: 'NM' },
-      { text: '<0.5', unit: 'NM' },
-      { text: '<1', unit: 'NM' },
-      { text: '<2', unit: 'NM' },
-      { text: '<4', unit: 'NM' },
-      { text: '<10', unit: 'NM' },
+      { v: '<3', unit: 'm' },
+      { v: '<10', unit: 'm' },
+      { v: '<30', unit: 'm' },
+      { v: '<93', unit: 'm' },
+      { v: '<0.1', unit: 'NM' },
+      { v: '<0.3', unit: 'NM' },
+      { v: '<0.5', unit: 'NM' },
+      { v: '<1', unit: 'NM' },
+      { v: '<2', unit: 'NM' },
+      { v: '<4', unit: 'NM' },
+      { v: '<10', unit: 'NM' },
     ]);
   });
 
@@ -262,10 +262,10 @@ describe('formatBoundM', () => {
 
     // Assert
     expect(out).toEqual([
-      { text: '<0.2', unit: 'NM' },
-      { text: '<0.9', unit: 'NM' },
-      { text: '<1', unit: 'NM' },
-      { text: '<2', unit: 'NM' },
+      { v: '<0.2', unit: 'NM' },
+      { v: '<0.9', unit: 'NM' },
+      { v: '<1', unit: 'NM' },
+      { v: '<2', unit: 'NM' },
     ]);
   });
 
@@ -278,8 +278,8 @@ describe('formatBoundM', () => {
 
     // Assert
     expect(out).toEqual([
-      { text: '<186', unit: 'm' },
-      { text: '<0.1', unit: 'NM' },
+      { v: '<186', unit: 'm' },
+      { v: '<0.1', unit: 'NM' },
     ]);
   });
 });

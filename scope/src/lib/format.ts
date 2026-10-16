@@ -153,8 +153,8 @@ const BOUND_ROUNDED_UP_BY_M = 1;
  * An upper bound in metres, such as a radius of containment, rounded up: in whole metres below a
  * tenth of a mile, and in nautical miles from there, in tenths below one mile.
  */
-export function formatBoundM(m: number): { text: string; unit: string } {
-  if (m < BOUND_NM_FROM_M) return { text: `<${Math.ceil(m)}`, unit: 'm' };
+export function formatBoundM(m: number): { v: string; unit: string } {
+  if (m < BOUND_NM_FROM_M) return { v: `<${Math.ceil(m)}`, unit: 'm' };
   const nm = (m - BOUND_ROUNDED_UP_BY_M) / NM_IN_METERS;
-  return { text: `<${formatTenthsBelow(nm, 1, Math.ceil)}`, unit: 'NM' };
+  return { v: `<${formatTenthsBelow(nm, 1, Math.ceil)}`, unit: 'NM' };
 }

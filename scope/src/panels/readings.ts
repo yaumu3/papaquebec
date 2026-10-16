@@ -94,9 +94,7 @@ const ageReading = (r: Readout): Reading => ({
 
 /** An upper bound in metres; a query when the category bounds nothing. */
 function boundReading(m: number | undefined): Reading {
-  if (m === undefined) return { v: '?' };
-  const { text, unit } = formatBoundM(m);
-  return { v: text, unit };
+  return m === undefined ? { v: '?' } : formatBoundM(m);
 }
 
 /**
