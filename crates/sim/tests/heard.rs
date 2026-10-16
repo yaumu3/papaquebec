@@ -6,13 +6,16 @@ use std::time::Duration;
 
 use feeder::follow::{follow, wall};
 use prost::Message;
-use sim::Fleet;
+use sim::{Fleet, Scenario};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::watch;
 use tracker::beast::Reader;
 use tracker::position::Position;
 use tracker::proto::{
-    AirGroundState, Aircraft, EmergencyPriorityStatus, Frame, Snapshot, Source, frame::Body,
+    Aircraft, EmergencyPriorityStatus, Frame, Snapshot, Source,
+    advisory::{Threat, ThreatPosition},
+    frame::Body,
+    reported,
 };
 use tracker::registry::Registry;
 use tracker::traffic::Traffic;
@@ -34,9 +37,14 @@ struct Heard {
 
 impl Heard {
     fn new(extra: u32) -> Self {
+        Self::of(|clock| Fleet::new(SITE, clock, extra))
+    }
+
+    /// The fleet `make` flies by a clock from second 1000 on.
+    fn of(make: impl FnOnce(Box<dyn Fn() -> f64 + Send>) -> Fleet) -> Self {
         let now = Arc::new(Mutex::new(1000.0));
         let clock = Arc::clone(&now);
-        let fleet = Fleet::new(SITE, move || *clock.lock().expect("clock"), extra);
+        let fleet = make(Box::new(move || *clock.lock().expect("clock")));
         Self {
             registry: fleet.registered().collect(),
             fleet,
@@ -73,19 +81,15 @@ fn numbered(snapshot: &Snapshot, number: u32) -> &Aircraft {
     snapshot.aircraft.iter().find(is).expect("in the fleet")
 }
 
-fn place(aircraft: &Aircraft) -> Option<Position> {
-    let (lat_deg, lon_deg) = aircraft.lat_deg.zip(aircraft.lon_deg)?;
-    Some(Position { lat_deg, lon_deg })
+fn on_ground(aircraft: &Aircraft) -> bool {
+    aircraft.on_ground.is_some_and(|flag| flag.value)
 }
 
 fn intent(aircraft: &Aircraft) -> [Option<i32>; 3] {
-    let selected = aircraft
-        .target_state
-        .and_then(|target| target.selected_altitude_mcp_ft);
     [
-        aircraft.baro_altitude_ft,
-        selected,
-        aircraft.baro_vertical_rate_fpm,
+        reported(aircraft.baro_altitude_ft),
+        reported(aircraft.selected_altitude_mcp_ft),
+        reported(aircraft.baro_vertical_rate_fpm),
     ]
 }
 
@@ -97,11 +101,14 @@ fn every_aircraft_is_heard_and_placed_near_the_site() {
     // Act
     let snapshot = heard.placed();
 
-    // Assert
-    let near = |a: &Aircraft| place(a).is_some_and(|place| SITE.distance_nm(place) < 60.0);
+    // Assert: each heard, and placed, at the snapshot's instant
+    let near = |a: &Aircraft| {
+        a.place()
+            .is_some_and(|place| SITE.distance_nm(place) < 60.0)
+    };
     let timed = |a: &Aircraft| {
-        a.reception
-            .is_some_and(|r| r.seen_s == Some(0.0) && r.seen_pos_s == Some(0.0))
+        a.reception.is_some_and(|r| r.heard_ms == snapshot.now_ms)
+            && a.position.is_some_and(|p| p.heard_ms == snapshot.now_ms)
     };
     assert_eq!(snapshot.aircraft.len(), 11);
     assert!(snapshot.aircraft.iter().all(near));
@@ -122,11 +129,12 @@ fn every_aircraft_moves_along_its_track() {
         .aircraft
         .iter()
         .zip(&first.aircraft)
-        .filter(|(now, before)| now.address == before.address && place(now) != place(before));
+        .filter(|(now, before)| now.address == before.address && now.place() != before.place());
     assert_eq!(moved.count(), first.aircraft.len());
     let airliner = numbered(&second, 1);
-    let flown = place(numbered(&first, 1))
-        .zip(place(airliner))
+    let flown = numbered(&first, 1)
+        .place()
+        .zip(airliner.place())
         .map(|(from, to)| from.distance_nm(to));
     // 290 kt for 10 s
     assert!(
@@ -145,13 +153,12 @@ fn fleet_exercises_every_glyph_and_color() {
 
     // Assert
     let count = |is: &dyn Fn(&Aircraft) -> bool| snapshot.aircraft.iter().filter(|a| is(a)).count();
-    assert_eq!(count(&|a| a.position_source() == Source::Mlat), 1);
-    assert_eq!(count(&|a| a.identification.is_none()), 2);
-    assert_eq!(count(&|a| a.target_state.is_some()), 5);
-    let qualified = |a: &Aircraft| {
-        a.quality
-            .is_some_and(|q| q.nic == Some(8) && q.nac_p == Some(9))
-    };
+    let multilaterated = |a: &Aircraft| a.position.is_some_and(|p| p.source() == Source::Mlat);
+    assert_eq!(count(&multilaterated), 1);
+    assert_eq!(count(&|a| a.callsign().is_none()), 2);
+    assert_eq!(count(&|a| a.selected_altitude_mcp_ft.is_some()), 5);
+    let qualified =
+        |a: &Aircraft| a.position.is_some_and(|p| p.nic == 8) && reported(a.nac_p) == Some(9);
     assert_eq!(count(&qualified), 11);
 }
 
@@ -167,13 +174,13 @@ fn emergency_is_on_a_target_without_a_callsign() {
     let emergencies: Vec<_> = snapshot
         .aircraft
         .iter()
-        .filter(|a| a.mode_a_code == Some(0o7700))
+        .filter(|a| reported(a.mode_a_code) == Some(0o7700))
         .collect();
     assert_eq!(emergencies.len(), 1);
-    assert_eq!(emergencies[0].identification, None);
+    assert_eq!(emergencies[0].callsign(), None);
     assert_eq!(
-        emergencies[0].emergency_priority_status(),
-        EmergencyPriorityStatus::GeneralEmergency
+        emergencies[0].emergency.map(|e| e.status()),
+        Some(EmergencyPriorityStatus::GeneralEmergency)
     );
 }
 
@@ -186,12 +193,11 @@ fn taxiing_targets_are_on_the_ground_at_taxi_speed() {
     let snapshot = heard.placed();
 
     // Assert
-    let ground: Vec<_> = snapshot
-        .aircraft
-        .iter()
-        .filter(|a| a.air_ground_state() == AirGroundState::OnGround)
-        .collect();
-    let taxiing = |a: &&Aircraft| a.ground_speed_kt.is_some_and(|gs| gs > 0.0 && gs < 40.0);
+    let ground: Vec<_> = snapshot.aircraft.iter().filter(|a| on_ground(a)).collect();
+    let taxiing = |a: &&Aircraft| {
+        a.ground_speed_kt
+            .is_some_and(|gs| gs.value > 0.0 && gs.value < 40.0)
+    };
     assert_eq!(ground.len(), 2);
     assert!(ground.iter().all(taxiing));
     assert!(ground.iter().all(|a| a.baro_altitude_ft.is_none()));
@@ -209,30 +215,26 @@ fn air_data_are_heard_of_every_aircraft_in_the_air() {
     // Assert: the speeds through the air, the wind the sim blows, and the
     // standard temperature at the level to what the steps of the Mach
     // number and the airspeed allow
-    let airborne: Vec<_> = snapshot
-        .aircraft
-        .iter()
-        .filter(|a| a.air_ground_state() != AirGroundState::OnGround)
-        .collect();
+    let airborne: Vec<_> = snapshot.aircraft.iter().filter(|a| !on_ground(a)).collect();
     assert_eq!(airborne.len(), 9);
     let speeds = |a: &&Aircraft| {
         a.true_airspeed_kt.is_some() && a.indicated_airspeed_kt.is_some() && a.mach.is_some()
     };
     assert!(airborne.iter().all(speeds), "{airborne:?}");
     let wind = |a: &&Aircraft| {
-        let wind = a.meteo.and_then(|m| m.wind_dir_deg.zip(m.wind_speed_kt));
-        wind.is_some_and(|(from, speed)| (from - 270.0).abs() < 4.0 && (speed - 35.0).abs() < 3.0)
+        let wind = a.wind_dir_deg.zip(a.wind_speed_kt);
+        wind.is_some_and(|(from, speed)| {
+            (from.value - 270.0).abs() < 4.0 && (speed.value - 35.0).abs() < 3.0
+        })
     };
     assert!(airborne.iter().all(wind), "{airborne:?}");
     let standard = |a: &&Aircraft| {
-        let isa = a
-            .baro_altitude_ft
-            .map(|ft| 15.0 - 1.9812 * f64::from(ft) / 1000.0);
+        let isa = reported(a.baro_altitude_ft).map(|ft| 15.0 - 1.9812 * f64::from(ft) / 1000.0);
         let steps = a
             .mach
             .zip(a.true_airspeed_kt)
-            .map(|(mach, tas)| 2.0 * 288.0 * (0.004 / mach + 1.0 / tas));
-        let oat = a.meteo.and_then(|m| m.oat_c);
+            .map(|(mach, tas)| 2.0 * 288.0 * (0.004 / mach.value + 1.0 / tas.value));
+        let oat = a.oat_c.map(|oat| oat.value);
         oat.zip(isa)
             .zip(steps)
             .is_some_and(|((oat, isa), within)| (oat - isa).abs() < within)
@@ -249,21 +251,29 @@ fn one_aircraft_idents_and_one_flies_an_advisory() {
     let snapshot = heard.placed();
 
     // Assert: a climb, of one threat
-    let identing: Vec<_> = snapshot.aircraft.iter().filter(|a| a.ident).collect();
+    let identing: Vec<_> = snapshot
+        .aircraft
+        .iter()
+        .filter(|a| a.ident.is_some_and(|ident| ident.value))
+        .collect();
     assert_eq!(identing.len(), 1);
-    assert_eq!(identing[0].identification.as_deref(), Some("TEST02"));
+    assert_eq!(identing[0].callsign(), Some("TEST02"));
     let advised: Vec<_> = snapshot
         .aircraft
         .iter()
-        .filter(|a| a.resolution_advisory.is_some())
+        .filter(|a| a.advisory.is_some())
         .collect();
     assert_eq!(advised.len(), 1);
-    assert_eq!(advised[0].identification.as_deref(), Some("TEST07"));
-    let advisory = advised[0]
-        .resolution_advisory
-        .and_then(|ra| ra.advisory)
-        .expect("of one threat");
-    assert!(advisory.corrective && advisory.positive && !advisory.downward);
+    assert_eq!(advised[0].callsign(), Some("TEST07"));
+    let advisory = advised[0].advisory.as_ref().expect("advised");
+    let resolution = advisory.resolution.expect("of one threat");
+    assert!(resolution.corrective && resolution.positive && !resolution.downward);
+    let placed = ThreatPosition {
+        altitude_ft: Some(16_500),
+        range_nm: Some(2.5),
+        bearing_deg: Some(33.0),
+    };
+    assert_eq!(advisory.threat, Some(Threat::ThreatPosition(placed)));
 }
 
 #[test]
@@ -275,10 +285,12 @@ fn newly_set_level_is_started_toward_after_a_pause() {
     // Act
     let snapshot = heard.after(30.0);
 
-    // Assert: 21000 ft selected and 1000 fpm, in the steps they are broadcast in
+    // Assert: 21000 ft selected, in the steps it is broadcast in, and 1000
+    // fpm in the steps the heading and speed report answers it in, which
+    // comes after the broadcast
     assert_eq!(
         intent(numbered(&snapshot, 7)),
-        [Some(17_000), Some(20_992), Some(1024)]
+        [Some(17_000), Some(20_992), Some(992)]
     );
 }
 
@@ -300,6 +312,36 @@ fn level_it_came_from_is_set_once_the_selected_one_was_held() {
 }
 
 #[test]
+fn turning_arrivals_carry_their_roll_and_track_rate() {
+    // Arrange: arrivals merging onto one final
+    let mut heard = Heard::of(|clock| Fleet::scenario(SITE, clock, Scenario::Merge, 1, 0));
+    heard.after(0.0);
+
+    // Act: two minutes of them, each as it was heard while it turned
+    let turning: Vec<_> = (0..120)
+        .flat_map(|_| {
+            let snapshot = heard.after(1.0);
+            let turning: Vec<_> = snapshot
+                .aircraft
+                .iter()
+                .filter_map(|a| {
+                    let rate = a.track_rate_deg_per_s?.value;
+                    (rate.abs() > 0.5).then(|| (rate, a.roll_deg.map(|roll| roll.value)))
+                })
+                .collect();
+            turning
+        })
+        .collect();
+
+    // Assert: whoever turns rolls the same way, within what an airliner banks
+    assert!(!turning.is_empty());
+    let banked = |(rate, roll): &(f64, Option<f64>)| {
+        roll.is_some_and(|roll| roll.signum() == rate.signum() && roll.abs() <= 35.0)
+    };
+    assert!(turning.iter().all(banked), "{turning:?}");
+}
+
+#[test]
 fn extra_traffic_is_added_within_the_bounds() {
     // Arrange: an aircraft that crosses a change of longitude zones between
     // its first two positions is placed by the third
@@ -315,7 +357,10 @@ fn extra_traffic_is_added_within_the_bounds() {
         .iter()
         .filter_map(|a| a.address.map(|address| address.value))
         .collect();
-    let near = |a: &Aircraft| place(a).is_some_and(|place| SITE.distance_nm(place) < 60.0);
+    let near = |a: &Aircraft| {
+        a.place()
+            .is_some_and(|place| SITE.distance_nm(place) < 60.0)
+    };
     assert_eq!(snapshot.aircraft.len(), 11 + 500);
     assert_eq!(addresses.len(), 11 + 500);
     assert!(snapshot.aircraft.iter().all(near));
@@ -333,7 +378,7 @@ fn every_identity_is_fictional_and_registered() {
     let callsigns: Vec<_> = snapshot
         .aircraft
         .iter()
-        .filter_map(|a| a.identification.as_deref())
+        .filter_map(Aircraft::callsign)
         .collect();
     let registered = |a: &Aircraft| {
         let registry = a.registry.as_ref();
@@ -377,7 +422,7 @@ async fn fleet_served_to_a_connection_is_followed_into_the_feed() {
                 && snapshot
                     .aircraft
                     .iter()
-                    .filter(|a| place(a).is_some())
+                    .filter(|a| a.place().is_some())
                     .count()
                     == 11
             {

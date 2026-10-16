@@ -39,7 +39,7 @@ export function buildHover(input: HoverInput): Batch[] {
   if (
     t &&
     p &&
-    (p.kind === 'live' || p.kind === 'last') &&
+    p.kind === 'live' &&
     t.hex !== input.selected &&
     visibility(t, input.selected, input.filter, input.altimeter) === 'shown'
   ) {

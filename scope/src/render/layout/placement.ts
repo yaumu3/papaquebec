@@ -84,7 +84,7 @@ export function blockSubjects(input: PlacementInput): Subject[] {
   const out: Subject[] = [];
   for (const t of input.tracks) {
     const p = t.position;
-    if (p.kind !== 'live' && p.kind !== 'last') continue;
+    if (p.kind !== 'live') continue;
     if (visibility(t, input.selected, input.filter, input.altimeter) !== 'shown') continue;
     const cx = p.x * k;
     const cy = -p.y * k;

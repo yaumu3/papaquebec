@@ -15,7 +15,10 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     track: undefined,
     heading: undefined,
     verticalRate: undefined,
+    roll: undefined,
+    trackRate: undefined,
     nic: undefined,
+    rc: undefined,
     nacP: undefined,
     messageRate: undefined,
     messages: undefined,
@@ -41,6 +44,7 @@ function track(hex: string, over: Partial<Track> = {}): Track {
     source: 'adsb',
     seen: 0,
     seenPos: 0,
+    heard: {},
     at: undefined,
     position: { kind: 'none' },
     history: [],
@@ -55,15 +59,14 @@ describe('distanceFromSite', () => {
     // Arrange
     const cases = [
       track('a', { position: { kind: 'live', lat: 0, lon: 0, x: 3, y: 4 } }),
-      track('b', { position: { kind: 'last', lat: 0, lon: 0, x: -6, y: 8 } }),
-      track('c', { position: { kind: 'none' } }),
+      track('b', { position: { kind: 'none' } }),
     ];
 
     // Act
     const d = cases.map(distanceFromSite);
 
     // Assert
-    expect(d).toEqual([5, 10, undefined]);
+    expect(d).toEqual([5, undefined]);
   });
 });
 

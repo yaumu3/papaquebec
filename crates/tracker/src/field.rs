@@ -8,9 +8,8 @@ use crate::code::{altitude, altitude_code, identity, mode_a_code, with_m, withou
 use crate::cpr::Cpr;
 use crate::position::{bearing_of, toward};
 use crate::proto::{
-    EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
-    resolution_advisory::{Advisory, Corrections},
-    target_state::Modes,
+    Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
+    advisory::{Corrections, Resolution, Threat, ThreatPosition},
 };
 
 /// The 56 bits an extended squitter carries of one kind of message.
@@ -91,17 +90,11 @@ impl AirbornePosition {
         type_code >= 20
     }
 
-    /// The Navigation Integrity Category of the position, given the NIC
-    /// supplement A and the ADS-B version that the aircraft reports in its
-    /// operational status.
+    /// The integrity of the position, given the NIC supplement A and the
+    /// ADS-B version that the aircraft reports in its operational status.
     #[must_use]
-    pub fn nic(&self, supplement_a: bool, version: u32) -> u32 {
-        // Before version 2 the bit of supplement B says something else.
-        nic(
-            self.type_code,
-            supplement_a,
-            version >= 2 && self.nic_supplement_b,
-        )
+    pub fn integrity(&self, supplement_a: bool, version: u32) -> Integrity {
+        integrity(self.type_code, version, supplement_a, self.nic_supplement_b)
     }
 
     /// The Navigation Accuracy Category for position that the message stands
@@ -204,11 +197,11 @@ impl Field for SurfacePosition {
 }
 
 impl SurfacePosition {
-    /// The Navigation Integrity Category of the position, given the NIC
-    /// supplements A and C that the aircraft reports in its operational status.
+    /// The integrity of the position, given the NIC supplements A and C and
+    /// the ADS-B version that the aircraft reports in its operational status.
     #[must_use]
-    pub fn nic(&self, supplement_a: bool, supplement_c: bool) -> u32 {
-        nic(self.type_code, supplement_a, supplement_c)
+    pub fn integrity(&self, supplement_a: bool, supplement_c: bool, version: u32) -> Integrity {
+        integrity(self.type_code, version, supplement_a, supplement_c)
     }
 
     /// The Navigation Accuracy Category for position that the message stands
@@ -254,24 +247,49 @@ fn version_0_nac_p(type_code: u32) -> u32 {
     }
 }
 
-/// The Navigation Integrity Category of a position, which DO-260B assigns by
-/// the type code of its message and the NIC supplements the aircraft reports:
-/// A, with B in the air or C on the ground.
-fn nic(type_code: u32, supplement_a: bool, supplement_b_or_c: bool) -> u32 {
-    match (type_code, supplement_a, supplement_b_or_c) {
-        (5 | 9 | 20, ..) => 11,
-        (6 | 10 | 21, ..) => 10,
-        (7, true, false) | (11, true, true) => 9,
-        (7 | 11, ..) => 8,
-        (8, true, true) | (12, ..) => 7,
-        (8, true, false) | (8, false, true) | (13, ..) => 6,
-        (14, ..) => 5,
-        (15, ..) => 4,
-        (16, true, true) => 3,
-        (16, ..) => 2,
-        (17, ..) => 1,
-        _ => 0,
-    }
+/// The integrity of a position: its Navigation Integrity Category, and the
+/// radius of containment the category stands for, in metres rounded up; none
+/// when the radius is unknown.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Integrity {
+    pub nic: u32,
+    pub rc_m: Option<u32>,
+}
+
+/// The integrity of a position, by the type code of its message, the ADS-B
+/// version the aircraft reports in its operational status and the NIC
+/// supplements it reports: A, with B in the air or C on the ground. Version
+/// 2 (RTCA DO-260B) tables all three; version 1 (DO-260A) supplement A
+/// alone; version 0 (DO-260) none, and a Navigation Uncertainty Category
+/// with a horizontal protection limit in place of the category and the
+/// radius, read here as the category the type code stands for since, and
+/// the limit as the radius.
+fn integrity(
+    type_code: u32,
+    version: u32,
+    supplement_a: bool,
+    supplement_b_or_c: bool,
+) -> Integrity {
+    let (nic, rc_m) = match (type_code, version, supplement_a, supplement_b_or_c) {
+        (5 | 9 | 20, ..) => (11, Some(8)),
+        (6 | 10 | 21, ..) => (10, Some(25)),
+        (7, 1.., true, false) | (11, 1, true, _) | (11, 2.., true, true) => (9, Some(75)),
+        (7 | 11, ..) => (8, Some(186)),
+        (8, 2.., true, true) | (12, ..) => (7, Some(371)),
+        (8, 2.., true, false) | (13, 2.., false, true) => (6, Some(556)),
+        (8, 2.., false, true) | (13, 1, true, _) | (13, 2.., true, true) => (6, Some(1112)),
+        (13, 0 | 1, ..) | (13, 2.., false, false) => (6, Some(926)),
+        // Supplement A alone on type code 13 is not assigned.
+        (13, ..) => (6, None),
+        (14, ..) => (5, Some(1852)),
+        (15, ..) => (4, Some(3704)),
+        (16, 1, true, _) | (16, 2.., true, true) => (3, Some(7408)),
+        (16, 0, ..) => (2, Some(18520)),
+        (16, ..) => (2, Some(14816)),
+        (17, ..) => (1, Some(37040)),
+        _ => (0, None),
+    };
+    Integrity { nic, rc_m }
 }
 
 /// Airborne Velocity message.
@@ -301,6 +319,49 @@ pub enum Airspeed {
 /// supersonic subtypes: the most the steps of 1 kt count.
 const SUBSONIC_KT: f64 = 1021.0;
 
+impl Velocity {
+    /// The step of each component of the speed over the ground, and of the
+    /// airspeed, in the subsonic subtypes; and in the supersonic ones.
+    pub const STEP_KT: f64 = 1.0;
+    pub const SUPERSONIC_STEP_KT: f64 = 4.0;
+    /// The step of the vertical rate.
+    pub const RATE_STEP_FPM: f64 = 64.0;
+    /// The step of the magnetic heading.
+    pub const HEADING_STEP_DEG: f64 = 360.0 / 1024.0;
+
+    /// The step the speed over the ground and the airspeed come in: that of
+    /// the supersonic subtypes where a component outruns the subsonic ones.
+    #[must_use]
+    pub fn speed_step_kt(&self) -> f64 {
+        let over_ground = self
+            .ground_speed_kt
+            .zip(self.track_deg)
+            .map(|(speed, track)| {
+                let (east, north) = toward(track, speed);
+                east.abs().max(north.abs())
+            });
+        let through_air = self.airspeed.map(|airspeed| match airspeed {
+            Airspeed::Indicated(speed) | Airspeed::True(speed) => speed,
+        });
+        let supersonic = over_ground
+            .or(through_air)
+            .is_some_and(|fastest| fastest > SUBSONIC_KT);
+        if supersonic {
+            Self::SUPERSONIC_STEP_KT
+        } else {
+            Self::STEP_KT
+        }
+    }
+
+    /// The step the track comes in at the speed over the ground: a step of
+    /// the speed across it; none without a speed.
+    #[must_use]
+    pub fn track_step_deg(&self) -> Option<f64> {
+        self.ground_speed_kt
+            .map(|speed| (self.speed_step_kt() / speed).atan().to_degrees())
+    }
+}
+
 impl Field for Velocity {
     fn read(me: Bits) -> Option<Self> {
         if me.get(1, 5) != 19 {
@@ -309,8 +370,8 @@ impl Field for Velocity {
         let subtype = me.get(6, 8);
         // Subtypes 2 and 4 are the supersonic ones.
         let step = match subtype {
-            1 | 3 => 1.0,
-            2 | 4 => 4.0,
+            1 | 3 => Self::STEP_KT,
+            2 | 4 => Self::SUPERSONIC_STEP_KT,
             _ => return None,
         };
         let over_ground = (subtype <= 2).then(|| over_ground(me, step)).flatten();
@@ -329,9 +390,10 @@ impl Field for Velocity {
     }
 
     fn write(&self) -> Bits {
+        let step = self.speed_step_kt();
         let (subtype, speeds) = match self.airspeed {
-            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg),
-            None => along_ground(self.ground_speed_kt.zip(self.track_deg)),
+            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg, step),
+            None => along_ground(self.ground_speed_kt.zip(self.track_deg), step),
         };
         let rate = self
             .baro_vertical_rate_fpm
@@ -374,21 +436,28 @@ fn over_ground(me: Bits, step: f64) -> Option<(f64, f64)> {
     Some((speed, track))
 }
 
-/// The subtype and the 22 bits of a ground speed along a track, as the
-/// velocities to the east and to the north; of none, not available.
-fn along_ground(velocity: Option<(f64, f64)>) -> (u32, Bits) {
+/// The subtype and the 22 bits of a ground speed along a track in steps of
+/// `step`, as the velocities to the east and to the north; of none, not
+/// available.
+fn along_ground(velocity: Option<(f64, f64)>, step: f64) -> (u32, Bits) {
     let Some((speed, track)) = velocity else {
         return (1, Bits::default().filled(22));
     };
     let (east, north) = toward(track, speed);
-    let supersonic = east.abs().max(north.abs()) > SUBSONIC_KT;
-    let step = if supersonic { 4.0 } else { 1.0 };
     let toward = |velocity: f64| {
         Bits::default()
             .put_flag(velocity < 0.0)
             .put(count(velocity.abs() / step) + 1, 10)
     };
-    (1 + u32::from(supersonic), toward(east).then(toward(north)))
+    (
+        1 + u32::from(supersonic(step)),
+        toward(east).then(toward(north)),
+    )
+}
+
+/// Whether a step of the speed is the supersonic subtypes'.
+fn supersonic(step: f64) -> bool {
+    step > Velocity::STEP_KT
 }
 
 fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
@@ -400,20 +469,19 @@ fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
     })
 }
 
-/// The subtype and the 22 bits of an airspeed on a magnetic heading.
-fn through_air(airspeed: Airspeed, heading_deg: Option<f64>) -> (u32, Bits) {
+/// The subtype and the 22 bits of an airspeed in steps of `step` on a
+/// magnetic heading.
+fn through_air(airspeed: Airspeed, heading_deg: Option<f64>, step: f64) -> (u32, Bits) {
     let (is_true, speed) = match airspeed {
         Airspeed::Indicated(speed) => (false, speed),
         Airspeed::True(speed) => (true, speed),
     };
-    let supersonic = speed > SUBSONIC_KT;
-    let step = if supersonic { 4.0 } else { 1.0 };
     let bits = Bits::default()
         .put_flag(heading_deg.is_some())
         .put(count(heading_deg.unwrap_or(0.0) * 1024.0 / 360.0), 10)
         .put_flag(is_true)
         .put(count(speed / step) + 1, 10);
-    (3 + u32::from(supersonic), bits)
+    (3 + u32::from(supersonic(step)), bits)
 }
 
 /// Aircraft Status message, of the emergency/priority status subtype.
@@ -454,7 +522,7 @@ impl Field for Status {
 /// the active resolution advisory as the ACAS register does.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RaBroadcast {
-    pub advisory: ResolutionAdvisory,
+    pub advisory: Advisory,
 }
 
 impl Field for RaBroadcast {
@@ -479,12 +547,13 @@ impl Field for RaBroadcast {
 /// The active resolution advisory in the 48 bits after the header of the
 /// message or the register; none when no advisory was generated. Of one
 /// threat, or of several that call for one sense, the six bits after the
-/// first say the advisory; of several that differ, what is called for.
-pub(crate) fn advisory(bits: Bits) -> Option<ResolutionAdvisory> {
+/// first say the resolution; of several that differ, what is called for.
+/// When it was heard is the traffic's to say.
+pub(crate) fn advisory(bits: Bits) -> Option<Advisory> {
     let multiple_threats = bits.flag(28);
-    let (advisory, corrections) = match (bits.flag(9), multiple_threats) {
+    let (resolution, corrections) = match (bits.flag(9), multiple_threats) {
         (true, _) => (
-            Some(Advisory {
+            Some(Resolution {
                 corrective: bits.flag(10),
                 downward: bits.flag(11),
                 increased_rate: bits.flag(12),
@@ -507,18 +576,73 @@ pub(crate) fn advisory(bits: Bits) -> Option<ResolutionAdvisory> {
         ),
         (false, false) => return None,
     };
-    Some(ResolutionAdvisory {
+    Some(Advisory {
         multiple_threats,
-        advisory,
+        resolution,
         corrections,
         terminated: bits.flag(27),
+        threat: threat(bits),
+        ..Advisory::default()
     })
 }
 
-/// The 48 bits of an advisory after a header; the complements and the
-/// threat, which are not read, as zeros.
-pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
-    let flags = match (advisory.advisory, advisory.corrections.unwrap_or_default()) {
+/// The threat the advisory identifies, as the type indicator in the two
+/// bits after the multiple threat encounter says: none; its address in the
+/// 26 bits that follow; or where it is in them, as a Mode C altitude code,
+/// the range from 1 in tenths of a mile and the bearing from 1 in steps of
+/// 6°, zero where there is no estimate (ICAO Annex 10 Volume IV, the TID
+/// subfield).
+fn threat(bits: Bits) -> Option<Threat> {
+    match bits.get(29, 30) {
+        1 => Some(Threat::ThreatAddress(bits.get(31, 54))),
+        2 => Some(Threat::ThreatPosition(ThreatPosition {
+            altitude_ft: altitude(bits.get(31, 43)),
+            range_nm: bits
+                .get(44, 50)
+                .checked_sub(1)
+                .map(|tenths| f64::from(tenths) / 10.0),
+            bearing_deg: bits
+                .get(51, 56)
+                .checked_sub(1)
+                .filter(|steps| *steps < 60)
+                .map(|steps| f64::from(steps) * 6.0 + 3.0),
+        })),
+        _ => None,
+    }
+}
+
+/// The two bits of the threat's type indicator and the 26 of its identity.
+fn threatened(threat: Option<&Threat>) -> Bits {
+    match threat {
+        None => Bits::default().put(0, 2 + 26),
+        Some(Threat::ThreatAddress(address)) => {
+            Bits::default().put(1, 2).put(*address, 24).put(0, 2)
+        }
+        Some(Threat::ThreatPosition(placed)) => Bits::default()
+            .put(2, 2)
+            .put(placed.altitude_ft.map_or(0, altitude_code), 13)
+            .put(
+                placed
+                    .range_nm
+                    .map_or(0, |nm| (count(nm * 10.0) + 1).min(127)),
+                7,
+            )
+            .put(
+                placed
+                    .bearing_deg
+                    .map_or(0, |deg| (count((deg - 3.0) / 6.0) + 1).min(60)),
+                6,
+            ),
+    }
+}
+
+/// The 48 bits of an advisory after a header; the complements, which are
+/// not read, as zeros.
+pub(crate) fn advised(advisory: &Advisory) -> Bits {
+    let flags = match (
+        advisory.resolution,
+        advisory.corrections.unwrap_or_default(),
+    ) {
         (Some(one), _) => [
             one.corrective,
             one.downward,
@@ -536,7 +660,7 @@ pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
             several.sense_reversal,
         ],
     };
-    let head = Bits::default().put_flag(advisory.advisory.is_some());
+    let head = Bits::default().put_flag(advisory.resolution.is_some());
     flags
         .into_iter()
         .fold(head, Bits::put_flag)
@@ -544,8 +668,56 @@ pub(crate) fn advised(advisory: &ResolutionAdvisory) -> Bits {
         .put(0, 7 + 4)
         .put_flag(advisory.terminated)
         .put_flag(advisory.multiple_threats)
-        // The threat's type and identity
-        .put(0, 2 + 26)
+        .then(threatened(advisory.threat.as_ref()))
+}
+
+/// What the aircraft is set to fly to: the Target State and Status message,
+/// or the Comm-B selected vertical intention register, which carries no
+/// heading and three of the modes.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TargetState {
+    /// Selected on the mode control panel or flight control unit.
+    pub selected_altitude_mcp_ft: Option<i32>,
+    /// Selected by the flight management system.
+    pub selected_altitude_fms_ft: Option<i32>,
+    /// DO-260B leaves true or magnetic undefined.
+    pub selected_heading_deg: Option<f64>,
+    /// QNH or QFE, as the crew set it.
+    pub baro_setting_hpa: Option<f64>,
+    pub modes: ModesReported,
+}
+
+/// The autopilot modes as a report carries them: each engaged or not, or
+/// none where the report does not say.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct ModesReported {
+    pub autopilot: Option<bool>,
+    pub vnav: Option<bool>,
+    pub altitude_hold: Option<bool>,
+    pub approach: Option<bool>,
+    pub lnav: Option<bool>,
+    pub tcas: Option<bool>,
+}
+
+impl From<Modes> for ModesReported {
+    /// Every mode, as the Target State and Status message carries them.
+    fn from(modes: Modes) -> Self {
+        Self {
+            autopilot: Some(modes.autopilot),
+            vnav: Some(modes.vnav),
+            altitude_hold: Some(modes.altitude_hold),
+            approach: Some(modes.approach),
+            lnav: Some(modes.lnav),
+            tcas: Some(modes.tcas),
+        }
+    }
+}
+
+/// The steps a report's selected altitudes and barometric setting come in.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TargetSteps {
+    pub altitude_ft: f64,
+    pub setting_hpa: f64,
 }
 
 /// Target State and Status message, of ADS-B version 2.
@@ -554,6 +726,14 @@ pub struct TargetStateAndStatus {
     pub target: TargetState,
     /// Navigation Accuracy Category for position, 0 to 11.
     pub nac_p: u32,
+}
+
+impl TargetStateAndStatus {
+    /// The steps the message comes in.
+    pub const STEPS: TargetSteps = TargetSteps {
+        altitude_ft: 32.0,
+        setting_hpa: 0.8,
+    };
 }
 
 impl Field for TargetStateAndStatus {
@@ -573,6 +753,7 @@ impl Field for TargetStateAndStatus {
             approach: me.flag(52),
             tcas: me.flag(53),
             lnav: me.flag(54),
+            ..Modes::default()
         });
         let target = TargetState {
             selected_altitude_mcp_ft: altitude.filter(|_| !from_fms),
@@ -582,7 +763,7 @@ impl Field for TargetStateAndStatus {
                 .then(|| f64::from(me.get(31, 39)) * 180.0 / 256.0),
             // In steps of 0.8 hPa from 800 hPa.
             baro_setting_hpa: steps(21, 29).map(|steps| f64::from(8000 + steps * 8) / 10.0),
-            modes,
+            modes: modes.map(ModesReported::from).unwrap_or_default(),
         };
         Some(Self {
             target,
@@ -596,7 +777,8 @@ impl Field for TargetStateAndStatus {
         let altitude = target
             .selected_altitude_fms_ft
             .or(target.selected_altitude_mcp_ft);
-        let modes = target.modes.unwrap_or_default();
+        let modes = target.modes;
+        let flag = |mode: Option<bool>| mode.unwrap_or(false);
         // Zero is no data; the first step follows it.
         let stepped = |value: Option<f64>| value.map_or(0, |steps| count(steps) + 1);
         Bits::default()
@@ -617,15 +799,15 @@ impl Field for TargetStateAndStatus {
             .put(self.nac_p, 4)
             // NIC baro and SIL
             .put(0, 3)
-            .put_flag(target.modes.is_some())
-            .put_flag(modes.autopilot)
-            .put_flag(modes.vnav)
-            .put_flag(modes.altitude_hold)
+            .put_flag(modes != ModesReported::default())
+            .put_flag(flag(modes.autopilot))
+            .put_flag(flag(modes.vnav))
+            .put_flag(flag(modes.altitude_hold))
             // Reserved for the rebroadcast flag
             .put_flag(false)
-            .put_flag(modes.approach)
-            .put_flag(modes.tcas)
-            .put_flag(modes.lnav)
+            .put_flag(flag(modes.approach))
+            .put_flag(flag(modes.tcas))
+            .put_flag(flag(modes.lnav))
             .filled(ME_LEN)
     }
 }
@@ -692,16 +874,17 @@ pub(crate) fn rounded(value: f64) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, RaBroadcast, Status,
-        SurfacePosition, TargetStateAndStatus, Velocity, nic, version_0_nac_p,
+        AirbornePosition, Airspeed, Field, Identification, Integrity, OperationalStatus,
+        RaBroadcast, Status, SurfacePosition, TargetState, TargetStateAndStatus, Velocity,
+        integrity, version_0_nac_p,
     };
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
+    use crate::code::altitude_code;
     use crate::cpr::Cpr;
     use crate::proto::{
-        EmergencyPriorityStatus, EmitterCategory, ResolutionAdvisory, TargetState,
-        resolution_advisory::{Advisory, Corrections},
-        target_state::Modes,
+        Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
+        advisory::{Corrections, Resolution, Threat, ThreatPosition},
     };
 
     /// What is read of a field of one kind and written again.
@@ -1157,6 +1340,32 @@ mod tests {
     }
 
     #[test]
+    fn speed_comes_in_steps_of_four_knots_only_above_the_subsonic_subtypes() {
+        // Arrange: over the ground at 290 kt, and at 1200 kt due north; through
+        // the air at 1200 kt
+        let velocity = |ground_speed_kt, airspeed| Velocity {
+            ground_speed_kt,
+            track_deg: ground_speed_kt.map(|_| 0.0),
+            airspeed,
+            magnetic_heading_deg: None,
+            baro_vertical_rate_fpm: None,
+            geometric_vertical_rate_fpm: None,
+            geometric_minus_baro_ft: None,
+        };
+        let velocities = [
+            velocity(Some(290.0), None),
+            velocity(Some(1200.0), None),
+            velocity(None, Some(Airspeed::True(1200.0))),
+        ];
+
+        // Act
+        let steps = velocities.map(|velocity| velocity.speed_step_kt());
+
+        // Assert
+        assert_eq!(steps.map(f64::to_bits), [1.0, 4.0, 4.0].map(f64::to_bits));
+    }
+
+    #[test]
     fn velocity_without_a_component_has_no_speed_or_track() {
         // Arrange: the east-west velocity is not available
         let me = with(published("8D485020994409940838175B284F"), 15, 24, 0);
@@ -1216,14 +1425,16 @@ mod tests {
             selected_altitude_fms_ft: None,
             selected_heading_deg: Some(66.796_875),
             baro_setting_hpa: Some(1012.8),
-            modes: Some(Modes {
+            modes: Modes {
                 autopilot: true,
                 vnav: true,
                 altitude_hold: false,
                 approach: false,
                 lnav: true,
                 tcas: true,
-            }),
+                ..Modes::default()
+            }
+            .into(),
         };
         assert_eq!(read, Some(TargetStateAndStatus { target, nac_p: 9 }));
     }
@@ -1237,11 +1448,12 @@ mod tests {
             selected_altitude_fms_ft: Some(20_992),
             selected_heading_deg: Some(270.0),
             baro_setting_hpa: Some(1013.6),
-            modes: Some(Modes {
+            modes: Modes {
                 altitude_hold: true,
                 approach: true,
                 ..Modes::default()
-            }),
+            }
+            .into(),
         };
         let written = [
             TargetStateAndStatus { target, nac_p: 10 },
@@ -1260,8 +1472,10 @@ mod tests {
 
     #[test]
     fn ra_broadcast_is_read_as_it_is_written() {
-        // Arrange: one threat with every flag, several threats, and one ended
-        let advisory = Advisory {
+        // Arrange: one threat with every flag, several threats, one ended; the
+        // threat named by its address, placed on the steps of the fields, and
+        // placed with no estimate
+        let resolution = Resolution {
             corrective: true,
             downward: true,
             increased_rate: true,
@@ -1277,24 +1491,41 @@ mod tests {
             crossing: false,
             sense_reversal: true,
         };
+        let placed = ThreatPosition {
+            altitude_ft: Some(38_000),
+            range_nm: Some(4.5),
+            bearing_deg: Some(117.0),
+        };
         let written = [
-            ResolutionAdvisory {
+            Advisory {
                 multiple_threats: true,
-                advisory: Some(advisory),
-                corrections: None,
-                terminated: false,
+                resolution: Some(resolution),
+                ..Advisory::default()
             },
-            ResolutionAdvisory {
+            Advisory {
                 multiple_threats: true,
-                advisory: None,
                 corrections: Some(corrections),
-                terminated: false,
+                ..Advisory::default()
             },
-            ResolutionAdvisory {
-                multiple_threats: false,
-                advisory: Some(Advisory::default()),
-                corrections: None,
+            Advisory {
+                resolution: Some(Resolution::default()),
                 terminated: true,
+                ..Advisory::default()
+            },
+            Advisory {
+                resolution: Some(resolution),
+                threat: Some(Threat::ThreatAddress(0x0048_40d6)),
+                ..Advisory::default()
+            },
+            Advisory {
+                resolution: Some(resolution),
+                threat: Some(Threat::ThreatPosition(placed)),
+                ..Advisory::default()
+            },
+            Advisory {
+                resolution: Some(resolution),
+                threat: Some(Threat::ThreatPosition(ThreatPosition::default())),
+                ..Advisory::default()
             },
         ]
         .map(|advisory| RaBroadcast { advisory });
@@ -1307,6 +1538,75 @@ mod tests {
     }
 
     #[test]
+    fn threat_identity_is_read_by_its_type_indicator() {
+        // Arrange: an advisory of one threat, then its identity as the
+        // indicator says: none, the address, the Mode C altitude with the
+        // range in tenths of a mile and the bearing in steps of 6°, and the
+        // value not assigned
+        let me = RaBroadcast {
+            advisory: Advisory {
+                resolution: Some(Resolution::default()),
+                ..Advisory::default()
+            },
+        }
+        .write();
+        let by_address = with(with(me, 29, 30, 1), 31, 54, 0x0048_40d6);
+        let by_position = with(
+            with(
+                with(with(me, 29, 30, 2), 31, 43, altitude_code(38_000)),
+                44,
+                50,
+                46,
+            ),
+            51,
+            56,
+            20,
+        );
+        let fields = [me, by_address, by_position, with(me, 29, 30, 3)];
+
+        // Act
+        let read = fields.map(|me| RaBroadcast::read(me).and_then(|read| read.advisory.threat));
+
+        // Assert
+        let placed = ThreatPosition {
+            altitude_ft: Some(38_000),
+            range_nm: Some(4.5),
+            bearing_deg: Some(117.0),
+        };
+        let expected = [
+            None,
+            Some(Threat::ThreatAddress(0x0048_40d6)),
+            Some(Threat::ThreatPosition(placed)),
+            None,
+        ];
+        assert_eq!(read, expected);
+    }
+
+    #[test]
+    fn threat_placed_without_an_estimate_has_none() {
+        // Arrange: the identity by position with every field at its code for no estimate
+        let me = RaBroadcast {
+            advisory: Advisory {
+                resolution: Some(Resolution::default()),
+                ..Advisory::default()
+            },
+        }
+        .write();
+        let placed = with(with(me, 29, 30, 2), 31, 56, 0);
+
+        // Act
+        let read = RaBroadcast::read(placed).and_then(|read| read.advisory.threat);
+
+        // Assert
+        let none = ThreatPosition {
+            altitude_ft: None,
+            range_nm: None,
+            bearing_deg: None,
+        };
+        assert_eq!(read, Some(Threat::ThreatPosition(none)));
+    }
+
+    #[test]
     fn ra_broadcast_with_no_advisory_generated_says_nothing() {
         // Arrange: type code 28, subtype 2, and no bit set after
         let me = Bits::default().put(28, 5).put(2, 3).filled(56);
@@ -1316,6 +1616,34 @@ mod tests {
 
         // Assert
         assert_eq!(read, None);
+    }
+
+    #[test]
+    fn threat_estimates_beyond_their_fields_are_written_as_their_most() {
+        // Arrange: a range beyond 12.55 NM, and a bearing of a full circle
+        let placed = ThreatPosition {
+            altitude_ft: None,
+            range_nm: Some(13.0),
+            bearing_deg: Some(360.0),
+        };
+        let written = RaBroadcast {
+            advisory: Advisory {
+                resolution: Some(Resolution::default()),
+                threat: Some(Threat::ThreatPosition(placed)),
+                ..Advisory::default()
+            },
+        };
+
+        // Act
+        let read = reread(&written).and_then(|read| read.advisory.threat);
+
+        // Assert: beyond 12.55 NM, and the last step of 6°
+        let most = ThreatPosition {
+            altitude_ft: None,
+            range_nm: Some(12.6),
+            bearing_deg: Some(357.0),
+        };
+        assert_eq!(read, Some(Threat::ThreatPosition(most)));
     }
 
     #[test]
@@ -1400,47 +1728,143 @@ mod tests {
         assert_eq!(categories, expected.collect::<Vec<_>>());
     }
 
+    /// The integrity of each row of a version's table: the type code, the
+    /// supplements A and B or C, and the category and radius they stand for.
+    type Row = (u32, bool, bool, u32, Option<u32>);
+
+    fn integrities(version: u32, rows: &[Row]) -> Vec<(Integrity, Integrity)> {
+        rows.iter()
+            .map(|&(type_code, a, b_or_c, nic, rc_m)| {
+                (
+                    integrity(type_code, version, a, b_or_c),
+                    Integrity { nic, rc_m },
+                )
+            })
+            .collect()
+    }
+
+    fn agree(integrities: &[(Integrity, Integrity)]) -> bool {
+        integrities.iter().all(|(read, expected)| read == expected)
+    }
+
     #[test]
-    fn integrity_category_is_that_of_the_type_code_and_the_supplements() {
-        // Arrange: (type code, supplement A, supplement B in the air or C on the ground)
+    fn integrity_of_version_2_is_tabled_by_the_type_code_and_the_supplements() {
+        // Arrange: in the air with supplements A and B, and on the ground
+        // with A and C, every row of DO-260B
         let airborne = [
-            (9, false, false),
-            (10, false, false),
-            (11, true, true),
-            (11, false, false),
-            (12, false, false),
-            (13, false, false),
-            (14, false, false),
-            (15, false, false),
-            (16, true, true),
-            (16, false, false),
-            (17, false, false),
-            (18, false, false),
-            (20, false, false),
-            (21, false, false),
-            (22, false, false),
+            (9, false, false, 11, Some(8)),
+            (10, false, false, 10, Some(25)),
+            (11, true, true, 9, Some(75)),
+            (11, false, false, 8, Some(186)),
+            (12, false, false, 7, Some(371)),
+            (13, false, true, 6, Some(556)),
+            (13, false, false, 6, Some(926)),
+            (13, true, true, 6, Some(1112)),
+            (14, false, false, 5, Some(1852)),
+            (15, false, false, 4, Some(3704)),
+            (16, true, true, 3, Some(7408)),
+            (16, false, false, 2, Some(14816)),
+            (17, false, false, 1, Some(37040)),
+            (18, false, false, 0, None),
+            (20, false, false, 11, Some(8)),
+            (21, false, false, 10, Some(25)),
+            (22, false, false, 0, None),
         ];
         let surface = [
-            (5, false, false),
-            (6, false, false),
-            (7, true, false),
-            (7, false, false),
-            (8, true, true),
-            (8, true, false),
-            (8, false, true),
-            (8, false, false),
+            (5, false, false, 11, Some(8)),
+            (6, false, false, 10, Some(25)),
+            (7, true, false, 9, Some(75)),
+            (7, false, false, 8, Some(186)),
+            (8, true, true, 7, Some(371)),
+            (8, true, false, 6, Some(556)),
+            (8, false, true, 6, Some(1112)),
+            (8, false, false, 0, None),
         ];
 
         // Act
-        let categories = airborne
-            .iter()
-            .chain(&surface)
-            .map(|&(type_code, a, other)| nic(type_code, a, other));
+        let read = integrities(2, &[airborne.as_slice(), &surface].concat());
 
         // Assert
-        let expected = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 11, 10, 0]
-            .into_iter()
-            .chain([11, 10, 9, 8, 7, 6, 6, 0]);
-        assert_eq!(categories.collect::<Vec<_>>(), expected.collect::<Vec<_>>());
+        assert!(agree(&read), "{read:?}");
+    }
+
+    #[test]
+    fn integrity_of_version_2_with_supplements_not_assigned_is_the_category_without_a_radius() {
+        // Arrange: type code 13 with supplement A alone
+        let rows = [(13, true, false, 6, None)];
+
+        // Act
+        let read = integrities(2, &rows);
+
+        // Assert
+        assert!(agree(&read), "{read:?}");
+    }
+
+    #[test]
+    fn integrity_of_version_1_is_tabled_by_the_type_code_and_supplement_a() {
+        // Arrange: every row of DO-260A, which knows supplement A alone
+        let airborne = [
+            (9, false, false, 11, Some(8)),
+            (10, false, false, 10, Some(25)),
+            (11, true, false, 9, Some(75)),
+            (11, false, false, 8, Some(186)),
+            (12, false, false, 7, Some(371)),
+            (13, false, false, 6, Some(926)),
+            (13, true, false, 6, Some(1112)),
+            (14, false, false, 5, Some(1852)),
+            (15, false, false, 4, Some(3704)),
+            (16, true, false, 3, Some(7408)),
+            (16, false, false, 2, Some(14816)),
+            (17, false, false, 1, Some(37040)),
+            (18, false, false, 0, None),
+            (20, false, false, 11, Some(8)),
+            (21, false, false, 10, Some(25)),
+            (22, false, false, 0, None),
+        ];
+        let surface = [
+            (5, false, false, 11, Some(8)),
+            (6, false, false, 10, Some(25)),
+            (7, true, false, 9, Some(75)),
+            (7, false, false, 8, Some(186)),
+            (8, true, false, 0, None),
+            (8, false, false, 0, None),
+        ];
+
+        // Act
+        let read = integrities(1, &[airborne.as_slice(), &surface].concat());
+
+        // Assert
+        assert!(agree(&read), "{read:?}");
+    }
+
+    #[test]
+    fn integrity_of_version_0_is_tabled_by_the_type_code_alone() {
+        // Arrange: every row of DO-260, which has no supplements; the
+        // categories are those the type codes stand for since
+        let rows = [
+            (5, false, false, 11, Some(8)),
+            (6, false, false, 10, Some(25)),
+            (7, false, false, 8, Some(186)),
+            (8, false, false, 0, None),
+            (9, false, false, 11, Some(8)),
+            (10, false, false, 10, Some(25)),
+            (11, true, true, 8, Some(186)),
+            (12, false, false, 7, Some(371)),
+            (13, true, true, 6, Some(926)),
+            (14, false, false, 5, Some(1852)),
+            (15, false, false, 4, Some(3704)),
+            (16, true, true, 2, Some(18520)),
+            (17, false, false, 1, Some(37040)),
+            (18, false, false, 0, None),
+            (20, false, false, 11, Some(8)),
+            (21, false, false, 10, Some(25)),
+            (22, false, false, 0, None),
+        ];
+
+        // Act
+        let read = integrities(0, &rows);
+
+        // Assert
+        assert!(agree(&read), "{read:?}");
     }
 }

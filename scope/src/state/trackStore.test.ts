@@ -8,17 +8,32 @@ const project = (lat: number, lon: number) => ({ x: (lon - 130) * 60, y: (lat - 
 
 const doubled = (lat: number, lon: number) => ({ x: (lon - 130) * 120, y: (lat - 33) * 120 });
 
+/** A snapshot at `now`, each report's message and position heard then unless it says when. */
 function snapshot(now: number, aircraft: AircraftReport[], messages = 0): AircraftSnapshot {
-  return { now, messages, aircraft };
+  const stamped = aircraft.map((a) => ({
+    ...a,
+    heard: { messages: now, ...(a.position && { position: now }), ...a.heard },
+  }));
+  return { now, messages, aircraft: stamped };
 }
 
+/** A target heard with its position. */
 const live = (hex: string, lat = 33.5, lon = 130.5): AircraftReport => ({
   hex,
   position: { lat, lon },
-  seen: 0.2,
-  seenPos: 0.2,
   alt: 11000,
+  heard: {},
 });
+
+/** A target reporting the ident or its end, heard at `heardAt`. */
+const identing = (hex: string, ident: boolean, heardAt: number): AircraftReport => ({
+  ...live(hex),
+  ident,
+  heard: { ...live(hex).heard, ident: heardAt },
+});
+
+/** A target whose last message was heard at `messages` seconds, with no count of them. */
+const heardLast = (messages: number): AircraftReport => ({ ...live('a'), heard: { messages } });
 
 describe('createTrackStore', () => {
   it('rebuilds from each snapshot, dropping tracks that are absent', () => {
@@ -60,6 +75,18 @@ describe('createTrackStore', () => {
     expect(h?.[1]?.x).toBeCloseTo(30, 9);
     expect(h?.[1]?.y).toBeCloseTo(36, 9);
     expect(h?.[1]?.alt).toBe(11000);
+  });
+
+  it('dates a fix by when its position was heard, not by the snapshot', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const backfilled = { ...live('a'), heard: { messages: 1007, position: 1001.5 } };
+
+    // Act
+    store.ingest(snapshot(1008, [backfilled]));
+
+    // Assert
+    expect(store.tracks.get('a')?.history.map((f) => f.t)).toEqual([1001.5]);
   });
 
   it('trims history older than the retention window', () => {
@@ -125,27 +152,74 @@ describe('createTrackStore', () => {
     expect(sources).toEqual(['adsb', 'mlat', 'tisb']);
   });
 
-  it('falls back from live position to lastPosition, then none', () => {
+  it('places a target nowhere without a position, and keeps no fix of it', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const aircraft: AircraftReport[] = [{ hex: 'none', heard: { messages: 999 } }];
+
+    // Act
+    store.ingest(snapshot(1000, aircraft));
+
+    // Assert
+    expect(store.tracks.get('none')?.position).toEqual({ kind: 'none' });
+    expect(store.tracks.get('none')?.history).toEqual([]);
+  });
+
+  it('tells how long ago the target and its position were heard from their instants', () => {
     // Arrange
     const store = createTrackStore(project);
     const aircraft: AircraftReport[] = [
-      { hex: 'last', seen: 40, lastPosition: { lat: 34, lon: 131 } }, // Yamaguchi
-      { hex: 'none', seen: 1 },
+      { ...live('a'), heard: { messages: 999.75, position: 997.5 } },
+      { hex: 'b', heard: { messages: 998 } },
     ];
 
     // Act
     store.ingest(snapshot(1000, aircraft));
 
     // Assert
-    expect(store.tracks.get('last')?.position).toEqual({
-      kind: 'last',
-      lat: 34,
-      lon: 131,
-      x: 60,
-      y: 60,
+    expect([store.tracks.get('a')?.seen, store.tracks.get('a')?.seenPos]).toEqual([0.25, 2.5]);
+    expect([store.tracks.get('b')?.seen, store.tracks.get('b')?.seenPos]).toEqual([2, undefined]);
+  });
+
+  it('shows the ident while it is reported true and its report is fresh', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const aircraft = [
+      identing('fresh', true, 982.1),
+      identing('lapsed', true, 982),
+      identing('ended', false, 999.9),
+    ];
+
+    // Act
+    store.ingest(snapshot(1000, aircraft));
+
+    // Assert
+    expect(['fresh', 'lapsed', 'ended'].map((hex) => store.tracks.get(hex)?.ident)).toEqual([
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it('shows the advisory while its report is fresh', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const ra = { multipleThreats: false, terminated: false };
+    const advised = (hex: string, heardAt: number): AircraftReport => ({
+      ...live(hex),
+      ra,
+      heard: { ...live(hex).heard, ra: heardAt },
     });
-    expect(store.tracks.get('none')?.position).toEqual({ kind: 'none' });
-    expect(store.tracks.get('last')?.history).toEqual([]);
+    const aircraft = [advised('fresh', 982.1), advised('lapsed', 982)];
+
+    // Act
+    store.ingest(snapshot(1000, aircraft));
+
+    // Assert
+    expect([store.tracks.get('fresh')?.ra, store.tracks.get('lapsed')?.ra]).toEqual([
+      ra,
+      undefined,
+    ]);
   });
 
   it('derives the message rate from the snapshot message counter', () => {
@@ -199,8 +273,8 @@ describe('createTrackStore', () => {
       type: 'B789',
       registration: 'TEST-01',
       emergency: 'none',
-      seen: 0.2,
-      seenPos: 0.2,
+      seen: 0,
+      seenPos: 0,
     });
   });
 
@@ -302,7 +376,7 @@ describe('createTrackStore samples', () => {
     store.ingest(snapshot(1000, [heard('a', 10)]));
 
     // Act
-    store.ingest(snapshot(1001, [heard('a', 10, { seen: 1.2 })]));
+    store.ingest(snapshot(1001, [heard('a', 10)]));
 
     // Assert
     expect(store.tracks.get('a')?.samples.map((s) => s.t)).toEqual([1000]);
@@ -327,7 +401,7 @@ describe('createTrackStore samples', () => {
     store.ingest(snapshot(1002, [heard('a', 30)]));
 
     // Act
-    store.ingest(snapshot(1003, [heard('a', 30, { seen: 1.2 })]));
+    store.ingest(snapshot(1003, [heard('a', 30)]));
 
     // Assert
     expect(store.tracks.get('a')?.messageRate).toBe(10);
@@ -361,14 +435,14 @@ describe('createTrackStore samples', () => {
     expect(store.tracks.get('a')?.samples.map((s) => s.t)).toEqual([1000]);
   });
 
-  it('goes by the age of the last message when the feed counts none', () => {
-    // Arrange
+  it('goes by the instant of the last message when the feed counts none', () => {
+    // Arrange: heard at 999.8 s, then not until 1001.6 s
     const store = createTrackStore(project);
-    store.ingest(snapshot(1000, [{ ...live('a'), seen: 0.2 }]));
-    store.ingest(snapshot(1001, [{ ...live('a'), seen: 1.2 }]));
+    store.ingest(snapshot(1000, [heardLast(999.8)]));
+    store.ingest(snapshot(1001, [heardLast(999.8)]));
 
     // Act
-    store.ingest(snapshot(1002, [{ ...live('a'), seen: 0.4 }]));
+    store.ingest(snapshot(1002, [heardLast(1001.6)]));
 
     // Assert
     expect(store.tracks.get('a')?.samples.map((s) => s.t)).toEqual([1000, 1002]);
@@ -414,8 +488,10 @@ describe('createTrackStore samples', () => {
       windSpeed: 14,
       navModes: ['autopilot', 'lnav'],
       source: 'mlat',
-      seen: 0.3,
-      seenPos: 2.5,
+      roll: -9.5,
+      trackRate: -0.4,
+      rc: 186,
+      heard: { messages: 999.75, position: 997.5, alt: 999.75 },
     };
 
     // Act
@@ -431,6 +507,8 @@ describe('createTrackStore samples', () => {
       track: 235,
       heading: undefined,
       verticalRate: -1200,
+      roll: -9.5,
+      trackRate: -0.4,
       ias: 229,
       tas: 282,
       mach: 0.428,
@@ -438,6 +516,7 @@ describe('createTrackStore samples', () => {
       tat: 23,
       navQnh: 1013.6,
       nic: 8,
+      rc: 186,
       nacP: 9,
       rssi: -12.3,
       selAlt: 35008,
@@ -447,8 +526,9 @@ describe('createTrackStore samples', () => {
       windSpeed: 14,
       navModes: ['autopilot', 'lnav'],
       source: 'mlat',
-      seen: 0.3,
+      seen: 0.25,
       seenPos: 2.5,
+      heard: { messages: 999.75, position: 997.5, alt: 999.75 },
       at: { lat: 33.5, lon: 130.5 },
     });
   });

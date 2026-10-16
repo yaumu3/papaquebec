@@ -23,7 +23,7 @@ export function targetAt(view: View, cx: number, cy: number, reachPx = TARGET_PX
   let bestD = reachPx * reachPx;
   for (const t of trackStore.tracks.values()) {
     const p = t.position;
-    if (p.kind !== 'live' && p.kind !== 'last') continue;
+    if (p.kind !== 'live') continue;
     const s = toScreen(view, p.x, p.y);
     const d = (s.cx - cx) ** 2 + (s.cy - cy) ** 2;
     if (d < bestD) {
@@ -42,7 +42,7 @@ export function anchorAt(v: View, cx: number, cy: number, reach: number): RblAnc
 /** Screen position of a track, or null when it has none. */
 export function targetScreen(view: View, hex: string): { cx: number; cy: number } | null {
   const p = trackStore.tracks.get(hex)?.position;
-  if (!p || (p.kind !== 'live' && p.kind !== 'last')) return null;
+  if (!p || p.kind !== 'live') return null;
   return toScreen(view, p.x, p.y);
 }
 

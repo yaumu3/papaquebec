@@ -31,13 +31,10 @@ export const NONE: Reading = { v: '---' };
 
 export const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
 
-/** The position as one cell, which owns up to a fix that is no longer live. */
+/** The position as one cell. */
 export function positionReading(p: Position): { k: string; r: Reading } {
   if (p.kind === 'none') return { k: 'POSITION', r: NONE };
-  return {
-    k: p.kind === 'last' ? 'LAST POSITION' : 'POSITION',
-    r: { v: `${p.lat.toFixed(5)} ${p.lon.toFixed(5)}` },
-  };
+  return { k: 'POSITION', r: { v: `${p.lat.toFixed(5)} ${p.lon.toFixed(5)}` } };
 }
 
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>

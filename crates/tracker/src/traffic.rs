@@ -6,15 +6,18 @@ use std::collections::{BTreeMap, VecDeque};
 use crate::air::{self, Wind};
 use crate::beast::{Frame, Observation};
 use crate::cpr::{self, Cpr};
-use crate::field::{Airspeed, Identification};
+use crate::field::{
+    Airspeed, Identification, Integrity, TargetState, TargetStateAndStatus, TargetSteps, Velocity,
+};
 use crate::message::{Report, Trust};
 use crate::position::Position;
 use crate::proto::{
-    Address, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory, LastPosition,
-    Meteo, Quality, Reception, ResolutionAdvisory, Snapshot, Source, TargetState,
-    target_state::Modes,
+    self, Address, Advisory, Aircraft, Emergency, EmergencyPriorityStatus, EmitterCategory, Flag,
+    Int, Modes, Real, Reception, Snapshot, Source, ms,
 };
-use crate::register::{Known, Register};
+use crate::register::{
+    BEARING_STEP_DEG, HeadingAndSpeed, Known, Register, SelectedVerticalIntention, TrackAndTurn,
+};
 
 /// readsb lists an aircraft from its second message on: a single one may be
 /// noise that passes for a message.
@@ -37,13 +40,6 @@ const MAX_RANGE_NM: f64 = 300.0;
 /// taken within this of one another: a radar sweep or two, in which an
 /// airliner changes little.
 const RELATED_S: f64 = 15.0;
-/// How long a transponder sends the special position identification after
-/// the crew presses IDENT (ICAO Annex 10 Volume IV).
-const IDENT_S: f64 = 18.0;
-/// How long an aircraft keeps reporting a resolution advisory once it has
-/// ended (ICAO Annex 10 Volume IV, RTCA DO-260B): one not reported for this
-/// long is over, not kept the minute the rest is.
-const ADVISORY_S: f64 = 18.0;
 /// The ground vector and the air vector a wind is derived from, and the
 /// heading and the airspeed of the latter, are taken within this of one
 /// another: a radar asks for the registers in one sweep, so values further
@@ -112,168 +108,273 @@ impl Traffic {
         self.remembered
             .extend(forgotten.map(|(key, tracked)| (key, tracked.remembered)));
         self.remembered
-            .retain(|_, remembered| remembered.at(now_s) != (None, None));
+            .retain(|_, remembered| remembered.at(now_s).is_some());
         let listed = self
             .aircraft
             .values()
             .filter(|tracked| tracked.messages >= MESSAGES_TO_BE_LISTED);
         Snapshot {
-            now_s,
+            now_ms: ms(now_s),
             messages: self.messages,
             aircraft: listed.map(|tracked| tracked.at(now_s)).collect(),
         }
     }
 }
 
-/// Something a message said, with when it did, and whether only in reply.
+/// Something said, when it was heard, in seconds since the epoch, and the
+/// step its report comes in, zero when exact. A value derived from others
+/// is heard when the oldest of them was.
+#[derive(Clone, Copy)]
+struct Heard<T> {
+    said: T,
+    at_s: f64,
+    step: f64,
+}
+
+/// What was heard, without when.
+fn said<T>(heard: Heard<T>) -> T {
+    heard.said
+}
+
+/// Something heard exactly, in no steps: a report, at its instant, or a value
+/// derived from others, at the oldest of theirs.
+fn exact<T>(said: T, at_s: f64) -> Heard<T> {
+    Heard {
+        said,
+        at_s,
+        step: 0.0,
+    }
+}
+
+impl<T> Heard<T> {
+    /// Something else made of what was heard, heard at the same instant.
+    fn map<U>(self, into: impl FnOnce(T) -> U) -> Heard<U> {
+        Heard {
+            said: into(self.said),
+            at_s: self.at_s,
+            step: self.step,
+        }
+    }
+
+    /// As the feed carries an integer; none of one that does not fit.
+    fn int(self) -> Option<Int>
+    where
+        T: TryInto<i32>,
+    {
+        Some(Int {
+            value: self.said.try_into().ok()?,
+            heard_ms: ms(self.at_s),
+        })
+    }
+}
+
+impl Heard<f64> {
+    /// As the feed carries a real number.
+    fn real(self) -> Real {
+        Real {
+            value: self.said,
+            heard_ms: ms(self.at_s),
+        }
+    }
+}
+
+impl Heard<bool> {
+    /// As the feed carries a flag.
+    fn flag(self) -> Flag {
+        Flag {
+            value: self.said,
+            heard_ms: ms(self.at_s),
+        }
+    }
+}
+
+/// The newest report of a value, however it was heard, unless it only repeats
+/// a finer one of the last sweep or two within rounding: a coarser one would
+/// only jitter it.
 struct Said<T> {
-    kept: Option<(T, f64)>,
-    answered: bool,
+    kept: Option<Heard<T>>,
 }
 
 impl<T> Default for Said<T> {
     fn default() -> Self {
-        Self {
-            kept: None,
-            answered: false,
-        }
+        Self { kept: None }
     }
 }
 
 impl<T: Clone> Said<T> {
-    /// Takes what a broadcast heard at `now_s` says, when it says it.
+    /// Takes what a message heard at `now_s` says exactly, when it says it.
     fn keep(&mut self, said: Option<T>, now_s: f64) {
-        if let Some(said) = said {
-            self.kept = Some((said, now_s));
-            self.answered = false;
+        self.keep_heard(said.map(|said| exact(said, now_s)));
+    }
+
+    /// Takes what was heard, when there is something, in place of what was kept.
+    fn keep_heard(&mut self, heard: Option<Heard<T>>) {
+        if heard.is_some() {
+            self.kept = heard;
         }
     }
 
-    /// Takes what a reply heard at `now_s` says, when it says it, unless a
-    /// broadcast said it within the lapse: replies fill in what the
-    /// broadcasts leave out.
-    fn fill(&mut self, said: Option<T>, now_s: f64) {
-        self.fill_within(said, LAPSE_S, now_s);
-    }
-
-    /// Fills in what a reply says, unless a broadcast said it less than
-    /// `lapse_s` before `now_s`.
-    fn fill_within(&mut self, said: Option<T>, lapse_s: f64, now_s: f64) {
-        if said.is_some() && (self.answered || self.within(lapse_s, now_s).is_none()) {
-            self.kept = said.map(|said| (said, now_s));
-            self.answered = true;
-        }
-    }
-
-    /// What was said, unless it has lapsed by `now_s`.
-    fn at(&self, now_s: f64) -> Option<T> {
+    /// What was said, and when, unless it has lapsed by `now_s`.
+    fn at(&self, now_s: f64) -> Option<Heard<T>> {
         self.within(LAPSE_S, now_s)
     }
 
-    /// What was said lately: within the seconds of each other that values
-    /// read together are taken from.
-    fn lately(&self, now_s: f64) -> Option<T> {
+    /// What was said lately, and when: within the seconds of each other that
+    /// values read together are taken from.
+    fn lately(&self, now_s: f64) -> Option<Heard<T>> {
         self.within(RELATED_S, now_s)
     }
 
-    /// What was said less than `lapse_s` before `now_s`.
-    fn within(&self, lapse_s: f64, now_s: f64) -> Option<T> {
-        self.lasting(lapse_s, now_s).map(|(said, _)| said.clone())
+    /// What was said less than `lapse_s` before `now_s`, and when.
+    fn within(&self, lapse_s: f64, now_s: f64) -> Option<Heard<T>> {
+        self.lasting(lapse_s, now_s).cloned()
     }
 
-    /// How long before `now_s` it was said, unless it has lapsed.
-    fn age_s(&self, now_s: f64) -> Option<f64> {
-        self.lasting(LAPSE_S, now_s)
-            .map(|(_, said_s)| now_s - said_s)
-    }
-
-    fn lasting(&self, lapse_s: f64, now_s: f64) -> Option<&(T, f64)> {
+    fn lasting(&self, lapse_s: f64, now_s: f64) -> Option<&Heard<T>> {
         self.kept
             .as_ref()
-            .filter(|(_, said_s)| now_s - said_s < lapse_s)
+            .filter(|heard| now_s - heard.at_s < lapse_s)
     }
 }
 
-/// Where an aircraft was placed.
+impl<T: Copy + Into<f64>> Said<T> {
+    /// Takes what a message heard at `now_s` says in steps of `step`, when
+    /// it says it, in place of what was kept: unless that is finer, of the
+    /// last sweep or two, and the two agree within their rounding, which a
+    /// coarser report would only jitter.
+    fn keep_in_steps(&mut self, said: Option<T>, step: f64, now_s: f64) {
+        let Some(said) = said else {
+            return;
+        };
+        let repeated = self.kept.as_ref().is_some_and(|kept| {
+            let rounding = f64::midpoint(step, kept.step);
+            kept.step < step
+                && (said.into() - kept.said.into()).abs() <= rounding
+                && now_s - kept.at_s < RELATED_S
+        });
+        if !repeated {
+            self.kept = Some(Heard {
+                said,
+                at_s: now_s,
+                step,
+            });
+        }
+    }
+}
+
+/// Where an aircraft was placed, and how well.
 #[derive(Clone, Copy)]
 struct Fix {
     position: Position,
-    nic: u32,
+    integrity: Integrity,
     source: Source,
 }
 
 /// What is kept of an aircraft longer than the rest, and when it is forgotten.
 #[derive(Default)]
 struct Remembered {
-    identification: Said<String>,
+    callsign: Said<String>,
     emitter_category: Said<EmitterCategory>,
 }
 
 impl Remembered {
     /// Takes what an identification message heard at `now_s` says.
     fn keep(&mut self, said: &Identification, now_s: f64) {
-        self.identification.keep(said.identification.clone(), now_s);
+        self.callsign.keep(said.identification.clone(), now_s);
         self.emitter_category
             .keep(Some(said.emitter_category), now_s);
     }
 
-    /// The callsign and the category, each unless it has lapsed by `now_s`.
-    fn at(&self, now_s: f64) -> (Option<String>, Option<EmitterCategory>) {
-        let lapse_s = IDENTIFICATION_LAPSE_S;
-        (
-            self.identification.within(lapse_s, now_s),
-            self.emitter_category.within(lapse_s, now_s),
-        )
+    /// The callsign and the category, each unless it has lapsed by `now_s`,
+    /// heard when the later of them was; none once both have lapsed.
+    fn at(&self, now_s: f64) -> Option<proto::Identification> {
+        let callsign = self.callsign.within(IDENTIFICATION_LAPSE_S, now_s);
+        let category = self.emitter_category.within(IDENTIFICATION_LAPSE_S, now_s);
+        let latest = [
+            callsign.as_ref().map(|heard| heard.at_s),
+            category.map(|heard| heard.at_s),
+        ]
+        .into_iter()
+        .flatten()
+        .reduce(f64::max)?;
+        Some(proto::Identification {
+            callsign: callsign.map(said),
+            emitter_category: category.map(|heard| heard.said.into()),
+            heard_ms: ms(latest),
+        })
     }
 }
 
-/// The target state, each field as it was last said: a broadcast may leave
-/// out what a reply says.
+/// The target state, each field and each mode as it was last said: the
+/// broadcast and the reply each leave out what the other says.
 #[derive(Default)]
 struct Target {
     selected_altitude_mcp_ft: Said<i32>,
     selected_altitude_fms_ft: Said<i32>,
     selected_heading_deg: Said<f64>,
     baro_setting_hpa: Said<f64>,
-    modes: Said<Modes>,
+    autopilot: Said<bool>,
+    vnav: Said<bool>,
+    altitude_hold: Said<bool>,
+    approach: Said<bool>,
+    lnav: Said<bool>,
+    tcas: Said<bool>,
 }
 
 impl Target {
-    /// Takes what a broadcast heard at `now_s` says of each field.
-    fn keep(&mut self, said: &TargetState, now_s: f64) {
-        self.selected_altitude_mcp_ft
-            .keep(said.selected_altitude_mcp_ft, now_s);
-        self.selected_altitude_fms_ft
-            .keep(said.selected_altitude_fms_ft, now_s);
+    /// Takes what a message heard at `now_s` says of each field, the
+    /// altitudes and the setting in the steps the message comes in.
+    fn keep(&mut self, said: &TargetState, steps: TargetSteps, now_s: f64) {
+        self.selected_altitude_mcp_ft.keep_in_steps(
+            said.selected_altitude_mcp_ft,
+            steps.altitude_ft,
+            now_s,
+        );
+        self.selected_altitude_fms_ft.keep_in_steps(
+            said.selected_altitude_fms_ft,
+            steps.altitude_ft,
+            now_s,
+        );
         self.selected_heading_deg
             .keep(said.selected_heading_deg, now_s);
-        self.baro_setting_hpa.keep(said.baro_setting_hpa, now_s);
-        self.modes.keep(said.modes, now_s);
+        self.baro_setting_hpa
+            .keep_in_steps(said.baro_setting_hpa, steps.setting_hpa, now_s);
+        self.autopilot.keep(said.modes.autopilot, now_s);
+        self.vnav.keep(said.modes.vnav, now_s);
+        self.altitude_hold.keep(said.modes.altitude_hold, now_s);
+        self.approach.keep(said.modes.approach, now_s);
+        self.lnav.keep(said.modes.lnav, now_s);
+        self.tcas.keep(said.modes.tcas, now_s);
     }
 
-    /// Takes what a reply heard at `now_s` says of each field the broadcasts
-    /// leave out.
-    fn fill(&mut self, said: &TargetState, now_s: f64) {
-        self.selected_altitude_mcp_ft
-            .fill(said.selected_altitude_mcp_ft, now_s);
-        self.selected_altitude_fms_ft
-            .fill(said.selected_altitude_fms_ft, now_s);
-        self.selected_heading_deg
-            .fill(said.selected_heading_deg, now_s);
-        self.baro_setting_hpa.fill(said.baro_setting_hpa, now_s);
-        self.modes.fill(said.modes, now_s);
-    }
-
-    /// The fields that have not lapsed by `now_s`, while any is left.
-    fn at(&self, now_s: f64) -> Option<TargetState> {
-        let target = TargetState {
-            selected_altitude_mcp_ft: self.selected_altitude_mcp_ft.at(now_s),
-            selected_altitude_fms_ft: self.selected_altitude_fms_ft.at(now_s),
-            selected_heading_deg: self.selected_heading_deg.at(now_s),
-            baro_setting_hpa: self.baro_setting_hpa.at(now_s),
-            modes: self.modes.at(now_s),
-        };
-        Some(target).filter(|target| *target != TargetState::default())
+    /// The modes as last said, while any is: heard when the latest was, a
+    /// mode that has lapsed as not engaged.
+    fn modes(&self, now_s: f64) -> Option<Modes> {
+        let said_lately = [
+            &self.autopilot,
+            &self.vnav,
+            &self.altitude_hold,
+            &self.approach,
+            &self.lnav,
+            &self.tcas,
+        ]
+        .map(|mode| mode.at(now_s));
+        let latest = said_lately
+            .iter()
+            .flatten()
+            .map(|heard| heard.at_s)
+            .reduce(f64::max)?;
+        let [autopilot, vnav, altitude_hold, approach, lnav, tcas] =
+            said_lately.map(|mode| mode.is_some_and(said));
+        Some(Modes {
+            autopilot,
+            vnav,
+            altitude_hold,
+            approach,
+            lnav,
+            tcas,
+            heard_ms: ms(latest),
+        })
     }
 }
 
@@ -300,10 +401,11 @@ struct Tracked {
     indicated_airspeed_kt: Said<f64>,
     true_airspeed_kt: Said<f64>,
     target_state: Target,
-    resolution_advisory: Said<ResolutionAdvisory>,
+    advisory: Said<Advisory>,
     nac_p: Said<u32>,
     /// The air data besides, and what they say together.
     magnetic_heading_deg: Said<f64>,
+    roll_deg: Said<f64>,
     track_rate_deg_per_s: Said<f64>,
     mach: Said<f64>,
     oat_c: Said<f64>,
@@ -339,19 +441,20 @@ impl Tracked {
                     .keep(said.geometric_altitude_ft, now_s);
                 self.on_ground.keep(Some(false), now_s);
                 self.qualify(said.nac_p_of_version_0(), now_s);
-                let nic = said.nic(self.nic_supplement_a, self.version);
+                let integrity = said.integrity(self.nic_supplement_a, self.version);
                 let position = self.airborne(said.cpr, now_s);
-                self.place(position, nic, observation.source, now_s, site);
+                self.place(position, integrity, observation.source, now_s, site);
             }
             Report::SurfacePosition(said) => {
                 self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
                 self.track_deg.keep(said.track_deg, now_s);
                 self.on_ground.keep(Some(true), now_s);
                 self.qualify(said.nac_p_of_version_0(), now_s);
-                let nic = said.nic(self.nic_supplement_a, self.nic_supplement_c);
+                let integrity =
+                    said.integrity(self.nic_supplement_a, self.nic_supplement_c, self.version);
                 // A receiver hears an aircraft on the ground only from nearby.
                 let position = cpr::surface_near(said.cpr, self.whereabouts(now_s, site));
-                self.place(position, nic, observation.source, now_s, site);
+                self.place(position, integrity, observation.source, now_s, site);
             }
             Report::Reply(said) => {
                 self.on_ground.keep(said.on_ground, now_s);
@@ -367,21 +470,43 @@ impl Tracked {
             }
             Report::Identification(said) => self.remembered.keep(said, now_s),
             Report::Velocity(said) => {
-                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
-                self.track_deg.keep(said.track_deg, now_s);
-                self.magnetic_heading_deg
-                    .keep(said.magnetic_heading_deg, now_s);
-                self.baro_vertical_rate_fpm
-                    .keep(said.baro_vertical_rate_fpm, now_s);
-                self.geometric_vertical_rate_fpm
-                    .keep(said.geometric_vertical_rate_fpm, now_s);
+                self.ground_speed_kt.keep_in_steps(
+                    said.ground_speed_kt,
+                    said.speed_step_kt(),
+                    now_s,
+                );
+                let track_step = said.track_step_deg().unwrap_or(0.0);
+                self.track_deg
+                    .keep_in_steps(said.track_deg, track_step, now_s);
+                self.magnetic_heading_deg.keep_in_steps(
+                    said.magnetic_heading_deg,
+                    Velocity::HEADING_STEP_DEG,
+                    now_s,
+                );
+                self.baro_vertical_rate_fpm.keep_in_steps(
+                    said.baro_vertical_rate_fpm,
+                    Velocity::RATE_STEP_FPM,
+                    now_s,
+                );
+                self.geometric_vertical_rate_fpm.keep_in_steps(
+                    said.geometric_vertical_rate_fpm,
+                    Velocity::RATE_STEP_FPM,
+                    now_s,
+                );
                 self.geometric_minus_baro_ft
                     .keep(said.geometric_minus_baro_ft, now_s);
                 match said.airspeed {
                     Some(Airspeed::Indicated(kt)) => {
-                        self.indicated_airspeed_kt.keep(Some(kt), now_s);
+                        self.indicated_airspeed_kt.keep_in_steps(
+                            Some(kt),
+                            said.speed_step_kt(),
+                            now_s,
+                        );
                     }
-                    Some(Airspeed::True(kt)) => self.true_airspeed_kt.keep(Some(kt), now_s),
+                    Some(Airspeed::True(kt)) => {
+                        self.true_airspeed_kt
+                            .keep_in_steps(Some(kt), said.speed_step_kt(), now_s);
+                    }
                     None => {}
                 }
             }
@@ -391,11 +516,12 @@ impl Tracked {
                 self.mode_a_code.keep(said.mode_a_code, now_s);
             }
             Report::TargetStateAndStatus(said) => {
-                self.target_state.keep(&said.target, now_s);
+                self.target_state
+                    .keep(&said.target, TargetStateAndStatus::STEPS, now_s);
                 self.nac_p.keep(Some(said.nac_p), now_s);
             }
             Report::ResolutionAdvisory(said) => {
-                self.resolution_advisory.keep(Some(said.advisory), now_s);
+                self.advisory.keep(Some(said.advisory), now_s);
             }
             Report::OperationalStatus(said) => {
                 self.nac_p.keep(said.nac_p, now_s);
@@ -409,90 +535,121 @@ impl Tracked {
     /// What is known of the aircraft lately, to tell the registers apart by.
     fn known(&self, now_s: f64) -> Known {
         Known {
-            track_deg: self.track_deg.lately(now_s),
-            ground_speed_kt: self.ground_speed_kt.lately(now_s),
-            true_airspeed_kt: self.true_airspeed_kt.lately(now_s),
-            baro_altitude_ft: self.baro_altitude_ft.lately(now_s),
-            magnetic_heading_deg: self.magnetic_heading_deg.lately(now_s),
-            indicated_airspeed_kt: self.indicated_airspeed_kt.lately(now_s),
-            mach: self.mach.lately(now_s),
+            track_deg: self.track_deg.lately(now_s).map(said),
+            ground_speed_kt: self.ground_speed_kt.lately(now_s).map(said),
+            true_airspeed_kt: self.true_airspeed_kt.lately(now_s).map(said),
+            baro_altitude_ft: self.baro_altitude_ft.lately(now_s).map(said),
+            magnetic_heading_deg: self.magnetic_heading_deg.lately(now_s).map(said),
+            indicated_airspeed_kt: self.indicated_airspeed_kt.lately(now_s).map(said),
+            mach: self.mach.lately(now_s).map(said),
         }
     }
 
-    /// Takes what a register the aircraft answered with says, to fill in what
-    /// its broadcasts leave out, and derives what the air data say together.
+    /// Takes what a register the aircraft answered with says, and derives
+    /// what the air data say together.
     fn answer(&mut self, register: &Register, now_s: f64, site: Position) {
         match register {
-            // The callsign is the same however it is heard.
-            Register::Identification(callsign) => self
-                .remembered
-                .identification
-                .keep(Some(callsign.clone()), now_s),
+            Register::Identification(callsign) => {
+                self.remembered.callsign.keep(Some(callsign.clone()), now_s);
+            }
             Register::ResolutionAdvisory(said) => {
-                self.resolution_advisory
-                    .fill_within(Some(*said), ADVISORY_S, now_s);
+                self.advisory.keep(Some(*said), now_s);
             }
             Register::SelectedVerticalIntention(said) => {
-                self.target_state.fill(&said.target, now_s);
+                self.target_state
+                    .keep(&said.target, SelectedVerticalIntention::STEPS, now_s);
             }
             Register::TrackAndTurn(said) => {
-                self.track_deg.fill(said.track_deg, now_s);
-                self.ground_speed_kt.fill(said.ground_speed_kt, now_s);
+                self.roll_deg.keep(said.roll_deg, now_s);
+                self.track_deg
+                    .keep_in_steps(said.track_deg, BEARING_STEP_DEG, now_s);
+                self.ground_speed_kt.keep_in_steps(
+                    said.ground_speed_kt,
+                    TrackAndTurn::SPEED_STEP_KT,
+                    now_s,
+                );
                 self.track_rate_deg_per_s
-                    .fill(said.track_rate_deg_per_s, now_s);
-                self.true_airspeed_kt.fill(said.true_airspeed_kt, now_s);
+                    .keep(said.track_rate_deg_per_s, now_s);
+                self.true_airspeed_kt.keep_in_steps(
+                    said.true_airspeed_kt,
+                    TrackAndTurn::SPEED_STEP_KT,
+                    now_s,
+                );
             }
             Register::HeadingAndSpeed(said) => {
-                self.magnetic_heading_deg
-                    .fill(said.magnetic_heading_deg, now_s);
-                self.indicated_airspeed_kt
-                    .fill(said.indicated_airspeed_kt, now_s);
-                self.mach.fill(said.mach, now_s);
-                self.baro_vertical_rate_fpm
-                    .fill(said.baro_vertical_rate_fpm, now_s);
-                self.geometric_vertical_rate_fpm
-                    .fill(said.inertial_vertical_rate_fpm, now_s);
+                self.magnetic_heading_deg.keep_in_steps(
+                    said.magnetic_heading_deg,
+                    BEARING_STEP_DEG,
+                    now_s,
+                );
+                self.indicated_airspeed_kt.keep_in_steps(
+                    said.indicated_airspeed_kt,
+                    HeadingAndSpeed::AIRSPEED_STEP_KT,
+                    now_s,
+                );
+                self.mach.keep(said.mach, now_s);
+                self.baro_vertical_rate_fpm.keep_in_steps(
+                    said.baro_vertical_rate_fpm,
+                    HeadingAndSpeed::RATE_STEP_FPM,
+                    now_s,
+                );
+                self.geometric_vertical_rate_fpm.keep_in_steps(
+                    said.inertial_vertical_rate_fpm,
+                    HeadingAndSpeed::RATE_STEP_FPM,
+                    now_s,
+                );
             }
         }
         self.derive(now_s, site);
     }
 
     /// Derives what the air data say together, from values said within a
-    /// sweep or two of one another: the temperature from the Mach number and
-    /// the airspeed, and the wind from the ground vector and the air vector.
+    /// sweep or two of one another: the temperatures from the Mach number
+    /// and the airspeed, and the wind from the ground vector and the air
+    /// vector; each heard when the oldest of what it is derived from was.
     fn derive(&mut self, now_s: f64, site: Position) {
         let mach = self.mach.lately(now_s);
         let airspeed = self.true_airspeed_kt.lately(now_s);
-        let oat_c = mach
-            .zip(airspeed)
-            .and_then(|(mach, tas)| air::static_air_temperature_c(mach, tas));
-        let tat_c = oat_c
-            .zip(mach)
-            .map(|(oat_c, mach)| air::total_air_temperature_c(oat_c, mach));
-        self.oat_c.keep(oat_c, now_s);
-        self.tat_c.keep(tat_c, now_s);
+        let oat_c = mach.zip(airspeed).and_then(|(mach, tas)| {
+            let oat_c = air::static_air_temperature_c(mach.said, tas.said)?;
+            Some(exact(oat_c, mach.at_s.min(tas.at_s)))
+        });
+        let tat_c = oat_c.zip(mach).map(|(oat_c, mach)| {
+            exact(
+                air::total_air_temperature_c(oat_c.said, mach.said),
+                oat_c.at_s,
+            )
+        });
+        self.oat_c.keep_heard(oat_c);
+        self.tat_c.keep_heard(tat_c);
+        let wind = self.wind(now_s, site);
+        self.wind.keep_heard(wind);
+    }
+
+    /// The wind the ground vector and the air vector say together, when both
+    /// are of one sweep and the aircraft flies straight.
+    fn wind(&self, now_s: f64, site: Position) -> Option<Heard<Wind>> {
         let straight = self
             .track_rate_deg_per_s
             .lately(now_s)
-            .is_none_or(|rate| rate.abs() <= STRAIGHT_DEG_PER_S);
-        let heading = self
-            .magnetic_heading_deg
-            .within(WIND_WITHIN_S, now_s)
-            .map(|magnetic| magnetic + self.declination(now_s, site));
-        let through_air = heading.zip(self.true_airspeed_kt.within(WIND_WITHIN_S, now_s));
-        let over_ground = self
-            .track_deg
-            .within(WIND_WITHIN_S, now_s)
-            .zip(self.ground_speed_kt.within(WIND_WITHIN_S, now_s));
-        let wind = over_ground.zip(through_air).filter(|_| straight).map(
-            |((track, speed), (heading, airspeed))| air::wind(track, speed, heading, airspeed),
-        );
-        self.wind.keep(wind, now_s);
+            .is_none_or(|rate| rate.said.abs() <= STRAIGHT_DEG_PER_S);
+        let heard = |said: &Said<f64>| said.within(WIND_WITHIN_S, now_s);
+        let track = heard(&self.track_deg)?;
+        let speed = heard(&self.ground_speed_kt)?;
+        let magnetic = heard(&self.magnetic_heading_deg)?;
+        let airspeed = heard(&self.true_airspeed_kt)?;
+        let heading = magnetic.said + self.declination(now_s, site);
+        let oldest = [track, speed, magnetic, airspeed]
+            .into_iter()
+            .map(|heard| heard.at_s)
+            .fold(f64::INFINITY, f64::min);
+        let wind = air::wind(track.said, speed.said, heading, airspeed.said);
+        straight.then(|| exact(wind, oldest))
     }
 
     /// Where the aircraft is, or else the site.
     fn whereabouts(&self, now_s: f64, site: Position) -> Position {
-        self.fix.at(now_s).map_or(site, |fix| fix.position)
+        self.fix.at(now_s).map_or(site, |fix| fix.said.position)
     }
 
     /// How far east of true north magnetic north lies where the aircraft is,
@@ -516,14 +673,14 @@ impl Tracked {
             .filter(|(_, heard_s)| now_s - heard_s <= PAIR_WITHIN_S);
         self.pairing[usize::from(cpr.odd)] = Some((cpr, now_s));
         let paired = other.and_then(|(earlier, _)| cpr::global(earlier, cpr));
-        paired.or_else(|| cpr::airborne_near(cpr, self.fix.at(now_s)?.position))
+        paired.or_else(|| cpr::airborne_near(cpr, self.fix.at(now_s)?.said.position))
     }
 
     /// Takes a position that lies within what the receiver at the site can hear.
     fn place(
         &mut self,
         position: Option<Position>,
-        nic: u32,
+        integrity: Integrity,
         source: Source,
         now_s: f64,
         site: Position,
@@ -531,84 +688,103 @@ impl Tracked {
         let in_range = |position: &Position| site.distance_nm(*position) <= MAX_RANGE_NM;
         let fix = position.filter(in_range).map(|position| Fix {
             position,
-            nic,
+            integrity,
             source,
         });
         self.fix.keep(fix, now_s);
     }
 
-    /// The aircraft as the feed carries it at `now_s`.
+    /// The aircraft as the feed carries it at `now_s`: every value that has
+    /// not lapsed, with when it was heard.
     fn at(&self, now_s: f64) -> Aircraft {
-        let on_ground = self.on_ground.at(now_s) == Some(true);
+        let on_ground = self.on_ground.at(now_s);
         // On the ground the altitude some still send is not one to fly by.
-        let baro_altitude_ft = self.baro_altitude_ft.at(now_s).filter(|_| !on_ground);
-        let from_difference = baro_altitude_ft
-            .zip(self.geometric_minus_baro_ft.at(now_s))
-            .map(|(baro, difference)| baro + difference);
-        let fix = self.fix.at(now_s);
+        let baro_altitude_ft = self
+            .baro_altitude_ft
+            .at(now_s)
+            .filter(|_| !on_ground.is_some_and(said));
+        let target = &self.target_state;
         let wind = self.wind.at(now_s);
-        let meteo = Meteo {
-            wind_speed_kt: wind.map(|wind| wind.speed_kt),
-            wind_dir_deg: wind.map(|wind| wind.from_deg),
-            oat_c: self.oat_c.at(now_s),
-            tat_c: self.tat_c.at(now_s),
-        };
-        let quality = Quality {
-            nic: fix.map(|fix| fix.nic),
-            nac_p: self.nac_p.at(now_s),
-        };
-        let air_ground_state = if on_ground {
-            AirGroundState::OnGround
-        } else {
-            AirGroundState::Unspecified
-        };
-        let (identification, emitter_category) = self.remembered.at(now_s);
         Aircraft {
             address: Some(self.address),
-            identification,
-            emitter_category: emitter_category.map(Into::into),
-            mode_a_code: self.mode_a_code.at(now_s),
-            emergency_priority_status: self.emergency_priority_status.at(now_s).map(Into::into),
-            ident: self.ident.within(IDENT_S, now_s).unwrap_or(false),
-            lat_deg: fix.map(|fix| fix.position.lat_deg),
-            lon_deg: fix.map(|fix| fix.position.lon_deg),
-            position_source: fix.map_or(Source::Unspecified, |fix| fix.source).into(),
-            air_ground_state: air_ground_state.into(),
-            baro_altitude_ft,
-            geometric_altitude_ft: self.geometric_altitude_ft.at(now_s).or(from_difference),
-            last_position: self.last_position(now_s),
-            ground_speed_kt: self.ground_speed_kt.at(now_s),
-            track_deg: self.track_deg.at(now_s),
-            baro_vertical_rate_fpm: self.baro_vertical_rate_fpm.at(now_s),
-            geometric_vertical_rate_fpm: self.geometric_vertical_rate_fpm.at(now_s),
-            indicated_airspeed_kt: self.indicated_airspeed_kt.at(now_s),
-            true_airspeed_kt: self.true_airspeed_kt.at(now_s),
-            mach: self.mach.at(now_s),
-            magnetic_heading_deg: self.magnetic_heading_deg.at(now_s),
-            target_state: self.target_state.at(now_s),
-            resolution_advisory: self.resolution_advisory.within(ADVISORY_S, now_s),
-            quality: Some(quality).filter(|quality| *quality != Quality::default()),
-            meteo: Some(meteo).filter(|meteo| *meteo != Meteo::default()),
             reception: Some(Reception {
-                messages: Some(self.messages),
+                messages: self.messages,
                 rssi_dbfs: self.rssi_dbfs(),
-                seen_s: Some(now_s - self.seen_s),
-                seen_pos_s: self.fix.age_s(now_s),
+                heard_ms: ms(self.seen_s),
             }),
-            ..Aircraft::default()
+            identification: self.remembered.at(now_s),
+            position: self.fix.at(now_s).map(|fix| proto::Position {
+                lat_deg: fix.said.position.lat_deg,
+                lon_deg: fix.said.position.lon_deg,
+                source: fix.said.source.into(),
+                nic: fix.said.integrity.nic,
+                rc_m: fix.said.integrity.rc_m,
+                heard_ms: ms(fix.at_s),
+            }),
+            modes: target.modes(now_s),
+            advisory: self.advisory.at(now_s).map(|advisory| Advisory {
+                heard_ms: ms(advisory.at_s),
+                ..advisory.said
+            }),
+            mode_a_code: self.mode_a_code.at(now_s).and_then(Heard::int),
+            emergency: self
+                .emergency_priority_status
+                .at(now_s)
+                .map(|status| Emergency {
+                    status: status.said.into(),
+                    heard_ms: ms(status.at_s),
+                }),
+            ident: self.ident.at(now_s).map(Heard::flag),
+            on_ground: on_ground.map(Heard::flag),
+            baro_altitude_ft: baro_altitude_ft.and_then(Heard::int),
+            geometric_altitude_ft: self
+                .geometric_altitude(baro_altitude_ft, now_s)
+                .and_then(Heard::int),
+            ground_speed_kt: self.ground_speed_kt.at(now_s).map(Heard::real),
+            track_deg: self.track_deg.at(now_s).map(Heard::real),
+            baro_vertical_rate_fpm: self.baro_vertical_rate_fpm.at(now_s).and_then(Heard::int),
+            geometric_vertical_rate_fpm: self
+                .geometric_vertical_rate_fpm
+                .at(now_s)
+                .and_then(Heard::int),
+            indicated_airspeed_kt: self.indicated_airspeed_kt.at(now_s).map(Heard::real),
+            true_airspeed_kt: self.true_airspeed_kt.at(now_s).map(Heard::real),
+            mach: self.mach.at(now_s).map(Heard::real),
+            magnetic_heading_deg: self.magnetic_heading_deg.at(now_s).map(Heard::real),
+            roll_deg: self.roll_deg.at(now_s).map(Heard::real),
+            track_rate_deg_per_s: self.track_rate_deg_per_s.at(now_s).map(Heard::real),
+            selected_altitude_mcp_ft: target
+                .selected_altitude_mcp_ft
+                .at(now_s)
+                .and_then(Heard::int),
+            selected_altitude_fms_ft: target
+                .selected_altitude_fms_ft
+                .at(now_s)
+                .and_then(Heard::int),
+            selected_heading_deg: target.selected_heading_deg.at(now_s).map(Heard::real),
+            baro_setting_hpa: target.baro_setting_hpa.at(now_s).map(Heard::real),
+            nac_p: self.nac_p.at(now_s).and_then(Heard::int),
+            wind_speed_kt: wind.map(|wind| wind.map(|wind| wind.speed_kt).real()),
+            wind_dir_deg: wind.map(|wind| wind.map(|wind| wind.from_deg).real()),
+            oat_c: self.oat_c.at(now_s).map(Heard::real),
+            tat_c: self.tat_c.at(now_s).map(Heard::real),
+            registry: None,
         }
     }
 
-    /// Where the aircraft was last placed, once that has lapsed.
-    fn last_position(&self, now_s: f64) -> Option<LastPosition> {
-        let (fix, fixed_s) = self.fix.kept.as_ref()?;
-        self.fix.at(now_s).is_none().then(|| LastPosition {
-            lat_deg: fix.position.lat_deg,
-            lon_deg: fix.position.lon_deg,
-            nic: Some(fix.nic),
-            rc_m: None,
-            seen_pos_s: now_s - fixed_s,
-        })
+    /// The GNSS height at `now_s`: as reported, or worked out from the
+    /// pressure altitude and the difference a velocity gives, whichever was
+    /// heard later; the reported one when heard together.
+    fn geometric_altitude(&self, baro: Option<Heard<i32>>, now_s: f64) -> Option<Heard<i32>> {
+        let reported = self.geometric_altitude_ft.at(now_s);
+        let difference = self.geometric_minus_baro_ft.at(now_s);
+        let worked_out = baro.zip(difference).map(|(baro, difference)| {
+            exact(baro.said + difference.said, baro.at_s.min(difference.at_s))
+        });
+        [worked_out, reported]
+            .into_iter()
+            .flatten()
+            .max_by(|a, b| a.at_s.total_cmp(&b.at_s))
     }
 
     /// The mean power of the last messages, in dB against full scale.
@@ -628,15 +804,14 @@ mod tests {
     use crate::bits::Bits;
     use crate::cpr;
     use crate::field::{
-        AirbornePosition, Airspeed, Field, Identification, OperationalStatus, RaBroadcast, Status,
-        SurfacePosition, TargetStateAndStatus, Velocity,
+        AirbornePosition, Airspeed, Field, Identification, ModesReported, OperationalStatus,
+        RaBroadcast, Status, SurfacePosition, TargetState, TargetStateAndStatus, Velocity,
     };
     use crate::message::{Reply, Report, Trust, squitter};
     use crate::position::Position;
     use crate::proto::{
-        Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Quality, Reception, ResolutionAdvisory, Snapshot, Source, TargetState,
-        resolution_advisory::Advisory,
+        self, Address, AddressType, Advisory, Aircraft, EmergencyPriorityStatus, EmitterCategory,
+        Flag, Int, Modes, Real, Reception, Snapshot, Source, advisory::Resolution, reported,
     };
     use crate::register::{HeadingAndSpeed, Register, SelectedVerticalIntention, TrackAndTurn};
 
@@ -684,12 +859,16 @@ mod tests {
     }
 
     fn velocity(ground_speed_kt: f64, track_deg: f64) -> Report {
+        velocity_at(ground_speed_kt, track_deg, -1216)
+    }
+
+    fn velocity_at(ground_speed_kt: f64, track_deg: f64, baro_vertical_rate_fpm: i32) -> Report {
         Report::Velocity(Velocity {
             ground_speed_kt: Some(ground_speed_kt),
             track_deg: Some(track_deg),
             airspeed: None,
             magnetic_heading_deg: None,
-            baro_vertical_rate_fpm: Some(-1216),
+            baro_vertical_rate_fpm: Some(baro_vertical_rate_fpm),
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
         })
@@ -761,14 +940,35 @@ mod tests {
         traffic
     }
 
-    /// Where the aircraft is known to be.
-    fn place(known: &Aircraft) -> Option<Position> {
-        let (lat_deg, lon_deg) = known.lat_deg.zip(known.lon_deg)?;
-        Some(Position { lat_deg, lon_deg })
+    fn is_at(known: &Aircraft, at: Position) -> bool {
+        known
+            .place()
+            .is_some_and(|place| place.distance_nm(at) < 0.01)
     }
 
-    fn is_at(known: &Aircraft, at: Position) -> bool {
-        place(known).is_some_and(|place| place.distance_nm(at) < 0.01)
+    fn category(known: &Aircraft) -> Option<EmitterCategory> {
+        let identification = known.identification.as_ref()?;
+        EmitterCategory::try_from(identification.emitter_category?).ok()
+    }
+
+    /// The target state: the altitudes, the heading and the setting.
+    fn selected(known: &Aircraft) -> (Option<i32>, Option<i32>, Option<f64>, Option<f64>) {
+        (
+            reported(known.selected_altitude_mcp_ft),
+            reported(known.selected_altitude_fms_ft),
+            reported(known.selected_heading_deg),
+            reported(known.baro_setting_hpa),
+        )
+    }
+
+    /// What is derived: the wind's direction and speed, and the temperatures.
+    fn derived(known: &Aircraft) -> [Option<f64>; 4] {
+        [
+            reported(known.wind_dir_deg),
+            reported(known.wind_speed_kt),
+            reported(known.oat_c),
+            reported(known.tat_c),
+        ]
     }
 
     /// The traffic after each report from the made-up address, one second apart from 100 s on.
@@ -788,7 +988,7 @@ mod tests {
     }
 
     #[test]
-    fn aircraft_is_known_by_what_its_messages_said() {
+    fn aircraft_is_known_by_what_its_messages_said_and_when() {
         // Arrange
         let mut traffic = Traffic::new(SITE);
         traffic.take(&said(identification("TEST01")), 100.0);
@@ -798,25 +998,53 @@ mod tests {
 
         // Assert
         let expected = Snapshot {
-            now_s: 103.0,
+            now_ms: 103_000,
             messages: 2,
             aircraft: vec![Aircraft {
                 address: Some(icao(ADDRESS)),
-                identification: Some("TEST01".into()),
-                emitter_category: Some(EmitterCategory::A3Large.into()),
-                ground_speed_kt: Some(290.0),
-                track_deg: Some(235.0),
-                baro_vertical_rate_fpm: Some(-1216),
                 reception: Some(Reception {
-                    messages: Some(2),
+                    messages: 2,
                     rssi_dbfs: Some(RSSI_DBFS),
-                    seen_s: Some(2.0),
-                    seen_pos_s: None,
+                    heard_ms: 101_000,
+                }),
+                identification: Some(proto::Identification {
+                    callsign: Some("TEST01".into()),
+                    emitter_category: Some(EmitterCategory::A3Large.into()),
+                    heard_ms: 100_000,
+                }),
+                ground_speed_kt: Some(Real {
+                    value: 290.0,
+                    heard_ms: 101_000,
+                }),
+                track_deg: Some(Real {
+                    value: 235.0,
+                    heard_ms: 101_000,
+                }),
+                baro_vertical_rate_fpm: Some(Int {
+                    value: -1216,
+                    heard_ms: 101_000,
                 }),
                 ..Aircraft::default()
             }],
         };
         assert_eq!(traffic.snapshot(103.0), expected);
+    }
+
+    #[test]
+    fn report_keeps_its_instant_from_one_snapshot_to_the_next() {
+        // Arrange
+        let mut traffic = after([identification("TEST01"), velocity(290.0, 235.0)]);
+
+        // Act
+        let carried =
+            [103.0, 130.0].map(|now_s| traffic.snapshot(now_s).aircraft.remove(0).ground_speed_kt);
+
+        // Assert
+        let heard = Some(Real {
+            value: 290.0,
+            heard_ms: 101_000,
+        });
+        assert_eq!(carried, [heard, heard]);
     }
 
     #[test]
@@ -839,11 +1067,7 @@ mod tests {
 
         // Assert
         let snapshot = traffic.snapshot(100.0);
-        let callsigns: Vec<_> = snapshot
-            .aircraft
-            .iter()
-            .map(|known| known.identification.as_deref())
-            .collect();
+        let callsigns: Vec<_> = snapshot.aircraft.iter().map(Aircraft::callsign).collect();
         assert_eq!((snapshot.messages, callsigns), (2, vec![Some("TEST01")]));
     }
 
@@ -900,7 +1124,7 @@ mod tests {
         let known: Vec<_> = snapshot
             .aircraft
             .iter()
-            .map(|a| (a.address, a.baro_altitude_ft))
+            .map(|a| (a.address, reported(a.baro_altitude_ft)))
             .collect();
         assert_eq!(known, [(Some(icao(ADDRESS)), Some(2500))]);
         assert_eq!(snapshot.messages, 2);
@@ -933,11 +1157,36 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(known.identification.as_deref(), Some("TEST01"));
-        assert_eq!(known.emitter_category(), EmitterCategory::A5Heavy);
-        assert_eq!(known.ground_speed_kt, Some(300.0));
-        assert_eq!(known.track_deg, Some(240.0));
-        assert_eq!(known.baro_vertical_rate_fpm, Some(-1216));
+        assert_eq!(known.callsign(), Some("TEST01"));
+        assert_eq!(category(&known), Some(EmitterCategory::A5Heavy));
+        assert_eq!(reported(known.ground_speed_kt), Some(300.0));
+        assert_eq!(reported(known.track_deg), Some(240.0));
+        assert_eq!(reported(known.baro_vertical_rate_fpm), Some(-1216));
+    }
+
+    #[test]
+    fn identification_is_heard_when_the_callsign_or_the_category_was_last() {
+        // Arrange: the message at 100 s, then the register with another callsign at 105 s
+        let messages = [
+            (said(identification("TEST01")), 100.0),
+            (
+                said(answered(&Register::Identification("TEST02".into()))),
+                105.0,
+            ),
+        ];
+
+        let mut traffic = hearing(messages);
+
+        // Act
+        let known = traffic.snapshot(106.0).aircraft.remove(0);
+
+        // Assert
+        let expected = proto::Identification {
+            callsign: Some("TEST02".into()),
+            emitter_category: Some(EmitterCategory::A3Large.into()),
+            heard_ms: 105_000,
+        };
+        assert_eq!(known.identification, Some(expected));
     }
 
     #[test]
@@ -958,8 +1207,8 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(known.baro_vertical_rate_fpm, Some(-1216));
-        assert_eq!(known.geometric_vertical_rate_fpm, Some(-832));
+        assert_eq!(reported(known.baro_vertical_rate_fpm), Some(-1216));
+        assert_eq!(reported(known.geometric_vertical_rate_fpm), Some(-832));
     }
 
     #[test]
@@ -988,7 +1237,12 @@ mod tests {
         let known = reports.map(|reports| known(after(reports)));
 
         // Assert
-        let altitudes = known.map(|a| (a.baro_altitude_ft, a.geometric_altitude_ft));
+        let altitudes = known.map(|a| {
+            (
+                reported(a.baro_altitude_ft),
+                reported(a.geometric_altitude_ft),
+            )
+        });
         assert_eq!(
             altitudes,
             [(Some(2525), None), (Some(2550), None), (None, Some(2650))]
@@ -1011,10 +1265,14 @@ mod tests {
         // Act
         let traffic = after([higher, altitude(38_000, None)]);
 
-        // Assert
+        // Assert: heard with the difference, the older of the two
         let known = known(traffic);
-        assert_eq!(known.baro_altitude_ft, Some(38_000));
-        assert_eq!(known.geometric_altitude_ft, Some(38_550));
+        assert_eq!(reported(known.baro_altitude_ft), Some(38_000));
+        let height = Int {
+            value: 38_550,
+            heard_ms: 100_000,
+        };
+        assert_eq!(known.geometric_altitude_ft, Some(height));
     }
 
     #[test]
@@ -1029,12 +1287,8 @@ mod tests {
         let known = reports.map(|reports| known(after(reports)));
 
         // Assert
-        let states = known.map(|a| (a.air_ground_state(), a.baro_altitude_ft));
-        let expected = [
-            (AirGroundState::OnGround, None),
-            (AirGroundState::Unspecified, Some(25)),
-        ];
-        assert_eq!(states, expected);
+        let states = known.map(|a| (reported(a.on_ground), reported(a.baro_altitude_ft)));
+        assert_eq!(states, [(Some(true), None), (Some(false), Some(25))]);
     }
 
     #[test]
@@ -1052,8 +1306,7 @@ mod tests {
         let known = reports.map(|report| known(after([identification("TEST01"), report])));
 
         // Assert
-        let states = known.map(|a| a.air_ground_state());
-        assert_eq!(states, [AirGroundState::OnGround; 2]);
+        assert_eq!(known.map(|a| reported(a.on_ground)), [Some(true); 2]);
     }
 
     #[test]
@@ -1077,11 +1330,17 @@ mod tests {
         let known = reports.map(|reports| known(after(reports)));
 
         // Assert
-        let statuses = known.map(|a| (a.mode_a_code, a.emergency_priority_status()));
+        let statuses = known.map(|a| (reported(a.mode_a_code), a.emergency.map(|e| e.status())));
         let expected = [
-            (Some(0o7700), EmergencyPriorityStatus::GeneralEmergency),
-            (Some(0o7700), EmergencyPriorityStatus::NoEmergency),
-            (Some(0o2431), EmergencyPriorityStatus::GeneralEmergency),
+            (
+                Some(0o7700),
+                Some(EmergencyPriorityStatus::GeneralEmergency),
+            ),
+            (Some(0o7700), Some(EmergencyPriorityStatus::NoEmergency)),
+            (
+                Some(0o2431),
+                Some(EmergencyPriorityStatus::GeneralEmergency),
+            ),
         ];
         assert_eq!(statuses, expected);
     }
@@ -1107,8 +1366,8 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(known.indicated_airspeed_kt, Some(250.0));
-        assert_eq!(known.true_airspeed_kt, Some(375.0));
+        assert_eq!(reported(known.indicated_airspeed_kt), Some(250.0));
+        assert_eq!(reported(known.true_airspeed_kt), Some(375.0));
     }
 
     #[test]
@@ -1142,12 +1401,10 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!(known.target_state, Some(target));
-        let accuracy = Quality {
-            nic: None,
-            nac_p: Some(9),
-        };
-        assert_eq!(known.quality, Some(accuracy));
+        assert_eq!(selected(&known), (Some(6000), None, None, Some(1013.6)));
+        assert_eq!(known.modes, None);
+        assert_eq!(reported(known.nac_p), Some(9));
+        assert_eq!(known.position, None);
     }
 
     #[test]
@@ -1190,7 +1447,7 @@ mod tests {
         // Assert
         let reception = known(traffic).reception;
         assert_eq!(reception.and_then(|r| r.rssi_dbfs), None);
-        assert_eq!(reception.and_then(|r| r.messages), Some(2));
+        assert_eq!(reception.map(|r| r.messages), Some(2));
     }
 
     #[test]
@@ -1204,12 +1461,15 @@ mod tests {
         // Act
         let traffic = hearing(messages);
 
-        // Assert
+        // Assert: with the integrity of type code 11, heard with the pair's second
         let known = known(traffic);
-        assert!(is_at(&known, NORTH), "{:?}", place(&known));
-        assert_eq!(known.position_source(), Source::Unspecified);
-        assert_eq!(known.quality.and_then(|quality| quality.nic), Some(8));
-        assert_eq!(known.reception.and_then(|r| r.seen_pos_s), Some(9.0));
+        assert!(is_at(&known, NORTH), "{:?}", known.place());
+        let position = known.position.expect("placed");
+        assert_eq!(position.source(), Source::Unspecified);
+        assert_eq!(
+            (position.nic, position.rc_m, position.heard_ms),
+            (8, Some(186), 101_000)
+        );
     }
 
     #[test]
@@ -1224,9 +1484,7 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        let known = known(traffic);
-        assert_eq!(place(&known), None);
-        assert_eq!(known.reception.and_then(|r| r.seen_pos_s), None);
+        assert_eq!(known(traffic).position, None);
     }
 
     #[test]
@@ -1241,7 +1499,7 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        assert_eq!(place(&known(traffic)), None);
+        assert_eq!(known(traffic).place(), None);
     }
 
     #[test]
@@ -1257,8 +1515,8 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert!(is_at(&known, FURTHER), "{:?}", place(&known));
-        assert_eq!(known.reception.and_then(|r| r.seen_pos_s), Some(5.0));
+        assert!(is_at(&known, FURTHER), "{:?}", known.place());
+        assert_eq!(known.position.map(|p| p.heard_ms), Some(105_000));
     }
 
     #[test]
@@ -1274,7 +1532,7 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert!(!is_at(&known, FURTHER), "{:?}", place(&known));
+        assert!(!is_at(&known, FURTHER), "{:?}", known.place());
     }
 
     #[test]
@@ -1290,7 +1548,7 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        assert_eq!(place(&known(traffic)), None);
+        assert_eq!(known(traffic).place(), None);
     }
 
     #[test]
@@ -1310,10 +1568,10 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert!(is_at(&known, apron), "{:?}", place(&known));
-        assert_eq!(known.air_ground_state(), AirGroundState::OnGround);
-        assert_eq!(known.ground_speed_kt, Some(18.0));
-        assert_eq!(known.track_deg, Some(340.3125));
+        assert!(is_at(&known, apron), "{:?}", known.place());
+        assert_eq!(reported(known.on_ground), Some(true));
+        assert_eq!(reported(known.ground_speed_kt), Some(18.0));
+        assert_eq!(reported(known.track_deg), Some(340.3125));
     }
 
     #[test]
@@ -1328,10 +1586,7 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        assert_eq!(
-            known(traffic).air_ground_state(),
-            AirGroundState::Unspecified
-        );
+        assert_eq!(reported(known(traffic).on_ground), Some(false));
     }
 
     #[test]
@@ -1349,7 +1604,8 @@ mod tests {
         ]);
 
         // Assert
-        assert_eq!(known(traffic).position_source(), Source::Mlat);
+        let source = known(traffic).position.map(|p| p.source());
+        assert_eq!(source, Some(Source::Mlat));
     }
 
     #[test]
@@ -1379,11 +1635,10 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert
-        let quality = Quality {
-            nic: Some(9),
-            nac_p: Some(10),
-        };
-        assert_eq!(known(traffic).quality, Some(quality));
+        let known = known(traffic);
+        let position = known.position.expect("placed");
+        assert_eq!((position.nic, position.rc_m), (9, Some(75)));
+        assert_eq!(reported(known.nac_p), Some(10));
     }
 
     #[test]
@@ -1398,11 +1653,9 @@ mod tests {
         let traffic = hearing(messages);
 
         // Assert: type code 11 stands for an accuracy category of 8
-        let quality = Quality {
-            nic: Some(8),
-            nac_p: Some(8),
-        };
-        assert_eq!(known(traffic).quality, Some(quality));
+        let known = known(traffic);
+        let nic = known.position.map(|p| p.nic);
+        assert_eq!((nic, reported(known.nac_p)), (Some(8), Some(8)));
     }
 
     #[test]
@@ -1452,9 +1705,9 @@ mod tests {
         // Assert: all else starts anew
         assert_eq!(forgetting.aircraft, vec![]);
         let known = snapshot.aircraft.remove(0);
-        assert_eq!(known.identification.as_deref(), Some("TEST01"));
-        assert_eq!(known.emitter_category(), EmitterCategory::A3Large);
-        assert_eq!(known.reception.and_then(|r| r.messages), Some(2));
+        assert_eq!(known.callsign(), Some("TEST01"));
+        assert_eq!(category(&known), Some(EmitterCategory::A3Large));
+        assert_eq!(known.reception.map(|r| r.messages), Some(2));
     }
 
     #[test]
@@ -1487,7 +1740,7 @@ mod tests {
 
         // Assert
         let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
-        let said = known.map(|a| (a.mode_a_code, a.ground_speed_kt));
+        let said = known.map(|a| (reported(a.mode_a_code), reported(a.ground_speed_kt)));
         assert_eq!(said, [(None, Some(290.0)), (None, None)]);
     }
 
@@ -1504,13 +1757,13 @@ mod tests {
 
         // Assert
         let known = snapshots.map(|mut snapshot| snapshot.aircraft.remove(0));
-        let kept = known.map(|a| (a.identification, a.emitter_category));
-        let said = (Some("TEST01".into()), Some(EmitterCategory::A3Large.into()));
+        let kept = known.map(|a| (a.callsign().map(String::from), category(&a)));
+        let said = (Some("TEST01".into()), Some(EmitterCategory::A3Large));
         assert_eq!(kept, [said, (None, None)]);
     }
 
     #[test]
-    fn position_not_renewed_for_a_minute_becomes_the_last_position() {
+    fn position_not_renewed_for_a_minute_is_gone_while_the_aircraft_is_listed() {
         // Arrange
         let mut traffic = hearing([
             (airborne(NORTH, false), 100.0),
@@ -1523,48 +1776,32 @@ mod tests {
 
         // Assert
         let known = snapshot.aircraft.remove(0);
-        assert_eq!(place(&known), None);
-        assert_eq!(known.position_source(), Source::Unspecified);
-        assert_eq!(known.quality.and_then(|quality| quality.nic), None);
-        assert_eq!(known.reception.and_then(|r| r.seen_pos_s), None);
-        let last = known.last_position.expect("kept");
-        let at = Position {
-            lat_deg: last.lat_deg,
-            lon_deg: last.lon_deg,
-        };
-        assert!(at.distance_nm(NORTH) < 0.01, "{at:?}");
-        assert_eq!((last.nic, last.seen_pos_s), (Some(8), 65.0));
+        assert_eq!(known.position, None);
     }
 
     #[test]
-    fn position_that_is_current_is_not_the_last_position() {
-        // Arrange
-        let messages = [
-            (airborne(NORTH, false), 100.0),
-            (airborne(NORTH, true), 101.0),
-        ];
-
-        // Act
-        let traffic = hearing(messages);
-
-        // Assert
-        assert_eq!(known(traffic).last_position, None);
-    }
-
-    #[test]
-    fn ident_is_shown_for_the_seconds_the_transponder_sends_it() {
-        // Arrange: one reply with the identification pulse, then nothing
+    fn ident_is_carried_as_last_reported_until_it_lapses() {
+        // Arrange: one reply with the identification pulse, then nothing of it
         let identing = Report::Reply(Reply {
             ident: Some(true),
             ..Reply::default()
         });
-        let mut traffic = hearing([(said(here()), 99.0), (said(identing), 100.0)]);
+        let mut traffic = hearing([
+            (said(here()), 99.0),
+            (said(identing), 100.0),
+            (said(here()), 130.0),
+        ]);
 
-        // Act: within 18 s of it, and at 18 s
-        let shown = [117.9, 118.0].map(|now_s| traffic.snapshot(now_s).aircraft.remove(0).ident);
+        // Act: within 18 s of it, at 18 s, and a minute after
+        let carried =
+            [117.9, 118.0, 160.0].map(|now_s| traffic.snapshot(now_s).aircraft.remove(0).ident);
 
-        // Assert
-        assert_eq!(shown, [true, false]);
+        // Assert: how long it is shown for is the scope's to say
+        let identing = Some(Flag {
+            value: true,
+            heard_ms: 100_000,
+        });
+        assert_eq!(carried, [identing, identing, None]);
     }
 
     #[test]
@@ -1581,7 +1818,7 @@ mod tests {
         let traffic = after([identing(true), identing(false)]);
 
         // Assert
-        assert!(!known(traffic).ident);
+        assert_eq!(reported(known(traffic).ident), Some(false));
     }
 
     #[test]
@@ -1601,22 +1838,46 @@ mod tests {
         let traffic = after([through_the_air.clone(), through_the_air]);
 
         // Assert
-        assert_eq!(known(traffic).magnetic_heading_deg, Some(243.984_375));
+        assert_eq!(
+            reported(known(traffic).magnetic_heading_deg),
+            Some(243.984_375)
+        );
+    }
+
+    #[test]
+    fn roll_and_track_rate_come_from_the_track_and_turn_report() {
+        // Arrange: "The 1090 Megahertz Riddle", banked left and turning left
+        let report = Register::TrackAndTurn(TrackAndTurn {
+            roll_deg: Some(-9.667_968_75),
+            track_deg: Some(140.273_437_5),
+            ground_speed_kt: Some(476.0),
+            track_rate_deg_per_s: Some(-0.406_25),
+            true_airspeed_kt: Some(466.0),
+        });
+
+        // Act
+        let traffic = after([here(), answered(&report)]);
+
+        // Assert
+        let known = known(traffic);
+        assert_eq!(reported(known.roll_deg), Some(-9.667_968_75));
+        assert_eq!(reported(known.track_rate_deg_per_s), Some(-0.406_25));
     }
 
     #[test]
     fn advisory_comes_from_the_broadcast_and_from_the_register() {
         // Arrange: a climb broadcast, then a descent answered, then ended in a broadcast
-        let advising = |downward, terminated| ResolutionAdvisory {
+        let advising = |downward, terminated| Advisory {
             multiple_threats: false,
-            advisory: Some(Advisory {
+            resolution: Some(Resolution {
                 corrective: true,
                 downward,
                 positive: true,
-                ..Advisory::default()
+                ..Resolution::default()
             }),
             corrections: None,
             terminated,
+            ..Advisory::default()
         };
         let broadcast = |downward, terminated| {
             Report::ResolutionAdvisory(RaBroadcast {
@@ -1635,26 +1896,32 @@ mod tests {
         // Act
         let known = reports.map(|reports| known(after(reports)));
 
-        // Assert
+        // Assert: each heard with the second message
+        let heard = |advisory| {
+            Some(Advisory {
+                heard_ms: 101_000,
+                ..advisory
+            })
+        };
         let expected = [
-            Some(advising(false, false)),
-            Some(advising(true, false)),
-            Some(advising(false, true)),
+            heard(advising(false, false)),
+            heard(advising(true, false)),
+            heard(advising(false, true)),
         ];
-        assert_eq!(known.map(|a| a.resolution_advisory), expected);
+        assert_eq!(known.map(|a| a.advisory), expected);
     }
 
     #[test]
-    fn advisory_lapses_once_not_reported_for_the_terminated_period() {
+    fn advisory_is_carried_for_a_minute_like_the_rest() {
         // Arrange: an advisory broadcast at 100 s as ended
-        let ended = ResolutionAdvisory {
-            advisory: Some(Advisory {
+        let ended = Advisory {
+            resolution: Some(Resolution {
                 corrective: true,
                 positive: true,
-                ..Advisory::default()
+                ..Resolution::default()
             }),
             terminated: true,
-            ..ResolutionAdvisory::default()
+            ..Advisory::default()
         };
         let messages = [
             (said(here()), 99.0),
@@ -1662,50 +1929,50 @@ mod tests {
                 said(Report::ResolutionAdvisory(RaBroadcast { advisory: ended })),
                 100.0,
             ),
+            (said(here()), 130.0),
         ];
         let mut traffic = hearing(messages);
 
-        // Act
-        let shown = [117.9, 118.0].map(|now_s| {
-            traffic
-                .snapshot(now_s)
-                .aircraft
-                .remove(0)
-                .resolution_advisory
-        });
+        // Act: 18 s after it, and a minute after it
+        let carried =
+            [118.0, 160.0].map(|now_s| traffic.snapshot(now_s).aircraft.remove(0).advisory);
 
-        // Assert
-        assert_eq!(shown, [Some(ended), None]);
+        // Assert: how long it is shown for is the scope's to say
+        let heard = Advisory {
+            heard_ms: 100_000,
+            ..ended
+        };
+        assert_eq!(carried, [Some(heard), None]);
     }
 
     #[test]
-    fn answered_advisory_fills_in_once_the_broadcast_one_has_lapsed() {
-        // Arrange: a climb broadcast at 100 s, then a descent answered 20 s on
-        let advising = |downward| ResolutionAdvisory {
-            advisory: Some(Advisory {
+    fn answered_advisory_replaces_the_broadcast_one_at_once() {
+        // Arrange: a climb broadcast at 100 s, then a descent answered a second on
+        let advising = |downward| Advisory {
+            resolution: Some(Resolution {
                 corrective: true,
                 downward,
                 positive: true,
-                ..Advisory::default()
+                ..Resolution::default()
             }),
-            ..ResolutionAdvisory::default()
+            ..Advisory::default()
         };
         let climb = Report::ResolutionAdvisory(RaBroadcast {
             advisory: advising(false),
         });
         let descent = answered(&Register::ResolutionAdvisory(advising(true)));
-        let messages = [(said(climb), 100.0), (said(descent), 120.0)];
+        let messages = [(said(climb), 100.0), (said(descent), 101.0)];
         let mut traffic = hearing(messages);
 
         // Act
-        let shown = traffic
-            .snapshot(121.0)
-            .aircraft
-            .remove(0)
-            .resolution_advisory;
+        let shown = traffic.snapshot(102.0).aircraft.remove(0).advisory;
 
         // Assert
-        assert_eq!(shown, Some(advising(true)));
+        let heard = Advisory {
+            heard_ms: 101_000,
+            ..advising(true)
+        };
+        assert_eq!(shown, Some(heard));
     }
 
     #[test]
@@ -1718,8 +1985,8 @@ mod tests {
 
         // Assert: which says nothing of the category
         let known = known(traffic);
-        assert_eq!(known.identification.as_deref(), Some("TEST01"));
-        assert_eq!(known.emitter_category, None);
+        assert_eq!(known.callsign(), Some("TEST01"));
+        assert_eq!(category(&known), None);
     }
 
     #[test]
@@ -1742,25 +2009,61 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        let over_ground = (known.track_deg, known.ground_speed_kt);
+        let over_ground = (reported(known.track_deg), reported(known.ground_speed_kt));
         assert_eq!(over_ground, (Some(225.0), Some(290.0)));
         let through_air = (
-            known.true_airspeed_kt,
-            known.indicated_airspeed_kt,
-            known.mach,
+            reported(known.true_airspeed_kt),
+            reported(known.indicated_airspeed_kt),
+            reported(known.mach),
         );
         assert_eq!(through_air, (Some(300.0), Some(250.0), Some(0.78)));
         let rates = (
-            known.baro_vertical_rate_fpm,
-            known.geometric_vertical_rate_fpm,
+            reported(known.baro_vertical_rate_fpm),
+            reported(known.geometric_vertical_rate_fpm),
         );
         assert_eq!(rates, (Some(-1216), Some(-1856)));
     }
 
     #[test]
-    fn broadcast_wins_over_the_register_while_it_is_current() {
-        // Arrange: the velocity broadcast before the report, and after it
-        let report = answered(&track_and_turn(240.0, 300.0, 310.0));
+    fn newest_report_wins_between_reports_of_one_step() {
+        // Arrange: the airspeed from the velocity and from the heading and
+        // speed report, both in steps of a knot, in either order
+        let through_the_air = Report::Velocity(Velocity {
+            ground_speed_kt: None,
+            track_deg: None,
+            airspeed: Some(Airspeed::Indicated(250.0)),
+            magnetic_heading_deg: None,
+            baro_vertical_rate_fpm: None,
+            geometric_vertical_rate_fpm: None,
+            geometric_minus_baro_ft: None,
+        });
+        let report = answered(&Register::HeadingAndSpeed(HeadingAndSpeed {
+            magnetic_heading_deg: Some(270.0),
+            indicated_airspeed_kt: Some(255.0),
+            mach: Some(0.78),
+            baro_vertical_rate_fpm: Some(-1216),
+            inertial_vertical_rate_fpm: Some(1856),
+        }));
+        let reports = [
+            vec![through_the_air.clone(), report.clone()],
+            vec![report, through_the_air],
+        ];
+
+        // Act
+        let known = reports.map(|reports| known(after(reports)));
+
+        // Assert
+        let read = known.map(|a| reported(a.indicated_airspeed_kt));
+        assert_eq!(read, [Some(255.0), Some(250.0)]);
+    }
+
+    #[test]
+    fn newest_report_wins_between_the_broadcast_and_the_register() {
+        // Arrange: the velocity broadcast before the track and turn report,
+        // and after it, the two further apart than their steps: the speed
+        // in steps of a knot against the report's two, the track in steps
+        // of 0.2° at that speed against the report's 0.18°
+        let report = answered(&track_and_turn(236.25, 300.0, 310.0));
         let reports = [
             vec![velocity(290.0, 235.0), report.clone()],
             vec![report, velocity(290.0, 235.0)],
@@ -1769,9 +2072,106 @@ mod tests {
         // Act
         let known = reports.map(|reports| known(after(reports)));
 
-        // Assert: the airspeed, which only the report says, fills in either way
-        let read = known.map(|a| (a.ground_speed_kt, a.track_deg, a.true_airspeed_kt));
-        assert_eq!(read, [(Some(290.0), Some(235.0), Some(310.0)); 2]);
+        // Assert: the airspeed, which only the report says, stays either way
+        let read = known.map(|a| {
+            (
+                reported(a.ground_speed_kt),
+                reported(a.track_deg),
+                reported(a.true_airspeed_kt),
+            )
+        });
+        let expected = [
+            (Some(300.0), Some(236.25), Some(310.0)),
+            (Some(290.0), Some(235.0), Some(310.0)),
+        ];
+        assert_eq!(read, expected);
+    }
+
+    /// The vertical rate of -1216 fpm in steps of 64 fpm from the velocity
+    /// at 100 s, of -1184 fpm in steps of 32 fpm from the heading and speed
+    /// report at 101 s, then from the velocity again at each of the seconds,
+    /// at the rate it says then.
+    fn rated_at(again: impl IntoIterator<Item = (f64, i32)>) -> Traffic {
+        let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
+            magnetic_heading_deg: Some(240.0),
+            indicated_airspeed_kt: Some(250.0),
+            mach: Some(0.78),
+            baro_vertical_rate_fpm: Some(-1184),
+            inertial_vertical_rate_fpm: Some(-1184),
+        });
+        let again = again
+            .into_iter()
+            .map(|(now_s, rate_fpm)| (said(velocity_at(290.0, 235.0, rate_fpm)), now_s));
+        hearing(
+            [
+                (said(velocity(290.0, 235.0)), 100.0),
+                (said(answered(&heading_and_speed)), 101.0),
+            ]
+            .into_iter()
+            .chain(again),
+        )
+    }
+
+    #[test]
+    fn coarser_report_that_repeats_a_finer_one_within_rounding_does_not_replace_it() {
+        // Arrange: the velocity again a second after the report, saying the
+        // same within its 64 fpm
+        let mut traffic = rated_at([(102.0, -1216)]);
+
+        // Act
+        let carried = traffic
+            .snapshot(103.0)
+            .aircraft
+            .remove(0)
+            .baro_vertical_rate_fpm;
+
+        // Assert
+        let finer = Int {
+            value: -1184,
+            heard_ms: 101_000,
+        };
+        assert_eq!(carried, Some(finer));
+    }
+
+    #[test]
+    fn coarser_report_that_disagrees_with_a_finer_one_replaces_it_at_once() {
+        // Arrange: the velocity again a second after the report, levelled off
+        let mut traffic = rated_at([(102.0, 0)]);
+
+        // Act
+        let carried = traffic
+            .snapshot(103.0)
+            .aircraft
+            .remove(0)
+            .baro_vertical_rate_fpm;
+
+        // Assert
+        let levelled = Int {
+            value: 0,
+            heard_ms: 102_000,
+        };
+        assert_eq!(carried, Some(levelled));
+    }
+
+    #[test]
+    fn coarser_report_replaces_a_finer_one_once_the_sweeps_have_passed() {
+        // Arrange: the velocity again within the sweeps, and beyond them,
+        // saying the same within its 64 fpm each time
+        let mut traffic = rated_at([(102.0, -1216), (117.0, -1216)]);
+
+        // Act
+        let carried = traffic
+            .snapshot(118.0)
+            .aircraft
+            .remove(0)
+            .baro_vertical_rate_fpm;
+
+        // Assert
+        let coarser = Int {
+            value: -1216,
+            heard_ms: 117_000,
+        };
+        assert_eq!(carried, Some(coarser));
     }
 
     #[test]
@@ -1788,13 +2188,13 @@ mod tests {
         // Assert
         let known = traffic.snapshot(171.0).aircraft.remove(0);
         assert_eq!(
-            (known.ground_speed_kt, known.track_deg),
+            (reported(known.ground_speed_kt), reported(known.track_deg)),
             (Some(300.0), Some(270.0))
         );
     }
 
     #[test]
-    fn selected_intention_register_fills_in_the_target_state_field_by_field() {
+    fn selected_intention_register_replaces_the_target_state_field_by_field() {
         // Arrange: an aircraft that only answers with it, and one that also
         // broadcasts a target state without the barometric setting
         let intention = TargetState {
@@ -1819,15 +2219,59 @@ mod tests {
         // Act
         let known = reports.map(|reports| known(after(reports)));
 
-        // Assert: the broadcast wins the altitude, the reply fills in the setting
-        let filled_in = TargetState {
-            baro_setting_hpa: Some(1013.6),
-            ..broadcast
+        // Assert: the reply, which came last, wins the altitude and adds the
+        // setting; the heading, which it leaves out, stays
+        let expected = [
+            (Some(6000), None, None, Some(1013.6)),
+            (Some(6000), None, Some(270.0), Some(1013.6)),
+        ];
+        assert_eq!(known.map(|a| selected(&a)), expected);
+    }
+
+    #[test]
+    fn selected_intention_register_leaves_the_modes_it_does_not_carry() {
+        // Arrange: every mode engaged in the broadcast, then the register
+        // with VNAV off
+        let engaged = Modes {
+            autopilot: true,
+            vnav: true,
+            altitude_hold: true,
+            approach: true,
+            lnav: true,
+            tcas: true,
+            ..Modes::default()
         };
-        assert_eq!(
-            known.map(|a| a.target_state),
-            [Some(intention), Some(filled_in)]
-        );
+        let broadcast = Report::TargetStateAndStatus(TargetStateAndStatus {
+            target: TargetState {
+                modes: engaged.into(),
+                ..TargetState::default()
+            },
+            nac_p: 9,
+        });
+        let intention = TargetState {
+            modes: ModesReported {
+                vnav: Some(false),
+                altitude_hold: Some(true),
+                approach: Some(true),
+                ..ModesReported::default()
+            },
+            ..TargetState::default()
+        };
+        let answered = answered(&Register::SelectedVerticalIntention(
+            SelectedVerticalIntention { target: intention },
+        ));
+
+        // Act
+        let traffic = after([broadcast, answered]);
+
+        // Assert: the reply's three as it says them, heard with it; the
+        // broadcast's others as they were
+        let expected = Modes {
+            vnav: false,
+            heard_ms: 101_000,
+            ..engaged
+        };
+        assert_eq!(known(traffic).modes, Some(expected));
     }
 
     #[test]
@@ -1845,7 +2289,10 @@ mod tests {
 
         // Assert
         let known = known(traffic);
-        assert_eq!((known.true_airspeed_kt, known.mach), (Some(228.0), None));
+        assert_eq!(
+            (reported(known.true_airspeed_kt), reported(known.mach)),
+            (Some(228.0), None)
+        );
     }
 
     #[test]
@@ -1874,14 +2321,14 @@ mod tests {
         // Assert: a tail wind of 30 kt, and the temperature that Mach 0.78
         // at 450 kt stands for, to the step the heading is sent in
         let known = traffic.snapshot(now_s + 3.0).aircraft.remove(0);
-        let meteo = known.meteo.expect("derived");
+        let [wind_dir, wind_speed, oat, tat] = derived(&known);
         let near = |value: Option<f64>, expected: f64, within: f64| {
             value.is_some_and(|value| (value - expected).abs() < within)
         };
-        assert!(near(meteo.wind_dir_deg, 270.0, 2.0), "{meteo:?}");
-        assert!(near(meteo.wind_speed_kt, 30.0, 1.0), "{meteo:?}");
-        assert!(near(meteo.oat_c, -53.96, 0.05), "{meteo:?}");
-        assert!(near(meteo.tat_c, -27.29, 0.05), "{meteo:?}");
+        assert!(near(wind_dir, 270.0, 2.0), "{known:?}");
+        assert!(near(wind_speed, 30.0, 1.0), "{known:?}");
+        assert!(near(oat, -53.96, 0.05), "{known:?}");
+        assert!(near(tat, -27.29, 0.05), "{known:?}");
     }
 
     #[test]
@@ -1910,8 +2357,8 @@ mod tests {
         let mut traffic = hearing(messages);
 
         // Assert: the temperature is derived all the same
-        let meteo = traffic.snapshot(now_s + 3.0).aircraft.remove(0).meteo;
-        let (wind, oat) = meteo.map_or((None, None), |m| (m.wind_speed_kt, m.oat_c));
+        let known = traffic.snapshot(now_s + 3.0).aircraft.remove(0);
+        let [_, wind, oat, _] = derived(&known);
         assert_eq!(wind, None);
         assert!(oat.is_some());
     }
@@ -1938,8 +2385,8 @@ mod tests {
         let mut traffic = hearing(messages);
 
         // Assert: the temperature is derived all the same
-        let meteo = traffic.snapshot(now_s + 6.0).aircraft.remove(0).meteo;
-        let (wind, oat) = meteo.map_or((None, None), |m| (m.wind_speed_kt, m.oat_c));
+        let known = traffic.snapshot(now_s + 6.0).aircraft.remove(0);
+        let [_, wind, oat, _] = derived(&known);
         assert_eq!(wind, None);
         assert!(oat.is_some());
     }
@@ -1973,10 +2420,60 @@ mod tests {
         let mut traffic = hearing(messages);
 
         // Assert: the temperature is derived all the same
-        let meteo = traffic.snapshot(now_s + 6.0).aircraft.remove(0).meteo;
-        let (wind, oat) = meteo.map_or((None, None), |m| (m.wind_speed_kt, m.oat_c));
+        let known = traffic.snapshot(now_s + 6.0).aircraft.remove(0);
+        let [_, wind, oat, _] = derived(&known);
         assert_eq!(wind, None);
         assert!(oat.is_some());
+    }
+
+    #[test]
+    fn derived_value_lapses_with_the_oldest_of_its_inputs() {
+        // Arrange: the Mach number at 100 s, the airspeed the temperature is
+        // derived from it with at 112 s
+        let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
+            mach: Some(0.78),
+            ..HeadingAndSpeed::default()
+        });
+        let messages = [
+            (said(velocity(480.0, 90.0)), 100.0),
+            (said(answered(&heading_and_speed)), 100.0),
+            (said(answered(&track_and_turn(90.0, 480.0, 450.0))), 112.0),
+        ];
+        let mut traffic = hearing(messages);
+
+        // Act: just short of a minute after the Mach number, and a minute after it
+        let derived = [159.9, 160.0].map(|now_s| {
+            let known = traffic.snapshot(now_s).aircraft.remove(0);
+            (reported(known.true_airspeed_kt), reported(known.oat_c))
+        });
+
+        // Assert: the airspeed, said later, is still known
+        let lapsed = derived.map(|(airspeed, oat)| (airspeed.is_some(), oat.is_some()));
+        assert_eq!(lapsed, [(true, true), (true, false)]);
+    }
+
+    #[test]
+    fn derived_value_is_heard_when_the_oldest_of_its_inputs_was() {
+        // Arrange: the Mach number at 100 s, the airspeed at 112 s
+        let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
+            mach: Some(0.78),
+            ..HeadingAndSpeed::default()
+        });
+        let messages = [
+            (said(velocity(480.0, 90.0)), 100.0),
+            (said(answered(&heading_and_speed)), 100.0),
+            (said(answered(&track_and_turn(90.0, 480.0, 450.0))), 112.0),
+        ];
+        let mut traffic = hearing(messages);
+
+        // Act
+        let heard = [113.0, 150.0].map(|now_s| {
+            let known = traffic.snapshot(now_s).aircraft.remove(0);
+            known.oat_c.map(|oat| oat.heard_ms)
+        });
+
+        // Assert: and keeps that instant while neither is heard again
+        assert_eq!(heard, [Some(100_000), Some(100_000)]);
     }
 
     #[test]
@@ -2002,6 +2499,6 @@ mod tests {
 
         // Assert
         let known = traffic.snapshot(now_s + 22.0).aircraft.remove(0);
-        assert_eq!(known.meteo, None);
+        assert_eq!(derived(&known), [None; 4]);
     }
 }

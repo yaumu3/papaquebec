@@ -260,7 +260,7 @@ mod tests {
     use super::{MAX_SESSIONS, Server, renewing, same_host, since};
     use crate::feed::{Published, weather};
     use bytes::Bytes;
-    use tracker::proto::{Frame, Hello, Qnh, Receiver, Snapshot, Weather, frame::Body};
+    use tracker::proto::{Frame, Hello, Qnh, Receiver, Snapshot, Weather, frame::Body, ms};
 
     const RECEIVER: Receiver = Receiver {
         lat_deg: Some(33.5844),
@@ -271,7 +271,7 @@ mod tests {
 
     fn snapshot_at(now_s: f64) -> Snapshot {
         Snapshot {
-            now_s,
+            now_ms: ms(now_s),
             ..Snapshot::default()
         }
     }
@@ -287,10 +287,10 @@ mod tests {
     }
 
     fn hello_after(since: f64) -> Body {
-        let history = [-16.0, -8.0].map(|before| snapshot_at(10.0 + before));
+        let history = [-16.0, -8.0].map(|before| snapshot_at(30.0 + before));
         let after = history
             .into_iter()
-            .filter(|snapshot| snapshot.now_s > since);
+            .filter(|snapshot| snapshot.now_ms > ms(since));
         Body::Hello(Hello {
             receiver: Some(RECEIVER),
             history: after.collect(),
@@ -299,7 +299,7 @@ mod tests {
 
     fn snapshot(now_s: f64) -> Body {
         Body::Snapshot(Snapshot {
-            now_s,
+            now_ms: ms(now_s),
             ..Snapshot::default()
         })
     }
@@ -310,7 +310,7 @@ mod tests {
             station: "RJFF".to_owned(),
             lat_deg: 33.5844,
             lon_deg: 130.4517,
-            observed_s: 10.0,
+            observed_ms: 10_000,
             qnh_in_hg: in_hg,
         }]
     }
@@ -438,7 +438,7 @@ mod tests {
     #[tokio::test]
     async fn newcomer_is_greeted_then_given_the_latest_snapshot() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
         let connection = started.connect(&started.hash()).await.expect("connects");
         let mut stream = stream_of(&connection).await.expect("opens");
@@ -447,7 +447,7 @@ mod tests {
         let frames = [next(&mut stream).await, next(&mut stream).await];
 
         // Assert
-        assert_eq!(frames, [Some(hello()), Some(snapshot(10.0))]);
+        assert_eq!(frames, [Some(hello()), Some(snapshot(30.0))]);
     }
 
     #[tokio::test]
@@ -456,7 +456,7 @@ mod tests {
         let (feed, _) = watch::channel(None);
         let started = started(&feed);
         let connection = started.connect(&started.hash()).await.expect("connects");
-        feed.send_replace(Some(at(10.0)));
+        feed.send_replace(Some(at(30.0)));
         let mut stream = stream_of(&connection).await.expect("opens");
 
         // Act
@@ -469,7 +469,7 @@ mod tests {
     #[tokio::test]
     async fn snapshots_follow_one_another_on_one_stream() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
         let connection = started.connect(&started.hash()).await.expect("connects");
         let mut stream = stream_of(&connection).await.expect("opens");
@@ -480,7 +480,7 @@ mod tests {
         ];
         assert_eq!(
             caught_up,
-            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())],
+            [Some(hello()), Some(snapshot(30.0)), Some(no_weather())],
             "precondition"
         );
         feed.send_replace(Some(at(11.0)));
@@ -495,7 +495,7 @@ mod tests {
     #[tokio::test]
     async fn newcomer_is_given_the_weather_after_the_latest_snapshot() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
         started.weather.send_replace(Some(weather(qnh(29.92))));
         let connection = started.connect(&started.hash()).await.expect("connects");
@@ -511,14 +511,14 @@ mod tests {
         // Assert
         assert_eq!(
             frames,
-            [Some(hello()), Some(snapshot(10.0)), Some(weather_of(29.92))]
+            [Some(hello()), Some(snapshot(30.0)), Some(weather_of(29.92))]
         );
     }
 
     #[tokio::test]
     async fn weather_follows_as_it_changes() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
         started.weather.send_replace(Some(weather(qnh(29.92))));
         let connection = started.connect(&started.hash()).await.expect("connects");
@@ -530,7 +530,7 @@ mod tests {
         ];
         assert_eq!(
             caught_up,
-            [Some(hello()), Some(snapshot(10.0)), Some(weather_of(29.92))],
+            [Some(hello()), Some(snapshot(30.0)), Some(weather_of(29.92))],
             "precondition"
         );
         started.weather.send_replace(Some(weather(qnh(29.95))));
@@ -545,7 +545,7 @@ mod tests {
     #[tokio::test]
     async fn snapshots_keep_coming_once_the_weather_ends() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
         let connection = started.connect(&started.hash()).await.expect("connects");
         let mut stream = stream_of(&connection).await.expect("opens");
@@ -556,7 +556,7 @@ mod tests {
         ];
         assert_eq!(
             caught_up,
-            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())],
+            [Some(hello()), Some(snapshot(30.0)), Some(no_weather())],
             "precondition"
         );
         drop(started.weather);
@@ -572,7 +572,7 @@ mod tests {
     #[tokio::test]
     async fn newcomer_before_any_weather_is_told_there_is_none() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
         let connection = started.connect(&started.hash()).await.expect("connects");
         let mut stream = stream_of(&connection).await.expect("opens");
@@ -587,14 +587,14 @@ mod tests {
         // Assert
         assert_eq!(
             frames,
-            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())]
+            [Some(hello()), Some(snapshot(30.0)), Some(no_weather())]
         );
     }
 
     #[tokio::test]
     async fn newcomer_before_any_weather_gets_it_once_it_is_told() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
         let connection = started.connect(&started.hash()).await.expect("connects");
         let mut stream = stream_of(&connection).await.expect("opens");
@@ -605,7 +605,7 @@ mod tests {
         ];
         assert_eq!(
             caught_up,
-            [Some(hello()), Some(snapshot(10.0)), Some(no_weather())],
+            [Some(hello()), Some(snapshot(30.0)), Some(no_weather())],
             "precondition"
         );
         started.weather.send_replace(Some(weather(qnh(29.92))));
@@ -721,21 +721,21 @@ mod tests {
         let connection = started.connect(&started.hash()).await.expect("connects");
         let mut stream = stream_of(&connection).await.expect("opens");
         started.server.renew().expect("renews");
-        feed.send_replace(Some(at(10.0)));
+        feed.send_replace(Some(at(30.0)));
 
         // Act
         let frames = [next(&mut stream).await, next(&mut stream).await];
 
         // Assert
-        assert_eq!(frames, [Some(hello()), Some(snapshot(10.0))]);
+        assert_eq!(frames, [Some(hello()), Some(snapshot(30.0))]);
     }
 
     #[tokio::test]
     async fn session_resumes_after_the_since_it_asks_for() {
         // Arrange
-        let (feed, _) = watch::channel(Some(at(10.0)));
+        let (feed, _) = watch::channel(Some(at(30.0)));
         let started = started(&feed);
-        let path = "/feed?since=-4.5";
+        let path = "/feed?since=15.5";
         let connection = started
             .connect_to(&started.hash(), path)
             .await
@@ -746,7 +746,7 @@ mod tests {
         let frame = next(&mut stream).await;
 
         // Assert
-        assert_eq!(frame, Some(hello_after(-4.5)));
+        assert_eq!(frame, Some(hello_after(15.5)));
     }
 
     #[test]

@@ -1,13 +1,23 @@
-//! The feed's wire contract, generated from `proto/papaquebec/feed/v1/feed.proto`.
+//! The feed's wire contract, generated from `proto/papaquebec/feed/v2/feed.proto`.
 //!
 //! The tracker keeps what it hears in these types, so the feeder sends them as they are.
 
 #[allow(clippy::pedantic)]
 mod generated {
-    include!(concat!(env!("OUT_DIR"), "/papaquebec.feed.v1.rs"));
+    include!(concat!(env!("OUT_DIR"), "/papaquebec.feed.v2.rs"));
 }
 
 pub use generated::*;
+
+use crate::position;
+
+/// An instant as the feed carries it: the seconds since the epoch as whole
+/// milliseconds, to the nearest; nothing before the epoch.
+#[must_use]
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+pub fn ms(seconds: f64) -> u64 {
+    (seconds * 1000.0).round().max(0.0) as u64
+}
 
 impl Address {
     #[must_use]
@@ -16,6 +26,62 @@ impl Address {
             value,
             r#type: r#type.into(),
         }
+    }
+}
+
+/// A value the feed carries with when it was heard.
+pub trait Reported: Copy {
+    type Value;
+
+    /// The value, without when.
+    fn reported(self) -> Self::Value;
+}
+
+impl Reported for Int {
+    type Value = i32;
+
+    fn reported(self) -> i32 {
+        self.value
+    }
+}
+
+impl Reported for Real {
+    type Value = f64;
+
+    fn reported(self) -> f64 {
+        self.value
+    }
+}
+
+impl Reported for Flag {
+    type Value = bool;
+
+    fn reported(self) -> bool {
+        self.value
+    }
+}
+
+/// What a field carries, without when; none when it carries nothing.
+#[must_use]
+pub fn reported<R: Reported>(field: Option<R>) -> Option<R::Value> {
+    field.map(Reported::reported)
+}
+
+impl Aircraft {
+    /// The callsign, when the identification carries one.
+    #[must_use]
+    pub fn callsign(&self) -> Option<&str> {
+        self.identification.as_ref()?.callsign.as_deref()
+    }
+
+    /// Where it is placed, when it is.
+    #[must_use]
+    pub fn place(&self) -> Option<position::Position> {
+        let position = self.position.as_ref()?;
+        Some(position::Position {
+            lat_deg: position.lat_deg,
+            lon_deg: position.lon_deg,
+        })
     }
 }
 
@@ -48,15 +114,50 @@ mod tests {
     use prost::Message;
 
     use super::{
-        Address, AddressType, AirGroundState, Aircraft, EmergencyPriorityStatus, EmitterCategory,
-        Frame, LastPosition, Meteo, Quality, Reception, Registry, ResolutionAdvisory, Snapshot,
-        Source, TargetState, frame::Body, resolution_advisory::Advisory, target_state::Modes,
+        Address, AddressType, Advisory, Aircraft, Emergency, EmergencyPriorityStatus,
+        EmitterCategory, Flag, Frame, Identification, Int, Modes, Position, Real, Reception,
+        Registry, Snapshot, Source,
+        advisory::{Resolution, Threat, ThreatPosition},
+        frame::Body,
+        ms,
     };
+
+    const NOW_MS: u64 = 1_700_000_000_500;
+    /// A second before the snapshot.
+    const HEARD_MS: u64 = NOW_MS - 1000;
+
+    fn int(value: i32) -> Int {
+        Int {
+            value,
+            heard_ms: HEARD_MS,
+        }
+    }
+
+    fn real(value: f64) -> Real {
+        Real {
+            value,
+            heard_ms: HEARD_MS,
+        }
+    }
+
+    fn flag(value: bool) -> Flag {
+        Flag {
+            value,
+            heard_ms: HEARD_MS,
+        }
+    }
+
+    fn emergency(status: EmergencyPriorityStatus) -> Emergency {
+        Emergency {
+            status: status.into(),
+            heard_ms: HEARD_MS,
+        }
+    }
 
     fn frame_of(aircraft: Aircraft) -> Frame {
         Frame {
             body: Some(Body::Snapshot(Snapshot {
-                now_s: 1_700_000_000.5,
+                now_ms: NOW_MS,
                 messages: 42,
                 aircraft: vec![aircraft],
             })),
@@ -68,9 +169,13 @@ mod tests {
         // Arrange
         let frame = frame_of(Aircraft {
             address: Some(Address::new(0x00d0_0001, AddressType::Icao)),
-            identification: Some("TEST01".into()),
-            baro_altitude_ft: Some(0),
-            emergency_priority_status: Some(EmergencyPriorityStatus::NoEmergency.into()),
+            identification: Some(Identification {
+                callsign: Some("TEST01".into()),
+                emitter_category: None,
+                heard_ms: HEARD_MS,
+            }),
+            baro_altitude_ft: Some(int(0)),
+            emergency: Some(emergency(EmergencyPriorityStatus::NoEmergency)),
             ..Aircraft::default()
         });
 
@@ -85,8 +190,8 @@ mod tests {
     fn zero_is_kept_apart_from_unknown() {
         // Arrange
         let reported = frame_of(Aircraft {
-            baro_altitude_ft: Some(0),
-            emergency_priority_status: Some(EmergencyPriorityStatus::NoEmergency.into()),
+            baro_altitude_ft: Some(int(0)),
+            emergency: Some(emergency(EmergencyPriorityStatus::NoEmergency)),
             ..Aircraft::default()
         });
         let unknown = frame_of(Aircraft::default());
@@ -119,73 +224,95 @@ mod tests {
         assert_eq!(actual, expected.map(|(_, code)| code));
     }
 
+    #[test]
+    fn instants_are_the_nearest_whole_milliseconds_since_the_epoch() {
+        // Arrange: half a millisecond up, down, and before the epoch
+        let seconds = [1_700_000_000.5, 1_700_000_000.000_4, 0.000_5, -1.0];
+
+        // Act
+        let instants = seconds.map(ms);
+
+        // Assert
+        assert_eq!(instants, [1_700_000_000_500, 1_700_000_000_000, 1, 0]);
+    }
+
     /// An aircraft of which the feed carries everything it can in the air.
     fn known_in_full() -> Aircraft {
         Aircraft {
             address: Some(Address::new(0x00d0_0001, AddressType::Icao)),
-            identification: Some("TEST01".into()),
-            emitter_category: Some(EmitterCategory::A3Large.into()),
-            mode_a_code: Some(0o0421),
-            emergency_priority_status: Some(EmergencyPriorityStatus::NoEmergency.into()),
-            ident: true,
-            lat_deg: Some(33.5),
-            lon_deg: Some(130.5),
-            baro_altitude_ft: Some(35_000),
-            geometric_altitude_ft: Some(35_625),
-            ground_speed_kt: Some(451.2),
-            track_deg: Some(182.9),
-            baro_vertical_rate_fpm: Some(-832),
-            geometric_vertical_rate_fpm: Some(-768),
-            indicated_airspeed_kt: Some(280.0),
-            true_airspeed_kt: Some(440.0),
-            magnetic_heading_deg: Some(176.1),
-            mach: Some(0.78),
-            target_state: Some(TargetState {
-                selected_altitude_mcp_ft: Some(6000),
-                selected_altitude_fms_ft: Some(5000),
-                selected_heading_deg: Some(210.2),
-                baro_setting_hpa: Some(1013.6),
-                modes: Some(Modes {
-                    autopilot: true,
-                    vnav: true,
-                    altitude_hold: true,
-                    approach: true,
-                    lnav: true,
-                    tcas: true,
-                }),
+            reception: Some(Reception {
+                messages: 1234,
+                rssi_dbfs: Some(-12.5),
+                heard_ms: HEARD_MS,
             }),
-            resolution_advisory: Some(ResolutionAdvisory {
+            identification: Some(Identification {
+                callsign: Some("TEST01".into()),
+                emitter_category: Some(EmitterCategory::A3Large.into()),
+                heard_ms: HEARD_MS,
+            }),
+            position: Some(Position {
+                lat_deg: 33.5,
+                lon_deg: 130.5,
+                source: Source::Unspecified.into(),
+                nic: 8,
+                rc_m: Some(186),
+                heard_ms: HEARD_MS,
+            }),
+            modes: Some(Modes {
+                autopilot: true,
+                vnav: true,
+                altitude_hold: true,
+                approach: true,
+                lnav: true,
+                tcas: true,
+                heard_ms: HEARD_MS,
+            }),
+            advisory: Some(Advisory {
                 multiple_threats: false,
-                advisory: Some(Advisory {
+                resolution: Some(Resolution {
                     corrective: true,
                     positive: true,
-                    ..Advisory::default()
+                    ..Resolution::default()
                 }),
                 corrections: None,
                 terminated: false,
+                threat: Some(Threat::ThreatPosition(ThreatPosition {
+                    altitude_ft: Some(35_000),
+                    range_nm: Some(4.5),
+                    bearing_deg: Some(117.0),
+                })),
+                heard_ms: HEARD_MS,
             }),
-            quality: Some(Quality {
-                nic: Some(8),
-                nac_p: Some(9),
-            }),
-            meteo: Some(Meteo {
-                wind_speed_kt: Some(35.0),
-                wind_dir_deg: Some(270.0),
-                oat_c: Some(-52.0),
-                tat_c: Some(-25.0),
-            }),
+            mode_a_code: Some(int(0o0421)),
+            emergency: Some(emergency(EmergencyPriorityStatus::NoEmergency)),
+            ident: Some(flag(true)),
+            on_ground: Some(flag(false)),
+            baro_altitude_ft: Some(int(35_000)),
+            geometric_altitude_ft: Some(int(35_625)),
+            ground_speed_kt: Some(real(451.2)),
+            track_deg: Some(real(182.9)),
+            baro_vertical_rate_fpm: Some(int(-832)),
+            geometric_vertical_rate_fpm: Some(int(-768)),
+            indicated_airspeed_kt: Some(real(280.0)),
+            true_airspeed_kt: Some(real(440.0)),
+            mach: Some(real(0.78)),
+            magnetic_heading_deg: Some(real(176.1)),
+            roll_deg: Some(real(-9.5)),
+            track_rate_deg_per_s: Some(real(-0.4)),
+            selected_altitude_mcp_ft: Some(int(6000)),
+            selected_altitude_fms_ft: Some(int(5000)),
+            selected_heading_deg: Some(real(210.2)),
+            baro_setting_hpa: Some(real(1013.6)),
+            nac_p: Some(int(9)),
+            wind_speed_kt: Some(real(35.0)),
+            wind_dir_deg: Some(real(270.0)),
+            oat_c: Some(real(-52.0)),
+            tat_c: Some(real(-25.0)),
             registry: Some(Registry {
                 registration: Some("TEST-01".into()),
                 type_designator: Some("B789".into()),
                 type_description: Some("TEST TYPE".into()),
             }),
-            reception: Some(Reception {
-                messages: Some(1234),
-                rssi_dbfs: Some(-12.5),
-                seen_s: Some(0.3),
-                seen_pos_s: Some(1.2),
-            }),
-            ..Aircraft::default()
         }
     }
 
@@ -193,43 +320,51 @@ mod tests {
     fn pinned_aircraft() -> Vec<Aircraft> {
         let on_the_ground = Aircraft {
             address: Some(Address::new(0x00d0_0002, AddressType::NonIcao)),
-            mode_a_code: Some(0o7700),
-            emitter_category: Some(EmitterCategory::C1SurfaceEmergencyVehicle.into()),
-            emergency_priority_status: Some(EmergencyPriorityStatus::GeneralEmergency.into()),
-            lat_deg: Some(33.25),
-            lon_deg: Some(130.25),
-            position_source: Source::Mlat.into(),
-            air_ground_state: AirGroundState::OnGround.into(),
-            target_state: Some(TargetState {
-                modes: Some(Modes::default()),
-                ..TargetState::default()
-            }),
             reception: Some(Reception {
-                seen_s: Some(0.0),
-                ..Reception::default()
+                messages: 2,
+                rssi_dbfs: None,
+                heard_ms: NOW_MS,
             }),
+            identification: Some(Identification {
+                callsign: None,
+                emitter_category: Some(EmitterCategory::C1SurfaceEmergencyVehicle.into()),
+                heard_ms: HEARD_MS,
+            }),
+            position: Some(Position {
+                lat_deg: 33.25,
+                lon_deg: 130.25,
+                source: Source::Mlat.into(),
+                nic: 0,
+                rc_m: None,
+                heard_ms: NOW_MS,
+            }),
+            modes: Some(Modes {
+                heard_ms: HEARD_MS,
+                ..Modes::default()
+            }),
+            mode_a_code: Some(int(0o7700)),
+            emergency: Some(emergency(EmergencyPriorityStatus::GeneralEmergency)),
+            on_ground: Some(flag(true)),
             ..Aircraft::default()
         };
-        let with_a_last_position = Aircraft {
+        let rebroadcast = Aircraft {
             address: Some(Address::new(0x00d0_0003, AddressType::Icao)),
-            lat_deg: Some(33.0),
-            lon_deg: Some(130.0),
-            position_source: Source::Tisb.into(),
-            baro_altitude_ft: Some(0),
-            last_position: Some(LastPosition {
-                lat_deg: 32.5,
-                lon_deg: 129.5,
-                nic: Some(8),
-                rc_m: Some(186),
-                seen_pos_s: 75.5,
+            position: Some(Position {
+                lat_deg: 33.0,
+                lon_deg: 130.0,
+                source: Source::Tisb.into(),
+                nic: 6,
+                rc_m: Some(926),
+                heard_ms: HEARD_MS,
             }),
+            baro_altitude_ft: Some(int(0)),
             ..Aircraft::default()
         };
         let bare = Aircraft {
             address: Some(Address::new(0x00d0_0004, AddressType::Icao)),
             ..Aircraft::default()
         };
-        vec![known_in_full(), on_the_ground, with_a_last_position, bare]
+        vec![known_in_full(), on_the_ground, rebroadcast, bare]
     }
 
     /// Run with `BLESS=1` to write the bytes after a deliberate change.
@@ -241,7 +376,7 @@ mod tests {
             "/../../proto/testdata/snapshot.bin"
         );
         let frame = Frame::from(Snapshot {
-            now_s: 1_700_000_000.5,
+            now_ms: NOW_MS,
             messages: 42,
             aircraft: pinned_aircraft(),
         });

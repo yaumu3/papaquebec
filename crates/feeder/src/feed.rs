@@ -6,12 +6,12 @@ use std::sync::Arc;
 use bytes::Bytes;
 use prost::Message;
 
-use tracker::proto::{Frame, Hello, Qnh, Receiver, Snapshot, Weather};
+use tracker::proto::{Frame, Hello, Qnh, Receiver, Snapshot, Weather, ms};
 
 /// How far apart the snapshots of the history are kept.
-const CADENCE_S: f64 = 8.0;
+const CADENCE_MS: u64 = 8000;
 /// The scope keeps an hour of trail and readings; a minute more fills its oldest slot.
-const RETENTION_S: f64 = 3660.0;
+const RETENTION_MS: u64 = 3_660_000;
 
 /// One snapshot every eight seconds for the last hour, each aircraft whole, so a
 /// session that joins gets the hour of trail and readings the scope shows.
@@ -27,16 +27,13 @@ impl History {
     /// Keeps the snapshot when eight seconds have passed since the last one kept,
     /// and forgets those older than the retention.
     pub(crate) fn record(&mut self, snapshot: &Snapshot) {
-        let last = self
-            .kept
-            .back()
-            .map_or(f64::NEG_INFINITY, |kept| kept.now_s);
-        if snapshot.now_s - last < CADENCE_S {
+        let last = self.kept.back().map(|kept| kept.now_ms);
+        if last.is_some_and(|last| snapshot.now_ms < last + CADENCE_MS) {
             return;
         }
         self.kept.push_back(Arc::new(snapshot.clone()));
-        let oldest = snapshot.now_s - RETENTION_S;
-        while self.kept.front().is_some_and(|kept| kept.now_s < oldest) {
+        let oldest = snapshot.now_ms.saturating_sub(RETENTION_MS);
+        while self.kept.front().is_some_and(|kept| kept.now_ms < oldest) {
             self.kept.pop_front();
         }
         self.shared = self.kept.iter().cloned().collect();
@@ -55,7 +52,7 @@ pub struct Published {
     history: Arc<[Arc<Snapshot>]>,
     /// The latest snapshot as a frame after its length, encoded once for every session.
     latest: Bytes,
-    latest_now_s: f64,
+    latest_now_ms: u64,
 }
 
 impl Published {
@@ -64,17 +61,19 @@ impl Published {
         Self {
             receiver,
             history,
-            latest_now_s: latest.now_s,
+            latest_now_ms: latest.now_ms,
             latest: framed(latest),
         }
     }
 
-    /// The frame that opens a session resuming after `since`, after its length.
-    /// Its history stops short of the latest snapshot, which follows it in full.
+    /// The frame that opens a session resuming after `since_s`, in seconds
+    /// since the epoch, after its length. Its history stops short of the
+    /// latest snapshot, which follows it in full.
     #[must_use]
-    pub fn hello(&self, since: f64) -> Bytes {
+    pub fn hello(&self, since_s: f64) -> Bytes {
+        let since = ms(since_s);
         let between = |snapshot: &&Arc<Snapshot>| {
-            since < snapshot.now_s && snapshot.now_s < self.latest_now_s
+            since < snapshot.now_ms && snapshot.now_ms < self.latest_now_ms
         };
         let after = self.history.iter().filter(between);
         let hello = Hello {
@@ -109,8 +108,8 @@ mod tests {
 
     use super::{History, Published, weather};
     use tracker::proto::{
-        Address, AirGroundState, Aircraft, Frame, Hello, Qnh, Receiver, Reception, Registry,
-        Snapshot, Source, TargetState, Weather, frame::Body,
+        Address, Aircraft, Flag, Frame, Hello, Identification, Int, Position, Qnh, Real, Receiver,
+        Reception, Registry, Snapshot, Source, Weather, frame::Body,
     };
 
     const RECEIVER: Receiver = Receiver {
@@ -118,9 +117,9 @@ mod tests {
         lon_deg: Some(130.4517),
     }; // RJFF
 
-    fn at(now_s: f64) -> Snapshot {
+    fn at(now_ms: u64) -> Snapshot {
         Snapshot {
-            now_s,
+            now_ms,
             ..Snapshot::default()
         }
     }
@@ -129,14 +128,14 @@ mod tests {
         Frame::decode_length_delimited(bytes).ok()?.body
     }
 
-    fn instants(snapshots: &[Arc<Snapshot>]) -> Vec<f64> {
-        snapshots.iter().map(|snapshot| snapshot.now_s).collect()
+    fn instants(snapshots: &[Arc<Snapshot>]) -> Vec<u64> {
+        snapshots.iter().map(|snapshot| snapshot.now_ms).collect()
     }
 
-    fn history_of(instants: impl IntoIterator<Item = f64>) -> Arc<[Arc<Snapshot>]> {
+    fn history_of(instants: impl IntoIterator<Item = u64>) -> Arc<[Arc<Snapshot>]> {
         let mut history = History::default();
-        for now_s in instants {
-            history.record(&at(now_s));
+        for now_ms in instants {
+            history.record(&at(now_ms));
         }
         history.shared()
     }
@@ -144,7 +143,8 @@ mod tests {
     #[test]
     fn hello_carries_the_receiver_and_the_history_after_since() {
         // Arrange
-        let published = Published::new(RECEIVER, history_of([10.0, 18.0, 26.0]), at(27.0));
+        let history = history_of([10_000, 18_000, 26_000]);
+        let published = Published::new(RECEIVER, history, at(27_000));
 
         // Act
         let hello = body(published.hello(18.0));
@@ -152,7 +152,7 @@ mod tests {
         // Assert
         let expected = Body::Hello(Hello {
             receiver: Some(RECEIVER),
-            history: vec![at(26.0)],
+            history: vec![at(26_000)],
         });
         assert_eq!(hello, Some(expected));
     }
@@ -160,7 +160,8 @@ mod tests {
     #[test]
     fn hello_leaves_the_latest_to_follow_in_full() {
         // Arrange
-        let published = Published::new(RECEIVER, history_of([10.0, 18.0, 26.0]), at(26.0));
+        let history = history_of([10_000, 18_000, 26_000]);
+        let published = Published::new(RECEIVER, history, at(26_000));
 
         // Act
         let hello = body(published.hello(f64::NEG_INFINITY));
@@ -168,7 +169,7 @@ mod tests {
         // Assert
         let expected = Body::Hello(Hello {
             receiver: Some(RECEIVER),
-            history: vec![at(10.0), at(18.0)],
+            history: vec![at(10_000), at(18_000)],
         });
         assert_eq!(hello, Some(expected));
     }
@@ -176,37 +177,37 @@ mod tests {
     #[test]
     fn latest_carries_the_snapshot() {
         // Arrange
-        let published = Published::new(RECEIVER, history_of([]), at(10.0));
+        let published = Published::new(RECEIVER, history_of([]), at(10_000));
 
         // Act
         let latest = body(published.latest().clone());
 
         // Assert
-        assert_eq!(latest, Some(Body::Snapshot(at(10.0))));
+        assert_eq!(latest, Some(Body::Snapshot(at(10_000))));
     }
 
     #[test]
     fn history_keeps_one_snapshot_every_eight_seconds() {
         // Arrange
-        let seconds = (0..=20).map(f64::from);
+        let seconds = (0..=20).map(|second| second * 1000);
 
         // Act
         let history = history_of(seconds);
 
         // Assert
-        assert_eq!(instants(&history), [0.0, 8.0, 16.0]);
+        assert_eq!(instants(&history), [0, 8000, 16_000]);
     }
 
     #[test]
     fn history_forgets_what_is_older_than_an_hour_and_a_minute() {
         // Arrange
-        let seconds = [0.0, 8.0, 3000.0, 3668.0];
+        let seconds = [0, 8000, 3_000_000, 3_668_000];
 
         // Act
         let history = history_of(seconds);
 
         // Assert
-        assert_eq!(instants(&history), [8.0, 3000.0, 3668.0]);
+        assert_eq!(instants(&history), [8000, 3_000_000, 3_668_000]);
     }
 
     #[test]
@@ -215,36 +216,50 @@ mod tests {
         let address = Some(Address::default());
         let positioned = Aircraft {
             address,
-            identification: Some("TEST01".into()),
-            lat_deg: Some(1.5),
-            lon_deg: Some(-2.5),
-            position_source: Source::Mlat.into(),
-            air_ground_state: AirGroundState::OnGround.into(),
-            baro_altitude_ft: Some(0),
-            ground_speed_kt: Some(12.0),
-            track_deg: Some(90.0),
-            mach: Some(0.1),
-            target_state: Some(TargetState {
-                selected_altitude_mcp_ft: Some(4000),
-                ..TargetState::default()
+            reception: Some(Reception {
+                messages: 12,
+                rssi_dbfs: Some(-3.0),
+                heard_ms: 9500,
+            }),
+            identification: Some(Identification {
+                callsign: Some("TEST01".into()),
+                emitter_category: None,
+                heard_ms: 9000,
+            }),
+            position: Some(Position {
+                lat_deg: 1.5,
+                lon_deg: -2.5,
+                source: Source::Mlat.into(),
+                nic: 8,
+                rc_m: Some(186),
+                heard_ms: 9500,
+            }),
+            on_ground: Some(Flag {
+                value: true,
+                heard_ms: 9500,
+            }),
+            ground_speed_kt: Some(Real {
+                value: 12.0,
+                heard_ms: 9500,
+            }),
+            selected_altitude_mcp_ft: Some(Int {
+                value: 4000,
+                heard_ms: 9000,
             }),
             registry: Some(Registry::default()),
-            reception: Some(Reception {
-                messages: Some(12),
-                rssi_dbfs: Some(-3.0),
-                seen_s: Some(0.5),
-                seen_pos_s: Some(0.5),
-            }),
             ..Aircraft::default()
         };
         let positionless = Aircraft {
             address,
-            baro_altitude_ft: Some(35000),
+            baro_altitude_ft: Some(Int {
+                value: 35_000,
+                heard_ms: 9500,
+            }),
             ..Aircraft::default()
         };
         let snapshot = Snapshot {
             aircraft: vec![positioned.clone(), positionless.clone()],
-            ..at(10.0)
+            ..at(10_000)
         };
         let mut history = History::default();
 
@@ -262,7 +277,7 @@ mod tests {
             station: "RJTT".to_owned(),
             lat_deg: 35.553,
             lon_deg: 139.781,
-            observed_s: 1_790_074_800.0,
+            observed_ms: 1_790_074_800_000,
             qnh_in_hg: 29.94,
         }];
 

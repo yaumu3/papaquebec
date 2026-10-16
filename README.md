@@ -239,25 +239,29 @@ flowchart LR
 
 **Data.** The receiver passes on every Mode S message it hears, in the Beast format. The tracker
 reads what each says (`message`, by ICAO Annex 10 Volume IV) and keeps what is said of each
-aircraft until it lapses (`traffic`).
+aircraft, with when it was heard, until it lapses a minute later (`traffic`).
 
 - Extended squitters, which is ADS-B: their fields by RTCA DO-260B (`field`), with the positions
-  that place the aircraft (`cpr`).
+  that place the aircraft (`cpr`), each with its integrity and the containment radius that
+  stands for.
 - Replies to radars: the altitude, the identity and the ident in every one, and in Comm-B replies
   the registers the ground asks for (`register`, by ICAO Doc 9871): the callsign, the selected
-  altitudes and QNH, track and ground speed, heading, airspeeds and Mach, and an active resolution
-  advisory.
+  altitudes and QNH, track, ground speed, roll and track rate, heading, airspeeds and Mach, and
+  an active resolution advisory with the threat it names.
   - A reply does not name its register, so each is told apart by the layout it fits and by what
     the aircraft broadcasts.
-  - A broadcast value wins over an answered one while it is current.
+  - The newest report of a value wins, whether broadcast or answered, unless it only repeats a
+    finer one of the last sweep or two within rounding.
 - Derived from them: the wind, with the magnetic heading made true by the World Magnetic Model
-  (`wmm`), and the air temperature (`air`).
+  (`wmm`), and the air temperature (`air`), each heard when the oldest of its inputs was.
 - Added from the aircraft database: the registration and type (`registry`).
 - Not read yet: what the ground rebroadcasts (TIS-B, ADS-R).
 
-Every second the feeder publishes a snapshot as protobuf (`proto/papaquebec/feed/v1/feed.proto`,
+Every second the feeder publishes a snapshot as protobuf (`proto/papaquebec/feed/v2/feed.proto`,
 named after DO-260B), which the feed worker reads into what the scope knows of an aircraft
-(`lib/aircraft.ts`), every field optional.
+(`lib/aircraft.ts`): every value with the instant it was heard, absent once never reported or
+lapsed, so the scope tells a fresh report from a held one and applies the 18 s of an ident or a
+resolution advisory itself.
 
 - Each session is one ordered stream: a hello with the receiver's position and the history since
   the snapshot the scope last took (one every eight seconds, up to an hour), then live snapshots.
@@ -266,10 +270,11 @@ named after DO-260B), which the feed worker reads into what the scope knows of a
   anew.
 - Every wait on a session has a deadline, and a missed one only means connecting again; the top
   bar tells the feed's state from the age of its data.
-- Each snapshot is a full one and the track store is rebuilt from it; liveness is the age of an
-  aircraft's last message, `seen`. Only position history and operator state (selection, block
-  bearing) persist across snapshots.
-- Live `lat/lon` draws normally, `lastPosition` draws stale, absent positions appear only in text.
+- Each snapshot is a full one and the track store is rebuilt from it; every value comes with the
+  instant it was heard, and liveness is the age of the last message. Only position history,
+  samples and operator state (selection, block bearing) persist across snapshots.
+- A position is drawn while the feed carries one, stale after 30 s; an aircraft whose position has
+  lapsed stays in the list and nowhere else.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has
 no adapter). The main thread owns all state and sends packed buffers; one draw per layer per frame,

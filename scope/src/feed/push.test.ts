@@ -4,7 +4,7 @@ import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import { sizeDelimitedEncode } from '@bufbuild/protobuf/wire';
 
 import type { FeedMessage } from './decode';
-import { FrameSchema } from './gen/papaquebec/feed/v1/feed_pb';
+import { FrameSchema } from './gen/papaquebec/feed/v2/feed_pb';
 import type { FetchLike } from './http';
 import { type FeedDown, followFeed, type PushOptions, type Transport } from './push';
 

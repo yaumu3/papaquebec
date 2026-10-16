@@ -253,9 +253,7 @@ mod tests {
     use crate::bits::published::{bytes, field};
     use crate::code::altitude_code;
     use crate::field::{Field, Identification, OperationalStatus, RaBroadcast};
-    use crate::proto::{
-        Address, AddressType, EmitterCategory, ResolutionAdvisory, resolution_advisory::Advisory,
-    };
+    use crate::proto::{Address, AddressType, Advisory, EmitterCategory, advisory::Resolution};
     use crate::register::Register;
 
     /// Made up: from a block ICAO reserves for future use.
@@ -353,9 +351,9 @@ mod tests {
             nac_p: Some(9),
         };
         let broadcast = RaBroadcast {
-            advisory: ResolutionAdvisory {
-                advisory: Some(Advisory::default()),
-                ..ResolutionAdvisory::default()
+            advisory: Advisory {
+                resolution: Some(Resolution::default()),
+                ..Advisory::default()
             },
         };
         let messages = [

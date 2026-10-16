@@ -8,9 +8,12 @@
 
 use crate::air;
 use crate::bits::Bits;
-use crate::field::{Field, Identification, advised, advisory, count, rounded};
+use crate::field::{
+    Field, Identification, ModesReported, TargetState, TargetSteps, advised, advisory, count,
+    rounded,
+};
 use crate::position::signed_bearing;
-use crate::proto::{EmitterCategory, ResolutionAdvisory, TargetState, target_state::Modes};
+use crate::proto::{Advisory, EmitterCategory};
 
 /// The envelope within which a field is taken for a track and turn report or
 /// a heading and speed one, after "The 1090 Megahertz Riddle" (BDS code
@@ -38,7 +41,7 @@ pub enum Register {
     /// Aircraft identification, register 2,0: the callsign.
     Identification(String),
     /// ACAS active resolution advisory, register 3,0.
-    ResolutionAdvisory(ResolutionAdvisory),
+    ResolutionAdvisory(Advisory),
     SelectedVerticalIntention(SelectedVerticalIntention),
     TrackAndTurn(TrackAndTurn),
     HeadingAndSpeed(HeadingAndSpeed),
@@ -163,7 +166,7 @@ fn coded(mb: Bits, code: u32) -> Option<Bits> {
 }
 
 /// The advisory of the ACAS register; none without one generated.
-fn resolution_advisory(mb: Bits) -> Option<ResolutionAdvisory> {
+fn resolution_advisory(mb: Bits) -> Option<Advisory> {
     advisory(coded(mb, 0x30)?)
 }
 
@@ -184,15 +187,18 @@ fn consistent(mb: Bits, fields: &[Gated]) -> bool {
         .all(|&(status, first, last)| mb.flag(status) || mb.get(first, last) == 0)
 }
 
-/// A bearing counted in steps of 90/512° either way from north.
+/// The step the track and the heading come in: 90/512°.
+pub const BEARING_STEP_DEG: f64 = 90.0 / 512.0;
+
+/// A bearing counted in its steps either way from north.
 fn bearing(steps: i32) -> f64 {
-    (f64::from(steps) * 90.0 / 512.0).rem_euclid(360.0)
+    (f64::from(steps) * BEARING_STEP_DEG).rem_euclid(360.0)
 }
 
 /// The status bit and the 11 bits of a bearing, as `bearing` reads them.
 fn bearing_field(bearing_deg: Option<f64>) -> Bits {
     signed(
-        bearing_deg.map(|deg| signed_bearing(deg) * 512.0 / 90.0),
+        bearing_deg.map(|deg| signed_bearing(deg) / BEARING_STEP_DEG),
         11,
     )
 }
@@ -217,6 +223,14 @@ fn signed(count_of: Option<f64>, width: u32) -> Bits {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SelectedVerticalIntention {
     pub target: TargetState,
+}
+
+impl SelectedVerticalIntention {
+    /// The steps the register comes in.
+    pub const STEPS: TargetSteps = TargetSteps {
+        altitude_ft: 16.0,
+        setting_hpa: 0.1,
+    };
 }
 
 /// The fields of the selected vertical intention: the altitudes selected on
@@ -247,11 +261,11 @@ impl Field for SelectedVerticalIntention {
             selected_heading_deg: None,
             // In steps of 0.1 hPa from 800 hPa.
             baro_setting_hpa: baro.map(|bits| f64::from(8000 + bits.get(1, 12)) / 10.0),
-            modes: modes.map(|bits| Modes {
-                vnav: bits.flag(1),
-                altitude_hold: bits.flag(2),
-                approach: bits.flag(3),
-                ..Modes::default()
+            modes: modes.map_or(ModesReported::default(), |bits| ModesReported {
+                vnav: Some(bits.flag(1)),
+                altitude_hold: Some(bits.flag(2)),
+                approach: Some(bits.flag(3)),
+                ..ModesReported::default()
             }),
         };
         (target != TargetState::default()).then_some(Self { target })
@@ -260,7 +274,8 @@ impl Field for SelectedVerticalIntention {
     fn write(&self) -> Bits {
         let target = &self.target;
         let altitude = |ft: Option<i32>| counted(ft.map(|ft| f64::from(ft) / 16.0), 12);
-        let modes = target.modes.unwrap_or_default();
+        let modes = target.modes;
+        let flag = |mode: Option<bool>| mode.unwrap_or(false);
         Bits::default()
             .then(altitude(target.selected_altitude_mcp_ft))
             .then(altitude(target.selected_altitude_fms_ft))
@@ -269,10 +284,10 @@ impl Field for SelectedVerticalIntention {
                 12,
             ))
             .put(0, 8)
-            .put_flag(target.modes.is_some())
-            .put_flag(modes.vnav)
-            .put_flag(modes.altitude_hold)
-            .put_flag(modes.approach)
+            .put_flag(modes != ModesReported::default())
+            .put_flag(flag(modes.vnav))
+            .put_flag(flag(modes.altitude_hold))
+            .put_flag(flag(modes.approach))
             // Reserved, then the source of the target altitude
             .put(0, 2 + 3)
     }
@@ -289,6 +304,11 @@ pub struct TrackAndTurn {
     /// Positive to the right.
     pub track_rate_deg_per_s: Option<f64>,
     pub true_airspeed_kt: Option<f64>,
+}
+
+impl TrackAndTurn {
+    /// The step the ground speed and the airspeed come in.
+    pub const SPEED_STEP_KT: f64 = 2.0;
 }
 
 /// The fields of the track and turn report: the roll, the track, the ground
@@ -351,6 +371,13 @@ pub struct HeadingAndSpeed {
     pub inertial_vertical_rate_fpm: Option<i32>,
 }
 
+impl HeadingAndSpeed {
+    /// The step the indicated airspeed comes in.
+    pub const AIRSPEED_STEP_KT: f64 = 1.0;
+    /// The step the vertical rates come in.
+    pub const RATE_STEP_FPM: f64 = 32.0;
+}
+
 /// The fields of the heading and speed report: the heading, the indicated
 /// airspeed, the Mach number, and the vertical rates by pressure and by inertia.
 const HEADING_AND_SPEED: [Gated; 5] = [
@@ -405,9 +432,8 @@ mod tests {
     use super::{HeadingAndSpeed, Known, Register, SelectedVerticalIntention, TrackAndTurn};
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
-    use crate::proto::{
-        ResolutionAdvisory, TargetState, resolution_advisory::Advisory, target_state::Modes,
-    };
+    use crate::field::{ModesReported, TargetState};
+    use crate::proto::{Advisory, advisory::Resolution};
 
     /// What the message field of a published Comm-B reply reads as, with
     /// nothing known of the aircraft.
@@ -455,22 +481,21 @@ mod tests {
         let read = fields.map(|mb| Register::read(mb, &Known::default()));
 
         // Assert: the complement is not carried
-        let advisory = |multiple_threats, advisory| {
-            Some(Register::ResolutionAdvisory(ResolutionAdvisory {
+        let advisory = |multiple_threats, resolution| {
+            Some(Register::ResolutionAdvisory(Advisory {
                 multiple_threats,
-                advisory: Some(advisory),
-                corrections: None,
-                terminated: false,
+                resolution: Some(resolution),
+                ..Advisory::default()
             }))
         };
         let expected = [
-            advisory(false, Advisory::default()),
+            advisory(false, Resolution::default()),
             advisory(
                 true,
-                Advisory {
+                Resolution {
                     corrective: true,
                     sense_reversal: true,
-                    ..Advisory::default()
+                    ..Resolution::default()
                 },
             ),
         ];
@@ -504,9 +529,15 @@ mod tests {
                 },
             ))
         };
+        let none_engaged = ModesReported {
+            vnav: Some(false),
+            altitude_hold: Some(false),
+            approach: Some(false),
+            ..ModesReported::default()
+        };
         let expected = [
-            selected(24_000, 1013.2, Some(Modes::default())),
-            selected(3008, 1020.0, None),
+            selected(24_000, 1013.2, none_engaged),
+            selected(3008, 1020.0, ModesReported::default()),
         ];
         assert_eq!(read, expected);
     }
@@ -605,11 +636,12 @@ mod tests {
                 selected_altitude_fms_ft: None,
                 selected_heading_deg: None,
                 baro_setting_hpa: Some(1013.6),
-                modes: Some(Modes {
-                    vnav: true,
-                    approach: true,
-                    ..Modes::default()
-                }),
+                modes: ModesReported {
+                    vnav: Some(true),
+                    altitude_hold: Some(false),
+                    approach: Some(true),
+                    ..ModesReported::default()
+                },
             }),
             intention(TargetState {
                 selected_altitude_fms_ft: Some(0),

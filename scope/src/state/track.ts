@@ -1,13 +1,12 @@
 import type { ResolutionAdvisory } from '../lib/acas';
-import type { PositionSource } from '../lib/aircraft';
+import type { Heard, PositionSource } from '../lib/aircraft';
 import type { GeoPoint } from '../lib/geo';
 
 export type Source = PositionSource;
 
-/** Where a track's position came from, in decreasing order of trust. */
+/** Where the track is: its position while the feed reports one, else nowhere. */
 export type Position =
   | { kind: 'live'; lat: number; lon: number; x: number; y: number }
-  | { kind: 'last'; lat: number; lon: number; x: number; y: number }
   | { kind: 'none' };
 
 export interface Fix {
@@ -15,7 +14,7 @@ export interface Fix {
   lon: number;
   x: number;
   y: number;
-  /** Snapshot time, seconds since epoch. */
+  /** When the position was heard, seconds since the epoch. */
   t: number;
   alt: number | 'ground' | undefined;
 }
@@ -42,7 +41,12 @@ export interface Readings {
   heading: number | undefined;
   /** In fpm: the barometric rate, or the geometric one from an aircraft that reports no other. */
   verticalRate: number | undefined;
+  /** Bank in degrees and how fast the track turns in degrees per second, both positive to the right. */
+  roll: number | undefined;
+  trackRate: number | undefined;
   nic: number | undefined;
+  /** The radius of containment the NIC stands for, in metres. */
+  rc: number | undefined;
   nacP: number | undefined;
   /** Messages heard from it since the receiver started. */
   messages: number | undefined;
@@ -65,9 +69,12 @@ export interface Readings {
   /** The engaged modes by name, e.g. autopilot, vnav, lnav. */
   navModes: string[] | undefined;
   source: Source;
+  /** Seconds since its last message, and since its last position. */
   seen: number;
   seenPos: number | undefined;
-  /** Where it was when heard: its position, or else the last one it reported. */
+  /** When each reading was last reported. */
+  heard: Heard;
+  /** Where it was when heard. */
   at: GeoPoint | undefined;
 }
 
@@ -93,9 +100,9 @@ export interface Track extends Readings {
   registration: string | undefined;
   description: string | undefined;
   emergency: string | undefined;
-  /** The crew pressed IDENT. */
+  /** The crew pressed IDENT, and the transponder still signals it. */
   ident: boolean;
-  /** The active resolution advisory, while one is reported. */
+  /** The active resolution advisory, while its report is fresh. */
   ra: ResolutionAdvisory | undefined;
   position: Position;
   history: Fix[];
