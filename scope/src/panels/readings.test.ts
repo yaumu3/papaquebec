@@ -73,6 +73,17 @@ describe('READINGS', () => {
     expect(readings).toEqual([{ v: '<0.1', unit: 'NM' }, NONE, NONE]);
   });
 
+  it('reads the category of a NIC that stands for no radius', () => {
+    // Arrange
+    const s = makeSample(1000, { nic: 6 });
+
+    // Act
+    const r = READINGS.nic.format(s);
+
+    // Assert
+    expect(r).toEqual({ v: '6' });
+  });
+
   it('reads the NACp as its position error bound, a query for NACp 0 and blank without one', () => {
     // Arrange
     const samples = [
