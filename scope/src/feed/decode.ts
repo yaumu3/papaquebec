@@ -1,4 +1,4 @@
-import type { ResolutionAdvisory } from '../lib/acas';
+import type { ResolutionAdvisory, Threat } from '../lib/acas';
 import type { AircraftReport, AircraftSnapshot, Heard, ReceiverPosition } from '../lib/aircraft';
 import type { StationReport } from '../lib/metar';
 import {
@@ -68,15 +68,31 @@ function plain<T extends { $typeName: string }>(message: T): Omit<T, '$typeName'
   return Object.fromEntries(fields) as Omit<T, '$typeName'>;
 }
 
+/** The threat as the scope reads it: the address as six hex digits, or the estimates known. */
+function threatOf(threat: NonNullable<Aircraft['advisory']>['threat']): Threat | undefined {
+  switch (threat.case) {
+    case 'threatAddress':
+      return { address: threat.value.toString(16).padStart(6, '0') };
+    case 'threatPosition': {
+      const { altitudeFt, rangeNm, bearingDeg } = threat.value;
+      return withoutUnknown({ altitude: altitudeFt, range: rangeNm, bearing: bearingDeg });
+    }
+    default:
+      return undefined;
+  }
+}
+
 /** The advisory as the scope reads it, its nested messages plain too. */
 function advisoryOf(ra: Aircraft['advisory']): ResolutionAdvisory | undefined {
   if (ra === undefined) return undefined;
   const { resolution, corrections, multipleThreats, terminated } = ra;
+  const threat = threatOf(ra.threat);
   return {
     multipleThreats,
     terminated,
     ...(resolution && { advisory: plain(resolution) }),
     ...(corrections && { corrections: plain(corrections) }),
+    ...(threat && { threat }),
   };
 }
 

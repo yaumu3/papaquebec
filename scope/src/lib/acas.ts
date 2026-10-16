@@ -26,7 +26,16 @@ export interface ResolutionAdvisory {
   };
   /** Ended, and still reported for a while. */
   terminated: boolean;
+  /** The threat, as the aircraft identifies it; absent when it gives no identity. */
+  threat?: Threat;
 }
+
+/**
+ * A threat by its address, or by where the aircraft estimates it to be: its pressure altitude
+ * in feet, its range in NM and its bearing in degrees relative to the heading, each absent
+ * without an estimate.
+ */
+export type Threat = { address: string } | { altitude?: number; range?: number; bearing?: number };
 
 /** A climb or a descent as the flags qualify it: a reversal, an increase or a crossing. */
 function qualified(

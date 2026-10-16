@@ -90,6 +90,7 @@ describe('messageOf', () => {
             altitudeCrossing: false,
             positive: true,
           },
+          threat: { altitude: 35000, range: 4.5, bearing: 117 },
         },
         position: { lat: 33.5, lon: 130.5 },
         alt: 35000,
@@ -210,6 +211,20 @@ describe('messageOf', () => {
       ['ground', 2],
       [25, 1],
     ]);
+  });
+
+  it('names the threat of an advisory by its address, the six hex digits', () => {
+    // Arrange
+    const advisory = { threat: { case: 'threatAddress' as const, value: 0x4840d6 } };
+    const frame = create(FrameSchema, {
+      body: { case: 'snapshot', value: { aircraft: [{ advisory }] } },
+    });
+
+    // Act
+    const read = aircraftOf(frame);
+
+    // Assert
+    expect(read.map((a) => a.ra?.threat)).toEqual([{ address: '4840d6' }]);
   });
 
   it('reads a frame that carries nothing it knows as nothing', () => {

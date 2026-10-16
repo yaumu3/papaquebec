@@ -20,7 +20,8 @@ use tracker::field::{
 use tracker::message::{comm_b_reply, squitter};
 use tracker::position::{Position, bearing_of, signed_bearing, toward};
 use tracker::proto::{
-    Advisory, EmergencyPriorityStatus, EmitterCategory, Modes, advisory::Resolution,
+    Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
+    advisory::{Resolution, Threat, ThreatPosition},
 };
 use tracker::register::{HeadingAndSpeed, TrackAndTurn};
 
@@ -142,7 +143,7 @@ enum Shown {
     Advisory,
 }
 
-/// A corrective climb against one threat.
+/// A corrective climb against one threat, placed a little below, ahead to the right.
 const CLIMB: Advisory = Advisory {
     multiple_threats: false,
     resolution: Some(Resolution {
@@ -155,6 +156,11 @@ const CLIMB: Advisory = Advisory {
     }),
     corrections: None,
     terminated: false,
+    threat: Some(Threat::ThreatPosition(ThreatPosition {
+        altitude_ft: Some(16_500),
+        range_nm: Some(2.5),
+        bearing_deg: Some(33.0),
+    })),
     heard_ms: 0,
 };
 

@@ -12,7 +12,9 @@ use tokio::sync::watch;
 use tracker::beast::Reader;
 use tracker::position::Position;
 use tracker::proto::{
-    Aircraft, EmergencyPriorityStatus, Frame, Int, Snapshot, Source, frame::Body,
+    Aircraft, EmergencyPriorityStatus, Frame, Int, Snapshot, Source,
+    advisory::{Threat, ThreatPosition},
+    frame::Body,
 };
 use tracker::registry::Registry;
 use tracker::traffic::Traffic;
@@ -270,11 +272,15 @@ fn one_aircraft_idents_and_one_flies_an_advisory() {
         .collect();
     assert_eq!(advised.len(), 1);
     assert_eq!(callsign(advised[0]), Some("TEST07"));
-    let advisory = advised[0]
-        .advisory
-        .and_then(|ra| ra.resolution)
-        .expect("of one threat");
-    assert!(advisory.corrective && advisory.positive && !advisory.downward);
+    let advisory = advised[0].advisory.as_ref().expect("advised");
+    let resolution = advisory.resolution.expect("of one threat");
+    assert!(resolution.corrective && resolution.positive && !resolution.downward);
+    let placed = ThreatPosition {
+        altitude_ft: Some(16_500),
+        range_nm: Some(2.5),
+        bearing_deg: Some(33.0),
+    };
+    assert_eq!(advisory.threat, Some(Threat::ThreatPosition(placed)));
 }
 
 #[test]

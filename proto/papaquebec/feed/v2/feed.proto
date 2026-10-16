@@ -293,6 +293,13 @@ message Advisory {
   Corrections corrections = 3;
   // The advisory has ended; it is still reported for 18 s.
   bool terminated = 4;
+  // The threat, as the aircraft identifies it: by its address, or by where it
+  // is; neither when it gives no identity.
+  oneof threat {
+    // The 24 bits of the threat's address.
+    fixed32 threat_address = 5;
+    ThreatPosition threat_position = 6;
+  }
   uint64 heard_ms = 7 [jstype = JS_NUMBER];
 
   message Resolution {
@@ -314,6 +321,17 @@ message Advisory {
     bool positive_descent = 4;
     bool crossing = 5;
     bool sense_reversal = 6;
+  }
+
+  // Where the threat is, as the aircraft estimates it; each absent when it
+  // has no estimate.
+  message ThreatPosition {
+    // Its pressure altitude, from a Mode C altitude code.
+    optional sint32 altitude_ft = 1;
+    // In steps of 0.1 NM: 0 within 0.05 NM, 12.6 beyond 12.55 NM.
+    optional double range_nm = 2;
+    // Relative to the aircraft's heading, the middle of a step of 6°.
+    optional double bearing_deg = 3;
   }
 }
 

@@ -58,7 +58,10 @@ mod tests {
     use super::{
         Address, AddressType, Advisory, Aircraft, Emergency, EmergencyPriorityStatus,
         EmitterCategory, Flag, Frame, Identification, Int, Modes, Position, Real, Reception,
-        Registry, Snapshot, Source, advisory::Resolution, frame::Body, ms,
+        Registry, Snapshot, Source,
+        advisory::{Resolution, Threat, ThreatPosition},
+        frame::Body,
+        ms,
     };
 
     const NOW_MS: u64 = 1_700_000_000_500;
@@ -215,6 +218,11 @@ mod tests {
                 }),
                 corrections: None,
                 terminated: false,
+                threat: Some(Threat::ThreatPosition(ThreatPosition {
+                    altitude_ft: Some(35_000),
+                    range_nm: Some(4.5),
+                    bearing_deg: Some(117.0),
+                })),
                 heard_ms: HEARD_MS,
             }),
             mode_a_code: Some(int(0o0421)),

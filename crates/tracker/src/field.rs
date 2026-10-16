@@ -9,7 +9,7 @@ use crate::cpr::Cpr;
 use crate::position::{bearing_of, toward};
 use crate::proto::{
     Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
-    advisory::{Corrections, Resolution},
+    advisory::{Corrections, Resolution, Threat, ThreatPosition},
 };
 
 /// The 56 bits an extended squitter carries of one kind of message.
@@ -531,12 +531,58 @@ pub(crate) fn advisory(bits: Bits) -> Option<Advisory> {
         resolution,
         corrections,
         terminated: bits.flag(27),
+        threat: threat(bits),
         ..Advisory::default()
     })
 }
 
-/// The 48 bits of an advisory after a header; the complements and the
-/// threat, which are not read, as zeros.
+/// The threat the advisory identifies, as the type indicator in the two
+/// bits after the multiple threat encounter says: none; its address in the
+/// 26 bits that follow; or where it is in them, as a Mode C altitude code,
+/// the range from 1 in tenths of a mile and the bearing from 1 in steps of
+/// 6°, zero where there is no estimate (ICAO Annex 10 Volume IV, the TID
+/// subfield).
+fn threat(bits: Bits) -> Option<Threat> {
+    match bits.get(29, 30) {
+        1 => Some(Threat::ThreatAddress(bits.get(31, 54))),
+        2 => Some(Threat::ThreatPosition(ThreatPosition {
+            altitude_ft: altitude(bits.get(31, 43)),
+            range_nm: bits
+                .get(44, 50)
+                .checked_sub(1)
+                .map(|tenths| f64::from(tenths) / 10.0),
+            bearing_deg: bits
+                .get(51, 56)
+                .checked_sub(1)
+                .filter(|steps| *steps < 60)
+                .map(|steps| f64::from(steps) * 6.0 + 3.0),
+        })),
+        _ => None,
+    }
+}
+
+/// The two bits of the threat's type indicator and the 26 of its identity.
+fn threatened(threat: Option<&Threat>) -> Bits {
+    match threat {
+        None => Bits::default().put(0, 2 + 26),
+        Some(Threat::ThreatAddress(address)) => {
+            Bits::default().put(1, 2).put(*address, 24).put(0, 2)
+        }
+        Some(Threat::ThreatPosition(placed)) => Bits::default()
+            .put(2, 2)
+            .put(placed.altitude_ft.map_or(0, altitude_code), 13)
+            .put(placed.range_nm.map_or(0, |nm| count(nm * 10.0) + 1), 7)
+            .put(
+                placed
+                    .bearing_deg
+                    .map_or(0, |deg| count((deg - 3.0) / 6.0) + 1),
+                6,
+            ),
+    }
+}
+
+/// The 48 bits of an advisory after a header; the complements, which are
+/// not read, as zeros.
 pub(crate) fn advised(advisory: &Advisory) -> Bits {
     let flags = match (
         advisory.resolution,
@@ -567,8 +613,7 @@ pub(crate) fn advised(advisory: &Advisory) -> Bits {
         .put(0, 7 + 4)
         .put_flag(advisory.terminated)
         .put_flag(advisory.multiple_threats)
-        // The threat's type and identity
-        .put(0, 2 + 26)
+        .then(threatened(advisory.threat.as_ref()))
 }
 
 /// What the aircraft is set to fly to: the Target State and Status message,
@@ -741,10 +786,11 @@ mod tests {
     };
     use crate::bits::Bits;
     use crate::bits::published::{field as published, with};
+    use crate::code::altitude_code;
     use crate::cpr::Cpr;
     use crate::proto::{
         Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
-        advisory::{Corrections, Resolution},
+        advisory::{Corrections, Resolution, Threat, ThreatPosition},
     };
 
     /// What is read of a field of one kind and written again.
@@ -1304,7 +1350,9 @@ mod tests {
 
     #[test]
     fn ra_broadcast_is_read_as_it_is_written() {
-        // Arrange: one threat with every flag, several threats, and one ended
+        // Arrange: one threat with every flag, several threats, one ended; the
+        // threat named by its address, placed on the steps of the fields, and
+        // placed with no estimate
         let resolution = Resolution {
             corrective: true,
             downward: true,
@@ -1320,6 +1368,11 @@ mod tests {
             positive_descent: true,
             crossing: false,
             sense_reversal: true,
+        };
+        let placed = ThreatPosition {
+            altitude_ft: Some(38_000),
+            range_nm: Some(4.5),
+            bearing_deg: Some(117.0),
         };
         let written = [
             Advisory {
@@ -1337,6 +1390,21 @@ mod tests {
                 terminated: true,
                 ..Advisory::default()
             },
+            Advisory {
+                resolution: Some(resolution),
+                threat: Some(Threat::ThreatAddress(0x0048_40d6)),
+                ..Advisory::default()
+            },
+            Advisory {
+                resolution: Some(resolution),
+                threat: Some(Threat::ThreatPosition(placed)),
+                ..Advisory::default()
+            },
+            Advisory {
+                resolution: Some(resolution),
+                threat: Some(Threat::ThreatPosition(ThreatPosition::default())),
+                ..Advisory::default()
+            },
         ]
         .map(|advisory| RaBroadcast { advisory });
 
@@ -1345,6 +1413,75 @@ mod tests {
 
         // Assert
         assert_eq!(read, written.map(Some));
+    }
+
+    #[test]
+    fn threat_identity_is_read_by_its_type_indicator() {
+        // Arrange: an advisory of one threat, then its identity as the
+        // indicator says: none, the address, the Mode C altitude with the
+        // range in tenths of a mile and the bearing in steps of 6°, and the
+        // value not assigned
+        let me = RaBroadcast {
+            advisory: Advisory {
+                resolution: Some(Resolution::default()),
+                ..Advisory::default()
+            },
+        }
+        .write();
+        let by_address = with(with(me, 29, 30, 1), 31, 54, 0x0048_40d6);
+        let by_position = with(
+            with(
+                with(with(me, 29, 30, 2), 31, 43, altitude_code(38_000)),
+                44,
+                50,
+                46,
+            ),
+            51,
+            56,
+            20,
+        );
+        let fields = [me, by_address, by_position, with(me, 29, 30, 3)];
+
+        // Act
+        let read = fields.map(|me| RaBroadcast::read(me).and_then(|read| read.advisory.threat));
+
+        // Assert
+        let placed = ThreatPosition {
+            altitude_ft: Some(38_000),
+            range_nm: Some(4.5),
+            bearing_deg: Some(117.0),
+        };
+        let expected = [
+            None,
+            Some(Threat::ThreatAddress(0x0048_40d6)),
+            Some(Threat::ThreatPosition(placed)),
+            None,
+        ];
+        assert_eq!(read, expected);
+    }
+
+    #[test]
+    fn threat_placed_without_an_estimate_has_none() {
+        // Arrange: the identity by position with every field at its code for no estimate
+        let me = RaBroadcast {
+            advisory: Advisory {
+                resolution: Some(Resolution::default()),
+                ..Advisory::default()
+            },
+        }
+        .write();
+        let placed = with(with(me, 29, 30, 2), 31, 56, 0);
+
+        // Act
+        let read = RaBroadcast::read(placed).and_then(|read| read.advisory.threat);
+
+        // Assert
+        let none = ThreatPosition {
+            altitude_ft: None,
+            range_nm: None,
+            bearing_deg: None,
+        };
+        assert_eq!(read, Some(Threat::ThreatPosition(none)));
     }
 
     #[test]
