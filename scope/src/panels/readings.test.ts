@@ -58,6 +58,36 @@ describe('READINGS', () => {
     expect(r).toEqual({ v: '269° / 36', unit: 'kt' });
   });
 
+  it('reads the NIC as its radius of containment, a query without one and blank without a position', () => {
+    // Arrange
+    const samples = [
+      makeSample(1000, { nic: 8, rc: 186 }),
+      makeSample(1000, { nic: 0 }),
+      makeSample(1000),
+    ];
+
+    // Act
+    const readings = samples.map((s) => READINGS.nic.format(s));
+
+    // Assert
+    expect(readings).toEqual([{ v: '<0.1', unit: 'NM' }, { v: '?' }, NONE]);
+  });
+
+  it('reads the NACp as its position error bound, a query for NACp 0 and blank without one', () => {
+    // Arrange
+    const samples = [
+      makeSample(1000, { nacP: 9 }),
+      makeSample(1000, { nacP: 0 }),
+      makeSample(1000),
+    ];
+
+    // Act
+    const readings = samples.map((s) => READINGS.nacp.format(s));
+
+    // Assert
+    expect(readings).toEqual([{ v: '<30', unit: 'm' }, { v: '?' }, NONE]);
+  });
+
   it('reads the one reading of the unknown for whatever a sample lacks', () => {
     // Arrange
     const s = makeSample(1000);
