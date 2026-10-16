@@ -1,4 +1,5 @@
 import type { PositionSource } from './aircraft';
+import { NM_IN_METERS } from './geo';
 
 export type ClimbState = 'climbing' | 'descending' | 'level';
 
@@ -131,3 +132,15 @@ export const formatAge = (seconds: number | undefined): string => formatTenthsBe
 
 /** A distance in nautical miles: in tenths up to a hundred miles. */
 export const formatDistance = (nm: number | undefined): string => formatTenthsBelow(nm, 100);
+
+/** Where a bound in metres starts to read in nautical miles: about a tenth of a mile. */
+const BOUND_NM_FROM_M = 185;
+
+/**
+ * An upper bound in metres, such as a radius of containment: in whole metres rounded up below a
+ * tenth of a mile, and in nautical miles from there, in tenths below one mile.
+ */
+export function formatBoundM(m: number): { text: string; unit: string } {
+  if (m < BOUND_NM_FROM_M) return { text: `<${Math.ceil(m)}`, unit: 'm' };
+  return { text: `<${formatTenthsBelow(m / NM_IN_METERS, 1)}`, unit: 'NM' };
+}

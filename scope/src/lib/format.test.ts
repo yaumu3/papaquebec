@@ -5,6 +5,7 @@ import {
   climbState,
   emergencyCode,
   formatAge,
+  formatBoundM,
   formatDistance,
   formatGsWake,
   formatMmSs,
@@ -199,5 +200,56 @@ describe('formatDistance', () => {
 
     // Assert
     expect(out).toEqual(['0.4', '14.5', '99.9', '100', '123', '---']);
+  });
+});
+
+describe('formatBoundM', () => {
+  it('reads every radius of containment the tracker sends', () => {
+    // Arrange
+    const radii = [8, 25, 75, 186, 371, 556, 926, 1112, 1852, 3704, 7408, 14816, 18520, 37040];
+
+    // Act
+    const out = radii.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { text: '<8', unit: 'm' },
+      { text: '<25', unit: 'm' },
+      { text: '<75', unit: 'm' },
+      { text: '<0.1', unit: 'NM' },
+      { text: '<0.2', unit: 'NM' },
+      { text: '<0.3', unit: 'NM' },
+      { text: '<0.5', unit: 'NM' },
+      { text: '<0.6', unit: 'NM' },
+      { text: '<1', unit: 'NM' },
+      { text: '<2', unit: 'NM' },
+      { text: '<4', unit: 'NM' },
+      { text: '<8', unit: 'NM' },
+      { text: '<10', unit: 'NM' },
+      { text: '<20', unit: 'NM' },
+    ]);
+  });
+
+  it('reads every position error bound of the NACp categories', () => {
+    // Arrange
+    const bounds = [3, 10, 30, 92.6, 185.2, 555.6, 926, 1852, 3704, 7408, 18520];
+
+    // Act
+    const out = bounds.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { text: '<3', unit: 'm' },
+      { text: '<10', unit: 'm' },
+      { text: '<30', unit: 'm' },
+      { text: '<93', unit: 'm' },
+      { text: '<0.1', unit: 'NM' },
+      { text: '<0.3', unit: 'NM' },
+      { text: '<0.5', unit: 'NM' },
+      { text: '<1', unit: 'NM' },
+      { text: '<2', unit: 'NM' },
+      { text: '<4', unit: 'NM' },
+      { text: '<10', unit: 'NM' },
+    ]);
   });
 });
