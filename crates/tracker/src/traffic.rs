@@ -6,14 +6,18 @@ use std::collections::{BTreeMap, VecDeque};
 use crate::air::{self, Wind};
 use crate::beast::{Frame, Observation};
 use crate::cpr::{self, Cpr};
-use crate::field::{Airspeed, Identification, Integrity, TargetState};
+use crate::field::{
+    Airspeed, Identification, Integrity, TargetState, TargetStateAndStatus, TargetSteps, Velocity,
+};
 use crate::message::{Report, Trust};
 use crate::position::Position;
 use crate::proto::{
     self, Address, Advisory, Aircraft, Emergency, EmergencyPriorityStatus, EmitterCategory, Flag,
     Int, Modes, Real, Reception, Snapshot, Source, ms,
 };
-use crate::register::{Known, Register};
+use crate::register::{
+    BEARING_STEP_DEG, HeadingAndSpeed, Known, Register, SelectedVerticalIntention, TrackAndTurn,
+};
 
 /// readsb lists an aircraft from its second message on: a single one may be
 /// noise that passes for a message.
@@ -117,17 +121,28 @@ impl Traffic {
     }
 }
 
-/// Something said, and when it was heard, in seconds since the epoch. A
-/// value derived from others is heard when the oldest of them was.
+/// Something said, when it was heard, in seconds since the epoch, and the
+/// step its report comes in, zero when exact. A value derived from others
+/// is heard when the oldest of them was.
 #[derive(Clone, Copy)]
 struct Heard<T> {
     said: T,
     at_s: f64,
+    step: f64,
 }
 
 /// What was heard, without when.
 fn said<T>(heard: Heard<T>) -> T {
     heard.said
+}
+
+/// Something derived, heard when the oldest of what it is derived from was.
+fn derived<T>(said: T, at_s: f64) -> Heard<T> {
+    Heard {
+        said,
+        at_s,
+        step: 0.0,
+    }
 }
 
 impl<T> Heard<T> {
@@ -136,6 +151,7 @@ impl<T> Heard<T> {
         Heard {
             said: into(self.said),
             at_s: self.at_s,
+            step: self.step,
         }
     }
 
@@ -171,7 +187,8 @@ impl Heard<bool> {
     }
 }
 
-/// The newest report of a value, however it was heard.
+/// The newest report of a value, however it was heard, unless a finer one
+/// came within a sweep or two: a coarser one would only jitter it.
 struct Said<T> {
     kept: Option<Heard<T>>,
 }
@@ -183,15 +200,33 @@ impl<T> Default for Said<T> {
 }
 
 impl<T: Clone> Said<T> {
-    /// Takes what a message heard at `now_s` says, when it says it.
+    /// Takes what a message heard at `now_s` says exactly, when it says it.
     fn keep(&mut self, said: Option<T>, now_s: f64) {
-        self.keep_heard(said.map(|said| Heard { said, at_s: now_s }));
+        self.keep_in_steps(said, 0.0, now_s);
     }
 
-    /// Takes what was derived, when there is something.
+    /// Takes what a message heard at `now_s` says in steps of `step`, when
+    /// it says it.
+    fn keep_in_steps(&mut self, said: Option<T>, step: f64, now_s: f64) {
+        self.keep_heard(said.map(|said| Heard {
+            said,
+            at_s: now_s,
+            step,
+        }));
+    }
+
+    /// Takes what was heard, when there is something, in place of what was
+    /// kept: unless that is finer and of the last sweep or two.
     fn keep_heard(&mut self, heard: Option<Heard<T>>) {
-        if heard.is_some() {
-            self.kept = heard;
+        let Some(heard) = heard else {
+            return;
+        };
+        let finer_lately = self
+            .kept
+            .as_ref()
+            .is_some_and(|kept| kept.step < heard.step && heard.at_s - kept.at_s < RELATED_S);
+        if !finer_lately {
+            self.kept = Some(heard);
         }
     }
 
@@ -278,15 +313,23 @@ struct Target {
 }
 
 impl Target {
-    /// Takes what a message heard at `now_s` says of each field.
-    fn keep(&mut self, said: &TargetState, now_s: f64) {
-        self.selected_altitude_mcp_ft
-            .keep(said.selected_altitude_mcp_ft, now_s);
-        self.selected_altitude_fms_ft
-            .keep(said.selected_altitude_fms_ft, now_s);
+    /// Takes what a message heard at `now_s` says of each field, the
+    /// altitudes and the setting in the steps the message comes in.
+    fn keep(&mut self, said: &TargetState, steps: TargetSteps, now_s: f64) {
+        self.selected_altitude_mcp_ft.keep_in_steps(
+            said.selected_altitude_mcp_ft,
+            steps.altitude_ft,
+            now_s,
+        );
+        self.selected_altitude_fms_ft.keep_in_steps(
+            said.selected_altitude_fms_ft,
+            steps.altitude_ft,
+            now_s,
+        );
         self.selected_heading_deg
             .keep(said.selected_heading_deg, now_s);
-        self.baro_setting_hpa.keep(said.baro_setting_hpa, now_s);
+        self.baro_setting_hpa
+            .keep_in_steps(said.baro_setting_hpa, steps.setting_hpa, now_s);
         self.autopilot.keep(said.modes.autopilot, now_s);
         self.vnav.keep(said.modes.vnav, now_s);
         self.altitude_hold.keep(said.modes.altitude_hold, now_s);
@@ -418,21 +461,40 @@ impl Tracked {
             }
             Report::Identification(said) => self.remembered.keep(said, now_s),
             Report::Velocity(said) => {
-                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
-                self.track_deg.keep(said.track_deg, now_s);
-                self.magnetic_heading_deg
-                    .keep(said.magnetic_heading_deg, now_s);
-                self.baro_vertical_rate_fpm
-                    .keep(said.baro_vertical_rate_fpm, now_s);
-                self.geometric_vertical_rate_fpm
-                    .keep(said.geometric_vertical_rate_fpm, now_s);
+                self.ground_speed_kt
+                    .keep_in_steps(said.ground_speed_kt, Velocity::STEP_KT, now_s);
+                let track_step = said.track_step_deg().unwrap_or(0.0);
+                self.track_deg
+                    .keep_in_steps(said.track_deg, track_step, now_s);
+                self.magnetic_heading_deg.keep_in_steps(
+                    said.magnetic_heading_deg,
+                    Velocity::HEADING_STEP_DEG,
+                    now_s,
+                );
+                self.baro_vertical_rate_fpm.keep_in_steps(
+                    said.baro_vertical_rate_fpm,
+                    Velocity::RATE_STEP_FPM,
+                    now_s,
+                );
+                self.geometric_vertical_rate_fpm.keep_in_steps(
+                    said.geometric_vertical_rate_fpm,
+                    Velocity::RATE_STEP_FPM,
+                    now_s,
+                );
                 self.geometric_minus_baro_ft
                     .keep(said.geometric_minus_baro_ft, now_s);
                 match said.airspeed {
                     Some(Airspeed::Indicated(kt)) => {
-                        self.indicated_airspeed_kt.keep(Some(kt), now_s);
+                        self.indicated_airspeed_kt.keep_in_steps(
+                            Some(kt),
+                            Velocity::STEP_KT,
+                            now_s,
+                        );
                     }
-                    Some(Airspeed::True(kt)) => self.true_airspeed_kt.keep(Some(kt), now_s),
+                    Some(Airspeed::True(kt)) => {
+                        self.true_airspeed_kt
+                            .keep_in_steps(Some(kt), Velocity::STEP_KT, now_s);
+                    }
                     None => {}
                 }
             }
@@ -442,7 +504,8 @@ impl Tracked {
                 self.mode_a_code.keep(said.mode_a_code, now_s);
             }
             Report::TargetStateAndStatus(said) => {
-                self.target_state.keep(&said.target, now_s);
+                self.target_state
+                    .keep(&said.target, TargetStateAndStatus::STEPS, now_s);
                 self.nac_p.keep(Some(said.nac_p), now_s);
             }
             Report::ResolutionAdvisory(said) => {
@@ -481,26 +544,48 @@ impl Tracked {
                 self.advisory.keep(Some(*said), now_s);
             }
             Register::SelectedVerticalIntention(said) => {
-                self.target_state.keep(&said.target, now_s);
+                self.target_state
+                    .keep(&said.target, SelectedVerticalIntention::STEPS, now_s);
             }
             Register::TrackAndTurn(said) => {
                 self.roll_deg.keep(said.roll_deg, now_s);
-                self.track_deg.keep(said.track_deg, now_s);
-                self.ground_speed_kt.keep(said.ground_speed_kt, now_s);
+                self.track_deg
+                    .keep_in_steps(said.track_deg, BEARING_STEP_DEG, now_s);
+                self.ground_speed_kt.keep_in_steps(
+                    said.ground_speed_kt,
+                    TrackAndTurn::SPEED_STEP_KT,
+                    now_s,
+                );
                 self.track_rate_deg_per_s
                     .keep(said.track_rate_deg_per_s, now_s);
-                self.true_airspeed_kt.keep(said.true_airspeed_kt, now_s);
+                self.true_airspeed_kt.keep_in_steps(
+                    said.true_airspeed_kt,
+                    TrackAndTurn::SPEED_STEP_KT,
+                    now_s,
+                );
             }
             Register::HeadingAndSpeed(said) => {
-                self.magnetic_heading_deg
-                    .keep(said.magnetic_heading_deg, now_s);
-                self.indicated_airspeed_kt
-                    .keep(said.indicated_airspeed_kt, now_s);
+                self.magnetic_heading_deg.keep_in_steps(
+                    said.magnetic_heading_deg,
+                    BEARING_STEP_DEG,
+                    now_s,
+                );
+                self.indicated_airspeed_kt.keep_in_steps(
+                    said.indicated_airspeed_kt,
+                    HeadingAndSpeed::AIRSPEED_STEP_KT,
+                    now_s,
+                );
                 self.mach.keep(said.mach, now_s);
-                self.baro_vertical_rate_fpm
-                    .keep(said.baro_vertical_rate_fpm, now_s);
-                self.geometric_vertical_rate_fpm
-                    .keep(said.inertial_vertical_rate_fpm, now_s);
+                self.baro_vertical_rate_fpm.keep_in_steps(
+                    said.baro_vertical_rate_fpm,
+                    HeadingAndSpeed::RATE_STEP_FPM,
+                    now_s,
+                );
+                self.geometric_vertical_rate_fpm.keep_in_steps(
+                    said.inertial_vertical_rate_fpm,
+                    HeadingAndSpeed::RATE_STEP_FPM,
+                    now_s,
+                );
             }
         }
         self.derive(now_s, site);
@@ -514,14 +599,14 @@ impl Tracked {
         let mach = self.mach.lately(now_s);
         let airspeed = self.true_airspeed_kt.lately(now_s);
         let oat_c = mach.zip(airspeed).and_then(|(mach, tas)| {
-            Some(Heard {
-                said: air::static_air_temperature_c(mach.said, tas.said)?,
-                at_s: mach.at_s.min(tas.at_s),
-            })
+            let oat_c = air::static_air_temperature_c(mach.said, tas.said)?;
+            Some(derived(oat_c, mach.at_s.min(tas.at_s)))
         });
-        let tat_c = oat_c.zip(mach).map(|(oat_c, mach)| Heard {
-            said: air::total_air_temperature_c(oat_c.said, mach.said),
-            at_s: oat_c.at_s,
+        let tat_c = oat_c.zip(mach).map(|(oat_c, mach)| {
+            derived(
+                air::total_air_temperature_c(oat_c.said, mach.said),
+                oat_c.at_s,
+            )
         });
         self.oat_c.keep_heard(oat_c);
         self.tat_c.keep_heard(tat_c);
@@ -546,10 +631,8 @@ impl Tracked {
             .into_iter()
             .map(|heard| heard.at_s)
             .fold(f64::INFINITY, f64::min);
-        straight.then(|| Heard {
-            said: air::wind(track.said, speed.said, heading, airspeed.said),
-            at_s: oldest,
-        })
+        let wind = air::wind(track.said, speed.said, heading, airspeed.said);
+        straight.then(|| derived(wind, oldest))
     }
 
     /// Where the aircraft is, or else the site.
@@ -683,9 +766,8 @@ impl Tracked {
     fn geometric_altitude(&self, baro: Option<Heard<i32>>, now_s: f64) -> Option<Heard<i32>> {
         let reported = self.geometric_altitude_ft.at(now_s);
         let difference = self.geometric_minus_baro_ft.at(now_s);
-        let worked_out = baro.zip(difference).map(|(baro, difference)| Heard {
-            said: baro.said + difference.said,
-            at_s: baro.at_s.min(difference.at_s),
+        let worked_out = baro.zip(difference).map(|(baro, difference)| {
+            derived(baro.said + difference.said, baro.at_s.min(difference.at_s))
         });
         [worked_out, reported]
             .into_iter()
@@ -1942,8 +2024,44 @@ mod tests {
     }
 
     #[test]
-    fn newest_report_wins_between_the_broadcast_and_the_register() {
-        // Arrange: the velocity broadcast before the report, and after it
+    fn newest_report_wins_between_reports_of_one_step() {
+        // Arrange: the airspeed from the velocity and from the heading and
+        // speed report, both in steps of a knot, in either order
+        let through_the_air = Report::Velocity(Velocity {
+            ground_speed_kt: None,
+            track_deg: None,
+            airspeed: Some(Airspeed::Indicated(250.0)),
+            magnetic_heading_deg: None,
+            baro_vertical_rate_fpm: None,
+            geometric_vertical_rate_fpm: None,
+            geometric_minus_baro_ft: None,
+        });
+        let report = answered(&Register::HeadingAndSpeed(HeadingAndSpeed {
+            magnetic_heading_deg: Some(270.0),
+            indicated_airspeed_kt: Some(255.0),
+            mach: Some(0.78),
+            baro_vertical_rate_fpm: Some(-1216),
+            inertial_vertical_rate_fpm: Some(1856),
+        }));
+        let reports = [
+            vec![through_the_air.clone(), report.clone()],
+            vec![report, through_the_air],
+        ];
+
+        // Act
+        let known = reports.map(|reports| known(after(reports)));
+
+        // Assert
+        let read = known.map(|a| real(a.indicated_airspeed_kt));
+        assert_eq!(read, [Some(255.0), Some(250.0)]);
+    }
+
+    #[test]
+    fn finer_report_of_the_last_sweeps_wins_whichever_came_last() {
+        // Arrange: the velocity broadcast before the track and turn report,
+        // and after it: the speed in steps of a knot against the report's
+        // two, the track in steps of 0.2° at that speed against the report's
+        // 0.18°
         let report = answered(&track_and_turn(236.25, 300.0, 310.0));
         let reports = [
             vec![velocity(290.0, 235.0), report.clone()],
@@ -1961,11 +2079,71 @@ mod tests {
                 real(a.true_airspeed_kt),
             )
         });
-        let expected = [
-            (Some(300.0), Some(236.25), Some(310.0)),
-            (Some(290.0), Some(235.0), Some(310.0)),
-        ];
-        assert_eq!(read, expected);
+        assert_eq!(read, [(Some(290.0), Some(236.25), Some(310.0)); 2]);
+    }
+
+    /// The vertical rate in steps of 64 fpm from the velocity at 100 s, in
+    /// steps of 32 fpm from the heading and speed report at 101 s, then from
+    /// the velocity again at each of the seconds.
+    fn rated_at(seconds: impl IntoIterator<Item = f64>) -> Traffic {
+        let heading_and_speed = Register::HeadingAndSpeed(HeadingAndSpeed {
+            magnetic_heading_deg: Some(240.0),
+            indicated_airspeed_kt: Some(250.0),
+            mach: Some(0.78),
+            baro_vertical_rate_fpm: Some(-1184),
+            inertial_vertical_rate_fpm: Some(-1184),
+        });
+        let again = seconds
+            .into_iter()
+            .map(|now_s| (said(velocity(290.0, 235.0)), now_s));
+        hearing(
+            [
+                (said(velocity(290.0, 235.0)), 100.0),
+                (said(answered(&heading_and_speed)), 101.0),
+            ]
+            .into_iter()
+            .chain(again),
+        )
+    }
+
+    #[test]
+    fn coarser_report_does_not_replace_a_finer_one_of_the_last_sweeps() {
+        // Arrange: the velocity again a second after the report
+        let mut traffic = rated_at([102.0]);
+
+        // Act
+        let carried = traffic
+            .snapshot(103.0)
+            .aircraft
+            .remove(0)
+            .baro_vertical_rate_fpm;
+
+        // Assert
+        let finer = Int {
+            value: -1184,
+            heard_ms: 101_000,
+        };
+        assert_eq!(carried, Some(finer));
+    }
+
+    #[test]
+    fn coarser_report_replaces_a_finer_one_once_the_sweeps_have_passed() {
+        // Arrange: the velocity again within the sweeps, and beyond them
+        let mut traffic = rated_at([102.0, 117.0]);
+
+        // Act
+        let carried = traffic
+            .snapshot(118.0)
+            .aircraft
+            .remove(0)
+            .baro_vertical_rate_fpm;
+
+        // Assert
+        let coarser = Int {
+            value: -1216,
+            heard_ms: 117_000,
+        };
+        assert_eq!(carried, Some(coarser));
     }
 
     #[test]

@@ -319,6 +319,24 @@ pub enum Airspeed {
 /// supersonic subtypes: the most the steps of 1 kt count.
 const SUBSONIC_KT: f64 = 1021.0;
 
+impl Velocity {
+    /// The step of each component of the speed over the ground, and of the
+    /// airspeed, below the supersonic subtypes.
+    pub const STEP_KT: f64 = 1.0;
+    /// The step of the vertical rate.
+    pub const RATE_STEP_FPM: f64 = 64.0;
+    /// The step of the magnetic heading.
+    pub const HEADING_STEP_DEG: f64 = 360.0 / 1024.0;
+
+    /// The step the track comes in at the speed over the ground: a knot
+    /// across it; none without a speed.
+    #[must_use]
+    pub fn track_step_deg(&self) -> Option<f64> {
+        self.ground_speed_kt
+            .map(|speed| (Self::STEP_KT / speed).atan().to_degrees())
+    }
+}
+
 impl Field for Velocity {
     fn read(me: Bits) -> Option<Self> {
         if me.get(1, 5) != 19 {
@@ -663,12 +681,27 @@ impl From<Modes> for ModesReported {
     }
 }
 
+/// The steps a report's selected altitudes and barometric setting come in.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TargetSteps {
+    pub altitude_ft: f64,
+    pub setting_hpa: f64,
+}
+
 /// Target State and Status message, of ADS-B version 2.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TargetStateAndStatus {
     pub target: TargetState,
     /// Navigation Accuracy Category for position, 0 to 11.
     pub nac_p: u32,
+}
+
+impl TargetStateAndStatus {
+    /// The steps the message comes in.
+    pub const STEPS: TargetSteps = TargetSteps {
+        altitude_ft: 32.0,
+        setting_hpa: 0.8,
+    };
 }
 
 impl Field for TargetStateAndStatus {

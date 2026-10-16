@@ -9,7 +9,8 @@
 use crate::air;
 use crate::bits::Bits;
 use crate::field::{
-    Field, Identification, ModesReported, TargetState, advised, advisory, count, rounded,
+    Field, Identification, ModesReported, TargetState, TargetSteps, advised, advisory, count,
+    rounded,
 };
 use crate::position::signed_bearing;
 use crate::proto::{Advisory, EmitterCategory};
@@ -186,15 +187,18 @@ fn consistent(mb: Bits, fields: &[Gated]) -> bool {
         .all(|&(status, first, last)| mb.flag(status) || mb.get(first, last) == 0)
 }
 
-/// A bearing counted in steps of 90/512° either way from north.
+/// The step the track and the heading come in: 90/512°.
+pub const BEARING_STEP_DEG: f64 = 90.0 / 512.0;
+
+/// A bearing counted in its steps either way from north.
 fn bearing(steps: i32) -> f64 {
-    (f64::from(steps) * 90.0 / 512.0).rem_euclid(360.0)
+    (f64::from(steps) * BEARING_STEP_DEG).rem_euclid(360.0)
 }
 
 /// The status bit and the 11 bits of a bearing, as `bearing` reads them.
 fn bearing_field(bearing_deg: Option<f64>) -> Bits {
     signed(
-        bearing_deg.map(|deg| signed_bearing(deg) * 512.0 / 90.0),
+        bearing_deg.map(|deg| signed_bearing(deg) / BEARING_STEP_DEG),
         11,
     )
 }
@@ -219,6 +223,14 @@ fn signed(count_of: Option<f64>, width: u32) -> Bits {
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct SelectedVerticalIntention {
     pub target: TargetState,
+}
+
+impl SelectedVerticalIntention {
+    /// The steps the register comes in.
+    pub const STEPS: TargetSteps = TargetSteps {
+        altitude_ft: 16.0,
+        setting_hpa: 0.1,
+    };
 }
 
 /// The fields of the selected vertical intention: the altitudes selected on
@@ -294,6 +306,11 @@ pub struct TrackAndTurn {
     pub true_airspeed_kt: Option<f64>,
 }
 
+impl TrackAndTurn {
+    /// The step the ground speed and the airspeed come in.
+    pub const SPEED_STEP_KT: f64 = 2.0;
+}
+
 /// The fields of the track and turn report: the roll, the track, the ground
 /// speed, the track rate and the airspeed.
 const TRACK_AND_TURN: [Gated; 5] = [
@@ -352,6 +369,13 @@ pub struct HeadingAndSpeed {
     pub mach: Option<f64>,
     pub baro_vertical_rate_fpm: Option<i32>,
     pub inertial_vertical_rate_fpm: Option<i32>,
+}
+
+impl HeadingAndSpeed {
+    /// The step the indicated airspeed comes in.
+    pub const AIRSPEED_STEP_KT: f64 = 1.0;
+    /// The step the vertical rates come in.
+    pub const RATE_STEP_FPM: f64 = 32.0;
 }
 
 /// The fields of the heading and speed report: the heading, the indicated
