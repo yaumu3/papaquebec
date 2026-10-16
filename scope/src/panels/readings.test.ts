@@ -58,7 +58,7 @@ describe('READINGS', () => {
     expect(r).toEqual({ v: '269° / 36', unit: 'kt' });
   });
 
-  it('reads the NIC as its radius of containment, a query without one and blank without a position', () => {
+  it('reads the NIC as its radius of containment, and blank for NIC 0 or without a position', () => {
     // Arrange
     const samples = [
       makeSample(1000, { nic: 8, rc: 186 }),
@@ -70,7 +70,7 @@ describe('READINGS', () => {
     const readings = samples.map((s) => READINGS.nic.format(s));
 
     // Assert
-    expect(readings).toEqual([{ v: '<0.1', unit: 'NM' }, { v: '?' }, NONE]);
+    expect(readings).toEqual([{ v: '<0.1', unit: 'NM' }, NONE, NONE]);
   });
 
   it('reads the NACp as its position error bound, a query for NACp 0 and blank without one', () => {

@@ -99,8 +99,11 @@ function boundReading(m: number | undefined): Reading {
   return { v: text, unit };
 }
 
-/** The radius of containment the position's NIC stands for; blank without a position. */
-const nicReading = (r: Readout): Reading => (r.nic === undefined ? NONE : boundReading(r.rc));
+/**
+ * The radius of containment the position's NIC stands for; blank without a position, and for
+ * NIC 0, which is no category: the integrity of an MLAT or TIS-B fix, or one not known.
+ */
+const nicReading = (r: Readout): Reading => (r.nic ? boundReading(r.rc) : NONE);
 
 /** The position error bound the NACp stands for; blank without a NACp. */
 const nacpReading = (r: Readout): Reading =>
