@@ -120,11 +120,18 @@ export function formatMach(m: number | undefined): string {
   return m === undefined ? '---' : `M${m.toFixed(2)}`;
 }
 
-/** A quantity in tenths while those read below `wholeFrom`, whole from there on. */
-function formatTenthsBelow(value: number | undefined, wholeFrom: number): string {
+/**
+ * A quantity in tenths while those read below `wholeFrom`, whole from there on, either rounded by
+ * `round`: to the nearest unless told otherwise.
+ */
+function formatTenthsBelow(
+  value: number | undefined,
+  wholeFrom: number,
+  round: (n: number) => number = Math.round,
+): string {
   if (value === undefined) return '---';
-  const tenths = Math.round(value * 10) / 10;
-  return tenths < wholeFrom ? tenths.toFixed(1) : String(Math.round(value));
+  const tenths = round(value * 10) / 10;
+  return tenths < wholeFrom ? tenths.toFixed(1) : String(round(value));
 }
 
 /** Seconds since something was last heard: in tenths up to ten seconds. */
@@ -149,6 +156,5 @@ const BOUND_ROUNDED_UP_BY_M = 1;
 export function formatBoundM(m: number): { text: string; unit: string } {
   if (m < BOUND_NM_FROM_M) return { text: `<${Math.ceil(m)}`, unit: 'm' };
   const nm = (m - BOUND_ROUNDED_UP_BY_M) / NM_IN_METERS;
-  const tenths = Math.ceil(nm * 10);
-  return { text: `<${tenths < 10 ? (tenths / 10).toFixed(1) : Math.ceil(nm)}`, unit: 'NM' };
+  return { text: `<${formatTenthsBelow(nm, 1, Math.ceil)}`, unit: 'NM' };
 }
