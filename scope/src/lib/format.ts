@@ -133,8 +133,8 @@ export const formatAge = (seconds: number | undefined): string => formatTenthsBe
 /** A distance in nautical miles: in tenths up to a hundred miles. */
 export const formatDistance = (nm: number | undefined): string => formatTenthsBelow(nm, 100);
 
-/** Where a bound in metres starts to read in nautical miles: about a tenth of a mile. */
-const BOUND_NM_FROM_M = 185;
+/** Where a bound in metres starts to read in nautical miles: a tenth of a mile. */
+const BOUND_NM_FROM_M = NM_IN_METERS / 10;
 
 /**
  * How far a bound may run past a step of the miles and still read as that step: the tracker

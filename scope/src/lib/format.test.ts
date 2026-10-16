@@ -268,4 +268,18 @@ describe('formatBoundM', () => {
       { text: '<2', unit: 'NM' },
     ]);
   });
+
+  it('reads a bound in miles from a tenth of a mile, in metres below', () => {
+    // Arrange
+    const bounds = [185.1, 185.2];
+
+    // Act
+    const out = bounds.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { text: '<186', unit: 'm' },
+      { text: '<0.1', unit: 'NM' },
+    ]);
+  });
 });
