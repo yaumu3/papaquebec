@@ -252,4 +252,20 @@ describe('formatBoundM', () => {
       { text: '<10', unit: 'NM' },
     ]);
   });
+
+  it('rounds a bound between the steps of the miles up to the next', () => {
+    // Arrange
+    const bounds = [200, 1500, 1800, 2700];
+
+    // Act
+    const out = bounds.map(formatBoundM);
+
+    // Assert
+    expect(out).toEqual([
+      { text: '<0.2', unit: 'NM' },
+      { text: '<0.9', unit: 'NM' },
+      { text: '<1', unit: 'NM' },
+      { text: '<2', unit: 'NM' },
+    ]);
+  });
 });

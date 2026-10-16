@@ -137,10 +137,18 @@ export const formatDistance = (nm: number | undefined): string => formatTenthsBe
 const BOUND_NM_FROM_M = 185;
 
 /**
- * An upper bound in metres, such as a radius of containment: in whole metres rounded up below a
+ * How far a bound may run past a step of the miles and still read as that step: the tracker
+ * sends each radius rounded up to whole metres, 0.1 NM (185.2 m) as 186.
+ */
+const BOUND_ROUNDED_UP_BY_M = 1;
+
+/**
+ * An upper bound in metres, such as a radius of containment, rounded up: in whole metres below a
  * tenth of a mile, and in nautical miles from there, in tenths below one mile.
  */
 export function formatBoundM(m: number): { text: string; unit: string } {
   if (m < BOUND_NM_FROM_M) return { text: `<${Math.ceil(m)}`, unit: 'm' };
-  return { text: `<${formatTenthsBelow(m / NM_IN_METERS, 1)}`, unit: 'NM' };
+  const nm = (m - BOUND_ROUNDED_UP_BY_M) / NM_IN_METERS;
+  const tenths = Math.ceil(nm * 10);
+  return { text: `<${tenths < 10 ? (tenths / 10).toFixed(1) : Math.ceil(nm)}`, unit: 'NM' };
 }
