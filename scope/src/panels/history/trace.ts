@@ -51,6 +51,13 @@ export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefine
   return instants.length > 0 ? Math.min(...instants) : undefined;
 }
 
+/** Whether the reading made of `keys` was heard no further than the gap from `t`; always, without keys. */
+export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
+  if (keys.length === 0) return true;
+  const at = heardAt(s, keys);
+  return at !== undefined && Math.abs(t - at) <= GAP_SEC;
+}
+
 /**
  * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
  * the `heard` instants of the reading, only a sample with a new report of it is a point, and a run
@@ -168,17 +175,20 @@ export interface Bar {
 
 /**
  * A bar per name reported, in order of first report: each stretch runs from the sample that
- * first reports the name to the last that does before one that does not, or a gap.
+ * first reports the name to the last that does before one that does not, or a gap. With the
+ * `heard` instants of the names, a sample whose names went unheard longer than the gap reports none.
  */
 export function barsOf(
   samples: readonly Sample[],
   names: (s: Sample) => readonly string[] | undefined,
+  heard: readonly HeardKey[] = [],
 ): Bar[] {
   const bars = new Map<string, Bar>();
   for (const stretch of stretches(samples)) {
     let previous: Sample | undefined;
     for (const s of stretch) {
-      for (const name of names(s) ?? []) {
+      const named = heardNear(s, heard, s.t) ? names(s) : undefined;
+      for (const name of named ?? []) {
         const bar = bars.get(name) ?? { name, on: [] };
         bars.set(name, bar);
         const open = bar.on.at(-1);

@@ -317,6 +317,19 @@ describe('barsOf', () => {
       },
     ]);
   });
+
+  it('ends a bar where its reading went unheard longer than the gap, though the samples kept coming', () => {
+    // Arrange
+    const samples = [1, 2, 2 + GAP_SEC, 3 + GAP_SEC].map((t) =>
+      sample(t, { navModes: ['AP'], heard: { navModes: 1 } }),
+    );
+
+    // Act
+    const bars = barsOf(samples, modes, ['navModes']);
+
+    // Assert
+    expect(bars).toEqual([{ name: 'AP', on: [{ from: 1, to: 2 }] }]);
+  });
 });
 
 describe('barbMarks', () => {

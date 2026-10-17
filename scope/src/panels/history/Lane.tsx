@@ -19,7 +19,7 @@ import {
   pathOf,
   valueAt,
 } from './plot';
-import { type Dash, PLOTS } from './plots';
+import { type Dash, HEARD, PLOTS } from './plots';
 import { type Interval, xOf } from './span';
 import { barsOf, gapsIn, type Read, yOf } from './trace';
 
@@ -77,7 +77,9 @@ export function Lane(props: {
     return r ? yOf(v, r, props.height, PAD_TOP_PX, PAD_BOTTOM_PX) : props.height / 2;
   };
   const gaps = createMemo(() => gapsIn(props.samples, props.visible));
-  const bars = createMemo(() => (spec.kind === 'gantt' ? barsOf(props.samples, spec.names) : []));
+  const bars = createMemo(() =>
+    spec.kind === 'gantt' ? barsOf(props.samples, spec.names, HEARD[props.lane]) : [],
+  );
   const rowHeight = () => props.height / Math.max(1, bars().length);
   /** The shortest round clock step that keeps glyphs at least `pitch` apart across the visible span. */
   const stepEvery = (pitch: number) =>
@@ -87,7 +89,13 @@ export function Lane(props: {
     clearOfEnds(ticks(props.visible, step), x, props.width, reach);
   const barbs = createMemo(() =>
     spec.kind === 'barbs'
-      ? atTicks(props.samples, ticksAt(stepEvery(BARB_PITCH_PX), barbReach(BARB_PX)), spec.barb)
+      ? atTicks(
+          props.samples,
+          ticksAt(stepEvery(BARB_PITCH_PX), barbReach(BARB_PX)),
+          spec.barb,
+          undefined,
+          HEARD[props.lane],
+        )
       : [],
   );
   /** What the intent plotted in the lane reads, if one is. */
@@ -109,10 +117,16 @@ export function Lane(props: {
     // the aircraft does not come and go with the replies that carry its heading.
     const step = stepEvery(GLYPH_PITCH_PX);
     const has = (sample: Sample) => spec.heading(sample)?.hdg !== undefined;
-    return atTicks(props.samples, ticksAt(step, GLYPH_REACH_PX), read, {
-      has,
-      withinSec: step / 2,
-    }).map((h) => headingGlyph(x(h.t), props.height / 2, h));
+    return atTicks(
+      props.samples,
+      ticksAt(step, GLYPH_REACH_PX),
+      read,
+      {
+        has,
+        withinSec: step / 2,
+      },
+      HEARD[props.lane],
+    ).map((h) => headingGlyph(x(h.t), props.height / 2, h));
   });
   const dots = () => {
     const h = props.hover;

@@ -284,6 +284,26 @@ describe('atTicks', () => {
     // Assert
     expect(reads).toEqual([{ t: 100, trk: 90, hdg: undefined }]);
   });
+
+  it('reads nothing at a tick its reading was heard a gap away from, though a sample is near', () => {
+    // Arrange
+    const samples = [100, 150].map((t) =>
+      sample(t, { windDir: 300, windSpeed: 12, heard: { windDir: 100, windSpeed: 100 } }),
+    );
+    const ticks = [100, 150];
+
+    // Act
+    const barbs = atTicks(
+      samples,
+      ticks,
+      (s) => (s.windDir === undefined ? undefined : { dir: s.windDir }),
+      undefined,
+      ['windDir', 'windSpeed'],
+    );
+
+    // Assert
+    expect(barbs).toEqual([{ t: 100, dir: 300 }]);
+  });
 });
 
 describe('barbPath', () => {
