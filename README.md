@@ -186,8 +186,8 @@ Conventions:
 - **Shape** is source: ADS-B filled square, MLAT square with ring, TIS-B diamond. Filtered-out
   targets persist as bare hollow diamonds.
 - **Emergency** is additive: red plus a two-letter tag (`HJ` `RF` `EM`), never hidden by filters.
-  - It comes from the squawk (7500, 7600, 7700) or from the ADS-B status: general, no
-    communications, unlawful interference or downed.
+  - It comes from the squawk (7500, 7600, 7700) or, while it keeps arriving, from the ADS-B
+    status: general, no communications, unlawful interference or downed.
   - Lifeguard and minimum fuel are a priority, not an emergency: no red, filtered like any target.
   - An active resolution advisory tags the block `RA` in the same red, and an ident `ID` in the
     block's own tone; the tags share one line in that order.
@@ -264,7 +264,7 @@ Every second the feeder publishes a snapshot as protobuf (`proto/papaquebec/feed
 named after DO-260B), which the feed worker reads into what the scope knows of an aircraft
 (`lib/aircraft.ts`): every value with the instant it was heard, absent once never reported or
 lapsed, so the scope tells a fresh report from a held one and applies the 18 s of an ident or a
-resolution advisory itself.
+resolution advisory, and the 10 s of an emergency status, itself.
 
 - Each session is one ordered stream: a hello with the receiver's position and the history since
   the snapshot the scope last took (one every eight seconds, up to an hour), then live snapshots.

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { AircraftReport, AircraftSnapshot } from '../lib/aircraft';
+import { EMERGENCY_SEC } from '../lib/reports';
 import { createTrackStore, HISTORY_RETENTION_SEC, REMEMBERED_SEC } from './trackStore';
 
 /** Equirectangular stub: 1° = 60 NM, good enough to check that projection is applied. */
@@ -30,6 +31,14 @@ const identing = (hex: string, ident: boolean, heardAt: number): AircraftReport 
   ...live(hex),
   ident,
   heard: { ...live(hex).heard, ident: heardAt },
+});
+
+/** A target declaring a general emergency with no code, heard at `heardAt`. */
+const declaring = (hex: string, heardAt: number): AircraftReport => ({
+  ...live(hex),
+  squawk: '2253',
+  emergency: 'general',
+  heard: { ...live(hex).heard, emergency: heardAt },
 });
 
 /** A target whose last message was heard at `messages` seconds, with no count of them. */
@@ -222,6 +231,23 @@ describe('createTrackStore', () => {
     ]);
   });
 
+  it('shows the emergency status while its report is fresh', () => {
+    // Arrange
+    const store = createTrackStore(project);
+    const aircraft = [
+      declaring('fresh', 1000 - EMERGENCY_SEC + 0.1),
+      declaring('lapsed', 1000 - EMERGENCY_SEC),
+    ];
+
+    // Act
+    store.ingest(snapshot(1000, aircraft));
+
+    // Assert
+    const [fresh, lapsed] = ['fresh', 'lapsed'].map((hex) => store.tracks.get(hex));
+    expect([fresh?.emergency, lapsed?.emergency]).toEqual(['general', undefined]);
+    expect(lapsed?.squawk).toBe('2253');
+  });
+
   it('derives the message rate from the snapshot message counter', () => {
     // Arrange
     const store = createTrackStore(project);
@@ -253,6 +279,7 @@ describe('createTrackStore', () => {
       type: 'B789',
       registration: 'TEST-01',
       emergency: 'none',
+      heard: { emergency: 1000 },
     };
 
     // Act

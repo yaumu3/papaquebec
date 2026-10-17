@@ -10,6 +10,14 @@ export const IDENT_SEC = 18;
  */
 export const ADVISORY_SEC = 18;
 
+/**
+ * How long an emergency/priority status holds after it was last heard. A transponder broadcasts a
+ * set status every 0.7 to 0.9 s (RTCA DO-260B), or every 2.4 to 2.6 s from one of version 1 that
+ * also broadcasts its target state (RTCA DO-260A §A.1.4.8.1), and stops once it is cleared: four
+ * of the longer intervals, so that a few broadcasts lost do not clear it.
+ */
+export const EMERGENCY_SEC = 10;
+
 /** Whether a report heard at `heardAt` still holds at `now`: heard less than `lapseSec` before. */
 export function holds(heardAt: number | undefined, now: number, lapseSec: number): boolean {
   return heardAt !== undefined && now - heardAt < lapseSec;
