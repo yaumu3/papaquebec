@@ -12,7 +12,6 @@ import {
   pathOf,
   scaleLabels,
   snapped,
-  valueAt,
 } from './plot';
 import type { Interval } from './span';
 import { GAP_SEC, type Point, type Range } from './trace';
@@ -227,19 +226,6 @@ describe('laneTraces on the ground', () => {
       [false, [3]],
       [true, [1, 2]],
     ]);
-  });
-});
-
-describe('valueAt', () => {
-  it('reads the value of a trace at a sample time, undefined where it has none', () => {
-    // Arrange
-    const runs: Point[][] = [[{ t: 1, v: 250 }], [{ t: 3, v: 252 }]];
-
-    // Act
-    const values = [valueAt(runs, 3), valueAt(runs, 2)];
-
-    // Assert
-    expect(values).toEqual([252, undefined]);
   });
 });
 

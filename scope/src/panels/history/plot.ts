@@ -157,14 +157,6 @@ export function pathOf(
     .join(' ');
 }
 
-/** The value of a trace at a sample time; undefined where the trace has none. */
-export function valueAt(runs: readonly Point[][], t: number): number | undefined {
-  for (const run of runs) {
-    for (const p of run) if (p.t === t) return p.v;
-  }
-  return undefined;
-}
-
 /** Samples to read a tick from rather than the nearest, while one lies within reach of it. */
 export interface Preference {
   has: (s: Sample) => boolean;

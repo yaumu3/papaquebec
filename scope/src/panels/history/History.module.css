@@ -154,7 +154,10 @@
   height: var(--lane-top);
   pointer-events: none;
 }
+/* On the panel's ground, so that the time cursor passes behind them. */
 .top > * {
+  z-index: 2;
+  background: var(--panel-bg);
   pointer-events: auto;
 }
 /*
@@ -250,12 +253,6 @@
 .bar {
   fill: var(--text-dim);
 }
-.cursor {
-  stroke: var(--color-selbox);
-}
-.dot {
-  fill: var(--color-selbox);
-}
 .name {
   color: var(--text-dim);
   font-size: var(--text-xs);
@@ -308,6 +305,53 @@
 .label {
   position: absolute;
   transform: translateX(-50%);
+}
+/*
+ * The time cursor: a chip on the clock with a notch down to the lanes, and one line through them,
+ * in front of the plots and behind the lanes' names and readouts. At rest it stands dim at the
+ * latest sample; it lights up while the lanes are hovered.
+ */
+.chip {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  height: 12px;
+  border: 1px solid currentColor;
+  background: var(--panel-bg);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+/* Measured for the chip's width, which an inline box does not report. */
+.chipTime {
+  display: inline-block;
+}
+.notch {
+  position: absolute;
+  top: 100%;
+  z-index: 1;
+  fill: currentColor;
+  color: var(--text-dim);
+}
+.timeCursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 1px;
+  background: var(--text-dim);
+  pointer-events: none;
+}
+.chip.live,
+.notch.live {
+  color: var(--color-selbox);
+}
+.timeCursor.live {
+  background: var(--color-selbox);
+}
+/* The hovered instant on the minimap. */
+.cursor {
+  stroke: var(--color-selbox);
 }
 /* Sized by the panel; its own width is read back for the coordinates. */
 .timeline {

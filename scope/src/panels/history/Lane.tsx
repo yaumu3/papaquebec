@@ -18,7 +18,6 @@ import {
   laneTraces,
   pathOf,
   scaleLabels,
-  valueAt,
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
 import { readoutOf } from './readout';
@@ -36,7 +35,6 @@ const GRID_INSET_PX = 4;
 const BAR_INSET_PX = 2;
 /** A row thinner than this cannot hold its tab's text, and tabs would run into each other. */
 const TAB_MIN_PX = 11;
-const DOT_PX = 3;
 const BARB_PX = 16;
 /** How far apart barbs stand at the least, on round clock times of their own. */
 const BARB_PITCH_PX = 32;
@@ -71,11 +69,9 @@ export function Lane(props: {
   ticks: readonly number[];
   width: number;
   height: number;
-  hover: Sample | null;
-  /** The sample the lane is read at. */
+  /** The sample the lane is read at, and whether it is the one hovered. */
   at: Sample | null;
-  /** The pointer is this far across the plot, or has left it. */
-  onHover: (x: number | null) => void;
+  hovering: boolean;
   onClose: () => void;
   onGripDown: (y: number) => void;
   onGripMove: (y: number) => void;
@@ -157,26 +153,11 @@ export function Lane(props: {
   const readout = createMemo(() => (props.at ? readoutOf(props.keys, props.at) : null));
   /** How wide the intents' slots are: as wide as the widest intent plotted in the lane. */
   const slotCh = () => Math.max(0, ...props.keys.slice(1).map((key) => INTENT_CH[key] ?? 0));
-  const dots = () => {
-    const h = props.hover;
-    if (!h) return [];
-    return traces().flatMap((tr) => {
-      const v = valueAt(tr.runs, h.t);
-      return v === undefined ? [] : [{ cx: x(h.t), cy: yFor(tr)(v) }];
-    });
-  };
 
   return (
     <div class={s.lane} style={{ height: `${props.height}px` }}>
       <div class={s.plot}>
-        <svg
-          class={s.svg}
-          height={props.height}
-          onPointerMove={(e) =>
-            props.onHover(e.clientX - e.currentTarget.getBoundingClientRect().left)
-          }
-          onPointerLeave={() => props.onHover(null)}
-        >
+        <svg class={s.svg} height={props.height}>
           <Index each={gaps()}>
             {(g) => (
               <rect
@@ -242,22 +223,6 @@ export function Lane(props: {
               </Index>
             )}
           </Index>
-          <Show when={props.hover}>
-            {(h) => (
-              <>
-                <line
-                  class={s.cursor}
-                  x1={fixed(x(h().t))}
-                  x2={fixed(x(h().t))}
-                  y1="0"
-                  y2={props.height}
-                />
-                <Index each={dots()}>
-                  {(d) => <circle class={s.dot} cx={fixed(d().cx)} cy={fixed(d().cy)} r={DOT_PX} />}
-                </Index>
-              </>
-            )}
-          </Show>
         </svg>
         <Show when={rowHeight() >= TAB_MIN_PX}>
           <Index each={bars()}>
@@ -320,7 +285,7 @@ export function Lane(props: {
         <Show when={readout()}>
           {(r) => (
             <div class={s.readout}>
-              <span class={cx(props.hover && s.hovered)}>{r().value}</span>
+              <span class={cx(props.hovering && s.hovered)}>{r().value}</span>
               <Show when={slotCh() > 0}>
                 <span class={cx(s.slot, s.intentText)} style={{ width: `${slotCh()}ch` }}>
                   {r().first?.text}
