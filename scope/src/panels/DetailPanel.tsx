@@ -1,14 +1,16 @@
-import { createMemo, createSignal, type JSX, onCleanup, Show } from 'solid-js';
+import { createMemo, createSignal, For, type JSX, onCleanup, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { isStale, trackLabel } from '../render/scene/rules';
+import { detailTab, plotted, setDetailTab } from '../state/history';
 import type { ReadingKey } from '../state/plotted';
 import { selected, setPan, snapshotVersion } from '../state/scope';
+import { DETAIL_TABS, type DetailTab } from '../state/settings';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
-import { Divider } from '../ui/Section';
+import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
 import { advisoryBelow } from './header';
 import { History } from './history/History';
@@ -184,6 +186,92 @@ function Header(props: { t: Track }) {
   );
 }
 
+const PANEL_ID = 'detail-tabpanel';
+const tabId = (tab: DetailTab): string => `detail-tab-${tab}`;
+const TAB_LABELS: Record<DetailTab, string> = { now: 'NOW', history: 'HISTORY' };
+
+/** The tabs of the detail panel, on a rule that runs the panel's width; the open one is a box open at its foot. */
+function Tabs() {
+  const buttons: Partial<Record<DetailTab, HTMLButtonElement>> = {};
+  return (
+    <div
+      role="tablist"
+      class={s.tabs}
+      onKeyDown={(e) => {
+        if (e.ctrlKey || e.metaKey || e.altKey) return;
+        const next = tabFor(e.key, DETAIL_TABS, detailTab());
+        if (next === null) return;
+        e.preventDefault();
+        setDetailTab(next);
+        buttons[next]?.focus();
+      }}
+    >
+      <For each={DETAIL_TABS}>
+        {(tab) => (
+          <button
+            ref={(el) => {
+              buttons[tab] = el;
+            }}
+            type="button"
+            role="tab"
+            id={tabId(tab)}
+            class={cx(s.tab, detailTab() === tab && s.on)}
+            aria-selected={detailTab() === tab}
+            aria-controls={PANEL_ID}
+            tabIndex={detailTab() === tab ? 0 : -1}
+            onClick={() => setDetailTab(tab)}
+          >
+            {TAB_LABELS[tab]}
+            <Show when={tab === 'history'}>
+              <span class={s.count}>{plotted().length}</span>
+            </Show>
+          </button>
+        )}
+      </For>
+    </div>
+  );
+}
+
+/** The readings table. */
+function Readings(props: { t: Track }) {
+  return (
+    <div class={s.readings}>
+      <Group name="FLT">
+        <ReadingCell of="alt" t={props.t} />
+        <ReadingCell of="vs" t={props.t} />
+        <ReadingCell of="gs" t={props.t} />
+        <ReadingCell of="trk" t={props.t} />
+      </Group>
+      <Group name="NAV">
+        <ReadingCell of="selAlt" t={props.t} />
+        <ReadingCell of="fmsAlt" t={props.t} />
+        <ReadingCell of="selHdg" t={props.t} />
+        <ReadingCell of="qnh" t={props.t} />
+        <ReadingCell of="modes" t={props.t} span={4} />
+      </Group>
+      <Group name="AIR">
+        <ReadingCell of="ias" t={props.t} />
+        <ReadingCell of="tas" t={props.t} />
+        <ReadingCell of="mach" t={props.t} />
+        <ReadingCell of="wind" t={props.t} />
+        <ReadingCell of="oat" t={props.t} />
+        <ReadingCell of="tat" t={props.t} />
+      </Group>
+      <Group name="POS">
+        <PositionCell t={props.t} />
+        <ReadingCell of="nic" t={props.t} />
+        <ReadingCell of="nacp" t={props.t} />
+      </Group>
+      <Group name="RX">
+        <ReadingCell of="src" t={props.t} />
+        <ReadingCell of="rssi" t={props.t} />
+        <ReadingCell of="msgs" t={props.t} />
+        <ReadingCell of="age" t={props.t} dim={isStale(props.t)} />
+      </Group>
+    </div>
+  );
+}
+
 export function DetailPanel() {
   const track = createMemo(() => {
     snapshotVersion();
@@ -199,40 +287,12 @@ export function DetailPanel() {
         {(t) => (
           <>
             <Header t={t()} />
-            <Divider />
-            <History track={t()} />
-            <Group name="FLT">
-              <ReadingCell of="alt" t={t()} />
-              <ReadingCell of="vs" t={t()} />
-              <ReadingCell of="gs" t={t()} />
-              <ReadingCell of="trk" t={t()} />
-            </Group>
-            <Group name="NAV">
-              <ReadingCell of="selAlt" t={t()} />
-              <ReadingCell of="fmsAlt" t={t()} />
-              <ReadingCell of="selHdg" t={t()} />
-              <ReadingCell of="qnh" t={t()} />
-              <ReadingCell of="modes" t={t()} span={4} />
-            </Group>
-            <Group name="AIR">
-              <ReadingCell of="ias" t={t()} />
-              <ReadingCell of="tas" t={t()} />
-              <ReadingCell of="mach" t={t()} />
-              <ReadingCell of="wind" t={t()} />
-              <ReadingCell of="oat" t={t()} />
-              <ReadingCell of="tat" t={t()} />
-            </Group>
-            <Group name="POS">
-              <PositionCell t={t()} />
-              <ReadingCell of="nic" t={t()} />
-              <ReadingCell of="nacp" t={t()} />
-            </Group>
-            <Group name="RX">
-              <ReadingCell of="src" t={t()} />
-              <ReadingCell of="rssi" t={t()} />
-              <ReadingCell of="msgs" t={t()} />
-              <ReadingCell of="age" t={t()} dim={isStale(t())} />
-            </Group>
+            <Tabs />
+            <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(detailTab())}>
+              <Show when={detailTab() === 'history'} fallback={<Readings t={t()} />}>
+                <History track={t()} />
+              </Show>
+            </div>
           </>
         )}
       </Show>

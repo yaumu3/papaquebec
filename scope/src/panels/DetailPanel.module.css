@@ -150,3 +150,44 @@
 .dim {
   --value: var(--text-dim);
 }
+/* The tabs stand on a rule across the panel; the open one is a box with its foot open into the content. */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  margin-top: var(--space-5);
+}
+.tabs::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--panel-border);
+}
+.tab {
+  display: flex;
+  gap: var(--space-5);
+  padding: calc(var(--space-3) + 1px) calc(var(--space-6) + 1px) var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking);
+}
+.tab:hover,
+.on {
+  color: var(--text);
+}
+.tab:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: calc(-1 * var(--space-2));
+}
+.on {
+  padding: var(--space-3) var(--space-6) calc(var(--space-3) + 1px);
+  border: 1px solid var(--panel-border);
+  border-bottom-width: 0;
+}
+.count {
+  color: var(--text-muted);
+}
+/* The tab bar's rule stands for the first group's. */
+.readings > .group:first-child {
+  border-top: 0;
+}
