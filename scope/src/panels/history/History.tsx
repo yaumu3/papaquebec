@@ -119,11 +119,13 @@ export function History(props: { track: Track }) {
   const at = createMemo(() => hover() ?? rest()?.sample ?? null);
   /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
   const past = () => hover() !== null || rest()?.current === false;
-  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane is dragged or swiped. */
+  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane is held, dragged or swiped. */
   const pointerAt = (e: PointerEvent) => {
     const target = e.target instanceof Element ? e.target : null;
     const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
-    setHoverPx(px < 0 || drag() || swipe() || !target?.closest('[data-lane]') ? null : px);
+    setHoverPx(
+      px < 0 || drag() || swipe() || holding() || !target?.closest('[data-lane]') ? null : px,
+    );
   };
 
   const [chipText, setChipText] = createSignal<HTMLSpanElement>();
@@ -232,7 +234,7 @@ export function History(props: { track: Track }) {
     const a = at();
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
-  const { drag, swipe, grab } = createLaneDrag({
+  const { drag, swipe, holding, grab } = createLaneDrag({
     scroller,
     bin: () => add,
     pitch: LANE_PX + 1,

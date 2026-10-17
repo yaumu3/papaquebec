@@ -203,6 +203,8 @@
   /* Scrolled to, clear of the fades. */
   scroll-margin-block: var(--fade);
   cursor: grab;
+  /* A finger held on it picks it up, not the page's callout. */
+  -webkit-touch-callout: none;
 }
 .lane:focus-visible {
   outline: none;
