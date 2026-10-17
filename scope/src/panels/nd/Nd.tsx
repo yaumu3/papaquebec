@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
+import { turn } from '../../lib/geo';
 import { ndRangeNm } from '../../state/nd';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
@@ -8,14 +9,17 @@ import { trackWidth } from '../../ui/size';
 import {
   aircraftPath,
   arcPath,
+  bugPath,
   compass,
+  diamondPath,
   lastHeardY,
   lubberPath,
   ndGeometry,
   rangeAnchors,
   ringPath,
+  trackPath,
 } from './geometry';
-import { ndFrame, type NdText, ndReadouts } from './readout';
+import { ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
 
 import s from './Nd.module.css';
 
@@ -39,6 +43,19 @@ export function Nd(props: { t: Track }) {
   const marks = createMemo(() => compass(g(), frame().orient));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
   const anchors = createMemo(() => rangeAnchors(g()));
+  const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now));
+  const relative = (deg: number | undefined) =>
+    deg === undefined ? undefined : turn(frame().orient, deg);
+  const track = createMemo(() => {
+    const rel = relative(symbols().track);
+    return rel === undefined
+      ? undefined
+      : { line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
+  });
+  const bug = createMemo(() => {
+    const rel = relative(symbols().sel);
+    return rel === undefined ? undefined : bugPath(g(), rel);
+  });
   return (
     <div ref={setRoot} class={cx(s.nd, lastFrame() && s.last)} style={{ height: `${g().h}px` }}>
       <Show when={width() > 0}>
@@ -48,6 +65,9 @@ export function Nd(props: { t: Track }) {
           <path class={s.minor} d={marks().minor} />
           <path class={s.major} d={marks().major} />
           <path class={s.lubber} d={lubberPath(g())} />
+          <Show when={track()}>{(p) => <path class={s.trackLine} d={p().line} />}</Show>
+          <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
+          <Show when={track()}>{(p) => <path class={s.diamond} d={p().diamond} />}</Show>
           <path class={s.aircraft} d={aircraftPath(g())} />
         </svg>
         <Index each={marks().labels}>

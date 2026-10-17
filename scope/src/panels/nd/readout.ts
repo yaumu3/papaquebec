@@ -32,6 +32,10 @@ export function oldestHeard(heard: Heard, keys: readonly HeardKey[]): number | u
   return times.length === 0 ? undefined : Math.min(...times);
 }
 
+/** Whether a value read from these keys still holds: it is as old as the oldest of them. */
+const holdsAll = (t: Pick<Readout, 'heard'>, keys: readonly HeardKey[], now: number): boolean =>
+  holds(oldestHeard(t.heard, keys), now, INSTRUMENT_SEC);
+
 /** Whether the target's last message is `INSTRUMENT_SEC` old or older: the instrument has lost it. */
 const isLost = (t: Pick<Readout, 'seen'>): boolean => t.seen >= INSTRUMENT_SEC;
 
@@ -98,7 +102,7 @@ const shown = (r: Reading, withUnit = false): string | undefined =>
 export function ndReadouts(t: Readout, now: number): NdReadouts {
   const lost = isLost(t);
   const read = (keys: readonly HeardKey[], text: () => string | undefined, degree = false) => {
-    const fresh = !lost && holds(oldestHeard(t.heard, keys), now, INSTRUMENT_SEC);
+    const fresh = !lost && holdsAll(t, keys, now);
     const value = fresh ? text() : undefined;
     if (value !== undefined) return { text: value, known: true };
     return { text: degree ? '---°' : '---', known: false };
@@ -115,5 +119,23 @@ export function ndReadouts(t: Readout, now: number): NdReadouts {
     trk: read(['track'], () => degrees(magneticTrack(t)), true),
     tat: read(['tat'], () => shown(READINGS.tat.format(t), true)),
     sat: read(['oat'], () => shown(READINGS.oat.format(t), true)),
+  };
+}
+
+/** What the ND draws of the target's own state, in degrees magnetic, each while it holds. */
+export interface NdSymbols {
+  track?: number | undefined;
+  sel?: number | undefined;
+}
+
+/** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
+export function ndSymbols(t: Readout, now: number): NdSymbols {
+  const mode = modeOf(t, now);
+  if (mode !== 'heading' && mode !== 'track') return {};
+  const live = (keys: readonly HeardKey[], v: number | undefined) =>
+    holdsAll(t, keys, now) ? v : undefined;
+  return {
+    track: live(['track'], magneticTrack(t)),
+    sel: live(['selHeading', 'navModes'], steeringHeading(t)),
   };
 }

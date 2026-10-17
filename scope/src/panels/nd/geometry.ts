@@ -18,6 +18,12 @@ const LAST_HEARD_RISE_PX = 8;
 const AIRCRAFT_HALF_WIDTH_PX = 6;
 const AIRCRAFT_NOSE_PX = 10;
 const AIRCRAFT_TAIL_PX = 8;
+const TRACK_FROM_PX = 14;
+const TRACK_SHORT_PX = 12;
+/** Half the length of the tick that crosses the track line at the ring. */
+const CROSS_PX = 4;
+const DIAMOND_HALF_HEIGHT_PX = 6;
+const DIAMOND_HALF_WIDTH_PX = 4;
 
 /** Where the display stands in its box: the centre of the compass and the radii of its arc and ring. */
 export interface NdGeometry {
@@ -120,3 +126,68 @@ export function rangeAnchors(g: NdGeometry): {
 
 /** The line LAST HEARD is centred on, just above the half-range ring. */
 export const lastHeardY = (g: NdGeometry): number => g.cy - g.r2 - LAST_HEARD_RISE_PX;
+
+/** Whether a bearing, relative to the top, falls on the compass's arc. */
+const onArc = (rel: number): boolean => Math.abs(rel) <= SPAN_DEG;
+
+/** The track line, from near the aircraft to short of the arc, crossed at the half-range ring; empty off the arc. */
+export function trackPath(g: NdGeometry, at: number): string {
+  if (!onArc(at)) return '';
+  const p = toward(g.cx, g.cy, at);
+  return `M${p(TRACK_FROM_PX)}L${p(g.r - TRACK_SHORT_PX)}M${p(g.r2, -CROSS_PX)}L${p(g.r2, CROSS_PX)}`;
+}
+
+/** The diamond on the arc at the track, open; empty off the arc. */
+export function diamondPath(g: NdGeometry, at: number): string {
+  if (!onArc(at)) return '';
+  const p = toward(g.cx, g.cy, at);
+  return `M${p(g.r + DIAMOND_HALF_HEIGHT_PX)}L${p(g.r, DIAMOND_HALF_WIDTH_PX)}L${p(g.r - DIAMOND_HALF_HEIGHT_PX)}L${p(g.r, -DIAMOND_HALF_WIDTH_PX)}Z`;
+}
+
+/** The bug outline as (outward from the arc's radius, across): a notch in the foot, towards the arc. */
+const BUG_OUTLINE: readonly (readonly [number, number])[] = [
+  [9, -7],
+  [9, 7],
+  [1, 7],
+  [1, 3],
+  [5, 0],
+  [1, -3],
+  [1, -7],
+];
+
+/**
+ * The half of the outline inside the arc's span, for a bug at its right end. The radial line
+ * through the bug (across 0) is the line the arc ends at, so the cut falls there: the half left
+ * of it is inside. The notch's half still points at the arc.
+ */
+const BUG_INBOARD_HALF: readonly (readonly [number, number])[] = [
+  [9, 0],
+  [9, -7],
+  [1, -7],
+  [1, -3],
+  [5, 0],
+];
+
+/** The path through `outline` about the bug's own bearing `a`, its across offsets turned to `side`. */
+function bugOutline(
+  g: NdGeometry,
+  a: number,
+  outline: readonly (readonly [number, number])[],
+  side = 1,
+): string {
+  const p = toward(g.cx, g.cy, a);
+  return outline
+    .map(([out, across], i) => `${i ? 'L' : 'M'}${p(g.r + out, across * side)}`)
+    .join('');
+}
+
+/**
+ * The selected-heading bug at `rel` degrees off the top. A bearing off the arc parks the bug at
+ * the nearer end, half of it, as an instrument shows it: the part inside the span, cut at the end,
+ * which draws as an open path so that no stroke runs along the cut.
+ */
+export function bugPath(g: NdGeometry, rel: number): string {
+  if (onArc(rel)) return `${bugOutline(g, rel, BUG_OUTLINE)}Z`;
+  const side = Math.sign(rel);
+  return bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side);
+}

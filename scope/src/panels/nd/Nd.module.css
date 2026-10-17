@@ -173,3 +173,15 @@
 .unknown {
   color: var(--text-muted);
 }
+.trackLine {
+  stroke: var(--nd-track);
+  stroke-width: 1;
+}
+.bug {
+  stroke: var(--plot-intent);
+  stroke-width: 1.6;
+}
+.diamond {
+  stroke: var(--color-level);
+  stroke-width: 1.6;
+}

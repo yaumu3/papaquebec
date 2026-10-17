@@ -3,12 +3,16 @@ import { describe, expect, it } from 'bun:test';
 import {
   aircraftPath,
   arcPath,
+  bugPath,
   compass,
+  diamondPath,
   lastHeardY,
   lubberPath,
+  type NdGeometry,
   ndGeometry,
   rangeAnchors,
   ringPath,
+  trackPath,
 } from './geometry';
 
 const segments = (path: string): number => (path.match(/M/g) ?? []).length;
@@ -155,5 +159,114 @@ describe('fixed symbols', () => {
       lubber: 'M173.0 27.0L173.0 43.0',
       aircraft: 'M173.0 179.0L179.0 197.0L167.0 197.0Z',
     });
+  });
+});
+
+describe('track line and diamond', () => {
+  const g = ndGeometry(346);
+
+  it('draws the line from near the aircraft out to the arc, crossed at the ring', () => {
+    // Arrange
+    const at = 0;
+
+    // Act
+    const path = trackPath(g, at);
+
+    // Assert
+    expect(path).toBe('M173.0 175.0L173.0 52.0M169.0 114.5L177.0 114.5');
+  });
+
+  it('draws the diamond on the arc, closed', () => {
+    // Arrange
+    const at = 0;
+
+    // Act
+    const path = diamondPath(g, at);
+
+    // Assert
+    expect(path).toBe('M173.0 34.0L177.0 40.0L173.0 46.0L169.0 40.0Z');
+  });
+
+  it('draws neither where the track is off the arc', () => {
+    // Arrange
+    const at = 70;
+
+    // Act
+    const paths = [trackPath(g, at), diamondPath(g, at)];
+
+    // Assert
+    expect(paths).toEqual(['', '']);
+  });
+});
+
+const vertices = (path: string): [number, number][] => {
+  const numbers = (path.match(/-?\d+\.\d/g) ?? []).map(Number);
+  return Array.from({ length: numbers.length / 2 }, (_, i) => [
+    numbers[2 * i] ?? 0,
+    numbers[2 * i + 1] ?? 0,
+  ]);
+};
+const bearingOf = (g: NdGeometry, [x, y]: [number, number]): number =>
+  (Math.atan2(x - g.cx, g.cy - y) * 180) / Math.PI;
+
+describe('bugPath', () => {
+  const g = ndGeometry(346);
+
+  it('draws the whole bug, closed, at its bearing while that is on the arc', () => {
+    // Arrange
+    const rels = [0, 30, -55, 55];
+
+    // Act
+    const paths = rels.map((rel) => bugPath(g, rel));
+
+    // Assert
+    expect(paths[0]).toBe(
+      'M166.0 31.0L180.0 31.0L180.0 39.0L176.0 39.0L173.0 35.0L170.0 39.0L166.0 39.0Z',
+    );
+    expect(paths.map((p) => [p.endsWith('Z'), vertices(p).length])).toEqual(
+      rels.map(() => [true, 7]),
+    );
+  });
+
+  it('draws only the half inside the arc, open, at the end of it for a bearing off it', () => {
+    // Arrange
+    const rels = [100, -100];
+
+    // Act
+    const paths = rels.map((rel) => bugPath(g, rel));
+
+    // Assert
+    expect(paths.map((p) => [p.includes('Z'), vertices(p).length])).toEqual([
+      [false, 5],
+      [false, 5],
+    ]);
+    const [right, left] = paths.map((p) => vertices(p).map((v) => bearingOf(g, v)));
+    expect(Math.max(...(right ?? []))).toBeCloseTo(55, 1);
+    expect(Math.max(...(right ?? []).map(Math.abs))).toBeLessThan(55.1);
+    expect(Math.min(...(left ?? []))).toBeCloseTo(-55, 1);
+    expect(Math.max(...(left ?? []).map(Math.abs))).toBeLessThan(55.1);
+  });
+
+  it('parks the same however far off the arc the bearing is', () => {
+    // Arrange
+    const rels = [100, 170];
+
+    // Act
+    const paths = rels.map((rel) => bugPath(g, rel));
+
+    // Assert
+    expect(paths[0]).toBe(paths[1]);
+  });
+
+  it('mirrors the half bug at the left end from the one at the right end', () => {
+    // Arrange
+    const mirrored = vertices(bugPath(g, 100)).map(([x, y]): [number, number] => [2 * g.cx - x, y]);
+
+    // Act
+    const left = vertices(bugPath(g, -100));
+
+    // Assert
+    expect(left?.map(([x]) => x)).toEqual(mirrored.map(([x]) => expect.closeTo(x, 1)));
+    expect(left?.map(([, y]) => y)).toEqual(mirrored.map(([, y]) => y));
   });
 });

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { INSTRUMENT_SEC } from '../../lib/reports';
 import { setDeclinationAt } from '../../state/magnetic';
 import { makeSample } from '../../state/sampleFixture';
-import { ndFrame, type NdReadouts, ndReadouts, oldestHeard } from './readout';
+import { ndFrame, type NdReadouts, ndReadouts, ndSymbols, oldestHeard } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
@@ -261,5 +261,48 @@ describe('ndReadouts', () => {
 
     // Assert
     expect(texts(readouts)).toEqual(['462', '---', '---', '---°', '---°', '---', '-56°C']);
+  });
+});
+
+const heardAll = (keys: string[], at: number) => Object.fromEntries(keys.map((k) => [k, at]));
+
+describe('ndSymbols', () => {
+  const KEYS = ['heading', 'track', 'selHeading', 'navModes'];
+  const fields = { heading: 284, track: 289, selHeading: 310, navModes: ['autopilot'] };
+
+  it('gives the track and the selected heading, magnetic, while the frame is live', () => {
+    // Arrange
+    setDeclinationAt(() => () => 7);
+    const t = makeSample(NOW, { seen: 1, ...fields, at: AT, heard: heardAll(KEYS, FRESH) });
+
+    // Act
+    const symbols = ndSymbols(t, NOW);
+
+    // Assert
+    expect(symbols).toEqual({ track: 282, sel: 310 });
+  });
+
+  it('leaves out what no longer holds', () => {
+    // Arrange
+    const heard = { ...heardAll(KEYS, FRESH), track: STALE };
+    const t = makeSample(NOW, { seen: 1, ...fields, heard });
+
+    // Act
+    const symbols = ndSymbols(t, NOW);
+
+    // Assert
+    expect(symbols).toEqual({ sel: 310 });
+  });
+
+  it('gives nothing in a blank frame or a lost one', () => {
+    // Arrange
+    const blank = makeSample(NOW, { seen: 1, ...fields, heard: heardAll(KEYS, STALE) });
+    const lost = makeSample(NOW, { seen: 34, ...fields, heard: heardAll(KEYS, FRESH) });
+
+    // Act
+    const symbols = [blank, lost].map((t) => ndSymbols(t, NOW));
+
+    // Assert
+    expect(symbols).toEqual([{}, {}]);
   });
 });
