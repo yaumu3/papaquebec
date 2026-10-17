@@ -9,38 +9,46 @@ import {
   hoverInstant,
   movePlotLane,
   plotted,
-  resetPlotted,
   setHoverInstant,
   toggleHistory,
 } from '../../state/history';
 import { lanesOf, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
-import type { Sample, Track } from '../../state/track';
+import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
-import { Button } from '../../ui/Button';
 import { trackReorder } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
-import { READINGS } from '../readings';
-import { Value } from '../Value';
-import { axisStep, clockLabel, ticks } from './axis';
+import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
 import { Lane } from './Lane';
-import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
+import { type ScrollView, scrollView } from './scroll';
+import { type Interval, resolveSpan, type Span, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
-import { nearestSample } from './trace';
+import { restSample, sampleAt, seesAll } from './trace';
 
 import s from './History.module.css';
 
-/** The lane bay's height, which the lanes in it share, a hairline between each two. */
-const BAY_PX = 184;
-/** How far the hover box stands from the cursor. */
-const BOX_GAP_PX = 12;
+/** Each lane's height, a hairline under it. */
+const LANE_PX = 84;
+/** A step of a minute, at which a clock label reads to the minute. */
+const MINUTE_SEC = 60;
+/** The left edge of a cursor `px` across the plots, as the viewport, wider by the overhang and the gutter, places it. */
+const cursorLeft = (px: number): string =>
+  `calc(var(--lane-overhang) + var(--plot-left) + ${px - 0.5}px)`;
+/** The chip's padding either side of its time. */
+const CHIP_PAD_PX = 3;
+/** A clock time to the second, measured for the clock labels' width per character. */
+const RULER = '00:00:00';
+/** The least room between the chip and a clock label. */
+const CHIP_GAP_PX = 4;
+/** The notch under the chip, pointing down the cursor. */
+const NOTCH_W_PX = 7;
+const NOTCH_H_PX = 4;
 
-/** The height of each of `count` lanes in the bay, less the hairlines between them. */
-const laneHeight = (count: number) => Math.floor((BAY_PX - (count - 1)) / count);
-
-/** What the lanes plot of the selected target over the visible span, and the box at the hovered sample. */
+/** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
 export function History(props: { track: Track }) {
   const [span, setSpan] = createSignal<Span>(WHOLE);
+  /** How far across the plots the pointer is, if it is over them. */
+  const [hoverPx, setHoverPx] = createSignal<number | null>(null);
   // A memo, so that only another target resets the span, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
   createEffect(
@@ -48,14 +56,14 @@ export function History(props: { track: Track }) {
       hex,
       () => {
         setSpan(WHOLE);
-        setHoverInstant(null);
+        setHoverPx(null);
       },
       { defer: true },
     ),
   );
   // The lanes leave without a pointer-leave when the group folds or goes, so the hover is cleared here.
   createEffect(() => {
-    if (!historyOpen()) setHoverInstant(null);
+    if (!historyOpen()) setHoverPx(null);
   });
   onCleanup(() => setHoverInstant(null));
 
@@ -74,43 +82,98 @@ export function History(props: { track: Track }) {
   });
   const visible = createMemo(() => resolveSpan(span(), contact()));
   const lanes = createMemo(() => lanesOf(plotted()));
-  const height = createMemo(() => laneHeight(lanes().length));
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
   // Signals, as the elements come and go with the group folding and unfolding.
-  const [bay, setBay] = createSignal<HTMLDivElement>();
+  const [top, setTop] = createSignal<HTMLDivElement>();
   const [labels, setLabels] = createSignal<HTMLDivElement>();
-  const width = trackWidth(bay);
+  const width = trackWidth(top);
   /** The axis labels line up with the plots, so their width is the plots'. */
   const plotWidth = trackWidth(labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
 
+  /** The sample under the pointer, as the span moves under it too. */
   const hover = createMemo(() => {
-    const t = hoverInstant();
-    return t === null ? null : (samples().find((sample) => sample.t === t) ?? null);
+    const px = hoverPx();
+    return px === null ? null : sampleAt(samples(), px, visible(), plotWidth());
   });
-  const hoverAt = (px: number | null) => {
-    const at =
-      px === null ? null : nearestSample(samples(), timeAt(px, visible(), plotWidth()), visible());
-    setHoverInstant(at?.t ?? null);
+  // The scope rings the hovered sample on the trail.
+  createEffect(on(hover, (h) => setHoverInstant(h?.t ?? null)));
+  /** Where the cursor rests: the last sample in view. */
+  const rest = createMemo(() => restSample(samples(), visible()));
+  /** The sample the lanes are read at: the hovered one, else the one the cursor rests at. */
+  const at = createMemo(() => hover() ?? rest()?.sample ?? null);
+  /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
+  const past = () => hover() !== null || rest()?.current === false;
+  /** Hovers the instant under the pointer, none over the gutter or while a lane's grip has it. */
+  const pointerAt = (e: PointerEvent) => {
+    // A finger holds whatever it lands on, so only a button's hold is a grip's.
+    const button = e.target instanceof Element ? e.target.closest('button') : null;
+    if (button?.hasPointerCapture(e.pointerId)) return;
+    const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
+    setHoverPx(px < 0 ? null : px);
   };
-  /** The box stands beside the cursor on whichever side has more room. */
-  const boxStyle = (h: Sample) => {
-    const hx = x(h.t);
-    return hx < plotWidth() / 2
-      ? { left: `${hx + BOX_GAP_PX}px` }
-      : { right: `${plotWidth() - hx + BOX_GAP_PX}px` };
+
+  const [chipText, setChipText] = createSignal<HTMLSpanElement>();
+  const chipTextWidth = trackWidth(chipText);
+  const [ruler, setRuler] = createSignal<HTMLSpanElement>();
+  const rulerWidth = trackWidth(ruler);
+  /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere without a lane. */
+  const cursorX = () => {
+    const a = at();
+    return a && lanes().length > 0
+      ? clamp(Math.floor(x(a.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5)
+      : null;
   };
+  /** The chip's width: its time, padding and border. */
+  const chipWidth = () => chipTextWidth() + 2 * (CHIP_PAD_PX + 1);
+  const chipLeft = (px: number) => chipAt(px, chipWidth(), plotWidth());
+  /** Half a clock label's width, at the ruler's width per character: the labels of one step are as long as each other. */
+  const labelHalf = () => {
+    const first = tickTimes()[0];
+    return first === undefined
+      ? 0
+      : (clockLabel(first, step()).length * rulerWidth()) / RULER.length / 2;
+  };
+  /** The ticks whose labels fit whole over the plots. */
+  const labelTimes = createMemo(() => clearOfEnds(tickTimes(), x, plotWidth(), labelHalf()));
+  /** Whether each clock label stands clear of the chip, which hides those it would overlap. */
+  const clockClear = createMemo(() => {
+    const times = labelTimes();
+    const cursor = cursorX();
+    if (cursor === null) return times.map(() => true);
+    const left = chipLeft(cursor);
+    return clearOf(times.map(x), left, left + chipWidth(), labelHalf() + CHIP_GAP_PX);
+  });
 
   const reorder = trackReorder(movePlotLane);
-  const reset = () => {
-    resetPlotted();
-    setSpan(WHOLE);
+
+  const [scroller, setScroller] = createSignal<HTMLDivElement>();
+  const [view, setView] = createSignal<ScrollView>(scrollView(0, 0, 0));
+  const measure = () => {
+    const el = scroller();
+    if (el) setView(scrollView(el.scrollTop, el.clientHeight, el.scrollHeight));
   };
+  // Lanes come and go, which changes how far they scroll.
+  createEffect(() => {
+    lanes();
+    measure();
+  });
+  // So does the scroller's own size: on a phone it is none until the sheet first shows.
+  createEffect(() => {
+    const el = scroller();
+    if (!el) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    onCleanup(() => observer.disconnect());
+  });
 
   return (
-    <div class={cx(s.history, !historyOpen() && s.folded)}>
+    <div
+      class={cx(s.history, !historyOpen() && s.folded)}
+      style={{ '--lane-height': `${LANE_PX}px`, '--notch-height': `${NOTCH_H_PX}px` }}
+    >
       <div class={s.title}>
         <button
           type="button"
@@ -120,70 +183,16 @@ export function History(props: { track: Track }) {
         >
           <span class={s.chevron}>{historyOpen() ? '▾' : '▸'}</span>
           HISTORY
-          <Show when={historyOpen()}>
-            : {clockTime(visible().from)} – {clockTime(visible().to)}Z
-          </Show>
         </button>
-        <Show when={historyOpen()}>
-          <Button onClick={reset}>RESET</Button>
-        </Show>
       </div>
       <Show when={historyOpen()}>
-        <div ref={setBay} class={s.bay} style={{ height: `${BAY_PX}px` }}>
-          <Show
-            when={lanes().length > 0}
-            fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
-          >
-            <For each={lanes()}>
-              {(lane, i) => (
-                <Lane
-                  lane={lane}
-                  index={i()}
-                  count={lanes().length}
-                  keys={readingsIn(plotted(), lane)}
-                  samples={samples()}
-                  visible={visible()}
-                  ticks={tickTimes()}
-                  width={plotWidth()}
-                  height={height()}
-                  hover={hover()}
-                  onHover={hoverAt}
-                  onClose={() => closePlotLane(lane)}
-                  onGripDown={(y) => reorder.down(i(), y, height() + 1, lanes().length)}
-                  onGripMove={(y) => reorder.move(y)}
-                  onGripStep={(by) => movePlotLane(i(), clamp(i() + by, 0, lanes().length - 1))}
-                />
-              )}
-            </For>
+        <div ref={setTop} class={s.span}>
+          <Show when={!seesAll(visible(), samples())}>
+            <span class={s.contactSpan}>
+              {clockLabel(contact().from, MINUTE_SEC)} – {clockLabel(contact().to, MINUTE_SEC)}
+            </span>
           </Show>
-          <div class={s.overlay}>
-            <Show when={hover()}>
-              {(h) => (
-                <div class={s.box} style={boxStyle(h())}>
-                  <div class={s.time}>{clockTime(h().t)}Z</div>
-                  <For each={lanes().flatMap((lane) => readingsIn(plotted(), lane))}>
-                    {(key) => (
-                      <div class={s.row}>
-                        <span class={s.rowLabel}>{READINGS[key].label}</span>
-                        <Value r={READINGS[key].format(h())} />
-                      </div>
-                    )}
-                  </For>
-                </div>
-              )}
-            </Show>
-          </div>
-        </div>
-        <div class={s.axis}>
-          <div ref={setLabels} class={s.labels}>
-            <For each={tickTimes()}>
-              {(t) => (
-                <span class={s.label} style={{ left: `${x(t)}px` }}>
-                  {clockLabel(t, step())}
-                </span>
-              )}
-            </For>
-          </div>
+          <span class={s.visibleSpan}>{spanLabel(visible())}</span>
         </div>
         <Timeline
           samples={samples()}
@@ -191,8 +200,110 @@ export function History(props: { track: Track }) {
           contact={contact()}
           visible={visible()}
           width={width()}
+          hover={hoverInstant()}
           onSpan={setSpan}
         />
+        <div class={s.axis}>
+          <div ref={setLabels} class={s.labels}>
+            <For each={labelTimes()}>
+              {(t, i) => (
+                <Show when={clockClear()[i()]}>
+                  <span class={s.label} style={{ left: `${x(t)}px` }}>
+                    {clockLabel(t, step())}
+                  </span>
+                </Show>
+              )}
+            </For>
+            <span ref={setRuler} class={cx(s.label, s.ruler)} aria-hidden="true">
+              {RULER}
+            </span>
+            <Show when={cursorX() !== null && at()}>
+              {(a) => (
+                <>
+                  <span
+                    class={cx(s.chip, past() && s.live)}
+                    style={{
+                      left: `${chipLeft(cursorX() ?? 0)}px`,
+                      padding: `0 ${CHIP_PAD_PX}px`,
+                    }}
+                  >
+                    <span ref={setChipText} class={s.chipTime}>
+                      {clockTime(a().t)}
+                    </span>
+                  </span>
+                  <svg
+                    class={cx(s.notch, past() && s.live)}
+                    style={{ left: `${(cursorX() ?? 0) - NOTCH_W_PX / 2}px` }}
+                    width={NOTCH_W_PX}
+                    height={NOTCH_H_PX}
+                  >
+                    <path d={`M0 0 H${NOTCH_W_PX} L${NOTCH_W_PX / 2} ${NOTCH_H_PX} Z`} />
+                  </svg>
+                </>
+              )}
+            </Show>
+          </div>
+        </div>
+        <div class={s.bay}>
+          <div
+            class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}
+            style={(() => {
+              const px = cursorX();
+              return px === null ? {} : { '--cursor-left': cursorLeft(px) };
+            })()}
+          >
+            <div
+              ref={setScroller}
+              class={s.scroller}
+              onScroll={measure}
+              onPointerMove={pointerAt}
+              onPointerLeave={() => setHoverPx(null)}
+            >
+              <Show
+                when={lanes().length > 0}
+                fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
+              >
+                <For each={lanes()}>
+                  {(lane, i) => (
+                    <Lane
+                      lane={lane}
+                      index={i()}
+                      count={lanes().length}
+                      keys={readingsIn(plotted(), lane)}
+                      samples={samples()}
+                      visible={visible()}
+                      ticks={tickTimes()}
+                      width={plotWidth()}
+                      height={LANE_PX}
+                      at={at()}
+                      past={past()}
+                      onClose={() => closePlotLane(lane)}
+                      onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, lanes().length)}
+                      onGripMove={(y) => reorder.move(y)}
+                      onGripStep={(by) => movePlotLane(i(), clamp(i() + by, 0, lanes().length - 1))}
+                    />
+                  )}
+                </For>
+              </Show>
+            </div>
+            <Show when={cursorX()}>
+              {(px) => (
+                <div
+                  class={cx(s.timeCursor, past() && s.live)}
+                  style={{ left: cursorLeft(px()) }}
+                />
+              )}
+            </Show>
+          </div>
+          <Show when={view().thumb}>
+            {(thumb) => (
+              <div
+                class={s.thumb}
+                style={{ top: `${thumb().top}px`, height: `${thumb().height}px` }}
+              />
+            )}
+          </Show>
+        </div>
       </Show>
     </div>
   );

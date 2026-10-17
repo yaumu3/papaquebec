@@ -1,26 +1,33 @@
 import { describe, expect, it } from 'bun:test';
 
-import { makeSample as sample } from '../../state/sampleFixture';
+import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
 import {
   atTicks,
   barbPath,
   barbReach,
   GLYPH_REACH_PX,
+  headingAt,
   headingGlyph,
   laneRange,
   laneTraces,
   pathOf,
-  valueAt,
+  scaleLabels,
+  snapped,
 } from './plot';
 import type { Interval } from './span';
-import { GAP_SEC, type Point } from './trace';
+import { GAP_SEC, type Point, type Range } from './trace';
 
 const ALL: Interval = { from: 0, to: 10_000 };
 
+/** The metres a power of ten stands for, to six figures. */
+const metres = (v: number) => Number((10 ** v).toPrecision(6));
+/** A range as flat as one value. */
+const flat = (v: number): Range => ({ lo: v, hi: v });
+
 describe('laneTraces', () => {
-  it('draws the lane its own reading first, then each intent plotted in it with its dash, marked as one', () => {
+  it('draws the lane its own reading first, then each intent plotted in it with its dash if any, marked as one', () => {
     // Arrange
-    const samples = [sample(1, { alt: 11000, selAlt: 12000, fmsAlt: 13000 })];
+    const samples = [heardSample(1, { alt: 11000, selAlt: 12000, fmsAlt: 13000 })];
 
     // Act
     const traces = laneTraces(samples, ['alt', 'fmsAlt', 'selAlt'], ALL);
@@ -29,7 +36,7 @@ describe('laneTraces', () => {
     expect(traces.map((tr) => [tr.key, tr.dash, tr.intent ?? false, tr.runs])).toEqual([
       ['alt', undefined, false, [[{ t: 1, v: 11000 }]]],
       ['fmsAlt', 'dotted', true, [[{ t: 1, v: 13000 }]]],
-      ['selAlt', 'dashed', true, [[{ t: 1, v: 12000 }]]],
+      ['selAlt', undefined, true, [[{ t: 1, v: 12000 }]]],
     ]);
   });
 
@@ -172,13 +179,44 @@ describe('headingGlyph with a selected heading', () => {
   });
 });
 
+describe('laneTraces with the instants each reading is heard at', () => {
+  it('breaks a line where its reading went unheard, while the target kept being heard', () => {
+    // Arrange
+    const again = 2 + GAP_SEC;
+    const samples = Array.from({ length: 40 }, (_, k) =>
+      sample(k + 1, {
+        alt: 11000,
+        verticalRate: 0,
+        heard: { alt: k + 1 < again ? 1 : again, verticalRate: k + 1 },
+      }),
+    );
+
+    // Act
+    const traces = [laneTraces(samples, ['alt'], ALL), laneTraces(samples, ['vs'], ALL)];
+
+    // Assert
+    expect(traces.map(([tr]) => tr?.runs.map((run) => run.length))).toEqual([[1, 1], [40]]);
+  });
+
+  it('joins every sample of a reading of the reception itself', () => {
+    // Arrange
+    const samples = [1, 2, 3].map((t) => sample(t, { messageRate: 4 }));
+
+    // Act
+    const traces = laneTraces(samples, ['msgs'], ALL);
+
+    // Assert
+    expect(traces.map((tr) => tr.runs.map((run) => run.length))).toEqual([[3]]);
+  });
+});
+
 describe('laneTraces on the ground', () => {
   it('draws the stretch on the ground along the floor, apart from the altitudes', () => {
     // Arrange
     const samples = [
-      sample(1, { alt: 'ground' }),
-      sample(2, { alt: 'ground' }),
-      sample(3, { alt: 500 }),
+      heardSample(1, { alt: 'ground' }),
+      heardSample(2, { alt: 'ground' }),
+      heardSample(3, { alt: 500 }),
     ];
 
     // Act
@@ -189,19 +227,6 @@ describe('laneTraces on the ground', () => {
       [false, [3]],
       [true, [1, 2]],
     ]);
-  });
-});
-
-describe('valueAt', () => {
-  it('reads the value of a trace at a sample time, undefined where it has none', () => {
-    // Arrange
-    const runs: Point[][] = [[{ t: 1, v: 250 }], [{ t: 3, v: 252 }]];
-
-    // Act
-    const values = [valueAt(runs, 3), valueAt(runs, 2)];
-
-    // Assert
-    expect(values).toEqual([252, undefined]);
   });
 });
 
@@ -252,6 +277,26 @@ describe('atTicks', () => {
 
     // Assert
     expect(reads).toEqual([{ t: 100, trk: 90, hdg: undefined }]);
+  });
+
+  it('reads nothing at a tick its reading was heard a gap away from, though a sample is near', () => {
+    // Arrange
+    const samples = [100, 150].map((t) =>
+      sample(t, { windDir: 300, windSpeed: 12, heard: { windDir: 100, windSpeed: 100 } }),
+    );
+    const ticks = [100, 150];
+
+    // Act
+    const barbs = atTicks(
+      samples,
+      ticks,
+      (s) => (s.windDir === undefined ? undefined : { dir: s.windDir }),
+      undefined,
+      ['windDir', 'windSpeed'],
+    );
+
+    // Assert
+    expect(barbs).toEqual([{ t: 100, dir: 300 }]);
   });
 });
 
@@ -318,13 +363,88 @@ describe('reach', () => {
   });
 });
 
+describe('snapped', () => {
+  it("bounds a lane's data by multiples of its quantum, a flat trace on a step one quantum below the top", () => {
+    // Arrange
+    const rows = [
+      { lane: 'alt', r: flat(29_400) },
+      { lane: 'alt', r: flat(30_000) },
+      { lane: 'alt', r: { lo: 26_200, hi: 33_700 } },
+      { lane: 'vs', r: { lo: 0, hi: 1800 } },
+      { lane: 'vs', r: flat(0) },
+      { lane: 'gs', r: flat(290.4) },
+      { lane: 'gs', r: flat(290) },
+      { lane: 'gs', r: { lo: 434, hi: 458 } },
+      { lane: 'qnh', r: flat(29.93) },
+      { lane: 'mach', r: { lo: 0.762, hi: 0.781 } },
+      { lane: 'oat', r: flat(-45.3) },
+      { lane: 'rssi', r: { lo: -15.3, hi: -9.3 } },
+      { lane: 'rssi', r: { lo: -12.4, hi: -11.6 } },
+      { lane: 'msgs', r: { lo: 1.2, hi: 3.8 } },
+      { lane: 'msgs', r: { lo: 6.2, hi: 11.3 } },
+      { lane: 'age', r: { lo: 0.4, hi: 5.4 } },
+    ] as const;
+
+    // Act
+    const ranges = rows.map(({ lane, r }) => snapped(r, lane));
+
+    // Assert
+    expect(ranges).toEqual([
+      { lo: 29_000, hi: 30_000 },
+      { lo: 30_000, hi: 31_000 },
+      { lo: 26_000, hi: 34_000 },
+      { lo: 0, hi: 2000 },
+      { lo: 0, hi: 500 },
+      { lo: 290, hi: 300 },
+      { lo: 290, hi: 300 },
+      { lo: 430, hi: 460 },
+      { lo: 29.93, hi: 29.94 },
+      { lo: 0.76, hi: 0.79 },
+      { lo: -46, hi: -45 },
+      { lo: -20, hi: -5 },
+      { lo: -15, hi: -10 },
+      { lo: 0, hi: 5 },
+      { lo: 5, hi: 15 },
+      { lo: 0, hi: 6 },
+    ]);
+  });
+
+  it('snaps a bound on a log scale outward to 1, 2, 5 × 10ⁿ metres, or of nautical miles from 0.1 NM', () => {
+    // Arrange
+    const rows = [
+      // The tracker rounds a radius up to whole metres, 0.1 NM to 186.
+      { lane: 'nic', lo: 186, hi: 1112 },
+      { lane: 'nacp', lo: 30, hi: 92.6 },
+      { lane: 'nacp', lo: 3, hi: 555.6 },
+      // On a rung, flat: up to the next rung.
+      { lane: 'nacp', lo: 926, hi: 926 },
+      // Between rungs, flat: out to the rungs either side, 30 m being none.
+      { lane: 'nacp', lo: 30, hi: 30 },
+    ] as const;
+
+    // Act
+    const ranges = rows.map(({ lane, lo, hi }) =>
+      snapped({ lo: Math.log10(lo), hi: Math.log10(hi) }, lane),
+    );
+
+    // Assert
+    expect(ranges.map((r) => [metres(r.lo), metres(r.hi)])).toEqual([
+      [185.2, 1852],
+      [20, 100],
+      [2, 926],
+      [926, 1852],
+      [20, 50],
+    ]);
+  });
+});
+
 describe('laneRange', () => {
-  it('spans the own reading and its intents on one scale, off the floor, at least the lane span', () => {
+  it('spans the own reading and its intents on one scale, off the floor, snapped to the quantum', () => {
     // Arrange
     const samples = [
-      sample(1, { alt: 'ground' }),
-      sample(2, { alt: 35_000, selAlt: 35_100 }),
-      sample(3, { alt: 35_020, selAlt: 35_100 }),
+      heardSample(1, { alt: 'ground' }),
+      heardSample(2, { alt: 35_000, selAlt: 35_100 }),
+      heardSample(3, { alt: 35_020, selAlt: 35_100 }),
     ];
     const traces = laneTraces(samples, ['alt', 'selAlt'], ALL);
 
@@ -332,6 +452,73 @@ describe('laneRange', () => {
     const range = laneRange(traces, 'alt', ALL);
 
     // Assert
-    expect(range).toEqual({ lo: 34_550, hi: 35_550 });
+    expect(range).toEqual({ lo: 35_000, hi: 36_000 });
+  });
+});
+
+describe('scaleLabels', () => {
+  it('labels the top and bottom of a lane as its reading reads them, bounds with their unit', () => {
+    // Arrange
+    const rows = [
+      { lane: 'alt', r: { lo: 26_000, hi: 34_000 } },
+      { lane: 'vs', r: { lo: 0, hi: 2000 } },
+      { lane: 'gs', r: { lo: 430, hi: 465 } },
+      { lane: 'nic', r: { lo: Math.log10(0.1 * 1852), hi: Math.log10(1852) } },
+      { lane: 'nacp', r: { lo: Math.log10(20), hi: Math.log10(100) } },
+      { lane: 'modes', r: { lo: 0, hi: 1 } },
+    ] as const;
+
+    // Act
+    const labels = rows.map(({ lane, r }) => scaleLabels(lane, r).map((l) => l.text));
+
+    // Assert
+    expect(labels).toEqual([
+      ['FL340', 'FL260'],
+      ['+2000', '0'],
+      ['465', '430'],
+      ['<1 NM', '<0.1 NM'],
+      ['<100 m', '<20 m'],
+      [],
+    ]);
+  });
+
+  it('puts each label at the value it labels', () => {
+    // Arrange
+    const r = { lo: 430, hi: 465 };
+
+    // Act
+    const labels = scaleLabels('gs', r);
+
+    // Assert
+    expect(labels.map((l) => l.v)).toEqual([465, 430]);
+  });
+});
+
+describe('headingAt', () => {
+  it('reads each of the track, heading and selected heading only while heard within the gap of the tick', () => {
+    // Arrange
+    const steering = { track: 90, heading: 85, selHeading: 120, navModes: ['autopilot'] };
+    const stale = 100 - GAP_SEC - 11;
+    const rows = [
+      { track: 100, heading: stale, selHeading: 100 },
+      { track: 100, heading: 100, selHeading: 100 },
+      { track: stale, heading: 100, selHeading: 100 },
+      { track: stale, heading: stale, selHeading: 100 },
+      { track: 100, heading: 100, selHeading: stale },
+    ];
+
+    // Act
+    const marks = rows.map((heard) =>
+      headingAt(sample(100, { ...steering, heard }), 100, 'selHdg'),
+    );
+
+    // Assert
+    expect(marks).toEqual([
+      { trk: 90, hdg: undefined, sel: 120 },
+      { trk: 90, hdg: 85, sel: 120 },
+      { trk: undefined, hdg: 85, sel: 120 },
+      undefined,
+      { trk: 90, hdg: 85, sel: undefined },
+    ]);
   });
 });

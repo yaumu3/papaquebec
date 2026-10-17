@@ -1,3 +1,4 @@
+import type { Heard } from '../lib/aircraft';
 import type { Sample } from './track';
 
 /** A sample at `t` with no reading but those given. */
@@ -36,4 +37,10 @@ export function makeSample(t: number, over: Partial<Sample> = {}): Sample {
     at: undefined,
     ...over,
   };
+}
+
+/** A sample at `t` with no reading but those given, each heard at `t`. */
+export function makeHeardSample(t: number, over: Partial<Sample> = {}): Sample {
+  const heard: Heard = Object.fromEntries(Object.keys(over).map((key) => [key, t]));
+  return makeSample(t, { ...over, heard });
 }

@@ -1,4 +1,5 @@
 import { clockTime } from '../../lib/format';
+import { clamp } from '../../lib/math';
 import type { Interval } from './span';
 
 /** Steps along the clock, seconds: each a round part of it, up to the hour. */
@@ -37,3 +38,23 @@ export function clockLabel(t: number, step: number): string {
   const full = clockTime(t);
   return step < 60 ? full : full.slice(0, 5);
 }
+
+/** The span's ends as its axis reads them, then how long it is: in seconds under a minute, else in whole minutes. */
+export function spanLabel(i: Interval): string {
+  const sec = i.to - i.from;
+  const step = axisStep(sec);
+  const long = sec < 60 ? `${Math.round(sec)} S` : `${Math.round(sec / 60)} MIN`;
+  return `${clockLabel(i.from, step)} – ${clockLabel(i.to, step)} · ${long}`;
+}
+
+/** The left of a chip `chipW` across centred on `x`, kept inside a plot `plotW` across. */
+export const chipAt = (x: number, chipW: number, plotW: number): number =>
+  clamp(x - chipW / 2, 0, Math.max(0, plotW - chipW));
+
+/** Whether each label at `xs`, `halfPx` either side, misses the stretch from `from` to `to`. */
+export const clearOf = (
+  xs: readonly number[],
+  from: number,
+  to: number,
+  halfPx: number,
+): boolean[] => xs.map((x) => x + halfPx <= from || x - halfPx >= to);

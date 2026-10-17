@@ -113,6 +113,37 @@ describe('READINGS', () => {
   });
 });
 
+describe('READINGS values', () => {
+  it('reads a number of a reading as the reading itself reads', () => {
+    // Arrange
+    const rows = [
+      { key: 'alt', v: 34_000 },
+      { key: 'alt', v: 8000 },
+      { key: 'vs', v: 2000 },
+      { key: 'gs', v: 465 },
+      { key: 'qnh', v: 29.85 },
+      { key: 'mach', v: 0.8 },
+      { key: 'nic', v: 1852 },
+      { key: 'nacp', v: 20 },
+    ] as const;
+
+    // Act
+    const readings = rows.map(({ key, v }) => READINGS[key].value?.(v));
+
+    // Assert
+    expect(readings.map((r) => [r?.v, r?.unit])).toEqual([
+      ['FL340', undefined],
+      ['8000', 'ft'],
+      ['+2000', 'fpm'],
+      ['465', 'kt'],
+      ['29.85', 'inHg'],
+      ['M0.80', undefined],
+      ['<1', 'NM'],
+      ['<20', 'm'],
+    ]);
+  });
+});
+
 describe('positionReading', () => {
   it('names a live fix and dashes none', () => {
     // Arrange

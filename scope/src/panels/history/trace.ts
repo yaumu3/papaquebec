@@ -1,7 +1,7 @@
-import { nearestInTime } from '../../lib/nearest';
+import type { HeardKey } from '../../lib/aircraft';
 import { STALE_SECONDS } from '../../render/scene/rules';
 import type { Sample } from '../../state/track';
-import type { Interval } from './span';
+import { type Interval, timeAt } from './span';
 
 /** As long without a report as makes a target stale on the scope breaks a trace too. */
 export const GAP_SEC = STALE_SECONDS;
@@ -44,21 +44,51 @@ function around(samples: readonly Sample[], i: Interval): Sample[] {
   return samples.slice(Math.max(0, first - 1), Math.min(samples.length, last + 1));
 }
 
-/** The runs of points a trace joins: consecutive samples of a stretch that carry the reading. */
-export function runsOf(samples: readonly Sample[], read: Read, i: Interval): Point[][] {
+/** When a reading made of the values `keys` was heard: when the oldest of them was; undefined unless one was. */
+export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefined {
+  const instants = keys.flatMap((key) => s.heard[key] ?? []);
+  return instants.length > 0 ? Math.min(...instants) : undefined;
+}
+
+/** Whether the reading made of `keys` was heard no further than the gap from `t`; always, without keys. */
+export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
+  if (keys.length === 0) return true;
+  const at = heardAt(s, keys);
+  return at !== undefined && Math.abs(t - at) <= GAP_SEC;
+}
+
+/**
+ * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
+ * the `heard` instants of the reading, only a sample with a new report of it, heard within the gap
+ * of the sample, is a point, and a run breaks where the reading went unheard longer than the gap.
+ */
+export function runsOf(
+  samples: readonly Sample[],
+  read: Read,
+  i: Interval,
+  heard: readonly HeardKey[] = [],
+): Point[][] {
   const runs: Point[][] = [];
   for (const stretch of stretches(around(samples, i))) {
     let run: Point[] = [];
+    let last: number | undefined;
+    const end = () => {
+      if (run.length > 0) runs.push(run);
+      run = [];
+    };
     for (const s of stretch) {
       const v = read(s);
+      const at = heard.length > 0 ? heardAt(s, heard) : s.t;
       if (v === undefined) {
-        if (run.length > 0) runs.push(run);
-        run = [];
-      } else {
-        run.push({ t: s.t, v });
+        end();
+        continue;
       }
+      if (at === undefined || at === last || !heardNear(s, heard, s.t)) continue;
+      if (last !== undefined && at - last > GAP_SEC) end();
+      run.push({ t: s.t, v });
+      last = at;
     }
-    if (run.length > 0) runs.push(run);
+    end();
   }
   return runs;
 }
@@ -92,13 +122,6 @@ export function rangeOf(traces: readonly Point[][][], i: Interval): Range | null
   return lo <= hi ? { lo, hi } : null;
 }
 
-/** The range spread about its middle to `span` when narrower, so that noise does not fill a lane. */
-export function widened(r: Range, span: number): Range {
-  if (r.hi - r.lo >= span) return r;
-  const mid = (r.lo + r.hi) / 2;
-  return { lo: mid - span / 2, hi: mid + span / 2 };
-}
-
 /** Where a value falls down a lane, the pads kept clear at the top and the bottom; midway between them for a flat range. */
 export function yOf(
   v: number,
@@ -128,12 +151,61 @@ export function gapsIn(samples: readonly Sample[], i: Interval): Interval[] {
   return out;
 }
 
-/** The sample inside the interval nearest in time to `t`; null without any. */
+/** How many of the samples, oldest first, come before `t`, or at it too when `through`. */
+function countBefore(samples: readonly Sample[], t: number, through = false): number {
+  let lo = 0;
+  let hi = samples.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const st = samples[mid]?.t ?? Infinity;
+    if (st < t || (through && st === t)) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * The sample inside the interval nearest in time to `t`, the earlier of two as near; null without
+ * any. The samples are oldest first.
+ */
 export function nearestSample(samples: readonly Sample[], t: number, i: Interval): Sample | null {
-  return nearestInTime(
-    samples.filter((s) => s.t >= i.from && s.t <= i.to),
-    t,
-  );
+  const start = countBefore(samples, i.from);
+  const end = countBefore(samples, i.to, true);
+  const k = Math.min(Math.max(countBefore(samples, t), start), end);
+  const before = k > start ? samples[k - 1] : undefined;
+  const after = k < end ? samples[k] : undefined;
+  if (!before || !after) return before ?? after ?? null;
+  return t - before.t <= after.t - t ? before : after;
+}
+
+/** The sample inside the interval nearest the time a point `px` across a plot `width` wide stands for; null without any. */
+export function sampleAt(
+  samples: readonly Sample[],
+  px: number,
+  i: Interval,
+  width: number,
+): Sample | null {
+  return nearestSample(samples, timeAt(px, i, width), i);
+}
+
+/** Where the cursor rests: a sample, and whether it is the contact's latest. */
+export interface Rest {
+  sample: Sample;
+  current: boolean;
+}
+
+/** The last sample inside the interval, where the cursor rests; null without any. The samples are oldest first. */
+export function restSample(samples: readonly Sample[], i: Interval): Rest | null {
+  const end = countBefore(samples, i.to, true);
+  const sample = end > countBefore(samples, i.from) ? samples[end - 1] : undefined;
+  return sample ? { sample, current: end === samples.length } : null;
+}
+
+/** Whether the interval holds every sample, oldest first; true of none. */
+export function seesAll(i: Interval, samples: readonly Sample[]): boolean {
+  const first = samples[0];
+  const last = samples.at(-1);
+  return !first || !last || (i.from <= first.t && i.to >= last.t);
 }
 
 export interface Bar {
@@ -144,17 +216,20 @@ export interface Bar {
 
 /**
  * A bar per name reported, in order of first report: each stretch runs from the sample that
- * first reports the name to the last that does before one that does not, or a gap.
+ * first reports the name to the last that does before one that does not, or a gap. With the
+ * `heard` instants of the names, a sample whose names went unheard longer than the gap reports none.
  */
 export function barsOf(
   samples: readonly Sample[],
   names: (s: Sample) => readonly string[] | undefined,
+  heard: readonly HeardKey[] = [],
 ): Bar[] {
   const bars = new Map<string, Bar>();
   for (const stretch of stretches(samples)) {
     let previous: Sample | undefined;
     for (const s of stretch) {
-      for (const name of names(s) ?? []) {
+      const named = heardNear(s, heard, s.t) ? names(s) : undefined;
+      for (const name of named ?? []) {
         const bar = bars.get(name) ?? { name, on: [] };
         bars.set(name, bar);
         const open = bar.on.at(-1);

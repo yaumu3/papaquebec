@@ -49,14 +49,36 @@ function ownsDrag(target: Element, sheet: Element): boolean {
   return false;
 }
 
-/** Whether the content under the finger is scrolled to its top, or has nothing to scroll. */
+/** A box under a finger, as far as its scroll goes. */
+export interface ScrollBox {
+  /** Whether its overflow scrolls. */
+  scrolls: boolean;
+  scrollTop: number;
+  scrollHeight: number;
+  clientHeight: number;
+}
+
+/** Whether every box of `chain` with something to scroll is scrolled to its top. */
+export function atTopOf(chain: readonly ScrollBox[]): boolean {
+  return chain.every(
+    (box) => !box.scrolls || box.scrollHeight <= box.clientHeight || box.scrollTop <= 0,
+  );
+}
+
+/** Whether the content under the finger is scrolled to its top, or has nothing to scroll, all the way out to the sheet. */
 function scrolledToTop(target: Element, sheet: Element): boolean {
+  const chain: ScrollBox[] = [];
   for (let el: Element | null = target; el && el !== sheet; el = el.parentElement) {
     const { overflowY } = getComputedStyle(el);
-    const scrolls = overflowY === 'auto' || overflowY === 'scroll';
-    if (scrolls && el.scrollHeight > el.clientHeight) return el.scrollTop <= 0;
+    const { scrollTop, scrollHeight, clientHeight } = el;
+    chain.push({
+      scrolls: overflowY === 'auto' || overflowY === 'scroll',
+      scrollTop,
+      scrollHeight,
+      clientHeight,
+    });
   }
-  return true;
+  return atTopOf(chain);
 }
 
 /** Whether text of `node` itself, not of what it holds, is in the text the page has selected. */

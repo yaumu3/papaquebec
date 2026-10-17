@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { HeardKey } from '../../lib/aircraft';
 import { makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
 import type { Interval } from './span';
@@ -8,11 +9,14 @@ import {
   barsOf,
   GAP_SEC,
   gapsIn,
+  heardAt,
   nearestSample,
+  restSample,
+  sampleAt,
+  seesAll,
   type Point,
   rangeOf,
   runsOf,
-  widened,
   yOf,
 } from './trace';
 
@@ -73,6 +77,82 @@ describe('runsOf', () => {
   });
 });
 
+describe('heardAt', () => {
+  it('is the oldest instant of the keys heard, undefined with none', () => {
+    // Arrange
+    const keys: readonly HeardKey[] = ['windSpeed', 'windDir'];
+    const rows = [
+      sample(20, { heard: { windSpeed: 10, windDir: 8 } }),
+      sample(20, { heard: { windDir: 8 } }),
+      sample(20, { heard: { gs: 8 } }),
+    ];
+
+    // Act
+    const instants = rows.map((s) => heardAt(s, keys));
+
+    // Assert
+    expect(instants).toEqual([8, 8, undefined]);
+  });
+});
+
+describe('runsOf with the instants a reading is heard at', () => {
+  it('takes a value repeated without a new report as no new point', () => {
+    // Arrange
+    const samples = [1, 1, 3, 3].map((heard, k) =>
+      sample(k + 1, { gs: 250 + heard, heard: { gs: heard } }),
+    );
+
+    // Act
+    const runs = runsOf(samples, gs, ALL, ['gs']);
+
+    // Assert
+    expect(runs).toEqual([
+      [
+        { t: 1, v: 251 },
+        { t: 3, v: 253 },
+      ],
+    ]);
+  });
+
+  it('breaks where the reading went unheard longer than the gap, though the samples kept coming', () => {
+    // Arrange
+    const again = 2 + GAP_SEC;
+    const samples = Array.from({ length: 40 }, (_, k) =>
+      sample(k + 1, { gs: 250, heard: { gs: k + 1 < again ? 1 : again } }),
+    );
+
+    // Act
+    const runs = runsOf(samples, gs, ALL, ['gs']);
+
+    // Assert
+    expect(runs).toEqual([[{ t: 1, v: 250 }], [{ t: again, v: 250 }]]);
+  });
+
+  it('skips a sample at the start of a stretch whose reading was heard a gap before it', () => {
+    // Arrange
+    const before = [0, 5, 10].map((t) => sample(t, { gs: 300, heard: { gs: t } }));
+    const stale = sample(100, { gs: 300, heard: { gs: 10 } });
+    const after = [101, 110].map((t) => sample(t, { gs: 200, heard: { gs: t } }));
+
+    // Act
+    const runs = runsOf([...before, stale, ...after], gs, { from: 95, to: 115 }, ['gs']);
+
+    // Assert
+    expect(runs.map((run) => run.map((p) => p.t))).toEqual([[10], [101, 110]]);
+  });
+
+  it('skips a sample whose reading was never heard', () => {
+    // Arrange
+    const samples = [sample(1, { gs: 250, heard: { gs: 1 } }), sample(2, { gs: 251 })];
+
+    // Act
+    const runs = runsOf(samples, gs, ALL, ['gs']);
+
+    // Assert
+    expect(runs).toEqual([[{ t: 1, v: 250 }]]);
+  });
+});
+
 describe('rangeOf', () => {
   it('spans the lowest to the highest value inside the interval over every trace', () => {
     // Arrange
@@ -96,23 +176,6 @@ describe('rangeOf', () => {
 
     // Assert
     expect(range).toEqual([{ lo: 50, hi: 300 }, null]);
-  });
-});
-
-describe('widened', () => {
-  it('widens a range narrower than the span about its middle, and keeps a wider one', () => {
-    // Arrange
-    const narrow = { lo: 35_000, hi: 35_100 };
-    const wide = { lo: 30_000, hi: 35_000 };
-
-    // Act
-    const ranges = [widened(narrow, 1000), widened(wide, 1000)];
-
-    // Assert
-    expect(ranges).toEqual([
-      { lo: 34_550, hi: 35_550 },
-      { lo: 30_000, hi: 35_000 },
-    ]);
   });
 });
 
@@ -203,6 +266,24 @@ describe('nearestSample', () => {
     // Assert
     expect(found.map((s) => s?.t)).toEqual([110, 110, undefined]);
   });
+
+  it("takes the earlier of two as near, the window's own ends included, none among none", () => {
+    // Arrange
+    const samples = [sample(100), sample(110), sample(120), sample(130)];
+    const rows = [
+      { from: samples, t: 115, i: { from: 100, to: 130 } },
+      { from: samples, t: 90, i: { from: 100, to: 130 } },
+      { from: samples, t: 140, i: { from: 100, to: 130 } },
+      { from: samples, t: 125, i: { from: 111, to: 119 } },
+      { from: [], t: 115, i: { from: 100, to: 130 } },
+    ];
+
+    // Act
+    const found = rows.map((r) => nearestSample(r.from, r.t, r.i));
+
+    // Assert
+    expect(found.map((s) => s?.t)).toEqual([110, 100, 130, undefined, undefined]);
+  });
 });
 
 const modes = (s: Sample) => s.navModes;
@@ -252,6 +333,19 @@ describe('barsOf', () => {
       },
     ]);
   });
+
+  it('ends a bar where its reading went unheard longer than the gap, though the samples kept coming', () => {
+    // Arrange
+    const samples = [1, 2, 2 + GAP_SEC, 3 + GAP_SEC].map((t) =>
+      sample(t, { navModes: ['AP'], heard: { navModes: 1 } }),
+    );
+
+    // Act
+    const bars = barsOf(samples, modes, ['navModes']);
+
+    // Assert
+    expect(bars).toEqual([{ name: 'AP', on: [{ from: 1, to: 2 }] }]);
+  });
 });
 
 describe('barbMarks', () => {
@@ -272,5 +366,68 @@ describe('barbMarks', () => {
       ['pennant', 'full', 'half'],
       ['pennant', 'pennant', 'full'],
     ]);
+  });
+});
+
+describe('restSample', () => {
+  it("rests on the last sample inside the window, current only when it is the contact's latest", () => {
+    // Arrange
+    const samples = [sample(100), sample(110), sample(120), sample(130)];
+    const windows = [
+      { from: 100, to: 130 },
+      { from: 100, to: 125 },
+      { from: 111, to: 119 },
+    ];
+
+    // Act
+    const rests = windows.map((i) => restSample(samples, i));
+
+    // Assert
+    expect(rests.map((r) => r && [r.sample.t, r.current])).toEqual([
+      [130, true],
+      [120, false],
+      null,
+    ]);
+  });
+});
+
+describe('seesAll', () => {
+  it('sees every sample when it reaches over the first and the last, and all of none', () => {
+    // Arrange
+    const contact = [sample(100), sample(150), sample(200)];
+    const rows = [
+      { i: { from: 90, to: 210 }, samples: contact },
+      { i: { from: 101, to: 210 }, samples: contact },
+      { i: { from: 90, to: 199 }, samples: contact },
+      { i: { from: 100, to: 200 }, samples: contact },
+      { i: { from: 90, to: 210 }, samples: [] },
+    ];
+
+    // Act
+    const seen = rows.map((r) => seesAll(r.i, r.samples));
+
+    // Assert
+    expect(seen).toEqual([true, false, false, true, true]);
+  });
+});
+
+describe('sampleAt', () => {
+  it('takes the sample nearest the time a point across the plot stands for, inside the window', () => {
+    // Arrange
+    const samples = [sample(100), sample(110), sample(120), sample(130)];
+    const window = { from: 100, to: 130 };
+    const rows = [
+      { px: 0, i: window },
+      { px: 140, i: window },
+      { px: 300, i: window },
+      { px: 140, i: { from: 110, to: 140 } },
+      { px: 140, i: { from: 111, to: 119 } },
+    ];
+
+    // Act
+    const found = rows.map((r) => sampleAt(samples, r.px, r.i, 300));
+
+    // Assert
+    expect(found.map((s) => s?.t)).toEqual([100, 110, 130, 120, undefined]);
   });
 });

@@ -5,7 +5,7 @@ import { HPA_PER_INHG } from '../../lib/units';
 import { setDeclinationAt } from '../../state/magnetic';
 import { laneOf, READING_KEYS } from '../../state/plotted';
 import { makeSample } from '../../state/sampleFixture';
-import { minSpanOf, PLOTS } from './plots';
+import { PLOTS } from './plots';
 
 describe('PLOTS', () => {
   it('draws an intent inside the lane plotted.ts says it belongs to, and nothing else as one', () => {
@@ -122,6 +122,18 @@ describe('PLOTS', () => {
     expect(out).toEqual([1.3, { dir: 300, speed: 12 }]);
   });
 
+  it('plots the crew QNH in the inHg it reads in, bounded on hundredths of an inch', () => {
+    // Arrange
+    const s = makeSample(1, { navQnh: 1013.2 });
+    const qnh = PLOTS.qnh;
+
+    // Act
+    const plotted = qnh.kind === 'line' ? [qnh.y(s), qnh.quantum] : null;
+
+    // Assert
+    expect(plotted).toEqual([1013.2 / HPA_PER_INHG, 0.01]);
+  });
+
   it('plots the NIC and NACp as the powers of ten of their bounds, none where they bound nothing', () => {
     // Arrange
     const samples = [
@@ -145,18 +157,5 @@ describe('PLOTS', () => {
       [undefined, undefined],
       [undefined, undefined],
     ]);
-  });
-});
-
-describe('minSpanOf', () => {
-  it('spans an intent like the lane it is drawn in, and a lane of glyphs, bars or barbs not at all', () => {
-    // Arrange
-    const keys = ['selAlt', 'alt', 'selHdg', 'trk', 'modes', 'wind'] as const;
-
-    // Act
-    const spans = keys.map(minSpanOf);
-
-    // Assert
-    expect(spans).toEqual([1000, 1000, undefined, undefined, undefined, undefined]);
   });
 });

@@ -1,15 +1,16 @@
 /*
- * Beside each plot: the grip, the close button, and a gutter between each and the plot. Padding
+ * Left of each plot, the gutter its scale is labelled in; the plots run to the right edge. Padding
  * below, not a margin, so the room under the timeline does not collapse into the next rule's;
  * as much as the title's ink stands from the rule above, which is less once the group is folded
  * and the title's line is all that is left.
  */
 .history {
-  --lane-grip: 24px;
-  --lane-close: 24px;
-  --lane-gutter: 8px;
-  --plot-left: calc(var(--lane-grip) + var(--lane-gutter));
-  --plot-right: calc(var(--lane-close) + var(--lane-gutter));
+  --lane-gutter: 32px;
+  --lane-top: 18px;
+  --plot-left: var(--lane-gutter);
+  --plot-right: 0px;
+  /* How far a long scale label may run left of the lanes: the panel's side padding (DetailPanel .body). */
+  --lane-overhang: var(--space-6);
   padding-bottom: var(--space-5);
 }
 .folded {
@@ -37,30 +38,77 @@
   display: inline-block;
   width: 1.5ch;
 }
+/* The lanes, and the thumb beside them in the margin. */
 .bay {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  margin-top: var(--space-4);
+}
+/*
+ * A lane cut by an edge fades into the panel ground there. The time cursor's column fades only at
+ * the bottom, so that the cursor runs on unbroken from the chip's notch.
+ */
+.viewport {
+  --fade-top: 0px;
+  --fade-bottom: 0px;
+  --cursor-left: -1px;
+  position: relative;
+  margin-left: calc(-1 * var(--lane-overhang));
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--fade-top),
+      #000 calc(100% - var(--fade-bottom)),
+      transparent
+    ),
+    linear-gradient(to bottom, #000 calc(100% - var(--fade-bottom)), transparent);
+  mask-size:
+    100% 100%,
+    1px 100%;
+  mask-position:
+    0 0,
+    var(--cursor-left) 0;
+  mask-repeat: no-repeat;
+  mask-composite: add;
+}
+.cutTop {
+  --fade-top: var(--space-6);
+}
+.cutBottom {
+  --fade-bottom: var(--space-6);
+}
+/* Four lanes and their hairlines at the most; past them the lanes scroll, with no bar of their own. */
+.scroller {
+  max-height: calc(4 * (var(--lane-height) + 1px));
+  padding-left: var(--lane-overhang);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+.thumb {
+  position: absolute;
+  right: calc(-1 * var(--space-3));
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--plot-scale);
+  pointer-events: none;
 }
 .empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: var(--lane-height);
   border: 1px dashed var(--plot-grid);
   color: var(--text-muted);
   font-size: var(--text-sm);
   letter-spacing: var(--tracking);
 }
+/* A hairline under each lane, outside its height. */
 .lane {
-  display: grid;
-  grid-template-columns: var(--lane-grip) 1fr var(--lane-close);
-  column-gap: var(--lane-gutter);
-  align-items: stretch;
-}
-.lane + .lane {
-  border-top: 1px solid var(--plot-grid);
+  position: relative;
+  box-sizing: content-box;
+  border-bottom: 1px solid var(--plot-grid);
 }
 .grip,
 .close {
@@ -78,12 +126,84 @@
   touch-action: none;
 }
 .plot {
-  position: relative;
-  min-width: 0;
+  position: absolute;
+  inset: 0 var(--plot-right) 0 var(--plot-left);
 }
+/* Sized by the lane; the width the plots are drawn to is read off the clock row. */
 .svg {
   display: block;
+  width: 100%;
   touch-action: pan-y;
+}
+/* The lane's only value lines: the top and bottom of its scale. */
+.scale {
+  fill: none;
+  stroke: var(--plot-scale);
+}
+/* The scale's labels, right-aligned a little short of the plot, each centred on its line. */
+.gutter {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--lane-gutter) - var(--space-2));
+  pointer-events: none;
+}
+.bound {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  color: var(--plot-label);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+/* Over the plot: the lane's grip, name and close button at the left. */
+.top {
+  position: absolute;
+  top: var(--space-1);
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--lane-top);
+  pointer-events: none;
+}
+/* On the panel's ground, so that the time cursor passes behind them. */
+.top > * {
+  z-index: 2;
+  background: var(--panel-bg);
+  pointer-events: auto;
+}
+/*
+ * What the lane reads at the cursor's instant, at the right on the panel's ground, a little short of
+ * the edge; each intent in a slot of its own width, so that none moves another.
+ */
+.readout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 100%;
+  margin: 0 var(--space-2) 0 auto;
+  padding-left: var(--space-2);
+  background: var(--panel-bg);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* A value read at an earlier instant than the latest, hovered or with the window in the past. */
+.past {
+  color: var(--color-selbox);
+}
+.slot {
+  display: inline-block;
+}
+.intentText {
+  color: var(--plot-intent);
+}
+.sample {
+  display: block;
 }
 .gap {
   fill: var(--plot-gap);
@@ -148,16 +268,7 @@
 .bar {
   fill: var(--text-dim);
 }
-.cursor {
-  stroke: var(--color-selbox);
-}
-.dot {
-  fill: var(--color-selbox);
-}
 .name {
-  position: absolute;
-  top: 1px;
-  left: var(--space-2);
   color: var(--text-dim);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-wide);
@@ -172,58 +283,111 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/* The axis line closes the bay; the labels under it line up with the plots. */
-.axis {
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--plot-grid);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-/* Labels line up with the plots; one at an edge may overhang into the grip or close column. */
-.labels {
-  position: relative;
-  height: 16px;
-  margin: 0 var(--plot-right) 0 var(--plot-left);
-}
-/* Over the plots, for the box; the pointer goes through to the lanes. */
-.overlay {
-  position: absolute;
-  inset: 0 var(--plot-right) 0 var(--plot-left);
-  pointer-events: none;
-}
-.label {
-  position: absolute;
-  transform: translateX(-50%);
-}
-.box {
-  position: absolute;
-  top: var(--space-3);
-  z-index: 1;
-  min-width: 150px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--panel-bg);
-  border: 1px solid var(--color-selbox);
-}
-.time {
-  color: var(--color-selbox);
-  font-size: var(--text-sm);
-}
-.row {
+/*
+ * Over the minimap: when the contact starts and ends at the left, while the window shows only part
+ * of it, and the visible span at the right.
+ */
+.span {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-5);
-}
-.rowLabel {
-  color: var(--text-dim);
-  font-size: var(--text-sm);
+  gap: var(--space-4);
+  margin: var(--space-4) 0 var(--space-1);
+  color: var(--text);
+  font-size: var(--text-xs);
+  line-height: 1;
   letter-spacing: var(--tracking);
+  white-space: nowrap;
+}
+.contactSpan {
+  color: var(--plot-label);
+}
+.visibleSpan {
+  margin-left: auto;
+}
+/* The clock over the lanes, a hairline under it. */
+.axis {
+  margin-top: var(--space-4);
+  border-bottom: 1px solid var(--plot-grid);
+  color: var(--plot-label);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking);
+  white-space: nowrap;
+}
+/*
+ * Labels line up with the plots; the cursor's chip stands among them, its notch below reaching
+ * down over the hairline to the first lane's top edge.
+ */
+.labels {
+  --chip-height: 14px;
+  position: relative;
+  height: calc(var(--chip-height) + var(--notch-height) - 1px);
+  margin: 0 var(--plot-right) 0 var(--plot-left);
+}
+/* On the chip time's baseline: its box as tall, less the chip's border either side. */
+.label {
+  position: absolute;
+  top: 1px;
+  line-height: calc(var(--chip-height) - 2px);
+  transform: translateX(-50%);
+}
+/* A clock label never shown, measured for the labels' width. */
+.ruler {
+  visibility: hidden;
+}
+/*
+ * The time cursor: a chip on the clock with a notch down to the lanes, and one line through them,
+ * in front of the plots and behind the lanes' names and readouts. At rest it stands at the last
+ * sample in view, dim at the latest; it lights up away from it, hovered or with the window in the
+ * past.
+ */
+.chip {
+  position: absolute;
+  top: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  height: var(--chip-height);
+  font-size: var(--text-sm);
+  line-height: calc(var(--chip-height) - 2px);
+  border: 1px solid currentColor;
+  background: var(--panel-bg);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+/* Measured for the chip's width, which an inline box does not report. */
+.chipTime {
+  display: inline-block;
+}
+.notch {
+  position: absolute;
+  top: var(--chip-height);
+  z-index: 1;
+  fill: currentColor;
+  color: var(--text-dim);
+}
+.timeCursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 1px;
+  background: var(--text-dim);
+  pointer-events: none;
+}
+.chip.live,
+.notch.live {
+  color: var(--color-selbox);
+}
+.timeCursor.live {
+  background: var(--color-selbox);
+}
+/* The hovered instant on the minimap. */
+.cursor {
+  stroke: var(--color-selbox);
 }
 /* Sized by the panel; its own width is read back for the coordinates. */
 .timeline {
   display: block;
   width: 100%;
-  margin-top: var(--space-4);
   overflow: visible;
   touch-action: none;
 }
@@ -253,6 +417,16 @@
 /* What the aircraft is set to do, in the lanes and the minimap alike. */
 .intent {
   stroke: var(--plot-intent);
+}
+/* The target the aircraft levels at second, and the sample of its line. */
+.intentDim {
+  color: var(--plot-intent-dim);
+  stroke: var(--plot-intent-dim);
+}
+/* An intent the contact has had, unknown at the cursor's instant: dimmed as the table dims it. */
+.unknown {
+  color: var(--text-dim);
+  stroke: var(--text-dim);
 }
 .dim {
   fill: var(--panel-bg);
