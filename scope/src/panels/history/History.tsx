@@ -145,6 +145,14 @@ export function History(props: { track: Track }) {
     lanes();
     measure();
   });
+  // So does the scroller's own size: on a phone it is none until the sheet first shows.
+  createEffect(() => {
+    const el = scroller();
+    if (!el) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    onCleanup(() => observer.disconnect());
+  });
 
   return (
     <div
