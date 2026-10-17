@@ -17,7 +17,12 @@ function declinationOf(at: GeoPoint | undefined): number {
   return where ? declinationAt()(where.lat, where.lon) : 0;
 }
 
+/** A true bearing in degrees magnetic, as measured where the target is, or at the site for one without a position. */
+export function magneticBearing(trueDeg: number, at: GeoPoint | undefined): number {
+  return trueToMagnetic(trueDeg, declinationOf(at));
+}
+
 /** Ground track in degrees magnetic, the reference every bearing on the scope reads in. */
 export function magneticTrack(t: Pick<Readings, 'track' | 'at'>): number | undefined {
-  return t.track === undefined ? undefined : trueToMagnetic(t.track, declinationOf(t.at));
+  return t.track === undefined ? undefined : magneticBearing(t.track, t.at);
 }
