@@ -161,6 +161,15 @@
   position: absolute;
   overflow: hidden;
 }
+.neg {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  color: var(--pfd-ink);
+  font-size: var(--text-pfd-2xs);
+  font-weight: 600;
+  line-height: 7px;
+  text-align: center;
+}
 .hatch {
   display: inline-block;
   width: 1ch;

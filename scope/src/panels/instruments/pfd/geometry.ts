@@ -213,6 +213,8 @@ const MONO_ADVANCE_EM = 0.6;
  * (1 − (1020 + 300) / 1000) / 2 + 1020 / 1000.
  */
 const MONO_BASELINE_EM = 0.86;
+/** JetBrains Mono's cap height, 730 of 1000 units per em. */
+const MONO_CAP_EM = 0.73;
 
 /**
  * The window of a digit of `px` ending at `edge`, standing on the baseline of a line of `linePx`
@@ -650,6 +652,8 @@ export interface AltitudeReadout {
   thousands: WheelCell;
   hundreds: WheelCell;
   drum: WheelCell;
+  /** The middle of the cap height of the slot's digit, where NEG is centred. */
+  neg: { x: number; y: number };
 }
 
 /** Where the altitude readout's wheels stand. */
@@ -660,10 +664,11 @@ export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
   const digit = (edge: number, px: number) => digitCell(g.yc, ALTITUDE_THOUSANDS_PX, edge, px);
   const hundreds = digit(right - ALTITUDE_DIGITS_GAP_PX, ALTITUDE_HUNDREDS_PX);
   const thousands = digit(hundreds.x, ALTITUDE_THOUSANDS_PX);
+  const slot = digit(thousands.x, ALTITUDE_THOUSANDS_PX);
   return {
     tapeX: (g.aL + g.aR) / 2,
     midX: (left + right) / 2,
-    tenThousands: digit(thousands.x, ALTITUDE_THOUSANDS_PX),
+    tenThousands: slot,
     thousands,
     hundreds,
     drum: {
@@ -673,6 +678,10 @@ export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
       h: DRUM_WINDOW_H_PX,
       lineH: ALTITUDE_DRUM_LINE_PX,
       above: 2,
+    },
+    neg: {
+      x: slot.x + slot.w / 2,
+      y: slot.y + (MONO_BASELINE_EM - MONO_CAP_EM / 2) * slot.h,
     },
   };
 }

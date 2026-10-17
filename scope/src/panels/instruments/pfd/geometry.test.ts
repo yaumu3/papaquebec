@@ -699,6 +699,17 @@ describe('altitudeReadout', () => {
     ]);
   });
 
+  it('centres NEG on the slot at the middle of its cap height', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = altitudeReadout(g);
+
+    // Assert
+    expect([out.neg.x, out.neg.y].map((v) => Number(v.toFixed(3)))).toEqual([279.9, 122.915]);
+  });
+
   it('keeps the thousands slot clear of the left stroke of the box and its spike', () => {
     // Arrange
     const g = pfdGeometry(346);

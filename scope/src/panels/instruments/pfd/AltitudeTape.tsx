@@ -54,10 +54,9 @@ function Hatch() {
   );
 }
 
-/** What a slot row shows: its digit or the hatch, and the minus sign for NEG until NEG is drawn. */
+/** What a slot row shows: its digit or the hatch; NEG stands apart, as the sign never rolls. */
 const slotText = (row: SlotRow): JSX.Element => {
   if (row.kind === 'hatch') return <Hatch />;
-  if (row.kind === 'neg') return '−';
   return row.kind === 'digit' ? row.text : '';
 };
 
@@ -141,6 +140,13 @@ export function AltitudeText(props: AltitudeProps & { baro: string }) {
               row={slotText}
               class={s.thousands}
             />
+            <Show when={v().digits.tenThousands.rows[1]?.kind === 'neg'}>
+              <div class={s.neg} style={{ left: `${at().neg.x}px`, top: `${at().neg.y}px` }}>
+                <div>N</div>
+                <div>E</div>
+                <div>G</div>
+              </div>
+            </Show>
             <Wheel cell={at().thousands} wheel={v().digits.thousands} class={s.thousands} />
             <Wheel cell={at().hundreds} wheel={v().digits.hundreds} class={s.hundreds} />
             <Wheel cell={at().drum} wheel={v().digits.drum} class={s.hundreds} />

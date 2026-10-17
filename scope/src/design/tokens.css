@@ -66,6 +66,7 @@
   /* The PFD's speed digits, altitude digits and the labels of its tapes and VSI. */
   --text-pfd-speed: 16px;
   --text-pfd-xs: 8px;
+  --text-pfd-2xs: 7px;
   --text-pfd-label: 12px;
   --text-pfd-alt: 17px;
   --tracking: 0.5px;
