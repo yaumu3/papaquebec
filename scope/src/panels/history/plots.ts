@@ -74,7 +74,7 @@ const inHg = (hpa: number | undefined): number | undefined =>
 const logOf = (m: number | undefined): number | undefined =>
   m === undefined ? undefined : Math.log10(m);
 
-/** How each reading is drawn; `laneOf` in `state/plotted.ts` says which lane an intent goes in. */
+/** How each reading is drawn; `INTENTS` in `state/plotted.ts` says which lane an intent goes in. */
 export const PLOTS: Record<ReadingKey, PlotSpec> = {
   // As the crew reads it, so that an aircraft holding its selected altitude sits on that line.
   alt: {

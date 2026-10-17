@@ -72,12 +72,12 @@ describe('savePersisted', () => {
       settings: { ...DEFAULT_SETTINGS, rangeNm: 20, labelDensity: 'dense' },
       panels: { ...DEFAULT_PANELS, maps: false },
       listSort: { key: 'alt', dir: 'desc' },
-      plotted: ['trk', 'selHdg'],
+      plotted: ['trk', 'gs'],
       historyOpen: false,
     };
+    savePersisted(storage, state);
 
     // Act
-    savePersisted(storage, state);
     const back = loadPersisted(storage, DEFAULTS);
 
     // Assert
@@ -150,7 +150,7 @@ describe('loadPersisted band', () => {
 });
 
 describe('loadPersisted plotted', () => {
-  it('keeps the readings it knows, each once, and falls back when the entry is no list', () => {
+  it('keeps the lanes it knows, each once, and falls back when the entry is no list', () => {
     // Arrange
     const stores = [['gs', 'bogus', 'alt', 'gs'], [], 'alt'].map((plotted) =>
       memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted }) }),
@@ -161,6 +161,26 @@ describe('loadPersisted plotted', () => {
 
     // Assert
     expect(plotted).toEqual([['gs', 'alt'], [], ['alt', 'gs']]);
+  });
+});
+
+describe('loadPersisted plotted from before lanes stood alone', () => {
+  it('drops the intents a plot saved then lists, keeping its lanes in order', () => {
+    // Arrange
+    const saved = [
+      ['alt', 'selAlt', 'fmsAlt', 'gs'],
+      ['trk', 'selHdg', 'gs'],
+      ['selAlt', 'gs'],
+    ];
+    const stores = saved.map((plotted) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted }) }),
+    );
+
+    // Act
+    const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
+
+    // Assert
+    expect(plotted).toEqual([['alt', 'gs'], ['trk', 'gs'], ['gs']]);
   });
 });
 

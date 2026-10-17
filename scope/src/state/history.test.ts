@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  closePlotLane,
   historyOpen,
   hoverInstant,
   movePlotLane,
   plotted,
+  removePlotLane,
   setHoverInstant,
   setPlotted,
   toggleHistory,
@@ -37,12 +37,12 @@ describe('history state', () => {
     expect(plotted()).toEqual([...DEFAULT_PLOTTED, 'vs']);
   });
 
-  it('closes a lane with the intents drawn in it', () => {
+  it('removes a lane', () => {
     // Arrange
     setPlotted([...DEFAULT_PLOTTED, 'vs']);
 
     // Act
-    closePlotLane('alt');
+    removePlotLane('alt');
 
     // Assert
     expect(plotted()).toEqual(['gs', 'vs']);

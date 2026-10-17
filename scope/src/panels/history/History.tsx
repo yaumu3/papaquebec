@@ -4,15 +4,15 @@ import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
 import {
-  closePlotLane,
   historyOpen,
   hoverInstant,
   movePlotLane,
   plotted,
+  removePlotLane,
   setHoverInstant,
   toggleHistory,
 } from '../../state/history';
-import { lanesOf, readingsIn } from '../../state/plotted';
+import { readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
@@ -81,7 +81,6 @@ export function History(props: { track: Track }) {
     return { from: samples()[0]?.t ?? now, to: now };
   });
   const visible = createMemo(() => resolveSpan(span(), contact()));
-  const lanes = createMemo(() => lanesOf(plotted()));
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
@@ -122,7 +121,7 @@ export function History(props: { track: Track }) {
   /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere without a lane. */
   const cursorX = () => {
     const a = at();
-    return a && lanes().length > 0
+    return a && plotted().length > 0
       ? clamp(Math.floor(x(a.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5)
       : null;
   };
@@ -157,7 +156,7 @@ export function History(props: { track: Track }) {
   };
   // Lanes come and go, which changes how far they scroll.
   createEffect(() => {
-    lanes();
+    plotted();
     measure();
   });
   // So does the scroller's own size: on a phone it is none until the sheet first shows.
@@ -196,7 +195,7 @@ export function History(props: { track: Track }) {
         </div>
         <Timeline
           samples={samples()}
-          lanes={lanes().map((lane) => readingsIn(plotted(), lane))}
+          lanes={plotted().map(readingsIn)}
           contact={contact()}
           visible={visible()}
           width={width()}
@@ -260,16 +259,16 @@ export function History(props: { track: Track }) {
               onPointerLeave={() => setHoverPx(null)}
             >
               <Show
-                when={lanes().length > 0}
+                when={plotted().length > 0}
                 fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
               >
-                <For each={lanes()}>
+                <For each={plotted()}>
                   {(lane, i) => (
                     <Lane
                       lane={lane}
                       index={i()}
-                      count={lanes().length}
-                      keys={readingsIn(plotted(), lane)}
+                      count={plotted().length}
+                      keys={readingsIn(lane)}
                       samples={samples()}
                       visible={visible()}
                       ticks={tickTimes()}
@@ -277,10 +276,12 @@ export function History(props: { track: Track }) {
                       height={LANE_PX}
                       at={at()}
                       past={past()}
-                      onClose={() => closePlotLane(lane)}
-                      onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, lanes().length)}
+                      onClose={() => removePlotLane(lane)}
+                      onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, plotted().length)}
                       onGripMove={(y) => reorder.move(y)}
-                      onGripStep={(by) => movePlotLane(i(), clamp(i() + by, 0, lanes().length - 1))}
+                      onGripStep={(by) =>
+                        movePlotLane(i(), clamp(i() + by, 0, plotted().length - 1))
+                      }
                     />
                   )}
                 </For>

@@ -1,17 +1,17 @@
 import { createSignal } from 'solid-js';
 
-import { closeLane, moveLane, type ReadingKey, togglePlotted } from './plotted';
+import { type LaneKey, moveLane, removeLane, togglePlotted } from './plotted';
 import { persisted } from './settings';
 
-/** The readings the history lanes plot, in lane order; see `plotted.ts` for what that means. */
-export const [plotted, setPlotted] = createSignal<readonly ReadingKey[]>(persisted.plotted);
+/** The lanes of the history, in order. */
+export const [plotted, setPlotted] = createSignal<readonly LaneKey[]>(persisted.plotted);
 
-export function togglePlot(key: ReadingKey): void {
-  setPlotted((p) => togglePlotted(p, key));
+export function togglePlot(lane: LaneKey): void {
+  setPlotted((p) => togglePlotted(p, lane));
 }
 
-export function closePlotLane(lane: ReadingKey): void {
-  setPlotted((p) => closeLane(p, lane));
+export function removePlotLane(lane: LaneKey): void {
+  setPlotted((p) => removeLane(p, lane));
 }
 
 export function movePlotLane(from: number, to: number): void {

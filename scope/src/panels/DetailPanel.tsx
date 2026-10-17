@@ -5,7 +5,7 @@ import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { isStale, trackLabel } from '../render/scene/rules';
 import { plotted, togglePlot } from '../state/history';
-import type { ReadingKey } from '../state/plotted';
+import { isLaneKey, type ReadingKey } from '../state/plotted';
 import { selected, setPan, snapshotVersion } from '../state/scope';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
@@ -55,17 +55,19 @@ function Cell(props: {
   );
 }
 
-/** The cell of one reading of the catalog: a tap plots it, another takes it off again. */
+/** The cell of one reading of the catalog: a tap plots its lane, if it has one, another takes it off again. */
 function ReadingCell(props: { of: ReadingKey; t: Track; dim?: boolean; span?: 4 }) {
   const spec = READINGS[props.of];
   return (
     <Cell
       k={spec.label}
       r={spec.format(props.t)}
-      on={plotted().includes(props.of)}
+      on={isLaneKey(props.of) && plotted().includes(props.of)}
       dim={props.dim}
       span={props.span}
-      onClick={() => togglePlot(props.of)}
+      onClick={() => {
+        if (isLaneKey(props.of)) togglePlot(props.of);
+      }}
     />
   );
 }

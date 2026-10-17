@@ -3,17 +3,18 @@ import { describe, expect, it } from 'bun:test';
 import { qnhAltitudeFt } from '../../lib/altitude';
 import { HPA_PER_INHG } from '../../lib/units';
 import { setDeclinationAt } from '../../state/magnetic';
-import { laneOf, READING_KEYS } from '../../state/plotted';
+import { INTENTS, READING_KEYS, type ReadingKey } from '../../state/plotted';
 import { makeSample } from '../../state/sampleFixture';
 import { PLOTS } from './plots';
 
 describe('PLOTS', () => {
-  it('draws an intent inside the lane plotted.ts says it belongs to, and nothing else as one', () => {
+  it('draws as an intent each reading plotted.ts draws in a lane, and nothing else', () => {
     // Arrange
     const keys = READING_KEYS;
+    const intents = new Set<ReadingKey>(Object.values(INTENTS).flat());
 
     // Act
-    const agree = keys.map((k) => (PLOTS[k].kind === 'intent') === (laneOf(k) !== k));
+    const agree = keys.map((k) => (PLOTS[k].kind === 'intent') === intents.has(k));
 
     // Assert
     expect(agree).toEqual(keys.map(() => true));
