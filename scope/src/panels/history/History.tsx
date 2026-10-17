@@ -1,13 +1,4 @@
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  on,
-  onCleanup,
-  onMount,
-  Show,
-} from 'solid-js';
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
@@ -252,18 +243,24 @@ export function History(props: { track: Track }) {
     el.scrollTop = historyView(hex()).scrollTop;
     measure();
   };
-  onMount(restoreScroll);
   createEffect(on(hex, restoreScroll, { defer: true }));
   // Lanes come and go, which changes how far they scroll.
   createEffect(() => {
     plotted();
     measure();
   });
-  // So does the scroller's own size: on a phone it is none until the sheet first shows.
+  // So does the scroller's own size, which is none while the panel is hidden; a hidden scroller drops
+  // the scroll it is given, so it gets the kept one back once it has a size again.
   createEffect(() => {
     const el = scroller();
     if (!el) return;
-    const observer = new ResizeObserver(measure);
+    let sized = false;
+    const observer = new ResizeObserver(() => {
+      const shown = el.clientHeight > 0;
+      if (shown && !sized) restoreScroll();
+      else measure();
+      sized = shown;
+    });
     observer.observe(el);
     onCleanup(() => observer.disconnect());
   });
