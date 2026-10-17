@@ -11,6 +11,7 @@ import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
 import { Divider } from '../ui/Section';
 import { Window } from '../ui/Window';
+import { advisoryBelow } from './header';
 import { History } from './history/History';
 import { NONE, positionReading, type Reading, READINGS } from './readings';
 import { Value } from './Value';
@@ -124,11 +125,15 @@ function Header(props: { t: Track }) {
   let head!: HTMLDivElement;
   let flight!: HTMLDivElement;
   let advisory: HTMLSpanElement | undefined;
-  const fit = () => {
-    const gap = Number.parseFloat(getComputedStyle(head).columnGap) || 0;
-    const needed = flight.offsetWidth + gap + (advisory?.offsetWidth ?? 0);
-    setRaBelow(needed > head.clientWidth);
-  };
+  const fit = () =>
+    setRaBelow(
+      advisoryBelow({
+        flight: flight.offsetWidth,
+        gap: Number.parseFloat(getComputedStyle(head).columnGap) || 0,
+        advisory: advisory?.offsetWidth ?? 0,
+        room: head.clientWidth,
+      }),
+    );
   const resized = new ResizeObserver(fit);
   onCleanup(() => resized.disconnect());
   const type = () => props.t.type && `${props.t.type}/${wakeLetter(props.t.category)}`;
