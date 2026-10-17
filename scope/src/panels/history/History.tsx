@@ -44,7 +44,7 @@ const CHIP_GAP_PX = 4;
 const NOTCH_W_PX = 7;
 const NOTCH_H_PX = 4;
 
-/** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the latest. */
+/** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
 export function History(props: { track: Track }) {
   const [span, setSpan] = createSignal<Span>(WHOLE);
   /** How far across the plots the pointer is, if it is over them. */
@@ -129,7 +129,7 @@ export function History(props: { track: Track }) {
   /** The chip's width: its time, padding and border. */
   const chipWidth = () => chipTextWidth() + 2 * (CHIP_PAD_PX + 1);
   const chipLeft = (px: number) => chipAt(px, chipWidth(), plotWidth());
-  /** Half a clock label's width: the labels of one step are as long as each other, in the chip's characters. */
+  /** Half a clock label's width, at the ruler's width per character: the labels of one step are as long as each other. */
   const labelHalf = () => {
     const first = tickTimes()[0];
     return first === undefined
