@@ -186,6 +186,9 @@ Conventions:
 - **Shape** is source: ADS-B filled square, MLAT square with ring, TIS-B diamond. Filtered-out
   targets persist as bare hollow diamonds.
 - **Emergency** is additive: red plus a two-letter tag (`HJ` `RF` `EM`), never hidden by filters.
+  - It comes from the squawk (7500, 7600, 7700) or from the ADS-B status: general, no
+    communications, unlawful interference or downed.
+  - Lifeguard and minimum fuel are a priority, not an emergency: no red, filtered like any target.
   - An active resolution advisory tags the block `RA` in the same red, and an ident `ID` in the
     block's own tone; the tags share one line in that order.
   - The detail panel badges them beside the callsign, the advisory in the words TCAS says it in.

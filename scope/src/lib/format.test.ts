@@ -71,15 +71,25 @@ describe('wakeLetter / formatGsWake', () => {
 });
 
 describe('emergencyCode', () => {
-  it('derives the two-letter prefix from the squawk or the emergency status', () => {
+  it('takes the code first, then an emergency status, and never a priority', () => {
     // Arrange
     const cases: [string | undefined, string | undefined, 'HJ' | 'RF' | 'EM' | null][] = [
       ['7500', undefined, 'HJ'],
       ['7600', undefined, 'RF'],
       ['7700', undefined, 'EM'],
+      ['7500', 'general', 'HJ'],
+      ['7600', 'unlawful', 'RF'],
+      ['7700', 'nordo', 'EM'],
+      ['7700', 'minfuel', 'EM'],
       ['1200', 'general', 'EM'],
+      ['1200', 'nordo', 'RF'],
+      ['1200', 'unlawful', 'HJ'],
+      ['1200', 'downed', 'EM'],
+      ['1200', 'lifeguard', null],
+      ['1200', 'minfuel', null],
       ['1200', 'none', null],
       ['1200', 'reserved', null],
+      [undefined, 'nordo', 'RF'],
       [undefined, undefined, null],
     ];
 
