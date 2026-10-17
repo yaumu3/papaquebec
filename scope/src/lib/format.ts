@@ -63,11 +63,11 @@ export function formatGsWake(gs: number | undefined, category: string | undefine
 export type EmergencyCode = 'HJ' | 'RF' | 'EM';
 
 /** The shorthand of each emergency code of the Mode A. */
-const SQUAWK_CODES: Readonly<Record<string, EmergencyCode>> = {
-  '7500': 'HJ',
-  '7600': 'RF',
-  '7700': 'EM',
-};
+const SQUAWK_CODES: ReadonlyMap<string, EmergencyCode> = new Map([
+  ['7500', 'HJ'],
+  ['7600', 'RF'],
+  ['7700', 'EM'],
+]);
 
 /**
  * The shorthand of each emergency/priority status that is an emergency: general, no
@@ -75,18 +75,18 @@ const SQUAWK_CODES: Readonly<Record<string, EmergencyCode>> = {
  * and 7500, and a downed aircraft is in distress. Lifeguard and minimum fuel are a priority, not
  * an emergency; `none` and `reserved` say nothing.
  */
-const STATUS_CODES: Readonly<Record<string, EmergencyCode>> = {
-  general: 'EM',
-  nordo: 'RF',
-  unlawful: 'HJ',
-  downed: 'EM',
-};
+const STATUS_CODES: ReadonlyMap<string, EmergencyCode> = new Map([
+  ['general', 'EM'],
+  ['nordo', 'RF'],
+  ['unlawful', 'HJ'],
+  ['downed', 'EM'],
+]);
 
 const squawkCode = (squawk: string | undefined): EmergencyCode | null =>
-  (squawk && SQUAWK_CODES[squawk]) || null;
+  (squawk === undefined ? undefined : SQUAWK_CODES.get(squawk)) ?? null;
 
 const statusCode = (emergency: string | undefined): EmergencyCode | null =>
-  (emergency && STATUS_CODES[emergency]) || null;
+  (emergency === undefined ? undefined : STATUS_CODES.get(emergency)) ?? null;
 
 /**
  * The shorthand of the emergency a squawk or an emergency/priority status declares, the code's

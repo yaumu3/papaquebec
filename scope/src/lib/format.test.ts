@@ -92,6 +92,7 @@ describe('emergencyCode', () => {
       ['1200', 'none', null],
       ['1200', 'reserved', null],
       [undefined, 'nordo', 'RF'],
+      ['constructor', 'toString', null],
       [undefined, undefined, null],
     ];
 
@@ -129,6 +130,7 @@ describe('statusTags', () => {
       ['7500', 'unlawful', { ...none, code: 'HJ' }],
       ['7500', 'nordo', { ...none, code: 'HJ', status: 'RF' }],
       ['7500', 'none', { ...none, code: 'HJ' }],
+      ['constructor', 'toString', none],
     ];
 
     // Act
