@@ -1,4 +1,4 @@
-import { For, Index, Show } from 'solid-js';
+import { For, Show } from 'solid-js';
 
 import { Flag } from './Flag';
 import {
@@ -11,6 +11,7 @@ import {
   speedStripPath,
   speedTape,
 } from './geometry';
+import { Wheel } from './Wheel';
 
 import s from './Pfd.module.css';
 
@@ -55,22 +56,9 @@ export function SpeedText(props: { g: PfdGeometry; view: SpeedView | undefined; 
                 </div>
               )}
             </For>
-            <div class={s.speed} style={{ left: `${at().hiX}px`, top: `${props.g.yc}px` }}>
-              {v().digits.hi}
-            </div>
-            <div
-              class={s.drum}
-              style={{
-                left: `${at().drum.x}px`,
-                top: `${at().drum.y}px`,
-                width: `${at().drum.w}px`,
-                height: `${at().drum.h}px`,
-              }}
-            >
-              <div class={s.digits} style={{ top: `${at().drumTop}px` }}>
-                <Index each={v().digits.drum}>{(d) => <div>{d()}</div>}</Index>
-              </div>
-            </div>
+            <Wheel cell={at().hundreds} wheel={v().digits.hundreds} class={s.speedDigits} />
+            <Wheel cell={at().tens} wheel={v().digits.tens} class={s.speedDigits} />
+            <Wheel cell={at().ones} wheel={v().digits.ones} class={s.speedDigits} />
           </>
         )}
       </Show>

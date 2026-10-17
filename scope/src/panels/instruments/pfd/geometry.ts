@@ -164,6 +164,70 @@ export function speedTape(g: PfdGeometry, ias: number): SpeedTape {
 const SPEED_BOX_OUT_PX = 4;
 const SPEED_BOX_IN_PX = 14;
 const READOUT_HALF_HEIGHT_PX = 18;
+
+/**
+ * A digit wheel of a readout: its rows top to bottom, and how far it has turned toward the row
+ * above the one at rest.
+ */
+export interface Wheel {
+  rows: readonly string[];
+  /** From 0, at rest, up to but not including 1, the next row fully in. */
+  turned: number;
+}
+
+/**
+ * The fraction of its last `step` before the next multiple of `place` that `a` has run: how far a
+ * carry wheel has turned.
+ */
+const carried = (a: number, place: number, step: number): number =>
+  Math.max(0, (a % place) - (place - step)) / step;
+
+/**
+ * The top of a wheel's column in its window: the row `above` rows down in place, moved down by
+ * `turned` of a row.
+ */
+export const wheelTop = (windowH: number, lineH: number, above: number, turned: number): number =>
+  windowH / 2 - lineH / 2 - above * lineH + turned * lineH;
+
+/** Where a wheel's window stands, and how its column is laid out in it. */
+export interface WheelCell {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** The height of a row, and the number of rows above the one at rest. */
+  lineH: number;
+  above: number;
+}
+
+/** A digit wheel of `place`, rolling from this digit to the next through the last `step` before it. */
+const carryWheel = (a: number, place: number, step: number, rows: [string, string]): Wheel => ({
+  rows,
+  turned: carried(a, place, step),
+});
+
+/** JetBrains Mono: advance 600, ascender 1020, descender 300 of 1000 units per em. */
+const MONO_ADVANCE_EM = 0.6;
+/**
+ * The baseline's depth in a box whose line height is its font size:
+ * (1 − (1020 + 300) / 1000) / 2 + 1020 / 1000.
+ */
+const MONO_BASELINE_EM = 0.86;
+
+/**
+ * The window of a digit of `px` ending at `edge`, standing on the baseline of a line of `linePx`
+ * centred on `yc`.
+ */
+const digitCell = (yc: number, linePx: number, edge: number, px: number): WheelCell => ({
+  x: edge - MONO_ADVANCE_EM * px,
+  y: yc - linePx / 2 + MONO_BASELINE_EM * (linePx - px),
+  w: MONO_ADVANCE_EM * px,
+  h: px,
+  lineH: px,
+  above: 1,
+});
+
+const DRUM_WINDOW_H_PX = 2 * READOUT_HALF_HEIGHT_PX - 2;
 const SPIKE_PX = 5;
 
 /** The speed readout: a box inset from the tape's edge, with a spike to the right at the centre line. */
@@ -181,44 +245,65 @@ export function speedBoxPath(g: PfdGeometry): string {
 }
 
 export interface SpeedDigits {
-  hi: string;
-  /** The ones digit with its neighbours: above (+1), at, below (-1). */
-  drum: [string, string, string];
+  hundreds: Wheel;
+  tens: Wheel;
+  /** The ones, rows base + 2 down to base − 1 kt. */
+  ones: Wheel;
 }
 
-/** The hundreds and tens of a speed, and the three digits of its drum. */
+const TEN_KT = 10;
+const HUNDRED_KT = 100;
+
+const oneDigit = (n: number): string => String(((n % 10) + 10) % 10);
+
+/** The speed as wheels: each digit rolls through the last knot before it changes. */
 export function speedDigits(ias: number): SpeedDigits {
-  const ones = ias % 10;
+  const base = Math.floor(ias);
+  const hundreds = Math.floor(ias / HUNDRED_KT);
+  const tens = Math.floor(ias / TEN_KT);
   return {
-    hi: String(Math.floor(ias / 10)),
-    drum: [String((ones + 1) % 10), String(ones), String((ones + 9) % 10)],
+    hundreds: carryWheel(ias, HUNDRED_KT, 1, [
+      String(hundreds + 1),
+      hundreds === 0 ? '' : String(hundreds),
+    ]),
+    tens: carryWheel(ias, TEN_KT, 1, [oneDigit(tens + 1), oneDigit(tens)]),
+    ones: {
+      rows: [2, 1, 0, -1].map((k) => (base + k < 0 ? '' : oneDigit(base + k))),
+      turned: ias - base,
+    },
   };
 }
 
+const SPEED_DIGIT_PX = 16;
 const SPEED_DRUM_GAP_PX = 12;
 const SPEED_DRUM_LINE_PX = 18;
 
 export interface SpeedReadout {
   /** The tape's centre, where its flag and its Mach stand. */
   midX: number;
-  /** Where the tens stand, right-aligned. */
-  hiX: number;
+  hundreds: WheelCell;
+  tens: WheelCell;
   /** The window the ones drum is clipped to. */
-  drum: { x: number; y: number; w: number; h: number };
-  /** Where the drum's column starts inside its window. */
-  drumTop: number;
+  ones: WheelCell;
 }
 
-/** Where the speed readout's texts stand. */
+/** Where the speed readout's wheels stand. */
 export function speedReadout(g: PfdGeometry): SpeedReadout {
   const right = g.sR - SPEED_BOX_IN_PX;
   const hiX = right - SPEED_DRUM_GAP_PX;
-  const h = 2 * READOUT_HALF_HEIGHT_PX - 2;
+  const tens = digitCell(g.yc, SPEED_DIGIT_PX, hiX, SPEED_DIGIT_PX);
   return {
     midX: (g.sL + g.sR) / 2,
-    hiX,
-    drum: { x: hiX + 1, y: g.yc - READOUT_HALF_HEIGHT_PX + 1, w: right - hiX - 2, h },
-    drumTop: READOUT_HALF_HEIGHT_PX - 1 - SPEED_DRUM_LINE_PX / 2 - SPEED_DRUM_LINE_PX,
+    hundreds: digitCell(g.yc, SPEED_DIGIT_PX, tens.x, SPEED_DIGIT_PX),
+    tens,
+    ones: {
+      x: hiX + 1,
+      y: g.yc - READOUT_HALF_HEIGHT_PX + 1,
+      w: right - hiX - 2,
+      h: DRUM_WINDOW_H_PX,
+      lineH: SPEED_DRUM_LINE_PX,
+      above: 2,
+    },
   };
 }
 
@@ -491,41 +576,6 @@ export function altitudeBoxPath(g: PfdGeometry): string {
   );
 }
 
-/**
- * A digit wheel of a readout: its rows top to bottom, and how far it has turned toward the row
- * above the one at rest.
- */
-export interface Wheel {
-  rows: readonly string[];
-  /** From 0, at rest, up to but not including 1, the next row fully in. */
-  turned: number;
-}
-
-/**
- * The fraction of its last `step` before the next multiple of `place` that `a` has run: how far a
- * carry wheel has turned.
- */
-const carried = (a: number, place: number, step: number): number =>
-  Math.max(0, (a % place) - (place - step)) / step;
-
-/**
- * The top of a wheel's column in its window: the row `above` rows down in place, moved down by
- * `turned` of a row.
- */
-export const wheelTop = (windowH: number, lineH: number, above: number, turned: number): number =>
-  windowH / 2 - lineH / 2 - above * lineH + turned * lineH;
-
-/** Where a wheel's window stands, and how its column is laid out in it. */
-export interface WheelCell {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  /** The height of a row, and the number of rows above the one at rest. */
-  lineH: number;
-  above: number;
-}
-
 export interface AltitudeDigits {
   tenThousands: Wheel;
   thousands: Wheel;
@@ -540,12 +590,6 @@ const TEN_THOUSAND_FT = 10000;
 
 /** The last two digits of a non-negative number. */
 const twoDigits = (n: number): string => String(n % 100).padStart(2, '0');
-
-/** A digit wheel of the altitude's `place` ft, rolling from this digit to the next. */
-const carryWheel = (a: number, place: number, rows: [string, string]): Wheel => ({
-  rows,
-  turned: carried(a, place, DRUM_STEP_FT),
-});
 
 /** The sign of a negative altitude takes the place of the leading digit, which is blank at zero. */
 const leadingDigit = (ft: number): string => {
@@ -566,15 +610,18 @@ export function altitudeDigits(ft: number): AltitudeDigits {
   const a = Math.abs(ft);
   const base = Math.floor(a / DRUM_STEP_FT) * DRUM_STEP_FT;
   return {
-    tenThousands: carryWheel(a, TEN_THOUSAND_FT, [
+    tenThousands: carryWheel(a, TEN_THOUSAND_FT, DRUM_STEP_FT, [
       String(Math.floor(a / TEN_THOUSAND_FT) + 1),
       leadingDigit(ft),
     ]),
-    thousands: carryWheel(a, ALTITUDE_THOUSAND_FT, [
+    thousands: carryWheel(a, ALTITUDE_THOUSAND_FT, DRUM_STEP_FT, [
       digitAt(a, ALTITUDE_THOUSAND_FT, 1),
       digitAt(a, ALTITUDE_THOUSAND_FT),
     ]),
-    hundreds: carryWheel(a, HUNDRED_FT, [digitAt(a, HUNDRED_FT, 1), digitAt(a, HUNDRED_FT)]),
+    hundreds: carryWheel(a, HUNDRED_FT, DRUM_STEP_FT, [
+      digitAt(a, HUNDRED_FT, 1),
+      digitAt(a, HUNDRED_FT),
+    ]),
     drum: {
       rows: [2, 1, 0, -1].map((k) => twoDigits(Math.abs(base + k * DRUM_STEP_FT))),
       turned: (a - base) / DRUM_STEP_FT,
@@ -582,16 +629,11 @@ export function altitudeDigits(ft: number): AltitudeDigits {
   };
 }
 
-/** JetBrains Mono: advance 600, ascender 1020, descender 300 of 1000 units per em. */
-const MONO_ADVANCE_EM = 0.6;
-/** The baseline's depth in a box whose line height is its font size: (1 − (1020 + 300) / 1000) / 2 + 1020 / 1000. */
-const MONO_BASELINE_EM = 0.86;
 const ALTITUDE_THOUSANDS_PX = 17;
 const ALTITUDE_HUNDREDS_PX = 13;
 const ALTITUDE_DIGITS_GAP_PX = 20;
 const ALTITUDE_DRUM_GAP_PX = 18;
 const ALTITUDE_DRUM_LINE_PX = 17;
-const DRUM_WINDOW_H_PX = 2 * READOUT_HALF_HEIGHT_PX - 2;
 
 export interface AltitudeReadout {
   /** The middle of the tape, where its flag stands. */
@@ -609,15 +651,7 @@ export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
   const left = g.aL + ALTITUDE_BOX_IN_PX;
   const right = g.aR + ALTITUDE_BOX_OUT_PX;
   const drumX = right - ALTITUDE_DRUM_GAP_PX;
-  const baseline = g.yc - ALTITUDE_THOUSANDS_PX / 2 + MONO_BASELINE_EM * ALTITUDE_THOUSANDS_PX;
-  const digit = (edge: number, px: number): WheelCell => ({
-    x: edge - MONO_ADVANCE_EM * px,
-    y: baseline - MONO_BASELINE_EM * px,
-    w: MONO_ADVANCE_EM * px,
-    h: px,
-    lineH: px,
-    above: 1,
-  });
+  const digit = (edge: number, px: number) => digitCell(g.yc, ALTITUDE_THOUSANDS_PX, edge, px);
   const hundreds = digit(right - ALTITUDE_DIGITS_GAP_PX, ALTITUDE_HUNDREDS_PX);
   const thousands = digit(hundreds.x, ALTITUDE_THOUSANDS_PX);
   return {

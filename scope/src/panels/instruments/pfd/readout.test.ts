@@ -203,7 +203,7 @@ describe('pfdFma boxes', () => {
 });
 
 describe('pfdReadouts speed', () => {
-  it('reads the speed rounded and the Mach without its leading zero while they hold', () => {
+  it('reads the speed as reported and the Mach without its leading zero while they hold', () => {
     // Arrange
     const t = makeSample(NOW, { ias: 261.6, mach: 0.79, heard: { ias: FRESH, mach: FRESH } });
 
@@ -212,7 +212,7 @@ describe('pfdReadouts speed', () => {
 
     // Assert
     expect(out).toEqual({
-      ias: 262,
+      ias: 261.6,
       mach: '.790',
       roll: undefined,
       fpv: undefined,

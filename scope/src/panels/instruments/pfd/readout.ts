@@ -88,7 +88,7 @@ export function pfdFma(t: Readout & Pick<Track, 'samples'>, now: number): PfdFma
 export type PfdAltitude = { kind: 'feet'; ft: number } | { kind: 'ground' } | { kind: 'flag' };
 
 export interface PfdReadouts {
-  /** The speed in knots, rounded; undefined for the SPD flag. */
+  /** The speed in knots; undefined for the SPD flag. */
   ias: number | undefined;
   /** The Mach as the tape's foot prints it; empty when it does not hold. */
   mach: string;
@@ -167,7 +167,7 @@ export function pfdReadouts(t: Readout, now: number, altimeter: Altimeter): PfdR
   const fmsAlt = asSet(liveValue(t, 'fmsAlt', now));
   const qnh = liveValue(t, 'navQnh', now);
   return {
-    ias: ias === undefined ? undefined : Math.round(ias),
+    ias,
     mach: mach === undefined ? '' : machText(mach),
     roll,
     fpv: fpvOf(t, now),

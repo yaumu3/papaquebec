@@ -237,28 +237,57 @@ describe('speedBoxPath', () => {
   });
 });
 
+const cellNumbers = (c: WheelCell) => Object.values(c).map((v) => Number(v.toFixed(2)));
+
 const roundedWheels = (ws: Wheel[]) =>
   ws.map((w) => ({ ...w, turned: Number(w.turned.toFixed(6)) }));
 
 describe('speedDigits', () => {
-  it('reads the tens, and the ones with the neighbours the drum shows', () => {
+  it('rolls the tens and hundreds through the last knot, the ones drum at its exact place', () => {
     // Arrange
-    const speeds = [262, 279, 270];
+    const speeds = [259, 260, 259.5, 299.5, 85, 0];
 
     // Act
     const out = speeds.map(speedDigits);
 
     // Assert
-    expect(out).toEqual([
-      { hi: '26', drum: ['3', '2', '1'] },
-      { hi: '27', drum: ['0', '9', '8'] },
-      { hi: '27', drum: ['1', '0', '9'] },
+    expect(out.map((d) => roundedWheels([d.hundreds, d.tens, d.ones]))).toEqual([
+      [
+        { rows: ['3', '2'], turned: 0 },
+        { rows: ['6', '5'], turned: 0 },
+        { rows: ['1', '0', '9', '8'], turned: 0 },
+      ],
+      [
+        { rows: ['3', '2'], turned: 0 },
+        { rows: ['7', '6'], turned: 0 },
+        { rows: ['2', '1', '0', '9'], turned: 0 },
+      ],
+      [
+        { rows: ['3', '2'], turned: 0 },
+        { rows: ['6', '5'], turned: 0.5 },
+        { rows: ['1', '0', '9', '8'], turned: 0.5 },
+      ],
+      [
+        { rows: ['3', '2'], turned: 0.5 },
+        { rows: ['0', '9'], turned: 0.5 },
+        { rows: ['1', '0', '9', '8'], turned: 0.5 },
+      ],
+      [
+        { rows: ['1', ''], turned: 0 },
+        { rows: ['9', '8'], turned: 0 },
+        { rows: ['7', '6', '5', '4'], turned: 0 },
+      ],
+      [
+        { rows: ['1', ''], turned: 0 },
+        { rows: ['1', '0'], turned: 0 },
+        { rows: ['2', '1', '0', ''], turned: 0 },
+      ],
     ]);
   });
 });
 
 describe('speedReadout', () => {
-  it('anchors the tens and the clipped drum inside the box', () => {
+  it('stands a window on each digit, the ones drum clipped inside the box', () => {
     // Arrange
     const g = pfdGeometry(346);
 
@@ -266,7 +295,12 @@ describe('speedReadout', () => {
     const out = speedReadout(g);
 
     // Assert
-    expect(out).toEqual({ midX: 31, hiX: 28, drum: { x: 29, y: 106, w: 10, h: 34 }, drumTop: -10 });
+    expect(out.midX).toBe(31);
+    expect([out.hundreds, out.tens, out.ones].map(cellNumbers)).toEqual([
+      [8.8, 115, 9.6, 16, 16, 1],
+      [18.4, 115, 9.6, 16, 16, 1],
+      [29, 106, 10, 34, 18, 2],
+    ]);
   });
 });
 
@@ -589,8 +623,6 @@ describe('wheelTop', () => {
     expect(out).toEqual([-25.5, -12.75, -17, -8.5]);
   });
 });
-
-const cellNumbers = (c: WheelCell) => Object.values(c).map((v) => Number(v.toFixed(2)));
 
 describe('altitudeReadout', () => {
   it('stands a window on each digit, right to left from the drum, on the line the text had', () => {
