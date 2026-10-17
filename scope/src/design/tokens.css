@@ -63,8 +63,10 @@
   --text-xl: 14px;
   /* The large labels of the ND's compass. */
   --text-nd-label: 12px;
-  /* The PFD's speed digits. */
+  /* The PFD's speed digits, and the thousands of its altitude tape and readout. */
   --text-pfd-speed: 16px;
+  --text-pfd-label: 12px;
+  --text-pfd-alt: 17px;
   --tracking: 0.5px;
   --tracking-wide: 1px;
 

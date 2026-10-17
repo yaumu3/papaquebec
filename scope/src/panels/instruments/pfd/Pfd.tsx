@@ -1,12 +1,17 @@
 import { createMemo, createSignal, createUniqueId, For, Index, Show } from 'solid-js';
 
 import { cx } from '../../../design/cx';
+import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
 import { trackWidth } from '../../../ui/size';
 import { isLost } from '../freshness';
 import {
+  altitudeBoxPath,
+  altitudeDigits,
+  altitudeReadout,
   altitudeStripPath,
+  altitudeTape,
   apY,
   attitude,
   bankIndexPath,
@@ -61,7 +66,7 @@ export function Pfd(props: { t: Track }) {
   const width = trackWidth(root);
   const g = createMemo(() => pfdGeometry(width()));
   const lost = createMemo(() => isLost(props.t));
-  const readouts = createMemo(() => pfdReadouts(props.t, trackStore.stats.now));
+  const readouts = createMemo(() => pfdReadouts(props.t, trackStore.stats.now, settings.altimeter));
   const speed = createMemo(() => {
     const ias = readouts().ias;
     return ias === undefined ? undefined : { tape: speedTape(g(), ias), digits: speedDigits(ias) };
@@ -78,6 +83,12 @@ export function Pfd(props: { t: Track }) {
       ? undefined
       : fpvPath(fpvAt(g(), roll, angles));
   });
+  const altitude = createMemo(() => {
+    const read = readouts().altitude;
+    if (read.kind !== 'feet') return undefined;
+    return { tape: altitudeTape(g(), read.ft), digits: altitudeDigits(read.ft) };
+  });
+  const altitudeAt = createMemo(() => altitudeReadout(g()));
   const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
   return (
     <div
@@ -124,6 +135,17 @@ export function Pfd(props: { t: Track }) {
                 <path class={s.readout} d={speedBoxPath(g())} />
               </>
             )}
+          </Show>
+          <Show when={altitude()}>
+            {(v) => (
+              <>
+                <path class={s.ticks} d={v().tape.ticks} />
+                <path class={s.bars} d={v().tape.bars} />
+              </>
+            )}
+          </Show>
+          <Show when={readouts().altitude.kind !== 'flag'}>
+            <path class={s.readout} d={altitudeBoxPath(g())} />
           </Show>
           <path class={s.fma} d={fmaBandPath(g())} />
           <path class={s.rules} d={fmaRulesPath(g())} />
@@ -181,6 +203,51 @@ export function Pfd(props: { t: Track }) {
         <div class={s.mach} style={{ left: `${speedAt().midX}px`, top: `${g().footY}px` }}>
           {readouts().mach}
         </div>
+        <Show when={altitude()}>
+          {(v) => (
+            <>
+              <For each={v().tape.labels}>
+                {(l) => (
+                  <div class={s.altitudeLabel} style={{ left: `${l.x}px`, top: `${l.y}px` }}>
+                    <span class={s.thousandsLabel}>{l.hi}</span>
+                    <span class={s.hundredsLabel}>{l.lo}</span>
+                  </div>
+                )}
+              </For>
+              <div
+                class={s.altitude}
+                style={{ left: `${altitudeAt().digitsX}px`, top: `${g().yc}px` }}
+              >
+                <span class={s.thousands}>{v().digits.thousands}</span>
+                <span class={s.hundreds}>{v().digits.hundreds}</span>
+              </div>
+              <div
+                class={s.drum}
+                style={{
+                  left: `${altitudeAt().drum.x}px`,
+                  top: `${altitudeAt().drum.y}px`,
+                  width: `${altitudeAt().drum.w}px`,
+                  height: `${altitudeAt().drum.h}px`,
+                }}
+              >
+                <div
+                  class={cx(s.digits, s.altitudeDigits)}
+                  style={{ top: `${altitudeAt().drumTop}px` }}
+                >
+                  <Index each={v().digits.drum}>{(d) => <div>{d()}</div>}</Index>
+                </div>
+              </div>
+            </>
+          )}
+        </Show>
+        <Show when={readouts().altitude.kind === 'ground'}>
+          <div class={s.gnd} style={{ left: `${altitudeAt().midX}px`, top: `${g().yc}px` }}>
+            GND
+          </div>
+        </Show>
+        <Show when={readouts().altitude.kind === 'flag'}>
+          <Flag text="ALT" x={altitudeAt().tapeX} y={g().yc} />
+        </Show>
         <Mode text={fma().lateral} x={fmaColumnX(g())[1]} boxed={fma().boxed.lateral} />
         <Mode text={fma().vertical} x={fmaColumnX(g())[2]} boxed={fma().boxed.vertical} />
         <Show when={fma().ap}>

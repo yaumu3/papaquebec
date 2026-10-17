@@ -416,3 +416,136 @@ export function fpvPath([x, y]: readonly [number, number]): string {
     `M${fixed(x)} ${fixed(y - FPV_RADIUS_PX)}v${-FPV_FIN_PX}`
   );
 }
+
+const ALTITUDE_SPAN_FT = 450;
+const ALTITUDE_STEP_FT = 100;
+const ALTITUDE_LABEL_STEP_FT = 200;
+const ALTITUDE_THOUSAND_FT = 1000;
+const ALTITUDE_REACH_FT = 600;
+const ALTITUDE_END_MARGIN_PX = 3;
+const ALTITUDE_LABEL_CLEAR_PX = 24;
+const ALTITUDE_LABEL_TICK_PX = 9;
+const ALTITUDE_TICK_PX = 5;
+const ALTITUDE_LABEL_GAP_PX = 13;
+const BAR_FROM_PX = 11;
+const BAR_TO_INSET_PX = 2;
+const BAR_OFF_PX = 9;
+const MINUS = '−';
+
+/** The thousands of an altitude, with the minus sign of a negative one before them. */
+const signedThousands = (ft: number): string =>
+  `${ft < 0 ? MINUS : ''}${Math.floor(Math.abs(ft) / ALTITUDE_THOUSAND_FT)}`;
+
+export interface AltitudeLabel {
+  /** The thousands, large, and the hundreds, in three small digits. */
+  hi: string;
+  lo: string;
+  x: number;
+  y: number;
+}
+
+export interface AltitudeTape {
+  ticks: string;
+  /** The lines above and below each labelled thousand. */
+  bars: string;
+  labels: AltitudeLabel[];
+}
+
+/** The ticks on the altitude tape's inner edge every 100 ft, its labels every 200 ft and its bars. */
+export function altitudeTape(g: PfdGeometry, ft: number): AltitudeTape {
+  const out: AltitudeTape = { ticks: '', bars: '', labels: [] };
+  const first = Math.ceil((ft - ALTITUDE_REACH_FT) / ALTITUDE_STEP_FT) * ALTITUDE_STEP_FT;
+  for (let a = first; a <= ft + ALTITUDE_REACH_FT; a += ALTITUDE_STEP_FT) {
+    const y = tapeY(g, a, ft, ALTITUDE_SPAN_FT);
+    if (y < g.yTop + ALTITUDE_END_MARGIN_PX || y > g.yBot - ALTITUDE_END_MARGIN_PX) continue;
+    const labelled = a % ALTITUDE_LABEL_STEP_FT === 0;
+    out.ticks += `M${fixed(g.aL)} ${fixed(y)}h${labelled ? ALTITUDE_LABEL_TICK_PX : ALTITUDE_TICK_PX}`;
+    if (!labelled || Math.abs(y - g.yc) <= ALTITUDE_LABEL_CLEAR_PX) continue;
+    const hundreds = String(Math.abs(a) % ALTITUDE_THOUSAND_FT).padStart(3, '0');
+    out.labels.push({
+      hi: signedThousands(a),
+      lo: hundreds,
+      x: g.aL + ALTITUDE_LABEL_GAP_PX,
+      y: tenth(y),
+    });
+    if (a % ALTITUDE_THOUSAND_FT !== 0) continue;
+    const bar = (at: number) =>
+      `M${fixed(g.aL + BAR_FROM_PX)} ${fixed(at)}H${fixed(g.aR - BAR_TO_INSET_PX)}`;
+    out.bars += bar(y - BAR_OFF_PX) + bar(y + BAR_OFF_PX);
+  }
+  return out;
+}
+
+const ALTITUDE_BOX_IN_PX = 15;
+const ALTITUDE_BOX_OUT_PX = 5;
+
+/** The altitude readout: a box inset from the tape's edge, with a spike to the left at the centre line. */
+export function altitudeBoxPath(g: PfdGeometry): string {
+  const left = g.aL + ALTITUDE_BOX_IN_PX;
+  const right = g.aR + ALTITUDE_BOX_OUT_PX;
+  const { yc } = g;
+  return (
+    `M${fixed(left)} ${fixed(yc - READOUT_HALF_HEIGHT_PX)}H${fixed(right)}` +
+    `V${fixed(yc + READOUT_HALF_HEIGHT_PX)}H${fixed(left)}V${fixed(yc + SPIKE_PX)}` +
+    `L${fixed(left - SPIKE_PX)} ${fixed(yc)}L${fixed(left)} ${fixed(yc - SPIKE_PX)}Z`
+  );
+}
+
+export interface AltitudeDigits {
+  thousands: string;
+  hundreds: string;
+  /** The last two digits with their neighbours 20 ft either side: above (+20), at, below (-20). */
+  drum: [string, string, string];
+}
+
+const DRUM_STEP_FT = 20;
+const HUNDRED_FT = 100;
+
+const twoDigits = (n: number): string => String(((n % 100) + 100) % 100).padStart(2, '0');
+
+/** The digits of an altitude rounded to 20 ft, the absolute value laid out as usual under a sign. */
+export function altitudeDigits(ft: number): AltitudeDigits {
+  const rounded = Math.round(Math.abs(ft) / DRUM_STEP_FT) * DRUM_STEP_FT;
+  const tens = rounded % HUNDRED_FT;
+  return {
+    thousands: signedThousands(ft < 0 ? -rounded : rounded),
+    hundreds: String(Math.floor((rounded % ALTITUDE_THOUSAND_FT) / HUNDRED_FT)),
+    drum: [twoDigits(tens + DRUM_STEP_FT), twoDigits(tens), twoDigits(tens - DRUM_STEP_FT)],
+  };
+}
+
+const ALTITUDE_DIGITS_GAP_PX = 20;
+const ALTITUDE_DRUM_GAP_PX = 18;
+const ALTITUDE_DRUM_LINE_PX = 17;
+
+export interface AltitudeReadout {
+  /** The middle of the tape, where its flag stands. */
+  tapeX: number;
+  /** The middle of the box, where GND stands. */
+  midX: number;
+  /** Where the thousands and hundreds end, right-aligned. */
+  digitsX: number;
+  /** The window the last two digits' drum is clipped to. */
+  drum: { x: number; y: number; w: number; h: number };
+  /** Where the drum's column starts inside its window. */
+  drumTop: number;
+}
+
+/** Where the altitude readout's texts stand. */
+export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
+  const left = g.aL + ALTITUDE_BOX_IN_PX;
+  const right = g.aR + ALTITUDE_BOX_OUT_PX;
+  const drumX = right - ALTITUDE_DRUM_GAP_PX;
+  return {
+    tapeX: (g.aL + g.aR) / 2,
+    midX: (left + right) / 2,
+    digitsX: right - ALTITUDE_DIGITS_GAP_PX,
+    drum: {
+      x: drumX,
+      y: g.yc - READOUT_HALF_HEIGHT_PX + 1,
+      w: right - drumX - 1,
+      h: 2 * READOUT_HALF_HEIGHT_PX - 2,
+    },
+    drumTop: READOUT_HALF_HEIGHT_PX - 1 - ALTITUDE_DRUM_LINE_PX / 2 - ALTITUDE_DRUM_LINE_PX,
+  };
+}

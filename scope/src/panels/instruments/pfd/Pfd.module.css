@@ -67,7 +67,10 @@
 }
 .speedLabel,
 .speed,
-.mach {
+.mach,
+.altitudeLabel,
+.altitude,
+.gnd {
   position: absolute;
   color: var(--pfd-ink);
   line-height: 1;
@@ -150,4 +153,36 @@
   font-size: var(--text-xs);
   font-style: italic;
   line-height: 1;
+}
+.altitudeLabel {
+  transform: translateY(-50%);
+}
+.thousandsLabel {
+  font-size: var(--text-pfd-label);
+}
+.hundredsLabel {
+  font-size: var(--text-xs);
+}
+.bars {
+  stroke: var(--pfd-ink);
+  stroke-width: 1.2;
+}
+.altitude {
+  font-weight: 600;
+  transform: translate(-100%, -50%);
+}
+.thousands {
+  font-size: var(--text-pfd-alt);
+}
+.hundreds {
+  font-size: var(--text-lg);
+}
+.altitudeDigits {
+  font-size: var(--text-lg);
+  line-height: 17px;
+}
+.gnd {
+  font-size: var(--text-pfd-alt);
+  font-weight: 600;
+  transform: translate(-50%, -50%);
 }

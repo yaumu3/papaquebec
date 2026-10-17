@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { STANDARD_ALTIMETER, qnhAltitudeFt } from '../../../lib/altitude';
 import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
-import { fmaColumns, modeChangedAt, pfdFma, pfdReadouts } from './readout';
+import { fmaColumns, modeChangedAt, type PfdReadouts, pfdFma, pfdReadouts } from './readout';
 
 const NOW = 1000;
 
@@ -19,6 +21,8 @@ const targetOf = (first: Sample, ...rest: Sample[]) => ({
   ...(rest.at(-1) ?? first),
   samples: [first, ...rest],
 });
+
+const altitudeOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).altitude;
 
 /** A sample at `t` reporting these modes, heard at `t`. */
 const reporting = (t: number, navModes: string[]) =>
@@ -197,10 +201,16 @@ describe('pfdReadouts speed', () => {
     const t = makeSample(NOW, { ias: 261.6, mach: 0.79, heard: { ias: FRESH, mach: FRESH } });
 
     // Act
-    const out = pfdReadouts(t, NOW);
+    const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
-    expect(out).toEqual({ ias: 262, mach: '.790', roll: undefined, fpv: undefined });
+    expect(out).toEqual({
+      ias: 262,
+      mach: '.790',
+      roll: undefined,
+      fpv: undefined,
+      altitude: { kind: 'flag' },
+    });
   });
 
   it('blanks the speed and the Mach when stale, never reported or lost', () => {
@@ -213,10 +223,16 @@ describe('pfdReadouts speed', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW));
+    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER));
 
     // Assert
-    const blank = { ias: undefined, mach: '', roll: undefined, fpv: undefined };
+    const blank: PfdReadouts = {
+      ias: undefined,
+      mach: '',
+      roll: undefined,
+      fpv: undefined,
+      altitude: { kind: 'flag' },
+    };
     expect(out).toEqual([blank, blank, blank]);
   });
 });
@@ -232,7 +248,7 @@ describe('pfdReadouts roll', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW).roll);
+    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).roll);
 
     // Assert
     expect(out).toEqual([-12, undefined, undefined, undefined]);
@@ -248,7 +264,7 @@ describe('pfdReadouts flight path vector', () => {
     const t = makeSample(NOW, { ...live, heard });
 
     // Act
-    const out = pfdReadouts(t, NOW).fpv;
+    const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv;
 
     // Assert
     expect(out?.fpaDeg).toBeCloseTo(2.203, 3);
@@ -268,7 +284,10 @@ describe('pfdReadouts flight path vector', () => {
     const staleTrack = { ...t, heard: { ...t.heard, track: STALE } };
 
     // Act
-    const out = [pfdReadouts(t, NOW).fpv?.driftDeg, pfdReadouts(staleTrack, NOW).fpv?.driftDeg];
+    const out = [
+      pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv?.driftDeg,
+      pfdReadouts(staleTrack, NOW, STANDARD_ALTIMETER).fpv?.driftDeg,
+    ];
 
     // Assert
     expect(out).toEqual([3, 0]);
@@ -286,9 +305,58 @@ describe('pfdReadouts flight path vector', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW).fpv);
+    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv);
 
     // Assert
     expect(out).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
+  });
+});
+
+describe('pfdReadouts altitude', () => {
+  it('reads the ground as GND', () => {
+    // Arrange
+    const t = makeSample(NOW, { alt: 'ground', heard: { alt: FRESH } });
+
+    // Act
+    const out = altitudeOf(t);
+
+    // Assert
+    expect(out).toEqual({ kind: 'ground' });
+  });
+
+  it('flags the altitude when stale, never reported or lost', () => {
+    // Arrange
+    const targets = [
+      makeSample(NOW, { alt: 37000, heard: { alt: STALE } }),
+      makeSample(NOW, { heard: {} }),
+      makeSample(NOW, { alt: 37000, heard: { alt: FRESH }, seen: INSTRUMENT_SEC }),
+    ];
+
+    // Act
+    const out = targets.map(altitudeOf);
+
+    // Assert
+    expect(out).toEqual([{ kind: 'flag' }, { kind: 'flag' }, { kind: 'flag' }]);
+  });
+
+  it('reads the altitude as the crew does, on their setting even when it has gone stale', () => {
+    // Arrange
+    const below = { alt: 4750, navQnh: 1023.2 };
+    const targets = [
+      makeSample(NOW, { ...below, heard: { alt: FRESH, navQnh: FRESH } }),
+      makeSample(NOW, { ...below, heard: { alt: FRESH, navQnh: STALE } }),
+      makeSample(NOW, { alt: 37000, heard: { alt: FRESH } }),
+    ];
+
+    // Act
+    const out = targets.map(altitudeOf);
+
+    // Assert
+    const crew = qnhAltitudeFt(4750, 1023.2 / HPA_PER_INHG);
+    expect(out).toEqual([
+      { kind: 'feet', ft: crew },
+      { kind: 'feet', ft: crew },
+      { kind: 'feet', ft: 37000 },
+    ]);
   });
 });

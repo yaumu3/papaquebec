@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  altitudeBoxPath,
+  altitudeDigits,
+  altitudeReadout,
   altitudeStripPath,
+  altitudeTape,
   apY,
   attitude,
   bankIndexPath,
@@ -406,5 +410,100 @@ describe('fpvPath', () => {
       'M150.0 123.0A5.0 5.0 0 1 0 160.0 123.0A5.0 5.0 0 1 0 150.0 123.0' +
         'M150.0 123.0h-13M160.0 123.0h13M155.0 118.0v-7',
     );
+  });
+});
+
+describe('altitudeTape', () => {
+  it('ticks every 100 ft short of the tape ends, long at the labels, and labels clear of the readout', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = altitudeTape(g, 37000);
+
+    // Assert
+    expect(out.ticks).toBe(
+      'M258.0 200.3h9M258.0 181.0h5M258.0 161.7h9M258.0 142.3h5M258.0 123.0h9' +
+        'M258.0 103.7h5M258.0 84.3h9M258.0 65.0h5M258.0 45.7h9',
+    );
+    expect(out.labels).toEqual([
+      { hi: '36', lo: '600', x: 271, y: 200.3 },
+      { hi: '36', lo: '800', x: 271, y: 161.7 },
+      { hi: '37', lo: '200', x: 271, y: 84.3 },
+      { hi: '37', lo: '400', x: 271, y: 45.7 },
+    ]);
+    expect(out.bars).toBe('');
+  });
+
+  it('bars a labelled thousand above and below', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = altitudeTape(g, 29600);
+
+    // Assert
+    expect(out.bars).toBe('M269.0 36.7H314.0M269.0 54.7H314.0');
+  });
+
+  it('signs the labels below zero', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = altitudeTape(g, 100);
+
+    // Assert
+    expect(out.labels.map((l) => [l.hi, l.lo])).toContainEqual(['−0', '200']);
+  });
+});
+
+describe('altitudeBoxPath', () => {
+  it('is a box with a spike to the left at the centre line', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = altitudeBoxPath(g);
+
+    // Assert
+    expect(out).toBe('M273.0 105.0H321.0V141.0H273.0V128.0L268.0 123.0L273.0 118.0Z');
+  });
+});
+
+describe('altitudeDigits', () => {
+  it('rounds to 20 ft and lays the drum out across 00, and the absolute value below zero', () => {
+    // Arrange
+    const altitudes = [29600, 29590, 29990, -40];
+
+    // Act
+    const out = altitudes.map(altitudeDigits);
+
+    // Assert
+    expect(out).toEqual([
+      { thousands: '29', hundreds: '6', drum: ['20', '00', '80'] },
+      { thousands: '29', hundreds: '6', drum: ['20', '00', '80'] },
+      { thousands: '30', hundreds: '0', drum: ['20', '00', '80'] },
+      { thousands: '−0', hundreds: '0', drum: ['60', '40', '20'] },
+    ]);
+  });
+});
+
+describe('altitudeReadout', () => {
+  it('anchors the thousands, the clipped drum and the middle of the box', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = altitudeReadout(g);
+
+    // Assert
+    expect(out).toEqual({
+      tapeX: 287,
+      midX: 297,
+      digitsX: 301,
+      drum: { x: 303, y: 106, w: 17, h: 34 },
+      drumTop: -8.5,
+    });
   });
 });
