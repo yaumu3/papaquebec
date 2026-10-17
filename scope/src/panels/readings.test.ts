@@ -114,6 +114,22 @@ describe('READINGS', () => {
     expect(readings).toEqual([{ v: '<30', unit: 'm' }, { v: '?' }, NONE]);
   });
 
+  it('prints a sign only on a temperature that rounds away from zero', () => {
+    // Arrange
+    const samples = [0.3, -0.3, 0.6, -2.4].map((oat) => makeSample(1000, { oat }));
+
+    // Act
+    const readings = samples.map((s) => READINGS.oat.format(s));
+
+    // Assert
+    expect(readings).toEqual([
+      { v: '0', unit: '°C' },
+      { v: '0', unit: '°C' },
+      { v: '+1', unit: '°C' },
+      { v: '-2', unit: '°C' },
+    ]);
+  });
+
   it('reads the one reading of the unknown for whatever a sample lacks', () => {
     // Arrange
     const s = makeSample(1000);
