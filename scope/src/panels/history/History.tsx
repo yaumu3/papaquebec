@@ -18,13 +18,17 @@ import { laneAfter, type LaneKey, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
-import { trackReorder } from '../../ui/reorder';
+import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
+import { NONE, READINGS } from '../readings';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
 import { chipOf } from './chips';
+import { liftLeft, slotShown } from './drag';
 import { Lane } from './Lane';
+import { createLaneDrag } from './laneDrag';
 import type { LaneMoves } from './moves';
 import { Palette } from './Palette';
+import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { type Interval, resolveSpan, type Span, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
@@ -50,6 +54,8 @@ const NOTCH_W_PX = 7;
 const NOTCH_H_PX = 4;
 /** Between a palette and the control it hangs from. */
 const PALETTE_GAP_PX = 2;
+/** Between the chip lifted with a dragged lane and the pointer under it. */
+const LIFT_GAP_PX = 4;
 
 /** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
 export function History(props: { track: Track }) {
@@ -112,13 +118,11 @@ export function History(props: { track: Track }) {
   const at = createMemo(() => hover() ?? rest()?.sample ?? null);
   /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
   const past = () => hover() !== null || rest()?.current === false;
-  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane's grip has it. */
+  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane is dragged. */
   const pointerAt = (e: PointerEvent) => {
     const target = e.target instanceof Element ? e.target : null;
-    // A finger holds whatever it lands on, so only a button's hold is a grip's.
-    if (target?.closest('button')?.hasPointerCapture(e.pointerId)) return;
     const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
-    setHoverPx(px < 0 || !target?.closest('[data-lane]') ? null : px);
+    setHoverPx(px < 0 || drag() || !target?.closest('[data-lane]') ? null : px);
   };
 
   const [chipText, setChipText] = createSignal<HTMLSpanElement>();
@@ -153,9 +157,8 @@ export function History(props: { track: Track }) {
     return clearOf(times.map(x), left, left + chipWidth(), labelHalf() + CHIP_GAP_PX);
   });
 
-  const reorder = trackReorder(movePlotLane);
-
   const [bay, setBay] = createSignal<HTMLDivElement>();
+  const bayBox = () => bay()?.getBoundingClientRect();
   /** The top row of each lane, its handle, which keeps the focus for it. */
   const rows = new Map<LaneKey, HTMLElement>();
   /** The button under the lanes that opens the palette to add one. */
@@ -223,6 +226,25 @@ export function History(props: { track: Track }) {
     const el = scroller();
     if (el) setView(scrollView(el.scrollTop, el.clientHeight, el.scrollHeight));
   };
+  /** What a lane reads at the cursor, as the chip lifted with it shows. */
+  const liftValue = (lane: LaneKey): string => {
+    const a = at();
+    return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
+  };
+  const { drag, grab } = createLaneDrag({
+    scroller,
+    bin: () => add,
+    pitch: LANE_PX + 1,
+    lanes: plotted,
+    onDrop: (lane, drop) => {
+      if (drop === 'remove') {
+        movesOf(lane).onRemove();
+        return;
+      }
+      movePlotLane(drop.move, drop.to);
+      reveal(lane);
+    },
+  });
   // Lanes come and go, which changes how far they scroll.
   createEffect(() => {
     plotted();
@@ -240,7 +262,7 @@ export function History(props: { track: Track }) {
   return (
     <div
       data-history
-      class={cx(s.history, !historyOpen() && s.folded)}
+      class={cx(s.history, !historyOpen() && s.folded, drag() && s.grabbing)}
       style={{ '--lane-height': `${LANE_PX}px`, '--notch-height': `${NOTCH_H_PX}px` }}
     >
       <div class={s.title}>
@@ -351,24 +373,37 @@ export function History(props: { track: Track }) {
                       rowRef={(el) => rows.set(lane, el)}
                       moves={movesOf(lane)}
                       onMenu={(anchor) => toggleMenu(lane, anchor)}
-                      onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, plotted().length)}
-                      onGripMove={(y) => reorder.move(y)}
+                      onGrab={(e) => grab(e, lane)}
+                      place={(() => {
+                        const d = drag();
+                        return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
+                      })()}
+                      slot={drag()?.lane === lane}
                     />
                   );
                 }}
               </For>
-              <div class={s.addRow}>
+              <div class={s.addRow} style={{ order: plotted().length }}>
                 <button
                   ref={(el) => {
                     add = el;
                   }}
                   type="button"
-                  class={cx(s.add, menu()?.anchor === add && s.open)}
+                  class={cx(s.add, menu()?.anchor === add && s.open, drag() && s.bin)}
                   aria-haspopup="dialog"
                   aria-expanded={menu()?.anchor === add}
                   onClick={(e) => toggleMenu(null, e.currentTarget)}
                 >
-                  + LANE
+                  <Show when={drag()} fallback="+ LANE">
+                    {(d) => (
+                      <>
+                        <svg class={s.binIcon} viewBox="0 0 10 12" aria-hidden="true">
+                          <path d="M0.5 2.5 H9.5 M3.5 2.5 V0.5 H6.5 V2.5 M1.5 2.5 L2 11.5 H8 L8.5 2.5" />
+                        </svg>
+                        RELEASE TO REMOVE {READINGS[d().lane].label}
+                      </>
+                    )}
+                  </Show>
                 </button>
               </div>
             </div>
@@ -388,6 +423,36 @@ export function History(props: { track: Track }) {
                 style={{ top: `${thumb().top}px`, height: `${thumb().height}px` }}
               />
             )}
+          </Show>
+          <Show when={drag()}>
+            {(d) => {
+              let lift: HTMLDivElement | undefined;
+              const left = () =>
+                liftLeft(
+                  d().x - (bayBox()?.left ?? 0),
+                  Math.min(d().grabX, lift?.offsetWidth ?? 0),
+                  bayBox()?.width ?? 0,
+                  lift?.offsetWidth ?? 0,
+                );
+              return (
+                <div
+                  ref={(el) => {
+                    lift = el;
+                  }}
+                  class={s.lift}
+                  style={{
+                    left: `${left()}px`,
+                    top: `${d().y - (bayBox()?.top ?? 0) - LIFT_GAP_PX}px`,
+                  }}
+                >
+                  <span class={s.liftName}>
+                    {READINGS[d().lane].label}
+                    <span class={s.caret}>▼</span>
+                  </span>
+                  <span class={s.liftValue}>{liftValue(d().lane)}</span>
+                </div>
+              );
+            }}
           </Show>
           <Show when={menu()}>
             {(m) => (

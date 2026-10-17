@@ -62,7 +62,7 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
   return p.kind === 'intent' ? p.dash : undefined;
 };
 
-/** One lane of the bay: a top row with its grip and the dropdown of its name, then its scale and its plot over the visible span. */
+/** One lane of the bay: a top row with the dropdown of its name, then its scale and its plot over the visible span. */
 export function Lane(props: {
   lane: ReadingKey;
   /** Its place among the lanes, and how many there are. */
@@ -84,8 +84,10 @@ export function Lane(props: {
   /** Whether the lane's palette is open, and the dropdown of its name that opens it. */
   menuOpen: boolean;
   onMenu: (anchor: HTMLElement) => void;
-  onGripDown: (y: number) => void;
-  onGripMove: (y: number) => void;
+  onGrab: (e: PointerEvent) => void;
+  /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
+  place: number;
+  slot: boolean;
 }) {
   const spec = PLOTS[props.lane];
   const label = READINGS[props.lane].label;
@@ -154,7 +156,11 @@ export function Lane(props: {
   const slotCh = () => Math.max(0, ...held().map((key) => INTENT_CH[key] ?? 0));
 
   return (
-    <div data-lane class={s.lane} style={{ height: `${props.height}px` }}>
+    <div
+      data-lane
+      class={cx(s.lane, props.slot && s.hole)}
+      style={{ height: `${props.height}px`, order: props.place }}
+    >
       <div class={s.plot}>
         <svg class={s.svg} height={props.height}>
           <Index each={gaps()}>
@@ -254,25 +260,11 @@ export function Lane(props: {
         class={s.top}
         tabindex="0"
         aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
+        onPointerDown={(e) => props.onGrab(e)}
         onKeyDown={(e) => {
           if (e.target === e.currentTarget) onMoveKey(props.moves, e);
         }}
       >
-        <button
-          type="button"
-          class={s.grip}
-          tabindex="-1"
-          aria-hidden="true"
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            props.onGripDown(e.clientY);
-          }}
-          onPointerMove={(e) => {
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) props.onGripMove(e.clientY);
-          }}
-        >
-          ⋮⋮
-        </button>
         <button
           type="button"
           class={cx(s.menu, props.menuOpen && s.open)}

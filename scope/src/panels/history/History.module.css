@@ -85,8 +85,16 @@
   --add-gap: var(--space-3);
   max-height: calc(4 * (var(--lane-height) + 1px) + var(--add-gap) + var(--add-height));
   padding-left: var(--lane-overhang);
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
+  /* A dragged lane reorders the lanes as it scrolls them, which no anchoring is to undo. */
+  overflow-anchor: none;
   scrollbar-width: none;
+}
+/* Each as tall as it is, the stack overflowing into the scroll. */
+.scroller > * {
+  flex-shrink: 0;
 }
 .scroller::-webkit-scrollbar {
   display: none;
@@ -122,22 +130,74 @@
 .add:hover {
   color: var(--text);
 }
+/* While a lane is dragged, + LANE is the bin it can be dropped in to remove it. */
+.bin,
+.bin:hover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  border: 1px solid var(--color-emergency);
+  background: var(--bin-bg);
+  color: var(--color-emergency);
+}
+.binIcon {
+  width: var(--space-5);
+  height: var(--space-6);
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: round;
+}
+/* The place a dragged lane would drop into, as tall as a lane and empty. */
+.hole > * {
+  opacity: 0;
+}
+.hole::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px dashed var(--panel-border);
+}
+/* The chip a dragged lane is lifted as, just above the pointer: its name and its value. */
+.lift {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-1) var(--space-4) var(--space-1) var(--space-1);
+  border: 1px solid var(--text);
+  background: var(--panel-bg);
+  transform: translateY(-100%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.liftName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  height: var(--lane-top);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+}
+.liftValue {
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.grabbing,
+.grabbing * {
+  cursor: grabbing;
+}
 /* A hairline under each lane, outside its height. */
 .lane {
   position: relative;
   box-sizing: content-box;
   border-bottom: 1px solid var(--plot-grid);
-}
-.grip {
-  color: var(--text-dim);
-  font-size: var(--text-xl);
-  line-height: 1;
-  letter-spacing: -3px;
-  cursor: grab;
-  touch-action: none;
-}
-.grip:hover {
-  color: var(--text);
 }
 .plot {
   position: absolute;
