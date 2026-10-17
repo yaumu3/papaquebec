@@ -17,6 +17,7 @@ import {
   type LaneTrace,
   laneTraces,
   pathOf,
+  scaleLabels,
   valueAt,
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
@@ -25,9 +26,11 @@ import { barsOf, gapsIn, type Read, yOf } from './trace';
 
 import s from './History.module.css';
 
-/** Kept clear above a trace, where the lane's name sits, and below it. */
-const PAD_TOP_PX = 14;
-const PAD_BOTTOM_PX = 5;
+/** The data band: below the lane's top row, where its name sits, and clear of its foot. */
+const PAD_TOP_PX = 28;
+const PAD_BOTTOM_PX = 11;
+/** How far the clock lines and the gaps stop short of the lane's top and bottom. */
+const GRID_INSET_PX = 4;
 /** Kept clear above and below a gantt bar, within its row. */
 const BAR_INSET_PX = 2;
 /** A row thinner than this cannot hold its tab's text, and tabs would run into each other. */
@@ -42,7 +45,7 @@ const GLYPH_PITCH_PX = 36;
 /** The class that dashes a trace, if any. */
 export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
 
-/** One lane of the bay: its grip, its plot over the visible span, and its close button. */
+/** One lane of the bay: a top row with its grip, name and close button, then its scale and its plot over the visible span. */
 export function Lane(props: {
   lane: ReadingKey;
   /** Its place among the lanes, and how many there are. */
@@ -72,15 +75,23 @@ export function Lane(props: {
   const range = createMemo(() => laneRange(traces(), props.lane, props.visible));
   /** Where a trace's values fall: on the lane's scale, or all of them along its floor. */
   const yFor = (tr: LaneTrace) => (tr.floor ? () => props.height - PAD_BOTTOM_PX : y);
+  /** Halfway down the data band. */
+  const mid = () => (PAD_TOP_PX + props.height - PAD_BOTTOM_PX) / 2;
   const y = (v: number) => {
     const r = range();
-    return r ? yOf(v, r, props.height, PAD_TOP_PX, PAD_BOTTOM_PX) : props.height / 2;
+    return r ? yOf(v, r, props.height, PAD_TOP_PX, PAD_BOTTOM_PX) : mid();
   };
+  const scale = createMemo(() => {
+    const r = range();
+    return r ? scaleLabels(props.lane, r) : [];
+  });
+  /** A value line on a whole pixel row, so it reads one pixel thin. */
+  const lineY = (v: number) => Math.floor(y(v)) + 0.5;
   const gaps = createMemo(() => gapsIn(props.samples, props.visible));
   const bars = createMemo(() =>
     spec.kind === 'gantt' ? barsOf(props.samples, spec.names, HEARD[props.lane]) : [],
   );
-  const rowHeight = () => props.height / Math.max(1, bars().length);
+  const rowHeight = () => (props.height - PAD_TOP_PX - PAD_BOTTOM_PX) / Math.max(1, bars().length);
   /** The shortest round clock step that keeps glyphs at least `pitch` apart across the visible span. */
   const stepEvery = (pitch: number) =>
     clockStep(props.visible.to - props.visible.from, Math.max(1, Math.floor(props.width / pitch)));
@@ -126,7 +137,7 @@ export function Lane(props: {
         withinSec: step / 2,
       },
       HEARD[props.lane],
-    ).map((h) => headingGlyph(x(h.t), props.height / 2, h));
+    ).map((h) => headingGlyph(x(h.t), mid(), h));
   });
   const dots = () => {
     const h = props.hover;
@@ -139,32 +150,9 @@ export function Lane(props: {
 
   return (
     <div class={s.lane} style={{ height: `${props.height}px` }}>
-      <button
-        type="button"
-        class={s.grip}
-        aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag or press an arrow key to move it.`}
-        onKeyDown={(e) => {
-          const step = stepFromKey(e.key);
-          if (step === null) return;
-          e.preventDefault();
-          props.onGripStep(step);
-          // The lane moved in the DOM, which blurs its grip.
-          e.currentTarget.focus();
-        }}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          props.onGripDown(e.clientY);
-        }}
-        onPointerMove={(e) => {
-          if (e.currentTarget.hasPointerCapture(e.pointerId)) props.onGripMove(e.clientY);
-        }}
-      >
-        ⋮⋮
-      </button>
       <div class={s.plot}>
         <svg
           class={s.svg}
-          width={props.width}
           height={props.height}
           onPointerMove={(e) =>
             props.onHover(e.clientX - e.currentTarget.getBoundingClientRect().left)
@@ -176,15 +164,23 @@ export function Lane(props: {
               <rect
                 class={s.gap}
                 x={fixed(x(g().from))}
-                y="0"
+                y={GRID_INSET_PX}
                 width={fixed(x(g().to) - x(g().from))}
-                height={props.height}
+                height={props.height - 2 * GRID_INSET_PX}
               />
             )}
           </Index>
           <path
             class={s.grid}
-            d={props.ticks.map((t) => `M${fixed(x(t))} 0 V${props.height}`).join(' ')}
+            d={props.ticks
+              .map((t) => `M${fixed(x(t))} ${GRID_INSET_PX} V${props.height - GRID_INSET_PX}`)
+              .join(' ')}
+          />
+          <path
+            class={s.scale}
+            d={scale()
+              .map((l) => `M0 ${lineY(l.v)} H${props.width}`)
+              .join(' ')}
           />
           <Index each={traces()}>
             {(tr) => (
@@ -196,10 +192,7 @@ export function Lane(props: {
           </Index>
           <Index each={barbs()}>
             {(b) => (
-              <path
-                class={s.barb}
-                d={barbPath(x(b().t), props.height / 2, b().dir, b().speed, BARB_PX)}
-              />
+              <path class={s.barb} d={barbPath(x(b().t), mid(), b().dir, b().speed, BARB_PX)} />
             )}
           </Index>
           <Index each={glyphs()}>
@@ -223,7 +216,7 @@ export function Lane(props: {
                   <rect
                     class={s.bar}
                     x={fixed(x(on().from))}
-                    y={fixed(row * rowHeight() + BAR_INSET_PX)}
+                    y={fixed(PAD_TOP_PX + row * rowHeight() + BAR_INSET_PX)}
                     width={fixed(Math.max(1, x(on().to) - x(on().from)))}
                     height={fixed(Math.max(2, rowHeight() - 2 * BAR_INSET_PX))}
                   />
@@ -248,16 +241,13 @@ export function Lane(props: {
             )}
           </Show>
         </svg>
-        <Show when={spec.kind !== 'gantt'}>
-          <span class={s.name}>{label}</span>
-        </Show>
         <Show when={rowHeight() >= TAB_MIN_PX}>
           <Index each={bars()}>
             {(bar, row) => (
               <span
                 class={s.tab}
                 style={{
-                  top: `${row * rowHeight()}px`,
+                  top: `${PAD_TOP_PX + row * rowHeight()}px`,
                   height: `${rowHeight()}px`,
                   'line-height': `${rowHeight()}px`,
                 }}
@@ -268,14 +258,48 @@ export function Lane(props: {
           </Index>
         </Show>
       </div>
-      <button
-        type="button"
-        class={s.close}
-        aria-label={`Close the ${label} lane`}
-        onClick={() => props.onClose()}
-      >
-        ×
-      </button>
+      <div class={s.gutter}>
+        <Index each={scale()}>
+          {(l) => (
+            <span class={s.bound} style={{ top: `${lineY(l().v)}px` }}>
+              {l().text}
+            </span>
+          )}
+        </Index>
+      </div>
+      <div class={s.top}>
+        <button
+          type="button"
+          class={s.grip}
+          aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag or press an arrow key to move it.`}
+          onKeyDown={(e) => {
+            const step = stepFromKey(e.key);
+            if (step === null) return;
+            e.preventDefault();
+            props.onGripStep(step);
+            // The lane moved in the DOM, which blurs its grip.
+            e.currentTarget.focus();
+          }}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            props.onGripDown(e.clientY);
+          }}
+          onPointerMove={(e) => {
+            if (e.currentTarget.hasPointerCapture(e.pointerId)) props.onGripMove(e.clientY);
+          }}
+        >
+          ⋮⋮
+        </button>
+        <span class={s.name}>{label}</span>
+        <button
+          type="button"
+          class={s.close}
+          aria-label={`Close the ${label} lane`}
+          onClick={() => props.onClose()}
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }

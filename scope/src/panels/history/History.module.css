@@ -1,15 +1,16 @@
 /*
- * Beside each plot: the grip, the close button, and a gutter between each and the plot. Padding
+ * Left of each plot, the gutter its scale is labelled in; the plots run to the right edge. Padding
  * below, not a margin, so the room under the timeline does not collapse into the next rule's;
  * as much as the title's ink stands from the rule above, which is less once the group is folded
  * and the title's line is all that is left.
  */
 .history {
-  --lane-grip: 24px;
-  --lane-close: 24px;
-  --lane-gutter: 8px;
-  --plot-left: calc(var(--lane-grip) + var(--lane-gutter));
-  --plot-right: calc(var(--lane-close) + var(--lane-gutter));
+  --lane-gutter: 32px;
+  --lane-top: 18px;
+  --plot-left: var(--lane-gutter);
+  --plot-right: 0px;
+  /* How far a long scale label may run left of the lanes: the panel's side padding (DetailPanel .body). */
+  --lane-overhang: var(--space-6);
   padding-bottom: var(--space-5);
 }
 .folded {
@@ -46,6 +47,7 @@
   --fade-top: 0px;
   --fade-bottom: 0px;
   position: relative;
+  margin-left: calc(-1 * var(--lane-overhang));
   mask-image: linear-gradient(
     to bottom,
     transparent,
@@ -63,6 +65,7 @@
 /* Four lanes and their hairlines at the most; past them the lanes scroll, with no bar of their own. */
 .scroller {
   max-height: calc(4 * (var(--lane-height) + 1px));
+  padding-left: var(--lane-overhang);
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -89,10 +92,7 @@
 }
 /* A hairline under each lane, outside its height. */
 .lane {
-  display: grid;
-  grid-template-columns: var(--lane-grip) 1fr var(--lane-close);
-  column-gap: var(--lane-gutter);
-  align-items: stretch;
+  position: relative;
   box-sizing: content-box;
   border-bottom: 1px solid var(--plot-grid);
 }
@@ -112,12 +112,50 @@
   touch-action: none;
 }
 .plot {
-  position: relative;
-  min-width: 0;
+  position: absolute;
+  inset: 0 var(--plot-right) 0 var(--plot-left);
 }
+/* Sized by the lane; the width the plots are drawn to is read off the clock row. */
 .svg {
   display: block;
+  width: 100%;
   touch-action: pan-y;
+}
+/* The lane's only value lines: the top and bottom of its scale. */
+.scale {
+  fill: none;
+  stroke: var(--plot-scale);
+}
+/* The scale's labels, right-aligned a little short of the plot, each centred on its line. */
+.gutter {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--lane-gutter) - var(--space-2));
+  pointer-events: none;
+}
+.bound {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  color: var(--plot-label);
+  font-size: var(--text-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+/* Over the plot: the lane's grip, name and close button at the left. */
+.top {
+  position: absolute;
+  top: var(--space-1);
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--lane-top);
+  pointer-events: none;
+}
+.top > * {
+  pointer-events: auto;
 }
 .gap {
   fill: var(--plot-gap);
@@ -189,9 +227,6 @@
   fill: var(--color-selbox);
 }
 .name {
-  position: absolute;
-  top: 1px;
-  left: var(--space-2);
   color: var(--text-dim);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-wide);
@@ -243,7 +278,7 @@
 /* Over the plots, for the box; the pointer goes through to the lanes. */
 .overlay {
   position: absolute;
-  inset: 0 var(--plot-right) 0 var(--plot-left);
+  inset: 0 var(--plot-right) 0 calc(var(--lane-overhang) + var(--plot-left));
   pointer-events: none;
 }
 .label {
