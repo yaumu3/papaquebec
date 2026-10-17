@@ -1,0 +1,122 @@
+import { fixed, offset, toward } from '../svg';
+
+/** The compass arc spans this far either side of the top. */
+const SPAN_DEG = 55;
+/** The labels of the compass run this far either side of the top. */
+const LABEL_SPAN_DEG = 50;
+const TICK_STEP_DEG = 5;
+const MINOR_TICK_PX = 5;
+const MAJOR_TICK_PX = 9;
+const BIG_LABEL_INSET_PX = 22;
+const SMALL_LABEL_INSET_PX = 19;
+const LUBBER_OUT_PX = 13;
+const LUBBER_IN_PX = 3;
+/** How far a range label stands left of the arc end it names. */
+const RANGE_LABEL_GAP_PX = 4;
+/** How far above the half-range ring LAST HEARD is centred. */
+const LAST_HEARD_RISE_PX = 8;
+const AIRCRAFT_HALF_WIDTH_PX = 6;
+const AIRCRAFT_NOSE_PX = 10;
+const AIRCRAFT_TAIL_PX = 8;
+
+/** Where the display stands in its box: the centre of the compass and the radii of its arc and ring. */
+export interface NdGeometry {
+  w: number;
+  h: number;
+  cx: number;
+  cy: number;
+  r: number;
+  r2: number;
+}
+
+/** The whole geometry of a display `w` wide: two thirds as high, the arc as large as that and the width let it be. */
+export function ndGeometry(w: number): NdGeometry {
+  const h = Math.floor((w * 2) / 3);
+  const r = Math.min(h - 60, w / 2 - 24);
+  return { w, h, cx: w / 2, cy: Math.min(h - 20, 40 + r), r, r2: r / 2 };
+}
+
+/** A number to a tenth of a pixel, as the drawing is. */
+const tenth = (n: number): number => Number(fixed(n));
+
+/** The point `a` degrees clockwise of the top at radius `r`. */
+const point = (g: NdGeometry, a: number, r: number): [number, number] => offset(g.cx, g.cy, a)(r);
+
+/** An arc across the compass's span at radius `r`. */
+export function arcPath(g: NdGeometry, r: number): string {
+  const at = (a: number) => toward(g.cx, g.cy, a)(r);
+  return `M${at(-SPAN_DEG)}A${fixed(r)} ${fixed(r)} 0 0 1 ${at(SPAN_DEG)}`;
+}
+
+/** The ring at half the range. */
+export const ringPath = (g: NdGeometry): string => arcPath(g, g.r2);
+
+/** A label of the compass, centred at (x, y). */
+export interface CompassLabel {
+  text: string;
+  x: number;
+  y: number;
+  /** The multiples of 30°, set larger. */
+  big: boolean;
+}
+
+export interface Compass {
+  /** The ticks of every 5°, one path, and of every 10°, another. */
+  minor: string;
+  major: string;
+  labels: CompassLabel[];
+}
+
+const norm = (deg: number): number => ((deg % 360) + 360) % 360;
+
+/** The ticks and labels of the arc, with `orient` degrees magnetic at the top. */
+export function compass(g: NdGeometry, orient: number): Compass {
+  const out: Compass = { minor: '', major: '', labels: [] };
+  const first = Math.ceil((orient - SPAN_DEG) / TICK_STEP_DEG) * TICK_STEP_DEG;
+  for (let b = first; b <= orient + SPAN_DEG; b += TICK_STEP_DEG) {
+    const a = b - orient;
+    const major = norm(b) % 10 === 0;
+    const at = toward(g.cx, g.cy, a);
+    const segment = `M${at(g.r)}L${at(g.r - (major ? MAJOR_TICK_PX : MINOR_TICK_PX))}`;
+    if (!major) {
+      out.minor += segment;
+      continue;
+    }
+    out.major += segment;
+    if (Math.abs(a) > LABEL_SPAN_DEG) continue;
+    const tens = norm(b) / 10;
+    const big = tens % 3 === 0;
+    const [x, y] = point(g, a, g.r - (big ? BIG_LABEL_INSET_PX : SMALL_LABEL_INSET_PX));
+    out.labels.push({ text: String(tens), x: tenth(x), y: tenth(y), big });
+  }
+  return out;
+}
+
+/** The fixed line at the top of the arc. */
+export function lubberPath(g: NdGeometry): string {
+  return `M${fixed(g.cx)} ${fixed(g.cy - g.r - LUBBER_OUT_PX)}L${fixed(g.cx)} ${fixed(g.cy - g.r + LUBBER_IN_PX)}`;
+}
+
+/** The open triangle at the centre, apex up. */
+export function aircraftPath(g: NdGeometry): string {
+  const { cx, cy } = g;
+  const nose = `${fixed(cx)} ${fixed(cy - AIRCRAFT_NOSE_PX)}`;
+  const right = `${fixed(cx + AIRCRAFT_HALF_WIDTH_PX)} ${fixed(cy + AIRCRAFT_TAIL_PX)}`;
+  const left = `${fixed(cx - AIRCRAFT_HALF_WIDTH_PX)} ${fixed(cy + AIRCRAFT_TAIL_PX)}`;
+  return `M${nose}L${right}L${left}Z`;
+}
+
+/** Where the right edges of the outer range's label and of half of it stand: left of the arc and ring ends. */
+export function rangeAnchors(g: NdGeometry): {
+  outer: { x: number; y: number };
+  half: { x: number; y: number };
+} {
+  const at = (r: number) => {
+    const [x, y] = point(g, -SPAN_DEG, r);
+    return { x: tenth(x - RANGE_LABEL_GAP_PX), y: tenth(y) };
+  };
+  return { outer: at(g.r), half: at(g.r2) };
+}
+
+/** The line LAST HEARD is centred on, just above the half-range ring. */
+export const lastHeardY = (g: NdGeometry): number => g.cy - g.r2 - LAST_HEARD_RISE_PX;

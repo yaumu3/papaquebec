@@ -28,6 +28,10 @@
   --row-hover: #2a2a2a;
   --row-selected: #3a3a3a;
   --accent: #fff;
+  /* The ND's ground, its half-range ring and its track line. */
+  --nd-bg: #0b0b0b;
+  --nd-ring: #3a3a38;
+  --nd-track: #6a6a66;
   /* Hairlines inside a plot, and the shade of a stretch with no report. */
   --plot-grid: #2c2c2a;
   --plot-gap: #262624;
@@ -48,6 +52,8 @@
   --text-md: 11px;
   --text-lg: 13px;
   --text-xl: 14px;
+  /* The large labels of the ND's compass. */
+  --text-nd-label: 12px;
   --tracking: 0.5px;
   --tracking-wide: 1px;
 

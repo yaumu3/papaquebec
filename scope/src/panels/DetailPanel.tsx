@@ -23,6 +23,7 @@ import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
 import { advisoryBelow } from './header';
 import { History } from './history/History';
+import { Nd } from './nd/Nd';
 import { NONE, positionReading, type Reading, READINGS } from './readings';
 import { Value } from './Value';
 
@@ -245,6 +246,7 @@ function Tabs() {
 function Readings(props: { t: Track }) {
   return (
     <div class={s.readings}>
+      <Nd t={props.t} />
       <Group name="FLT">
         <ReadingCell of="alt" t={props.t} />
         <ReadingCell of="vs" t={props.t} />

@@ -1,0 +1,128 @@
+/* The ink of the frame, which the last frame of a target not heard drops to muted. */
+.nd {
+  --nd-ink: var(--text);
+  --nd-label: var(--color-level);
+  --nd-small: var(--text-dim);
+  position: relative;
+  margin-top: var(--space-4);
+  background: var(--nd-bg);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.last {
+  --nd-ink: var(--text-muted);
+  --nd-label: var(--text-muted);
+  --nd-small: var(--text-muted);
+}
+.svg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  fill: none;
+  stroke-linejoin: round;
+}
+.ring {
+  stroke: var(--nd-ring);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+.arc {
+  stroke: var(--nd-ink);
+  stroke-width: 1.2;
+}
+.minor {
+  stroke: var(--nd-ink);
+  stroke-width: 1;
+}
+.major {
+  stroke: var(--nd-ink);
+  stroke-width: 1.5;
+}
+.lubber {
+  stroke: var(--nd-ink);
+  stroke-width: 2;
+}
+.aircraft {
+  stroke: var(--nd-ink);
+  stroke-width: 1.8;
+}
+.mark,
+.range {
+  position: absolute;
+  line-height: 1;
+}
+.mark {
+  transform: translate(-50%, -50%);
+}
+.big {
+  color: var(--nd-ink);
+  font-size: var(--text-nd-label);
+}
+.small {
+  color: var(--nd-small);
+  font-size: var(--text-xs);
+}
+.range {
+  transform: translate(-100%, -50%);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+.top {
+  position: absolute;
+  inset: var(--space-2) 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+}
+.label {
+  width: 30px;
+  color: var(--nd-label);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+}
+.modeLabel {
+  text-align: right;
+}
+.box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 44px;
+  height: 20px;
+  border: 1px solid var(--nd-ink);
+  color: var(--nd-ink);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+}
+.lastHeard {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  transform: translateY(-50%);
+  color: var(--color-caution);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  line-height: 1;
+  text-align: center;
+}
+.alerts {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.flag {
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-caution);
+  color: var(--color-caution);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  line-height: 15px;
+}
