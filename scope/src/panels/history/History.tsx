@@ -74,7 +74,8 @@ export function History(props: { track: Track }) {
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
   // A memo, so that only another target resets the hover, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
-  const span = () => historyView(hex()).span;
+  // A memo, so that scrolling the lanes, which keeps the span, redraws none of them.
+  const span = createMemo(() => historyView(hex()).span);
   const setSpan = (next: Span) => setHistorySpan(hex(), next);
   createEffect(on(hex, () => setHoverPx(null), { defer: true }));
   onCleanup(() => setHoverInstant(null));

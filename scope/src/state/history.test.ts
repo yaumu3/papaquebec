@@ -120,6 +120,19 @@ describe('history state', () => {
     expect(view.scrollTop).toBe(140);
   });
 
+  it('keeps the span by reference when the lanes scroll', () => {
+    // Arrange
+    const tail: Span = { kind: 'tail', sec: 120 };
+    setHistorySpan('a', tail);
+    setLaneScroll('a', 90);
+
+    // Act
+    const { span } = historyView('a');
+
+    // Assert
+    expect(span).toBe(tail);
+  });
+
   it('starts another target whole and at the top', () => {
     // Arrange
     setHistorySpan('a', { kind: 'tail', sec: 120 });
