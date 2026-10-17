@@ -37,7 +37,7 @@
   position: absolute;
   box-sizing: border-box;
   height: 13px;
-  padding: 0 4px;
+  padding: 0 var(--space-2);
   border: 1px solid transparent;
   color: var(--color-level);
   font-size: var(--text-sm);
