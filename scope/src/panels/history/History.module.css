@@ -76,9 +76,14 @@
 .cutBottom {
   --fade-bottom: var(--space-6);
 }
-/* Four lanes and their hairlines at the most; past them the lanes scroll, with no bar of their own. */
+/*
+ * Four lanes and their hairlines at the most, and + LANE under them; past them the lanes scroll,
+ * with no bar of their own.
+ */
 .scroller {
-  max-height: calc(4 * (var(--lane-height) + 1px));
+  --add-height: calc(var(--control-height) + var(--space-3));
+  --add-gap: var(--space-3);
+  max-height: calc(4 * (var(--lane-height) + 1px) + var(--add-gap) + var(--add-height));
   padding-left: var(--lane-overhang);
   overflow-y: auto;
   scrollbar-width: none;
@@ -94,15 +99,28 @@
   background: var(--plot-scale);
   pointer-events: none;
 }
-.empty {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--lane-height);
-  border: 1px dashed var(--plot-grid);
-  color: var(--text-muted);
+/*
+ * Under the last lane, the last thing in the scroll: + LANE, which opens the palette to add a
+ * lane. On the panel's ground, in front of the time cursor, which so stops at the lanes.
+ */
+.addRow {
+  position: relative;
+  z-index: 2;
+  padding-top: var(--add-gap);
+  background: var(--panel-bg);
+}
+.add {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: var(--add-height);
+  border: 1px dashed var(--panel-border);
+  color: var(--text-dim);
   font-size: var(--text-sm);
-  letter-spacing: var(--tracking);
+  letter-spacing: var(--tracking-wide);
+}
+.add:hover {
+  color: var(--text);
 }
 /* A hairline under each lane, outside its height. */
 .lane {

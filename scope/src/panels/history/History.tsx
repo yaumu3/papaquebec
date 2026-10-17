@@ -111,13 +111,13 @@ export function History(props: { track: Track }) {
   const at = createMemo(() => hover() ?? rest()?.sample ?? null);
   /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
   const past = () => hover() !== null || rest()?.current === false;
-  /** Hovers the instant under the pointer, none over the gutter or while a lane's grip has it. */
+  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane's grip has it. */
   const pointerAt = (e: PointerEvent) => {
+    const target = e.target instanceof Element ? e.target : null;
     // A finger holds whatever it lands on, so only a button's hold is a grip's.
-    const button = e.target instanceof Element ? e.target.closest('button') : null;
-    if (button?.hasPointerCapture(e.pointerId)) return;
+    if (target?.closest('button')?.hasPointerCapture(e.pointerId)) return;
     const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
-    setHoverPx(px < 0 ? null : px);
+    setHoverPx(px < 0 || !target?.closest('[data-lane]') ? null : px);
   };
 
   const [chipText, setChipText] = createSignal<HTMLSpanElement>();
@@ -157,6 +157,8 @@ export function History(props: { track: Track }) {
   const [bay, setBay] = createSignal<HTMLDivElement>();
   /** The dropdown of each lane's name, which opens its palette and keeps the focus for it. */
   const menus = new Map<LaneKey, HTMLElement>();
+  /** The button under the lanes that opens the palette to add one. */
+  let add: HTMLButtonElement | undefined;
   /** The palette open, if one is: for a lane, or with none to add one; under its anchor. */
   const [menu, setMenu] = createSignal<{
     own: LaneKey | null;
@@ -174,11 +176,11 @@ export function History(props: { track: Track }) {
     const below = anchor.getBoundingClientRect().bottom - (bay()?.getBoundingClientRect().top ?? 0);
     setMenu({ own, anchor, top: below + PALETTE_GAP_PX });
   };
-  /** Brings a lane into view and gives its dropdown the focus. */
+  /** Brings a lane into view and gives its dropdown the focus; with none, + LANE. */
   const reveal = (lane: LaneKey | null) => {
-    const el = lane && menus.get(lane);
+    const el = (lane && menus.get(lane)) || add;
     if (!el) return;
-    el.closest('[data-lane]')?.scrollIntoView({ block: 'nearest' });
+    (el.closest('[data-lane]') ?? el).scrollIntoView({ block: 'nearest' });
     el.focus({ preventScroll: true });
   };
   const pick = (lane: LaneKey) => {
@@ -328,39 +330,48 @@ export function History(props: { track: Track }) {
               onPointerMove={pointerAt}
               onPointerLeave={() => setHoverPx(null)}
             >
-              <Show
-                when={plotted().length > 0}
-                fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
-              >
-                <For each={plotted()}>
-                  {(lane, i) => {
-                    onCleanup(() => menus.delete(lane));
-                    return (
-                      <Lane
-                        lane={lane}
-                        index={i()}
-                        count={plotted().length}
-                        keys={readingsIn(lane)}
-                        samples={samples()}
-                        visible={visible()}
-                        ticks={tickTimes()}
-                        width={plotWidth()}
-                        height={LANE_PX}
-                        at={at()}
-                        past={past()}
-                        menuOpen={menu()?.own === lane}
-                        menuRef={(el) => menus.set(lane, el)}
-                        onMenu={(anchor) => toggleMenu(lane, anchor)}
-                        onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, plotted().length)}
-                        onGripMove={(y) => reorder.move(y)}
-                        onGripStep={(by) =>
-                          movePlotLane(i(), clamp(i() + by, 0, plotted().length - 1))
-                        }
-                      />
-                    );
+              <For each={plotted()}>
+                {(lane, i) => {
+                  onCleanup(() => menus.delete(lane));
+                  return (
+                    <Lane
+                      lane={lane}
+                      index={i()}
+                      count={plotted().length}
+                      keys={readingsIn(lane)}
+                      samples={samples()}
+                      visible={visible()}
+                      ticks={tickTimes()}
+                      width={plotWidth()}
+                      height={LANE_PX}
+                      at={at()}
+                      past={past()}
+                      menuOpen={menu()?.own === lane}
+                      menuRef={(el) => menus.set(lane, el)}
+                      onMenu={(anchor) => toggleMenu(lane, anchor)}
+                      onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, plotted().length)}
+                      onGripMove={(y) => reorder.move(y)}
+                      onGripStep={(by) =>
+                        movePlotLane(i(), clamp(i() + by, 0, plotted().length - 1))
+                      }
+                    />
+                  );
+                }}
+              </For>
+              <div class={s.addRow}>
+                <button
+                  ref={(el) => {
+                    add = el;
                   }}
-                </For>
-              </Show>
+                  type="button"
+                  class={cx(s.add, menu()?.anchor === add && s.open)}
+                  aria-haspopup="dialog"
+                  aria-expanded={menu()?.anchor === add}
+                  onClick={(e) => toggleMenu(null, e.currentTarget)}
+                >
+                  + LANE
+                </button>
+              </div>
             </div>
             <Show when={cursorX()}>
               {(px) => (
