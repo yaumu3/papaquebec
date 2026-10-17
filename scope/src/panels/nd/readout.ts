@@ -5,6 +5,7 @@ import { holds, INSTRUMENT_SEC } from '../../lib/reports';
 import { magneticBearing, magneticTrack } from '../../state/magnetic';
 import type { Readout } from '../../state/track';
 import { NONE, type Reading, READINGS } from '../readings';
+import type { Trend } from './geometry';
 
 /** The state of the instrument: oriented on the heading, on the track, or blank for want of both. */
 export type NdMode = 'heading' | 'track' | 'lost' | 'blank';
@@ -126,7 +127,11 @@ export function ndReadouts(t: Readout, now: number): NdReadouts {
 export interface NdSymbols {
   track?: number | undefined;
   sel?: number | undefined;
+  trend?: Trend | undefined;
 }
+
+/** A turn slower than this, in degrees per second, is flight in a straight line: no trend is drawn. */
+const TREND_MIN_RATE_DEG_S = 0.3;
 
 /** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
 export function ndSymbols(t: Readout, now: number): NdSymbols {
@@ -137,5 +142,15 @@ export function ndSymbols(t: Readout, now: number): NdSymbols {
   return {
     track: live(['track'], magneticTrack(t)),
     sel: live(['selHeading', 'navModes'], steeringHeading(t)),
+    trend: trendOf(t, now),
   };
+}
+
+/** The turn rate and ground speed, while both hold, the aircraft is under way and the track turns. */
+function trendOf(t: Readout, now: number): Trend | undefined {
+  const { trackRate: rateDegS, gs: gsKt } = t;
+  if (rateDegS === undefined || gsKt === undefined) return undefined;
+  if (!holdsAll(t, ['trackRate', 'gs'], now)) return undefined;
+  if (Math.abs(rateDegS) < TREND_MIN_RATE_DEG_S || gsKt <= 0) return undefined;
+  return { rateDegS, gsKt };
 }

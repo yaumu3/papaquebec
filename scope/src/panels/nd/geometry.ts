@@ -1,3 +1,4 @@
+import { RAD } from '../../lib/units';
 import { fixed, offset, toward } from '../svg';
 
 /** The compass arc spans this far either side of the top. */
@@ -190,4 +191,49 @@ export function bugPath(g: NdGeometry, rel: number): string {
   if (onArc(rel)) return `${bugOutline(g, rel, BUG_OUTLINE)}Z`;
   const side = Math.sign(rel);
   return bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side);
+}
+
+/** How the track turns and how fast the aircraft goes: what the trend vector extends. */
+export interface Trend {
+  rateDegS: number;
+  gsKt: number;
+}
+
+const TREND_SEC = 90;
+const TREND_FROM_PX = 9;
+/** The seconds of the trend, from and to, that each of its three dashes covers. */
+const TREND_DASHES: readonly (readonly [number, number])[] = [
+  [1, 28],
+  [32, 58],
+  [62, 88],
+];
+
+/** Where the aircraft will be each second of the next 90, turning at the rate, on the scale of the range. */
+export function trendPoints(
+  g: NdGeometry,
+  at: number,
+  trend: Trend,
+  rangeNm: number,
+): [number, number][] {
+  const pxPerSec = ((trend.gsKt / 3600) * g.r) / rangeNm;
+  let x = g.cx;
+  let y = g.cy - TREND_FROM_PX;
+  const points: [number, number][] = [];
+  for (let t = 0; t <= TREND_SEC; t++) {
+    points.push([x, y]);
+    const rad = (at + trend.rateDegS * (t + 0.5)) * RAD;
+    x += pxPerSec * Math.sin(rad);
+    y -= pxPerSec * Math.cos(rad);
+  }
+  return points;
+}
+
+/** The trend as three dashes, one for each 30 s. */
+export function trendPath(points: readonly (readonly [number, number])[]): string {
+  return TREND_DASHES.map(([from, to]) =>
+    points
+      .slice(from, to + 1)
+      .map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`)
+      .join(''),
+  ).join('');
 }

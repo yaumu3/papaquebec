@@ -185,3 +185,8 @@
   stroke: var(--color-level);
   stroke-width: 1.6;
 }
+.trend {
+  stroke: var(--text);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}

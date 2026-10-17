@@ -306,3 +306,55 @@ describe('ndSymbols', () => {
     expect(symbols).toEqual([{}, {}]);
   });
 });
+
+const turningSample = (over: Partial<Parameters<typeof makeSample>[1]>, heard = {}) =>
+  makeSample(NOW, {
+    seen: 1,
+    heading: 284,
+    track: 289,
+    gs: 360,
+    trackRate: 1,
+    ...over,
+    heard: { heading: FRESH, track: FRESH, gs: FRESH, trackRate: FRESH, ...heard },
+  });
+
+describe('ndSymbols trend', () => {
+  it('gives the turn rate and the ground speed of a turning aircraft', () => {
+    // Arrange
+    const t = turningSample({});
+
+    // Act
+    const symbols = ndSymbols(t, NOW);
+
+    // Assert
+    expect(symbols.trend).toEqual({ rateDegS: 1, gsKt: 360 });
+  });
+
+  it('gives none for a turn slower than 0.3 °/s, at a standstill, or for an input not heard', () => {
+    // Arrange
+    const quiet = [
+      turningSample({ trackRate: 0.2 }),
+      turningSample({ trackRate: -0.29 }),
+      turningSample({ gs: 0 }),
+      turningSample({}, { gs: STALE }),
+      turningSample({}, { trackRate: STALE }),
+    ];
+
+    // Act
+    const trends = quiet.map((t) => ndSymbols(t, NOW).trend);
+
+    // Assert
+    expect(trends).toEqual(Array(5).fill(undefined));
+  });
+
+  it('gives the trend of a turn of exactly 0.3 °/s either way', () => {
+    // Arrange
+    const turning = [0.3, -0.3].map((trackRate) => turningSample({ trackRate }));
+
+    // Act
+    const trends = turning.map((t) => ndSymbols(t, NOW).trend?.rateDegS);
+
+    // Assert
+    expect(trends).toEqual([0.3, -0.3]);
+  });
+});

@@ -13,6 +13,8 @@ import {
   rangeAnchors,
   ringPath,
   trackPath,
+  trendPath,
+  trendPoints,
 } from './geometry';
 
 const segments = (path: string): number => (path.match(/M/g) ?? []).length;
@@ -268,5 +270,52 @@ describe('bugPath', () => {
     // Assert
     expect(left?.map(([x]) => x)).toEqual(mirrored.map(([x]) => expect.closeTo(x, 1)));
     expect(left?.map(([, y]) => y)).toEqual(mirrored.map(([, y]) => y));
+  });
+});
+
+const turning = (rateDegS: number) => ({ rateDegS, gsKt: 360 });
+const lengthOf = (points: readonly (readonly [number, number])[]): number =>
+  points.reduce((sum, p, i, all) => {
+    const from = all[i - 1];
+    return from ? sum + Math.hypot(p[0] - from[0], p[1] - from[1]) : sum;
+  }, 0);
+
+describe('trend vector', () => {
+  const g = ndGeometry(346);
+
+  it('steps 90 s at the ground speed scaled to the range, from just above the aircraft', () => {
+    // Arrange
+    const speed = turning(1);
+
+    // Act
+    const points = trendPoints(g, 0, speed, 20);
+
+    // Assert
+    expect(points).toHaveLength(91);
+    expect(points[0]).toEqual([173, 180]);
+    expect(lengthOf(points)).toBeCloseTo(67.05, 6);
+  });
+
+  it('curves to the side the track turns', () => {
+    // Arrange
+    const rates = [1, -1, 0];
+
+    // Act
+    const ends = rates.map((rate) => trendPoints(g, 0, turning(rate), 20).at(-1)?.[0] ?? 0);
+
+    // Assert
+    expect(ends.map((x) => Math.sign(Math.round((x - g.cx) * 1e6)))).toEqual([1, -1, 0]);
+  });
+
+  it('draws three dashes, one for each 30 s', () => {
+    // Arrange
+    const points = trendPoints(g, 0, turning(0), 20);
+
+    // Act
+    const path = trendPath(points);
+
+    // Assert
+    expect(segments(path)).toBe(3);
+    expect(path.startsWith('M173.0 179.3L173.0 178.5')).toBe(true);
   });
 });

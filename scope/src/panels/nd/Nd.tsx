@@ -18,6 +18,8 @@ import {
   rangeAnchors,
   ringPath,
   trackPath,
+  trendPath,
+  trendPoints,
 } from './geometry';
 import { ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
 
@@ -50,7 +52,12 @@ export function Nd(props: { t: Track }) {
     const rel = relative(symbols().track);
     return rel === undefined
       ? undefined
-      : { line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
+      : { rel, line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
+  });
+  const trend = createMemo(() => {
+    const at = track();
+    const turning = symbols().trend;
+    return at && turning ? trendPath(trendPoints(g(), at.rel, turning, ndRangeNm())) : undefined;
   });
   const bug = createMemo(() => {
     const rel = relative(symbols().sel);
@@ -66,6 +73,7 @@ export function Nd(props: { t: Track }) {
           <path class={s.major} d={marks().major} />
           <path class={s.lubber} d={lubberPath(g())} />
           <Show when={track()}>{(p) => <path class={s.trackLine} d={p().line} />}</Show>
+          <Show when={trend()}>{(d) => <path class={s.trend} d={d()} />}</Show>
           <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
           <Show when={track()}>{(p) => <path class={s.diamond} d={p().diamond} />}</Show>
           <path class={s.aircraft} d={aircraftPath(g())} />
