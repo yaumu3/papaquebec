@@ -298,7 +298,7 @@ export function DetailPanel() {
           <>
             <Header t={t()} />
             <Tabs />
-            <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(detailTab())}>
+            <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(detailTab())} class={s.panel}>
               <Show when={detailTab() === 'history'} fallback={<Readings t={t()} />}>
                 <History track={t()} />
               </Show>

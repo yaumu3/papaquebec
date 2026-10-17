@@ -1,7 +1,4 @@
-/*
- * Left of each plot, the gutter its scale is labelled in; the plots run to the right edge. Padding
- * below, not a margin, so the room under the timeline does not collapse into the next rule's.
- */
+/* Left of each plot, the gutter its scale is labelled in; the plots run to the right edge. */
 .history {
   --lane-gutter: 32px;
   --lane-top: 18px;
@@ -9,11 +6,16 @@
   --plot-right: 0px;
   /* How far a long scale label may run left of the lanes: the panel's side padding (DetailPanel .body). */
   --lane-overhang: var(--space-6);
-  padding-bottom: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 /* The lanes, and the thumb beside them in the margin. */
 .bay {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 /*
  * A lane cut by an edge fades into the panel ground there. The time cursor's column fades only at
@@ -26,6 +28,9 @@
   --fade-bottom: 0px;
   --cursor-left: -1px;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   margin-left: calc(-1 * var(--lane-overhang));
   mask-image:
     linear-gradient(
@@ -52,13 +57,13 @@
   --fade-bottom: var(--fade);
 }
 /*
- * Four lanes and their hairlines at the most, and + LANE under them; past them the lanes scroll,
- * with no bar of their own.
+ * The lanes and + LANE under them, as many as the column has room for; past them they scroll, with
+ * no bar of their own.
  */
 .scroller {
   --add-height: calc(var(--control-height) + var(--space-3));
   --add-gap: var(--space-3);
-  max-height: calc(4 * (var(--lane-height) + 1px) + var(--add-gap) + var(--add-height));
+  min-height: 0;
   padding-left: var(--lane-overhang);
   display: flex;
   flex-direction: column;
