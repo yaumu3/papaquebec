@@ -161,6 +161,15 @@
   position: absolute;
   overflow: hidden;
 }
+.hatch {
+  display: inline-block;
+  width: 1ch;
+  height: 1cap;
+}
+.hatchLine {
+  stroke: var(--color-level);
+  stroke-width: 1;
+}
 .wheelRows {
   position: absolute;
   left: 0;

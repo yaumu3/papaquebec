@@ -1,4 +1,4 @@
-import { createUniqueId, For, Show } from 'solid-js';
+import { createUniqueId, For, type JSX, Show } from 'solid-js';
 
 import { Flag } from './Flag';
 import {
@@ -33,8 +33,30 @@ export function altitudeView(g: PfdGeometry, read: PfdAltitude): AltitudeView | 
   return { ft: read.ft, tape: altitudeTape(g, read.ft), digits: altitudeDigits(read.ft) };
 }
 
-/** What a slot row shows for now: its digit, the minus sign for NEG, and nothing for a hatch. */
-const slotText = (row: SlotRow): string => {
+/** One digit cell of crosshatch: 1 px lines at 45 and 135 degrees, 4 px apart. */
+function Hatch() {
+  const id = createUniqueId();
+  return (
+    <svg class={s.hatch} aria-hidden="true">
+      <defs>
+        <pattern
+          id={id}
+          width="4"
+          height="4"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(45)"
+        >
+          <path class={s.hatchLine} d="M0 0.5H4M0.5 0V4" />
+        </pattern>
+      </defs>
+      <rect width="100%" height="100%" fill={`url(#${id})`} />
+    </svg>
+  );
+}
+
+/** What a slot row shows: its digit or the hatch, and the minus sign for NEG until NEG is drawn. */
+const slotText = (row: SlotRow): JSX.Element => {
+  if (row.kind === 'hatch') return <Hatch />;
   if (row.kind === 'neg') return '−';
   return row.kind === 'digit' ? row.text : '';
 };
