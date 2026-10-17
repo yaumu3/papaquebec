@@ -40,6 +40,8 @@
   --plot-intent-dim: #a868a8;
   /* The labels of a plot's scales and clock. */
   --plot-label: #6a6a66;
+  /* The rules between lanes, above their value lines. */
+  --plot-rule: var(--plot-label);
   /* A plot's value lines, and the thumb of scrolled lanes. */
   --plot-scale: var(--panel-border);
   /* The bin a dragged lane is dropped in to remove it. */

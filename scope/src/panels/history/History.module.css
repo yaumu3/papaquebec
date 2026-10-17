@@ -177,7 +177,7 @@
 .lane {
   position: relative;
   box-sizing: content-box;
-  border-bottom: 1px solid var(--plot-grid);
+  border-bottom: 1px solid var(--plot-rule);
   /* Scrolled to, clear of the fades. */
   scroll-margin-block: var(--fade);
   cursor: grab;
@@ -414,7 +414,7 @@
 /* The clock over the lanes, a hairline under it. */
 .axis {
   margin-top: var(--space-4);
-  border-bottom: 1px solid var(--plot-grid);
+  border-bottom: 1px solid var(--plot-rule);
   color: var(--plot-label);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking);
