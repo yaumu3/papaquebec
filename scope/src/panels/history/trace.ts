@@ -1,5 +1,4 @@
 import type { HeardKey } from '../../lib/aircraft';
-import { nearestInTime } from '../../lib/nearest';
 import { STALE_SECONDS } from '../../render/scene/rules';
 import type { Sample } from '../../state/track';
 import type { Interval } from './span';
@@ -152,12 +151,31 @@ export function gapsIn(samples: readonly Sample[], i: Interval): Interval[] {
   return out;
 }
 
-/** The sample inside the interval nearest in time to `t`; null without any. */
+/** How many of the samples, oldest first, come before `t`, or at it too when `through`. */
+function countBefore(samples: readonly Sample[], t: number, through = false): number {
+  let lo = 0;
+  let hi = samples.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    const st = samples[mid]?.t ?? Infinity;
+    if (st < t || (through && st === t)) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
+/**
+ * The sample inside the interval nearest in time to `t`, the earlier of two as near; null without
+ * any. The samples are oldest first.
+ */
 export function nearestSample(samples: readonly Sample[], t: number, i: Interval): Sample | null {
-  return nearestInTime(
-    samples.filter((s) => s.t >= i.from && s.t <= i.to),
-    t,
-  );
+  const start = countBefore(samples, i.from);
+  const end = countBefore(samples, i.to, true);
+  const k = Math.min(Math.max(countBefore(samples, t), start), end);
+  const before = k > start ? samples[k - 1] : undefined;
+  const after = k < end ? samples[k] : undefined;
+  if (!before || !after) return before ?? after ?? null;
+  return t - before.t <= after.t - t ? before : after;
 }
 
 export interface Bar {

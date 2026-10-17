@@ -14,7 +14,7 @@ import {
 } from '../../state/history';
 import { lanesOf, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
-import type { Track } from '../../state/track';
+import type { Sample, Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { trackReorder } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
@@ -88,15 +88,18 @@ export function History(props: { track: Track }) {
   const plotWidth = trackWidth(labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
 
+  /** The sample under the pointer, kept beside the instant the scope rings, which others may clear. */
+  const [hovered, setHovered] = createSignal<Sample | null>(null);
   const hover = createMemo(() => {
-    const t = hoverInstant();
-    return t === null ? null : (samples().find((sample) => sample.t === t) ?? null);
+    const h = hovered();
+    return h && hoverInstant() === h.t ? h : null;
   });
   /** The sample the lanes are read at: the hovered one, else the latest in view. */
   const at = createMemo(() => hover() ?? nearestSample(samples(), visible().to, visible()));
   const hoverAt = (px: number | null) => {
     const near =
       px === null ? null : nearestSample(samples(), timeAt(px, visible(), plotWidth()), visible());
+    setHovered(near);
     setHoverInstant(near?.t ?? null);
   };
   /** Hovers the instant under the pointer, none over the gutter or while a lane's grip has it. */

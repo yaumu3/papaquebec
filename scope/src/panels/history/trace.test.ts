@@ -263,6 +263,24 @@ describe('nearestSample', () => {
     // Assert
     expect(found.map((s) => s?.t)).toEqual([110, 110, undefined]);
   });
+
+  it("takes the earlier of two as near, the window's own ends included, none among none", () => {
+    // Arrange
+    const samples = [sample(100), sample(110), sample(120), sample(130)];
+    const rows = [
+      { from: samples, t: 115, i: { from: 100, to: 130 } },
+      { from: samples, t: 90, i: { from: 100, to: 130 } },
+      { from: samples, t: 140, i: { from: 100, to: 130 } },
+      { from: samples, t: 125, i: { from: 111, to: 119 } },
+      { from: [], t: 115, i: { from: 100, to: 130 } },
+    ];
+
+    // Act
+    const found = rows.map((r) => nearestSample(r.from, r.t, r.i));
+
+    // Assert
+    expect(found.map((s) => s?.t)).toEqual([110, 100, 130, undefined, undefined]);
+  });
 });
 
 const modes = (s: Sample) => s.navModes;
