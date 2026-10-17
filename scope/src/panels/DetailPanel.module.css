@@ -1,3 +1,7 @@
+/* Wider at the sides than the other panels, as the design has it, and as a phone sheet is. */
+.body {
+  padding-inline: var(--space-6);
+}
 .empty {
   color: var(--text-dim);
   font-size: var(--text-sm);

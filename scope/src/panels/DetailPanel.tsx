@@ -200,7 +200,7 @@ export function DetailPanel() {
     return hex ? (trackStore.tracks.get(hex) ?? null) : null;
   });
   return (
-    <Window id="detail">
+    <Window id="detail" bodyClass={s.body}>
       <Show
         when={track()}
         fallback={<div class={s.empty}>{selected() ? 'NOT IN FEED' : 'NO TARGET SELECTED'}</div>}
