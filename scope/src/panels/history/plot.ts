@@ -7,6 +7,7 @@ import type { ReadingKey } from '../../state/plotted';
 import type { Interval } from '../../state/span';
 import type { Sample } from '../../state/track';
 import { type Reading, READINGS } from '../readings';
+import { fixed, offset, toward } from '../svg';
 import { type Dash, HEARD, type Heading, PLOTS } from './plots';
 import {
   barbMarks,
@@ -18,9 +19,6 @@ import {
   type Read,
   runsOf,
 } from './trace';
-
-/** A number as an SVG attribute: a tenth of a pixel is precision enough. */
-export const fixed = (n: number): string => n.toFixed(1);
 
 export interface LaneTrace {
   key: ReadingKey;
@@ -251,21 +249,6 @@ const TICK_TO_PX = ARROW_PX + 6.5;
 const HOLD_DEG = 3;
 /** How far a glyph reaches round its point at the most: the track, or the tick past its arrow, with its stroke. */
 export const GLYPH_REACH_PX = Math.max(VECTOR_PX, TICK_TO_PX) + STROKE_HALF_PX;
-
-/** A point `a` out from (x, y) along `deg` and `c` across it to the right, north up. */
-const offset =
-  (x: number, y: number, deg: number) =>
-  (a: number, c = 0): [number, number] => {
-    const ux = Math.sin(deg * RAD);
-    const uy = -Math.cos(deg * RAD);
-    return [x + ux * a - uy * c, y + uy * a + ux * c];
-  };
-
-/** The same as an SVG pair. */
-const toward = (x: number, y: number, deg: number) => {
-  const at = offset(x, y, deg);
-  return (a: number, c = 0): string => at(a, c).map(fixed).join(' ');
-};
 
 /** To a tenth, as precise as the drawing. */
 const tenth = (n: number): number => Math.round(n * 10) / 10;

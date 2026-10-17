@@ -17,8 +17,9 @@ import {
   xOf,
 } from '../../state/span';
 import type { Sample } from '../../state/track';
+import { fixed } from '../svg';
 import { dashClass } from './Lane';
-import { fixed, laneRange, laneTraces, pathOf } from './plot';
+import { laneRange, laneTraces, pathOf } from './plot';
 import { yOf } from './trace';
 
 import s from './History.module.css';
