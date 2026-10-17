@@ -11,6 +11,7 @@ import {
   gapsIn,
   heardAt,
   nearestSample,
+  restSample,
   type Point,
   rangeOf,
   runsOf,
@@ -362,6 +363,28 @@ describe('barbMarks', () => {
       ['pennant'],
       ['pennant', 'full', 'half'],
       ['pennant', 'pennant', 'full'],
+    ]);
+  });
+});
+
+describe('restSample', () => {
+  it("rests on the last sample inside the window, current only when it is the contact's latest", () => {
+    // Arrange
+    const samples = [sample(100), sample(110), sample(120), sample(130)];
+    const windows = [
+      { from: 100, to: 130 },
+      { from: 100, to: 125 },
+      { from: 111, to: 119 },
+    ];
+
+    // Act
+    const rests = windows.map((i) => restSample(samples, i));
+
+    // Assert
+    expect(rests.map((r) => r && [r.sample.t, r.current])).toEqual([
+      [130, true],
+      [120, false],
+      null,
     ]);
   });
 });

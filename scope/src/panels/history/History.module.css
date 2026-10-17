@@ -192,7 +192,8 @@
   white-space: nowrap;
   pointer-events: none;
 }
-.hovered {
+/* A value read at an earlier instant than the latest, hovered or with the window in the past. */
+.past {
   color: var(--color-selbox);
 }
 .slot {
@@ -322,8 +323,9 @@
 }
 /*
  * The time cursor: a chip on the clock with a notch down to the lanes, and one line through them,
- * in front of the plots and behind the lanes' names and readouts. At rest it stands dim at the
- * latest sample; it lights up while the lanes are hovered.
+ * in front of the plots and behind the lanes' names and readouts. At rest it stands at the last
+ * sample in view, dim at the latest; it lights up away from it, hovered or with the window in the
+ * past.
  */
 .chip {
   position: absolute;

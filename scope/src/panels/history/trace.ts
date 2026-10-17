@@ -178,6 +178,19 @@ export function nearestSample(samples: readonly Sample[], t: number, i: Interval
   return t - before.t <= after.t - t ? before : after;
 }
 
+/** Where the cursor rests: a sample, and whether it is the contact's latest. */
+export interface Rest {
+  sample: Sample;
+  current: boolean;
+}
+
+/** The last sample inside the interval, where the cursor rests; null without any. The samples are oldest first. */
+export function restSample(samples: readonly Sample[], i: Interval): Rest | null {
+  const end = countBefore(samples, i.to, true);
+  const sample = end > countBefore(samples, i.from) ? samples[end - 1] : undefined;
+  return sample ? { sample, current: end === samples.length } : null;
+}
+
 export interface Bar {
   name: string;
   /** The stretches during which the name was reported. */

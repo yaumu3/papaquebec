@@ -75,9 +75,9 @@ export function Lane(props: {
   ticks: readonly number[];
   width: number;
   height: number;
-  /** The sample the lane is read at, and whether it is the one hovered. */
+  /** The sample the lane is read at, and whether it is an earlier one than the latest. */
   at: Sample | null;
-  hovering: boolean;
+  past: boolean;
   onClose: () => void;
   onGripDown: (y: number) => void;
   onGripMove: (y: number) => void;
@@ -281,9 +281,7 @@ export function Lane(props: {
         <Show when={readout()}>
           {(r) => (
             <div class={s.readout}>
-              <span class={cx(r().unknown ? s.unknown : props.hovering && s.hovered)}>
-                {r().value}
-              </span>
+              <span class={cx(r().unknown ? s.unknown : props.past && s.past)}>{r().value}</span>
               <Index each={slots()}>
                 {(slot, i) => (
                   <>

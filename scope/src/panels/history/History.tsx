@@ -23,7 +23,7 @@ import { Lane } from './Lane';
 import { type ScrollView, scrollView } from './scroll';
 import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
-import { nearestSample } from './trace';
+import { nearestSample, restSample } from './trace';
 
 import s from './History.module.css';
 
@@ -95,8 +95,12 @@ export function History(props: { track: Track }) {
     const h = hovered();
     return h && hoverInstant() === h.t ? h : null;
   });
-  /** The sample the lanes are read at: the hovered one, else the latest in view. */
-  const at = createMemo(() => hover() ?? nearestSample(samples(), visible().to, visible()));
+  /** Where the cursor rests: the last sample in view. */
+  const rest = createMemo(() => restSample(samples(), visible()));
+  /** The sample the lanes are read at: the hovered one, else the one the cursor rests at. */
+  const at = createMemo(() => hover() ?? rest()?.sample ?? null);
+  /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
+  const past = () => hover() !== null || rest()?.current === false;
   const hoverAt = (px: number | null) => {
     const near =
       px === null ? null : nearestSample(samples(), timeAt(px, visible(), plotWidth()), visible());
@@ -212,7 +216,7 @@ export function History(props: { track: Track }) {
               {(a) => (
                 <>
                   <span
-                    class={cx(s.chip, hover() && s.live)}
+                    class={cx(s.chip, past() && s.live)}
                     style={{
                       left: `${chipLeft(cursorX() ?? 0)}px`,
                       padding: `0 ${CHIP_PAD_PX}px`,
@@ -223,7 +227,7 @@ export function History(props: { track: Track }) {
                     </span>
                   </span>
                   <svg
-                    class={cx(s.notch, hover() && s.live)}
+                    class={cx(s.notch, past() && s.live)}
                     style={{ left: `${(cursorX() ?? 0) - NOTCH_W_PX / 2}px` }}
                     width={NOTCH_W_PX}
                     height={NOTCH_H_PX}
@@ -267,7 +271,7 @@ export function History(props: { track: Track }) {
                       width={plotWidth()}
                       height={LANE_PX}
                       at={at()}
-                      hovering={hover() !== null}
+                      past={past()}
                       onClose={() => closePlotLane(lane)}
                       onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, lanes().length)}
                       onGripMove={(y) => reorder.move(y)}
@@ -280,7 +284,7 @@ export function History(props: { track: Track }) {
             <Show when={cursorX()}>
               {(px) => (
                 <div
-                  class={cx(s.timeCursor, hover() && s.live)}
+                  class={cx(s.timeCursor, past() && s.live)}
                   style={{ left: cursorLeft(px()) }}
                 />
               )}
