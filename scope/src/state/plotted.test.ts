@@ -13,7 +13,6 @@ import {
   readingsIn,
   removeLane,
   switchLane,
-  togglePlotted,
 } from './plotted';
 
 describe('LANE_GROUPS', () => {
@@ -59,41 +58,6 @@ describe('readingsIn', () => {
 
     // Assert
     expect(keys).toEqual([['alt', 'selAlt', 'fmsAlt'], ['trk', 'selHdg'], ['gs']]);
-  });
-});
-
-describe('togglePlotted', () => {
-  it('plots a lane that is off at the end', () => {
-    // Arrange
-    const plotted: LaneKey[] = ['alt'];
-
-    // Act
-    const next = togglePlotted(plotted, 'vs');
-
-    // Assert
-    expect(next).toEqual(['alt', 'vs']);
-  });
-
-  it('removes a lane that is on', () => {
-    // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs'];
-
-    // Act
-    const next = togglePlotted(plotted, 'alt');
-
-    // Assert
-    expect(next).toEqual(['gs']);
-  });
-
-  it('plots any number of lanes', () => {
-    // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs', 'trk', 'ias'];
-
-    // Act
-    const next = togglePlotted(plotted, 'vs');
-
-    // Assert
-    expect(next).toEqual(['alt', 'gs', 'trk', 'ias', 'vs']);
   });
 });
 

@@ -11,7 +11,6 @@ import {
   setPlotted,
   switchPlotLane,
   toggleHistory,
-  togglePlot,
 } from './history';
 import { DEFAULT_PLOTTED } from './plotted';
 import { persisted } from './settings';
@@ -26,17 +25,6 @@ describe('history state', () => {
 
     // Assert
     expect(keys).toEqual(defaults);
-  });
-
-  it('toggles a reading on, in a lane of its own', () => {
-    // Arrange
-    setPlotted(DEFAULT_PLOTTED);
-
-    // Act
-    togglePlot('vs');
-
-    // Assert
-    expect(plotted()).toEqual([...DEFAULT_PLOTTED, 'vs']);
   });
 
   it('removes a lane', () => {

@@ -1,14 +1,10 @@
 import { createSignal } from 'solid-js';
 
-import { addLane, type LaneKey, moveLane, removeLane, switchLane, togglePlotted } from './plotted';
+import { addLane, type LaneKey, moveLane, removeLane, switchLane } from './plotted';
 import { persisted } from './settings';
 
 /** The lanes of the history, in order. */
 export const [plotted, setPlotted] = createSignal<readonly LaneKey[]>(persisted.plotted);
-
-export function togglePlot(lane: LaneKey): void {
-  setPlotted((p) => togglePlotted(p, lane));
-}
 
 export function removePlotLane(lane: LaneKey): void {
   setPlotted((p) => removeLane(p, lane));

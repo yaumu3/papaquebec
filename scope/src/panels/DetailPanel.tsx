@@ -4,8 +4,7 @@ import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { isStale, trackLabel } from '../render/scene/rules';
-import { plotted, togglePlot } from '../state/history';
-import { isLaneKey, type ReadingKey } from '../state/plotted';
+import type { ReadingKey } from '../state/plotted';
 import { selected, setPan, snapshotVersion } from '../state/scope';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
@@ -18,32 +17,26 @@ import { Value } from './Value';
 
 import s from './DetailPanel.module.css';
 
-/** One labeled reading in the detail grid; every cell is a button. */
+/** One labeled reading in the detail grid; a button for a cell that does something. */
 function Cell(props: {
   k: string;
   r: Reading;
-  /** A faint glyph after the label, for a cell that does something other than plot. */
+  /** A faint glyph after the label, for a cell that does something. */
   glyph?: string;
-  /** Pressed, for a cell that plots: filled light, label and value dark. */
-  on?: boolean | undefined;
   dim?: boolean | undefined;
   /** Columns taken, for a value too long for one. */
   span?: 2 | 4 | undefined;
-  onClick: () => void;
+  onClick?: () => void;
 }) {
-  return (
-    <button
-      type="button"
-      class={cx(
-        s.cell,
-        props.span === 2 && s.span2,
-        props.span === 4 && s.span4,
-        (props.dim ?? props.r === NONE) && s.dim,
-        props.on && s.on,
-      )}
-      aria-pressed={props.on}
-      onClick={() => props.onClick()}
-    >
+  const cls = () =>
+    cx(
+      s.cell,
+      props.span === 2 && s.span2,
+      props.span === 4 && s.span4,
+      (props.dim ?? props.r === NONE) && s.dim,
+    );
+  const body = () => (
+    <>
       <div class={s.k}>
         {props.k}
         <Show when={props.glyph}>
@@ -51,25 +44,21 @@ function Cell(props: {
         </Show>
       </div>
       <Value r={props.r} />
-    </button>
+    </>
+  );
+  return (
+    <Show when={props.onClick} fallback={<div class={cls()}>{body()}</div>}>
+      <button type="button" class={cx(cls(), s.action)} onClick={() => props.onClick?.()}>
+        {body()}
+      </button>
+    </Show>
   );
 }
 
-/** The cell of one reading of the catalog: a tap plots its lane, if it has one, another takes it off again. */
+/** The cell of one reading of the catalog. */
 function ReadingCell(props: { of: ReadingKey; t: Track; dim?: boolean; span?: 4 }) {
   const spec = READINGS[props.of];
-  return (
-    <Cell
-      k={spec.label}
-      r={spec.format(props.t)}
-      on={isLaneKey(props.of) && plotted().includes(props.of)}
-      dim={props.dim}
-      span={props.span}
-      onClick={() => {
-        if (isLaneKey(props.of)) togglePlot(props.of);
-      }}
-    />
-  );
+  return <Cell k={spec.label} r={spec.format(props.t)} dim={props.dim} span={props.span} />;
 }
 
 /** The position, whose tap centres the scope on it. */

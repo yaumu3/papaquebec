@@ -54,12 +54,6 @@ export const readingsIn = (lane: LaneKey): ReadingKey[] => [lane, ...(INTENTS[la
 /** Plotted on first use. */
 export const DEFAULT_PLOTTED: readonly LaneKey[] = ['alt', 'gs'];
 
-/** The lanes after a tap on `lane`: off when on, else on at the end. */
-export function togglePlotted(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
-  if (plotted.includes(lane)) return removeLane(plotted, lane);
-  return [...plotted, lane];
-}
-
 export function removeLane(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
   return plotted.filter((k) => k !== lane);
 }
