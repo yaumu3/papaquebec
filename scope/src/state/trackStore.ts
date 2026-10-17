@@ -1,6 +1,6 @@
 import type { AircraftReport, AircraftSnapshot } from '../lib/aircraft';
 import type { ProjectFn } from '../lib/geo';
-import { ADVISORY_SEC, holds, IDENT_SEC } from '../lib/reports';
+import { ADVISORY_SEC, EMERGENCY_SEC, holds, IDENT_SEC } from '../lib/reports';
 import type { Fix, OperatorState, Position, Readings, Sample, Track } from './track';
 
 export const HISTORY_RETENTION_SEC = 3600;
@@ -157,7 +157,7 @@ function toTrack(
     type: a.type,
     registration: a.registration,
     description: a.description,
-    emergency: a.emergency,
+    emergency: holds(a.heard.emergency, now, EMERGENCY_SEC) ? a.emergency : undefined,
     ident: a.ident === true && holds(a.heard.ident, now, IDENT_SEC),
     ra: holds(a.heard.ra, now, ADVISORY_SEC) ? a.ra : undefined,
     position,
@@ -171,8 +171,9 @@ function toTrack(
  * The track store is rebuilt from every snapshot. Only position history, samples and operator
  * state carry over, because the feed does not carry them; of a target the feed drops they are
  * kept for when it is heard again, as long as the tracker keeps its callsign: any longer, and the
- * airframe's next flight would carry on from its last. The ident and the advisory are shown for
- * as long as a transponder reports them, from when the feed heard them.
+ * airframe's next flight would carry on from its last. The ident, the advisory and the
+ * emergency/priority status are shown for as long as a transponder reports them, from when the
+ * feed heard them.
  */
 export function createTrackStore(initialProject: ProjectFn): TrackStore {
   let project = initialProject;

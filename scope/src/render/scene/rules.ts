@@ -31,6 +31,7 @@ export const THEME = {
   selected: PALETTE.selected,
   selbox: PALETTE.selbox,
   emergency: PALETTE.emergency,
+  caution: PALETTE.caution,
   ident: '#ffffff',
   history: '#ffa050',
   cursor: '#d48cf0',

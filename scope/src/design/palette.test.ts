@@ -37,6 +37,7 @@ describe('design tokens', () => {
       [THEME.selected, PALETTE.selected],
       [THEME.selbox, PALETTE.selbox],
       [THEME.emergency, PALETTE.emergency],
+      [THEME.caution, PALETTE.caution],
     ];
 
     // Act

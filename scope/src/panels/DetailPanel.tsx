@@ -1,28 +1,22 @@
-import { createMemo, type JSX, Show } from 'solid-js';
+import { createMemo, createSignal, type JSX, onCleanup, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
-import { emergencyCode, wakeLetter } from '../lib/format';
+import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { isStale, trackLabel } from '../render/scene/rules';
 import { plotted, togglePlot } from '../state/history';
 import type { ReadingKey } from '../state/plotted';
 import { selected, setPan, snapshotVersion } from '../state/scope';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
-import { copyText } from '../ui/clipboard';
 import { Divider } from '../ui/Section';
 import { Window } from '../ui/Window';
+import { advisoryBelow } from './header';
 import { History } from './history/History';
-import { NONE, plain, positionReading, type Reading, READINGS } from './readings';
+import { NONE, positionReading, type Reading, READINGS } from './readings';
 import { Value } from './Value';
 
 import s from './DetailPanel.module.css';
-
-/** Type with its wake letter in the flight-plan form, e.g. B738/M, then the raw category. */
-function typeReading(type: string | undefined, category: string | undefined): Reading {
-  const v = `${type ?? '----'}/${wakeLetter(category)}`;
-  return category === undefined ? { v } : { v, also: category };
-}
 
 /** One labeled reading in the detail grid; every cell is a button. */
 function Cell(props: {
@@ -33,22 +27,17 @@ function Cell(props: {
   /** Pressed, for a cell that plots: filled light, label and value dark. */
   on?: boolean | undefined;
   dim?: boolean | undefined;
-  tone?: 'alert' | undefined;
   /** Columns taken, for a value too long for one. */
   span?: 2 | 4 | undefined;
-  /** What hovering the cell tells beyond its value. */
-  title?: string | undefined;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      title={props.title}
       class={cx(
         s.cell,
         props.span === 2 && s.span2,
         props.span === 4 && s.span4,
-        props.tone === 'alert' && s.alert,
         (props.dim ?? props.r === NONE) && s.dim,
         props.on && s.on,
       )}
@@ -81,30 +70,6 @@ function ReadingCell(props: { of: ReadingKey; t: Track; dim?: boolean; span?: 4 
   );
 }
 
-/** A cell of the identity, whose tap copies the value. */
-function CopyCell(props: {
-  k: string;
-  r: Reading;
-  text: string | undefined;
-  dim?: boolean;
-  tone?: 'alert' | undefined;
-  title?: string | undefined;
-}) {
-  return (
-    <Cell
-      k={props.k}
-      r={props.r}
-      glyph="⧉"
-      dim={props.dim}
-      tone={props.tone}
-      title={props.title}
-      onClick={() => {
-        if (props.text !== undefined) copyText(props.text);
-      }}
-    />
-  );
-}
-
 /** The position, whose tap centres the scope on it. */
 function PositionCell(props: { t: Track }) {
   const reading = () => positionReading(props.t.position);
@@ -133,6 +98,101 @@ function Group(props: { name: string; children: JSX.Element }) {
   );
 }
 
+/** The word the header tags each priority with. */
+const PRIORITY_WORDS: Record<Priority, string> = { lifeguard: 'LIFEGUARD', minfuel: 'MIN FUEL' };
+
+/** The squawk, or the emergency code it is with its shorthand. */
+function Squawk(props: { squawk: string | undefined; code: EmergencyCode | null }) {
+  return (
+    <Show when={props.squawk}>
+      {(squawk) => (
+        <Show when={props.code} fallback={<span class={cx(s.text, s.squawk)}>{squawk()}</span>}>
+          {(code) => <span class={cx(s.text, s.code)}>{`${squawk()} ${code()}`}</span>}
+        </Show>
+      )}
+    </Show>
+  );
+}
+
+/**
+ * Who it is: the flight on the first line, the airframe on the second. An active advisory stands
+ * at the right end of the first, or of the second when the first has no room for it.
+ */
+function Header(props: { t: Track }) {
+  const tags = createMemo(() => statusTags(props.t.squawk, props.t.emergency));
+  const ra = () => (props.t.ra?.terminated ? undefined : props.t.ra);
+  const [raBelow, setRaBelow] = createSignal(false);
+  let head!: HTMLDivElement;
+  let flight!: HTMLDivElement;
+  let advisory: HTMLSpanElement | undefined;
+  const fit = () =>
+    setRaBelow(
+      advisoryBelow({
+        flight: flight.offsetWidth,
+        gap: Number.parseFloat(getComputedStyle(head).columnGap) || 0,
+        advisory: advisory?.offsetWidth ?? 0,
+        room: head.clientWidth,
+      }),
+    );
+  const resized = new ResizeObserver(fit);
+  onCleanup(() => resized.disconnect());
+  const type = () => props.t.type && `${props.t.type}/${wakeLetter(props.t.category)}`;
+  const about = () => [props.t.description, props.t.category].filter(Boolean).join(' · ');
+  return (
+    <div
+      ref={(el) => {
+        head = el;
+        resized.observe(el);
+      }}
+      class={cx(s.head, raBelow() && s.raBelow)}
+    >
+      <div
+        ref={(el) => {
+          flight = el;
+          resized.observe(el);
+        }}
+        class={s.flight}
+      >
+        <span class={cx(s.text, s.callsign)}>{trackLabel(props.t)}</span>
+        <Squawk squawk={props.t.squawk} code={tags().code} />
+        <Show when={props.t.ident}>
+          <span class={s.tag}>ID</span>
+        </Show>
+        <Show when={tags().status}>{(status) => <span class={s.emergency}>{status()}</span>}</Show>
+        <Show when={tags().priority}>
+          {(priority) => <span class={s.priority}>{PRIORITY_WORDS[priority()]}</span>}
+        </Show>
+      </div>
+      <Show when={ra()}>
+        {(r) => (
+          <span
+            ref={(el) => {
+              advisory = el;
+              resized.observe(el);
+              onCleanup(() => {
+                resized.unobserve(el);
+                advisory = undefined;
+              });
+            }}
+            class={cx(s.emergency, s.ra)}
+          >
+            RA {advisoryWord(r())}
+          </span>
+        )}
+      </Show>
+      <div class={cx(s.text, s.airframe)}>
+        <Show when={type()}>
+          <span title={about() || undefined}>{type()}</span>
+        </Show>
+        <Show when={props.t.registration}>
+          <span>{props.t.registration}</span>
+        </Show>
+        <span>{props.t.hex.toUpperCase()}</span>
+      </div>
+    </div>
+  );
+}
+
 export function DetailPanel() {
   const track = createMemo(() => {
     snapshotVersion();
@@ -140,84 +200,50 @@ export function DetailPanel() {
     return hex ? (trackStore.tracks.get(hex) ?? null) : null;
   });
   return (
-    <Window id="detail">
+    <Window id="detail" bodyClass={s.body}>
       <Show
         when={track()}
         fallback={<div class={s.empty}>{selected() ? 'NOT IN FEED' : 'NO TARGET SELECTED'}</div>}
       >
-        {(t) => {
-          const ecode = () => emergencyCode(t().squawk, t().emergency);
-          return (
-            <>
-              <div class={s.head}>
-                <div class={s.callsign}>
-                  {trackLabel(t())}
-                  <Show when={ecode()}>
-                    <span class={s.badge}>{ecode()}</span>
-                  </Show>
-                  <Show when={t().ra}>
-                    {(ra) => <span class={s.badge}>RA {advisoryWord(ra())}</span>}
-                  </Show>
-                  <Show when={t().ident}>
-                    <span class={s.tag}>ID</span>
-                  </Show>
-                </div>
-              </div>
-              <Divider />
-              <History track={t()} />
-              <Group name="ID">
-                <CopyCell k="HEX" r={{ v: t().hex.toUpperCase() }} text={t().hex.toUpperCase()} />
-                <CopyCell
-                  k="SQUAWK"
-                  r={plain(t().squawk)}
-                  text={t().squawk}
-                  tone={ecode() ? 'alert' : undefined}
-                />
-                <CopyCell
-                  k="TYPE"
-                  r={typeReading(t().type, t().category)}
-                  text={t().type}
-                  title={t().description}
-
-                  dim={t().type === undefined}
-                />
-                <CopyCell k="REG" r={plain(t().registration)} text={t().registration} />
-              </Group>
-              <Group name="FLT">
-                <ReadingCell of="alt" t={t()} />
-                <ReadingCell of="vs" t={t()} />
-                <ReadingCell of="gs" t={t()} />
-                <ReadingCell of="trk" t={t()} />
-              </Group>
-              <Group name="NAV">
-                <ReadingCell of="selAlt" t={t()} />
-                <ReadingCell of="fmsAlt" t={t()} />
-                <ReadingCell of="selHdg" t={t()} />
-                <ReadingCell of="qnh" t={t()} />
-                <ReadingCell of="modes" t={t()} span={4} />
-              </Group>
-              <Group name="AIR">
-                <ReadingCell of="ias" t={t()} />
-                <ReadingCell of="tas" t={t()} />
-                <ReadingCell of="mach" t={t()} />
-                <ReadingCell of="wind" t={t()} />
-                <ReadingCell of="oat" t={t()} />
-                <ReadingCell of="tat" t={t()} />
-              </Group>
-              <Group name="POS">
-                <PositionCell t={t()} />
-                <ReadingCell of="nic" t={t()} />
-                <ReadingCell of="nacp" t={t()} />
-              </Group>
-              <Group name="RX">
-                <ReadingCell of="src" t={t()} />
-                <ReadingCell of="rssi" t={t()} />
-                <ReadingCell of="msgs" t={t()} />
-                <ReadingCell of="age" t={t()} dim={isStale(t())} />
-              </Group>
-            </>
-          );
-        }}
+        {(t) => (
+          <>
+            <Header t={t()} />
+            <Divider />
+            <History track={t()} />
+            <Group name="FLT">
+              <ReadingCell of="alt" t={t()} />
+              <ReadingCell of="vs" t={t()} />
+              <ReadingCell of="gs" t={t()} />
+              <ReadingCell of="trk" t={t()} />
+            </Group>
+            <Group name="NAV">
+              <ReadingCell of="selAlt" t={t()} />
+              <ReadingCell of="fmsAlt" t={t()} />
+              <ReadingCell of="selHdg" t={t()} />
+              <ReadingCell of="qnh" t={t()} />
+              <ReadingCell of="modes" t={t()} span={4} />
+            </Group>
+            <Group name="AIR">
+              <ReadingCell of="ias" t={t()} />
+              <ReadingCell of="tas" t={t()} />
+              <ReadingCell of="mach" t={t()} />
+              <ReadingCell of="wind" t={t()} />
+              <ReadingCell of="oat" t={t()} />
+              <ReadingCell of="tat" t={t()} />
+            </Group>
+            <Group name="POS">
+              <PositionCell t={t()} />
+              <ReadingCell of="nic" t={t()} />
+              <ReadingCell of="nacp" t={t()} />
+            </Group>
+            <Group name="RX">
+              <ReadingCell of="src" t={t()} />
+              <ReadingCell of="rssi" t={t()} />
+              <ReadingCell of="msgs" t={t()} />
+              <ReadingCell of="age" t={t()} dim={isStale(t())} />
+            </Group>
+          </>
+        )}
       </Show>
     </Window>
   );

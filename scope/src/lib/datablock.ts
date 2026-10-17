@@ -11,6 +11,8 @@ export interface Rect {
 /** Data block type size and footprint in CSS pixels: two lines of mono, twelve glyphs wide. */
 export const DB_FONT_PX = 11;
 export const DB_WIDTH = 80;
+/** How many glyphs one line of a block holds. */
+export const DB_COLUMNS = 12;
 export const DB_HEIGHT = 26;
 export const DB_LINE = 12;
 /** Half the drawn glyph, where a leader starts. */

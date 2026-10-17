@@ -65,17 +65,48 @@ describe('dataBlock', () => {
     expect(text(block.tags)).toBe('RF');
   });
 
-  it('tags the emergency, then the advisory as alerts, then the ident in its own tone', () => {
+  it('tags the emergency and the advisory as alerts, then the priority, then the ident', () => {
     // Arrange
     const ra = { multipleThreats: false, terminated: false };
-    const t = track({ squawk: '7700', ra, ident: true });
+    const t = track({ squawk: '7700', emergency: 'lifeguard', ra, ident: true });
 
     // Act
     const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
-    expect(text(block.tags)).toBe('EM RA ID');
-    expect(block.tags.map((r) => r.tone)).toEqual(['alert', 'plain', 'alert', 'plain', 'ident']);
+    expect(text(block.tags)).toBe('EM RA MED ID');
+    expect(block.tags.filter((r) => r.text !== ' ').map((r) => r.tone)).toEqual([
+      'alert',
+      'alert',
+      'caution',
+      'ident',
+    ]);
+  });
+
+  it('drops the tags of least precedence that would run past the block', () => {
+    // Arrange
+    const ra = { multipleThreats: false, terminated: false };
+    const t = track({ squawk: '7700', emergency: 'minfuel', ra, ident: true });
+
+    // Act
+    const block = dataBlock(t, 0, STANDARD_ALTIMETER);
+
+    // Assert
+    expect(text(block.tags)).toBe('EM RA FUEL');
+  });
+
+  it('tags minimum fuel and lifeguard as a priority, not an emergency', () => {
+    // Arrange
+    const cases = [track({ emergency: 'minfuel' }), track({ emergency: 'lifeguard' })];
+
+    // Act
+    const blocks = cases.map((t) => dataBlock(t, 0, STANDARD_ALTIMETER));
+
+    // Assert
+    expect(blocks.map((b) => b.tags)).toEqual([
+      [{ text: 'FUEL', tone: 'caution' }],
+      [{ text: 'MED', tone: 'caution' }],
+    ]);
   });
 
   it('flips every block on the same clock, whatever the hex', () => {
@@ -155,6 +186,7 @@ describe('extraLines', () => {
     const cases = [
       track(),
       track({ squawk: '7700' }),
+      track({ emergency: 'minfuel' }),
       track({ selHeading: 95 }),
       track({ squawk: '7700', selHeading: 95 }),
     ];
@@ -168,6 +200,7 @@ describe('extraLines', () => {
     // Assert
     expect(out).toEqual([
       [0, 0],
+      [1, 1],
       [1, 1],
       [1, 1],
       [2, 2],
@@ -236,6 +269,20 @@ describe('drawDataBlock', () => {
     const white = g.map(({ rgb }) => near(rgb, [1, 1, 1]));
     expect(white.slice(0, 'ID'.length)).toEqual([true, true]);
     expect(white.slice('ID'.length).some(Boolean)).toBe(false);
+  });
+
+  it('sets a priority tag in the caution amber, whatever the block color', () => {
+    // Arrange
+    const t = track({ emergency: 'minfuel' });
+    const level = { ...ne, color: '#8ac060' };
+
+    // Act
+    const g = glyphs(t, level);
+
+    // Assert
+    expect(g.map(({ rgb }) => near(rgb, [0xe8 / 255, 0xb8 / 255, 0x48 / 255]))).toEqual(
+      g.map((_, i) => i < 'FUEL'.length),
+    );
   });
 
   it('ends the text at the right edge of a block west of its target', () => {

@@ -59,16 +59,63 @@ export function formatGsWake(gs: number | undefined, category: string | undefine
   return String(tens).padStart(2, '0') + wakeLetter(category);
 }
 
-/** Two-letter emergency prefix, or null when there is no emergency; a `reserved` status is none. */
+/** The shorthand of an emergency: hijack, radio failure, or any other. */
+export type EmergencyCode = 'HJ' | 'RF' | 'EM';
+
+/** The shorthand of each emergency code of the Mode A. */
+const SQUAWK_CODES: ReadonlyMap<string, EmergencyCode> = new Map([
+  ['7500', 'HJ'],
+  ['7600', 'RF'],
+  ['7700', 'EM'],
+]);
+
+/**
+ * The shorthand of each emergency/priority status that is an emergency: general, no
+ * communications and unlawful interference are the statuses a transponder sets with 7700, 7600
+ * and 7500, and a downed aircraft is in distress. Lifeguard and minimum fuel are a priority, not
+ * an emergency; `none` and `reserved` say nothing.
+ */
+const STATUS_CODES: ReadonlyMap<string, EmergencyCode> = new Map([
+  ['general', 'EM'],
+  ['nordo', 'RF'],
+  ['unlawful', 'HJ'],
+  ['downed', 'EM'],
+]);
+
+const squawkCode = (squawk: string | undefined): EmergencyCode | null =>
+  (squawk === undefined ? undefined : SQUAWK_CODES.get(squawk)) ?? null;
+
+const statusCode = (emergency: string | undefined): EmergencyCode | null =>
+  (emergency === undefined ? undefined : STATUS_CODES.get(emergency)) ?? null;
+
+/**
+ * The shorthand of the emergency a squawk or an emergency/priority status declares, the code's
+ * before the status's; null when neither declares one.
+ */
 export function emergencyCode(
   squawk: string | undefined,
   emergency: string | undefined,
-): 'HJ' | 'RF' | 'EM' | null {
-  if (squawk === '7500') return 'HJ';
-  if (squawk === '7600') return 'RF';
-  if (squawk === '7700') return 'EM';
-  if (emergency !== undefined && emergency !== 'none' && emergency !== 'reserved') return 'EM';
-  return null;
+): EmergencyCode | null {
+  return squawkCode(squawk) ?? statusCode(emergency);
+}
+
+/** A priority an emergency/priority status asks for that is not an emergency. */
+export type Priority = 'lifeguard' | 'minfuel';
+
+/** What a squawk and an emergency/priority status tell, each told once. */
+export interface StatusTags {
+  /** The shorthand of the emergency code the squawk is. */
+  code: EmergencyCode | null;
+  /** The emergency the status declares, unless the code already says it. */
+  status: EmergencyCode | 'DOWNED' | null;
+  priority: Priority | null;
+}
+
+export function statusTags(squawk: string | undefined, emergency: string | undefined): StatusTags {
+  const code = squawkCode(squawk);
+  const declared = emergency === 'downed' ? 'DOWNED' : statusCode(emergency);
+  const priority = emergency === 'lifeguard' || emergency === 'minfuel' ? emergency : null;
+  return { code, status: declared === code ? null : declared, priority };
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');

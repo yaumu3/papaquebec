@@ -22,7 +22,7 @@ const fingers = (timeStamp: number, touches: Finger[], changed: Finger[] = touch
   timeStamp,
 });
 
-/** A tracker over content that is free, scrolled to its top and short of the largest detent unless `reads` says otherwise, recording every pull. */
+/** A tracker over content that is free, scrolled to its top, short of the largest detent and with nothing selected unless `reads` says otherwise, recording every pull. */
 function subject(reads: Partial<ContentReads> = {}) {
   const pulls: [string, number, number][] = [];
   const t = trackContentTouches(
@@ -31,7 +31,13 @@ function subject(reads: Partial<ContentReads> = {}) {
       move: (y, at) => pulls.push(['move', y, at]),
       up: (y, at) => pulls.push(['up', y, at]),
     },
-    { free: () => true, atTop: () => true, atLargest: () => false, ...reads },
+    {
+      free: () => true,
+      atTop: () => true,
+      atLargest: () => false,
+      selecting: () => false,
+      ...reads,
+    },
   );
   return { pulls, t };
 }
@@ -152,6 +158,27 @@ describe('trackContentTouches', () => {
     // Assert
     expect(claimed).toBe(false);
     expect(pulls).toEqual([]);
+  });
+
+  it('leaves a finger on selected text to the selection, and pulls with one elsewhere', () => {
+    // Arrange
+    const selected = new EventTarget();
+    const elsewhere = new EventTarget();
+    const runs = [selected, elsewhere].map((target) => ({
+      target,
+      sheet: subject({ selecting: (on) => on === selected }),
+    }));
+    for (const { sheet, target } of runs)
+      sheet.t.start({ ...fingers(0, [finger(1, 500)]), target });
+
+    // Act
+    const claimed = runs.map(({ sheet, target }) =>
+      sheet.t.move({ ...fingers(600, [finger(1, 480)]), target }),
+    );
+
+    // Assert
+    expect(claimed).toEqual([false, true]);
+    expect(runs.map(({ sheet }) => sheet.pulls.length)).toEqual([0, 2]);
   });
 
   it('leaves the content to scroll where the sheet would not move that way', () => {

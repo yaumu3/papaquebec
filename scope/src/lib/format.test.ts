@@ -15,6 +15,8 @@ import {
   modeNames,
   padBearing,
   sourceName,
+  statusTags,
+  type StatusTags,
   wakeLetter,
 } from './format';
 
@@ -71,20 +73,68 @@ describe('wakeLetter / formatGsWake', () => {
 });
 
 describe('emergencyCode', () => {
-  it('derives the two-letter prefix from the squawk or the emergency status', () => {
+  it('takes the code first, then an emergency status, and never a priority', () => {
     // Arrange
     const cases: [string | undefined, string | undefined, 'HJ' | 'RF' | 'EM' | null][] = [
       ['7500', undefined, 'HJ'],
       ['7600', undefined, 'RF'],
       ['7700', undefined, 'EM'],
+      ['7500', 'general', 'HJ'],
+      ['7600', 'unlawful', 'RF'],
+      ['7700', 'nordo', 'EM'],
+      ['7700', 'minfuel', 'EM'],
       ['1200', 'general', 'EM'],
+      ['1200', 'nordo', 'RF'],
+      ['1200', 'unlawful', 'HJ'],
+      ['1200', 'downed', 'EM'],
+      ['1200', 'lifeguard', null],
+      ['1200', 'minfuel', null],
       ['1200', 'none', null],
       ['1200', 'reserved', null],
+      [undefined, 'nordo', 'RF'],
+      ['constructor', 'toString', null],
       [undefined, undefined, null],
     ];
 
     // Act
     const results = cases.map(([sq, em]) => emergencyCode(sq, em));
+
+    // Assert
+    expect(results).toEqual(cases.map((c) => c[2]));
+  });
+});
+
+describe('statusTags', () => {
+  it('tags the code, the emergency it leaves unsaid, and the priority', () => {
+    // Arrange
+    const none = { code: null, status: null, priority: null };
+    const cases: [string | undefined, string | undefined, StatusTags][] = [
+      ['2253', undefined, none],
+      ['2253', 'none', none],
+      ['2253', 'reserved', none],
+      ['2253', 'general', { ...none, status: 'EM' }],
+      ['2253', 'nordo', { ...none, status: 'RF' }],
+      ['2253', 'unlawful', { ...none, status: 'HJ' }],
+      ['2253', 'downed', { ...none, status: 'DOWNED' }],
+      ['2253', 'lifeguard', { ...none, priority: 'lifeguard' }],
+      ['2253', 'minfuel', { ...none, priority: 'minfuel' }],
+      [undefined, 'general', { ...none, status: 'EM' }],
+      ['7700', undefined, { ...none, code: 'EM' }],
+      ['7700', 'general', { ...none, code: 'EM' }],
+      ['7700', 'unlawful', { ...none, code: 'EM', status: 'HJ' }],
+      ['7700', 'downed', { ...none, code: 'EM', status: 'DOWNED' }],
+      ['7700', 'minfuel', { ...none, code: 'EM', priority: 'minfuel' }],
+      ['7600', 'nordo', { ...none, code: 'RF' }],
+      ['7600', 'general', { ...none, code: 'RF', status: 'EM' }],
+      ['7600', 'lifeguard', { ...none, code: 'RF', priority: 'lifeguard' }],
+      ['7500', 'unlawful', { ...none, code: 'HJ' }],
+      ['7500', 'nordo', { ...none, code: 'HJ', status: 'RF' }],
+      ['7500', 'none', { ...none, code: 'HJ' }],
+      ['constructor', 'toString', none],
+    ];
+
+    // Act
+    const results = cases.map(([sq, em]) => statusTags(sq, em));
 
     // Assert
     expect(results).toEqual(cases.map((c) => c[2]));
