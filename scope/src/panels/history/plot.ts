@@ -1,9 +1,11 @@
 import type { HeardKey } from '../../lib/aircraft';
+import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
+import { NM_IN_METERS } from '../../lib/geo';
 import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
-import type { ReadingKey } from '../../state/plotted';
+import { laneOf, type ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Dash, HEARD, type Heading, minSpanOf, PLOTS } from './plots';
+import { type Dash, HEARD, type Heading, PLOTS } from './plots';
 import type { Interval } from './span';
 import {
   barbMarks,
@@ -14,7 +16,6 @@ import {
   rangeOf,
   type Read,
   runsOf,
-  widened,
 } from './trace';
 
 /** A number as an SVG attribute: a tenth of a pixel is precision enough. */
@@ -58,7 +59,7 @@ export function laneTraces(
   return [{ key: lane, runs: read(own.y) }, ...floored, ...second, ...drawn];
 }
 
-/** The one scale of a lane's traces off its floor over the interval, at least its least span; null without any. */
+/** The one scale of a lane's traces off its floor over the interval, snapped to its quantum; null without any. */
 export function laneRange(
   traces: readonly LaneTrace[],
   lane: ReadingKey,
@@ -68,7 +69,47 @@ export function laneRange(
     traces.filter((tr) => !tr.floor).map((tr) => tr.runs),
     visible,
   );
-  return r && widened(r, minSpanOf(lane) ?? 0);
+  return r && snapped(r, lane);
+}
+
+/** Slack for the float error of a value that falls on a step. */
+const EPS = 1e-9;
+
+/** A number without the float error of the arithmetic that made it. */
+const clean = (n: number): number => Number(n.toPrecision(12));
+
+/** 1, 2 and 5 times each power of ten from 10⁻¹ to 10⁴. */
+const ROUND = [-1, 0, 1, 2, 3, 4].flatMap((n) => [1, 2, 5].map((m) => clean(m * 10 ** n)));
+
+/** The round bounds in metres, as they read: in metres below a tenth of a mile, in miles from there. */
+const BOUNDS_M = [
+  ...ROUND.filter((m) => m < BOUND_NM_FROM_M),
+  ...ROUND.map((nm) => clean(nm * NM_IN_METERS)).filter((m) => m >= BOUND_NM_FROM_M),
+];
+
+/** Whether a bound in metres reads as no more than the round bound `round`, the tracker's rounding up allowed for in miles. */
+const within = (m: number, round: number): boolean =>
+  m <= round * (1 + EPS) + (round >= BOUND_NM_FROM_M ? BOUND_ROUNDED_UP_BY_M : 0);
+
+/**
+ * The range spread outward to multiples of the lane's quantum, in the unit its reading is shown
+ * in, or on a lane of bounds on a log scale to the nearest round bounds; one step taller when it
+ * would have none, a flat line on a step lying along the bottom.
+ */
+export function snapped(r: Range, lane: ReadingKey): Range {
+  const spec = PLOTS[laneOf(lane)];
+  if (spec.kind !== 'line' && spec.kind !== 'pair') return r;
+  if (spec.log) {
+    const lo = BOUNDS_M.findLast((m) => m <= 10 ** r.lo * (1 + EPS)) ?? 10 ** r.lo;
+    const at = BOUNDS_M.findIndex((m) => within(10 ** r.hi, m));
+    const top = BOUNDS_M[at] ?? 10 ** r.hi;
+    const hi = top === lo ? (BOUNDS_M[at + 1] ?? top) : top;
+    return { lo: Math.log10(lo), hi: Math.log10(hi) };
+  }
+  const q = spec.quantum;
+  const lo = clean(Math.floor(r.lo / q + EPS) * q);
+  const hi = clean(Math.ceil(r.hi / q - EPS) * q);
+  return { lo, hi: hi === lo ? clean(lo + q) : hi };
 }
 
 /** The path of the runs across a lane, each run its own subpath. */

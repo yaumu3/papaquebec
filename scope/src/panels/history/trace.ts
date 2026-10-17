@@ -123,13 +123,6 @@ export function rangeOf(traces: readonly Point[][][], i: Interval): Range | null
   return lo <= hi ? { lo, hi } : null;
 }
 
-/** The range spread about its middle to `span` when narrower, so that noise does not fill a lane. */
-export function widened(r: Range, span: number): Range {
-  if (r.hi - r.lo >= span) return r;
-  const mid = (r.lo + r.hi) / 2;
-  return { lo: mid - span / 2, hi: mid + span / 2 };
-}
-
 /** Where a value falls down a lane, the pads kept clear at the top and the bottom; midway between them for a flat range. */
 export function yOf(
   v: number,

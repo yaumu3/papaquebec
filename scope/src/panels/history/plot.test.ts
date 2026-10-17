@@ -10,12 +10,18 @@ import {
   laneRange,
   laneTraces,
   pathOf,
+  snapped,
   valueAt,
 } from './plot';
 import type { Interval } from './span';
-import { GAP_SEC, type Point } from './trace';
+import { GAP_SEC, type Point, type Range } from './trace';
 
 const ALL: Interval = { from: 0, to: 10_000 };
+
+/** The metres a power of ten stands for, to six figures. */
+const metres = (v: number) => Number((10 ** v).toPrecision(6));
+/** A range as flat as one value. */
+const flat = (v: number): Range => ({ lo: v, hi: v });
 
 describe('laneTraces', () => {
   it('draws the lane its own reading first, then each intent plotted in it with its dash, marked as one', () => {
@@ -369,8 +375,83 @@ describe('reach', () => {
   });
 });
 
+describe('snapped', () => {
+  it("bounds a lane's data by multiples of its quantum, a flat trace on a step one quantum below the top", () => {
+    // Arrange
+    const rows = [
+      { lane: 'alt', r: flat(29_400) },
+      { lane: 'alt', r: flat(30_000) },
+      { lane: 'alt', r: { lo: 26_200, hi: 33_700 } },
+      { lane: 'vs', r: { lo: 0, hi: 1800 } },
+      { lane: 'vs', r: flat(0) },
+      { lane: 'gs', r: flat(290.4) },
+      { lane: 'gs', r: flat(290) },
+      { lane: 'gs', r: { lo: 434, hi: 458 } },
+      { lane: 'qnh', r: flat(29.93) },
+      { lane: 'mach', r: { lo: 0.762, hi: 0.781 } },
+      { lane: 'oat', r: flat(-45.3) },
+      { lane: 'rssi', r: { lo: -15.3, hi: -9.3 } },
+      { lane: 'rssi', r: { lo: -12.4, hi: -11.6 } },
+      { lane: 'msgs', r: { lo: 1.2, hi: 3.8 } },
+      { lane: 'msgs', r: { lo: 6.2, hi: 11.3 } },
+      { lane: 'age', r: { lo: 0.4, hi: 5.4 } },
+    ] as const;
+
+    // Act
+    const ranges = rows.map(({ lane, r }) => snapped(r, lane));
+
+    // Assert
+    expect(ranges).toEqual([
+      { lo: 29_000, hi: 30_000 },
+      { lo: 30_000, hi: 31_000 },
+      { lo: 26_000, hi: 34_000 },
+      { lo: 0, hi: 2000 },
+      { lo: 0, hi: 500 },
+      { lo: 290, hi: 300 },
+      { lo: 290, hi: 300 },
+      { lo: 430, hi: 460 },
+      { lo: 29.93, hi: 29.94 },
+      { lo: 0.76, hi: 0.79 },
+      { lo: -46, hi: -45 },
+      { lo: -20, hi: -5 },
+      { lo: -15, hi: -10 },
+      { lo: 0, hi: 5 },
+      { lo: 5, hi: 15 },
+      { lo: 0, hi: 6 },
+    ]);
+  });
+
+  it('snaps a bound on a log scale outward to 1, 2, 5 × 10ⁿ metres, or of nautical miles from 0.1 NM', () => {
+    // Arrange
+    const rows = [
+      // The tracker rounds a radius up to whole metres, 0.1 NM to 186.
+      { lane: 'nic', lo: 186, hi: 1112 },
+      { lane: 'nacp', lo: 30, hi: 92.6 },
+      { lane: 'nacp', lo: 3, hi: 555.6 },
+      // On a rung, flat: up to the next rung.
+      { lane: 'nacp', lo: 926, hi: 926 },
+      // Between rungs, flat: out to the rungs either side, 30 m being none.
+      { lane: 'nacp', lo: 30, hi: 30 },
+    ] as const;
+
+    // Act
+    const ranges = rows.map(({ lane, lo, hi }) =>
+      snapped({ lo: Math.log10(lo), hi: Math.log10(hi) }, lane),
+    );
+
+    // Assert
+    expect(ranges.map((r) => [metres(r.lo), metres(r.hi)])).toEqual([
+      [185.2, 1852],
+      [20, 100],
+      [2, 926],
+      [926, 1852],
+      [20, 50],
+    ]);
+  });
+});
+
 describe('laneRange', () => {
-  it('spans the own reading and its intents on one scale, off the floor, at least the lane span', () => {
+  it('spans the own reading and its intents on one scale, off the floor, snapped to the quantum', () => {
     // Arrange
     const samples = [
       heardSample(1, { alt: 'ground' }),
@@ -383,6 +464,6 @@ describe('laneRange', () => {
     const range = laneRange(traces, 'alt', ALL);
 
     // Assert
-    expect(range).toEqual({ lo: 34_550, hi: 35_550 });
+    expect(range).toEqual({ lo: 35_000, hi: 36_000 });
   });
 });

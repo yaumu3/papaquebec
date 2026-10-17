@@ -14,7 +14,6 @@ import {
   type Point,
   rangeOf,
   runsOf,
-  widened,
   yOf,
 } from './trace';
 
@@ -161,23 +160,6 @@ describe('rangeOf', () => {
 
     // Assert
     expect(range).toEqual([{ lo: 50, hi: 300 }, null]);
-  });
-});
-
-describe('widened', () => {
-  it('widens a range narrower than the span about its middle, and keeps a wider one', () => {
-    // Arrange
-    const narrow = { lo: 35_000, hi: 35_100 };
-    const wide = { lo: 30_000, hi: 35_000 };
-
-    // Act
-    const ranges = [widened(narrow, 1000), widened(wide, 1000)];
-
-    // Assert
-    expect(ranges).toEqual([
-      { lo: 34_550, hi: 35_550 },
-      { lo: 30_000, hi: 35_000 },
-    ]);
   });
 });
 

@@ -188,13 +188,13 @@ export const formatAge = (seconds: number | undefined): string => formatTenthsBe
 export const formatDistance = (nm: number | undefined): string => formatTenthsBelow(nm, 100);
 
 /** Where a bound in metres starts to read in nautical miles: a tenth of a mile. */
-const BOUND_NM_FROM_M = NM_IN_METERS / 10;
+export const BOUND_NM_FROM_M = NM_IN_METERS / 10;
 
 /**
  * How far a bound may run past a step of the miles and still read as that step: the tracker
  * sends each radius rounded up to whole metres, 0.1 NM (185.2 m) as 186.
  */
-const BOUND_ROUNDED_UP_BY_M = 1;
+export const BOUND_ROUNDED_UP_BY_M = 1;
 
 /**
  * An upper bound in metres, such as a radius of containment, rounded up: in whole metres below a
