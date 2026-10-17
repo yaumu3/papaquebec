@@ -1,4 +1,4 @@
-import type { Heard, HeardKey } from '../../../lib/aircraft';
+import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
 import { steeringHeading } from '../../../lib/autopilot';
 import { padBearing } from '../../../lib/format';
@@ -6,6 +6,7 @@ import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
 import { NONE, type Reading, READINGS } from '../../readings';
+import { holdsAll, isLost } from '../freshness';
 import type { Trend } from './geometry';
 
 /** The state of the instrument: oriented on the heading, on the track, or blank for want of both. */
@@ -24,22 +25,6 @@ export interface NdFrame {
 }
 
 const BLANK_BOX = '---';
-
-/**
- * When the oldest of the keys heard was heard. A key never heard does not age the value: a reading
- * is absent exactly when it was not reported, and many aircraft send a selection with no modes.
- */
-export function oldestHeard(heard: Heard, keys: readonly HeardKey[]): number | undefined {
-  const times = keys.flatMap((key) => heard[key] ?? []);
-  return times.length === 0 ? undefined : Math.min(...times);
-}
-
-/** Whether a value read from these keys still holds: it is as old as the oldest of them. */
-const holdsAll = (t: Pick<Readout, 'heard'>, keys: readonly HeardKey[], now: number): boolean =>
-  holds(oldestHeard(t.heard, keys), now, INSTRUMENT_SEC);
-
-/** Whether the target's last message is `INSTRUMENT_SEC` old or older: the instrument has lost it. */
-const isLost = (t: Pick<Readout, 'seen'>): boolean => t.seen >= INSTRUMENT_SEC;
 
 /** The mode the instrument is in: the heading while it holds, else the magnetic track while it holds. */
 function modeOf(t: Readout, now: number): NdMode {

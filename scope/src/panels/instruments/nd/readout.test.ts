@@ -4,7 +4,7 @@ import { STANDARD_ALTIMETER } from '../../../lib/altitude';
 import { INSTRUMENT_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
-import { ndFrame, type NdReadouts, ndReadouts, ndSymbols, oldestHeard } from './readout';
+import { ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
@@ -13,23 +13,6 @@ const AT = { lat: 35.5, lon: 139.8 };
 
 afterEach(() => {
   setDeclinationAt(() => () => 0);
-});
-
-describe('oldestHeard', () => {
-  it('takes the earliest instant of the keys heard, none when none is', () => {
-    // Arrange
-    const heard = { trackRate: 990, gs: 980 };
-
-    // Act
-    const out = [
-      oldestHeard(heard, ['trackRate', 'gs']),
-      oldestHeard(heard, ['gs', 'selAlt']),
-      oldestHeard(heard, ['selAlt']),
-    ];
-
-    // Assert
-    expect(out).toEqual([980, 980, undefined]);
-  });
 });
 
 describe('ndFrame', () => {
