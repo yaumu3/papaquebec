@@ -283,23 +283,20 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/* The visible span, over the right end of the minimap. */
+/* Over the minimap: when the contact starts and ends at the left, the visible span at the right. */
 .span {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
   margin: var(--space-4) 0 var(--space-1);
   color: var(--text);
   font-size: var(--text-xs);
   line-height: 1;
   letter-spacing: var(--tracking);
-  text-align: right;
+  white-space: nowrap;
 }
-/* When the contact starts and ends, under the minimap's ends. */
-.ends {
-  display: flex;
-  justify-content: space-between;
+.contactSpan {
   color: var(--plot-label);
-  font-size: var(--text-xs);
-  line-height: 1;
-  letter-spacing: var(--tracking);
 }
 /* The clock over the lanes, a hairline under it. */
 .axis {

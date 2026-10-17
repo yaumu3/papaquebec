@@ -186,7 +186,10 @@ export function History(props: { track: Track }) {
       </div>
       <Show when={historyOpen()}>
         <div ref={setTop} class={s.span}>
-          {spanLabel(visible())}
+          <span class={s.contactSpan}>
+            {clockLabel(contact().from, MINUTE_SEC)} – {clockLabel(contact().to, MINUTE_SEC)}
+          </span>
+          <span>{spanLabel(visible())}</span>
         </div>
         <Timeline
           samples={samples()}
@@ -197,10 +200,6 @@ export function History(props: { track: Track }) {
           hover={hoverInstant()}
           onSpan={setSpan}
         />
-        <div class={s.ends}>
-          <span>{clockLabel(contact().from, MINUTE_SEC)}</span>
-          <span>{clockLabel(contact().to, MINUTE_SEC)}</span>
-        </div>
         <div class={s.axis}>
           <div ref={setLabels} class={s.labels}>
             <For each={labelTimes()}>
