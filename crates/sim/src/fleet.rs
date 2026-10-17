@@ -217,6 +217,7 @@ fn fleet() -> Vec<Plan> {
         Plan { sel_alt: Some(4000.0), sel_heading: Some(210.0), modes: Some(AUTOPILOT), shown: Some(Shown::Ident),
             ..plan(2, true, large, 0o1724, (17.0, 22.0), 9000.0, 270.0, 210.0, -1000.0, "B738") },
         Plan { sel_alt: Some(7000.0), modes: Some(MANAGED),
+            hold: Some(Hold { x: 5.0, y: 7.0, inbound_deg: 270.0, leg_s: 60.0 }),
             ..plan(3, true, large, 0o2106, (5.0, 7.0), 5000.0, 220.0, 90.0, 1500.0, "B738") },
         plan(4, true, large, 0o4421, (-13.0, -26.0), 8000.0, 260.0, 25.0, -800.0, "B738"),
         Plan { mlat: true,
@@ -471,7 +472,6 @@ impl Flying {
 
     /// Flies the next `elapsed` seconds of the hold: in to the fix, then right round to the
     /// reciprocal, out wings level for the leg's time, and right round to the inbound course.
-    /// The level is not touched, so it stays the one it was started at.
     fn hold_for(&mut self, hold: Hold, elapsed: f64) {
         match self.holding {
             Phase::Inbound => {
@@ -526,6 +526,7 @@ impl Flying {
         }
         if let Some(hold) = self.plan.hold {
             self.hold_for(hold, elapsed);
+            self.fly_level(now, elapsed);
             return;
         }
         self.fly_straight(elapsed);
@@ -997,12 +998,12 @@ mod tests {
         phase: Phase,
     }
 
-    /// TEST06 flown from its start for `seconds`, one second at a time.
-    fn hold_flown(seconds: u32) -> Vec<Step> {
+    /// The fleet's aircraft numbered `number` flown from its start for `seconds`, one second at a time.
+    fn hold_flown(number: u32, seconds: u32) -> Vec<Step> {
         let plan = planned()
             .into_iter()
-            .find(|plan| plan.number == 6)
-            .expect("TEST06 is in the fleet");
+            .find(|plan| plan.number == number)
+            .expect("the aircraft is in the fleet");
         let mut flying = Flying::new(plan, 0.0);
         (0..seconds)
             .map(|second| {
@@ -1037,7 +1038,7 @@ mod tests {
         let minutes = 20;
 
         // Act
-        let steps = hold_flown(minutes * 60);
+        let steps = hold_flown(6, minutes * 60);
 
         // Assert: between two passes of the fix, which start its turn out, it turned a full
         // circle to the right, and each pass is on the inbound course
@@ -1062,7 +1063,7 @@ mod tests {
         let minutes = 30;
 
         // Act
-        let steps = hold_flown(minutes * 60);
+        let steps = hold_flown(6, minutes * 60);
 
         // Assert
         let far = steps
@@ -1075,12 +1076,35 @@ mod tests {
     }
 
     #[test]
+    fn aircraft_in_a_hold_turns_while_it_climbs_and_stays_near_its_fix() {
+        // Arrange: TEST03 holds at its fix and climbs from 5 000 to 7 000 ft; five minutes
+        let seconds = 300;
+
+        // Act
+        let steps = hold_flown(3, seconds);
+
+        // Assert: it banked more than 15° in a step in which it climbed, reached its level,
+        // and kept within a few miles of its fix
+        let climbing_in_a_turn = steps
+            .iter()
+            .any(|step| step.baro_rate > 0.0 && step.roll.abs() > 15.0);
+        let highest = steps.iter().map(|step| step.alt).fold(0.0, f64::max);
+        let far = steps
+            .iter()
+            .map(|step| (step.x - 5.0).hypot(step.y - 7.0))
+            .fold(0.0, f64::max);
+        assert!(climbing_in_a_turn);
+        assert!((highest - 7000.0).abs() < 1e-9, "{highest}");
+        assert!(far < 8.0, "{far}");
+    }
+
+    #[test]
     fn holding_aircraft_banks_right_in_its_turns_and_flies_wings_level_outbound() {
         // Arrange: two patterns
         let minutes = 10;
 
         // Act
-        let steps = hold_flown(minutes * 60);
+        let steps = hold_flown(6, minutes * 60);
 
         // Assert
         let turning_phase = |phase: Phase| matches!(phase, Phase::TurningOut | Phase::TurningIn);
@@ -1106,7 +1130,7 @@ mod tests {
         let minutes = 20;
 
         // Act
-        let steps = hold_flown(minutes * 60);
+        let steps = hold_flown(6, minutes * 60);
 
         // Assert: each leg, from its first second to its last, is a minute long
         let outbound = |phase: &Phase| matches!(phase, Phase::Outbound { .. });
