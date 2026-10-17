@@ -3,7 +3,7 @@ import { type Accessor, createSignal, onCleanup } from 'solid-js';
 import type { LaneKey } from '../../state/plotted';
 import { edgeSpeed, slotAt } from '../../ui/reorder';
 import { dropOf, overBin } from './drag';
-import { axisOf } from './swipe';
+import { axisOf, gestureOf, swipeRemoves } from './swipe';
 
 /** How far a pointer travels from where it took hold of a lane's top row before it drags the lane. */
 const SLOP_PX = 4;
@@ -20,10 +20,18 @@ export interface LaneDrag {
   grabX: number;
 }
 
+/** A lane's top row swiped by a finger `dx` across, the row `width` wide. */
+export interface LaneSwipe {
+  lane: LaneKey;
+  dx: number;
+  width: number;
+}
+
 /**
  * The drag of lanes by their top rows, `pitch` apart down `scroller`: the slot under the pointer
  * as it moves, the view scrolling near its edges, and over `bin` the lane's removal. Esc, or the
- * pointer lost, cancels.
+ * pointer lost, cancels. A finger moving sideways swipes the row instead, which removes the lane
+ * past a third of its width.
  */
 export function createLaneDrag(deps: {
   scroller: () => HTMLElement | undefined;
@@ -31,8 +39,13 @@ export function createLaneDrag(deps: {
   pitch: number;
   lanes: () => readonly LaneKey[];
   onDrop: (lane: LaneKey, drop: ReturnType<typeof dropOf>) => void;
-}): { drag: Accessor<LaneDrag | null>; grab: (e: PointerEvent, lane: LaneKey) => void } {
+}): {
+  drag: Accessor<LaneDrag | null>;
+  swipe: Accessor<LaneSwipe | null>;
+  grab: (e: PointerEvent, lane: LaneKey) => void;
+} {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
+  const [swipe, setSwipe] = createSignal<LaneSwipe | null>(null);
   let end: (() => void) | null = null;
   onCleanup(() => end?.());
 
@@ -72,11 +85,19 @@ export function createLaneDrag(deps: {
     };
     const onMove = (m: PointerEvent) => {
       const d = drag();
+      const s = swipe();
       if (d) {
         setDrag(at(d, m.clientX, m.clientY));
         return;
       }
-      if (axisOf(m.clientX - x0, m.clientY - y0, SLOP_PX) === null) return;
+      if (s) {
+        setSwipe({ ...s, dx: m.clientX - x0 });
+        return;
+      }
+      const dx = m.clientX - x0;
+      const gesture = gestureOf(m.pointerType, axisOf(dx, m.clientY - y0, SLOP_PX));
+      if (gesture === 'swipe') setSwipe({ lane, dx, width: row.getBoundingClientRect().width });
+      if (gesture !== 'drag') return;
       setDrag(
         at({ lane, from, slot: from, overBin: false, x: x0, y: y0, grabX }, m.clientX, m.clientY),
       );
@@ -85,8 +106,10 @@ export function createLaneDrag(deps: {
     };
     const onUp = () => {
       const d = drag();
+      const s = swipe();
       end?.();
       if (d) deps.onDrop(d.lane, dropOf(d.from, d.slot, d.overBin));
+      else if (s && swipeRemoves(s.dx, s.width)) deps.onDrop(s.lane, 'remove');
     };
     const onKey = (k: KeyboardEvent) => {
       if (k.key !== 'Escape') return;
@@ -109,8 +132,9 @@ export function createLaneDrag(deps: {
       window.removeEventListener('keydown', onKey, { capture: true });
       if (row.hasPointerCapture(e.pointerId)) row.releasePointerCapture(e.pointerId);
       setDrag(null);
+      setSwipe(null);
     };
   };
 
-  return { drag, grab };
+  return { drag, swipe, grab };
 }

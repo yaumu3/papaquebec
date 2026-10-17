@@ -31,6 +31,7 @@ import { Palette } from './Palette';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { type Interval, resolveSpan, type Span, WHOLE, xOf } from './span';
+import { swipeOffset } from './swipe';
 import { Timeline } from './Timeline';
 import { restSample, sampleAt, seesAll } from './trace';
 
@@ -118,11 +119,11 @@ export function History(props: { track: Track }) {
   const at = createMemo(() => hover() ?? rest()?.sample ?? null);
   /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
   const past = () => hover() !== null || rest()?.current === false;
-  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane is dragged. */
+  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane is dragged or swiped. */
   const pointerAt = (e: PointerEvent) => {
     const target = e.target instanceof Element ? e.target : null;
     const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
-    setHoverPx(px < 0 || drag() || !target?.closest('[data-lane]') ? null : px);
+    setHoverPx(px < 0 || drag() || swipe() || !target?.closest('[data-lane]') ? null : px);
   };
 
   const [chipText, setChipText] = createSignal<HTMLSpanElement>();
@@ -231,7 +232,7 @@ export function History(props: { track: Track }) {
     const a = at();
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
-  const { drag, grab } = createLaneDrag({
+  const { drag, swipe, grab } = createLaneDrag({
     scroller,
     bin: () => add,
     pitch: LANE_PX + 1,
@@ -379,6 +380,10 @@ export function History(props: { track: Track }) {
                         return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
                       })()}
                       slot={drag()?.lane === lane}
+                      swipeX={(() => {
+                        const sw = swipe();
+                        return sw?.lane === lane ? swipeOffset(sw.dx) : null;
+                      })()}
                     />
                   );
                 }}

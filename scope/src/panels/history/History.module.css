@@ -244,6 +244,19 @@
   gap: var(--space-2);
   height: var(--lane-top);
   cursor: grab;
+  /* A finger on it drags or swipes the lane rather than scrolling. */
+  touch-action: none;
+  /* A swipe short of removing the lane springs back. */
+  transition: transform var(--sheet-ms) var(--sheet-ease);
+}
+/* Following the finger. */
+.swiping {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .top {
+    transition: none;
+  }
 }
 .top:focus-visible {
   outline: 1px solid var(--text);

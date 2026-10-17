@@ -87,6 +87,8 @@ export function Lane(props: {
   onGrab: (e: PointerEvent) => void;
   /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
   place: number;
+  /** How far a finger has swiped the top row left, while one does. */
+  swipeX: number | null;
   slot: boolean;
 }) {
   const spec = PLOTS[props.lane];
@@ -257,7 +259,8 @@ export function Lane(props: {
       </div>
       <div
         ref={props.rowRef}
-        class={s.top}
+        class={cx(s.top, props.swipeX !== null && s.swiping)}
+        style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
         tabindex="0"
         aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
         onPointerDown={(e) => props.onGrab(e)}
