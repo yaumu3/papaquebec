@@ -3,7 +3,7 @@ import { For, onCleanup, onMount, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import { LANE_GROUPS, type LaneKey } from '../../state/plotted';
 import { READINGS } from '../readings';
-import { chipOf } from './chips';
+import { chipName, chipOf, paletteName } from './chips';
 import { type LaneMoves, onMoveKey } from './moves';
 
 import s from './Palette.module.css';
@@ -56,6 +56,8 @@ export function Palette(props: {
       }}
       class={s.palette}
       style={{ top: `${props.top}px` }}
+      role="dialog"
+      aria-label={paletteName(props.own)}
       onKeyDown={(e) => {
         if (props.moves) onMoveKey(props.moves, e);
       }}
@@ -77,10 +79,11 @@ export function Palette(props: {
                         chip() === 'open' && s.elsewhere,
                       )}
                       aria-current={chip() === 'own' ? 'true' : undefined}
+                      aria-label={chipName(lane, chip())}
                       onClick={() => props.onPick(lane)}
                     >
                       <Show when={chip() === 'open'}>
-                        <span class={s.dot} />
+                        <span class={s.dot} aria-hidden="true" />
                       </Show>
                       {READINGS[lane].label}
                     </button>
