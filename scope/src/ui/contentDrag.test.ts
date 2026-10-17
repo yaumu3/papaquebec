@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  atTopOf,
   type ContentReads,
   DECIDE_PX,
   type Finger,
   type Fingers,
+  type ScrollBox,
   trackContentTouches,
 } from './contentDrag';
 
@@ -197,5 +199,27 @@ describe('trackContentTouches', () => {
     // Assert
     expect(claimed).toEqual([false, false, false]);
     expect(runs.flatMap(({ pulls }) => pulls)).toEqual([]);
+  });
+});
+
+describe('atTopOf', () => {
+  it('is at the top only when every box under the finger that scrolls is scrolled to its own', () => {
+    // Arrange
+    const lanes: ScrollBox = { scrolls: true, scrollTop: 0, scrollHeight: 600, clientHeight: 340 };
+    const panel: ScrollBox = { scrolls: true, scrollTop: 0, scrollHeight: 900, clientHeight: 500 };
+    const plain: ScrollBox = { scrolls: false, scrollTop: 0, scrollHeight: 50, clientHeight: 50 };
+    const full: ScrollBox = { scrolls: true, scrollTop: 0, scrollHeight: 50, clientHeight: 50 };
+    const chains = [
+      [plain, lanes, panel],
+      [plain, lanes, { ...panel, scrollTop: 120 }],
+      [plain, { ...lanes, scrollTop: 80 }, panel],
+      [plain, full, plain],
+    ];
+
+    // Act
+    const atTop = chains.map(atTopOf);
+
+    // Assert
+    expect(atTop).toEqual([true, false, false, true]);
   });
 });
