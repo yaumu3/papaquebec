@@ -32,6 +32,8 @@
   --plot-grid: #2c2c2a;
   --plot-gap: #262624;
   --plot-intent: #e864e8;
+  /* The labels of a plot's scales and clock. */
+  --plot-label: #6a6a66;
 
   /* Type */
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;

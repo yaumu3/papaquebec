@@ -9,7 +9,6 @@ import {
   hoverInstant,
   movePlotLane,
   plotted,
-  resetPlotted,
   setHoverInstant,
   toggleHistory,
 } from '../../state/history';
@@ -17,12 +16,11 @@ import { lanesOf, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
 import type { Sample, Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
-import { Button } from '../../ui/Button';
 import { trackReorder } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { READINGS } from '../readings';
 import { Value } from '../Value';
-import { axisStep, clockLabel, ticks } from './axis';
+import { axisStep, clockLabel, spanLabel, ticks } from './axis';
 import { Lane } from './Lane';
 import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
@@ -32,6 +30,8 @@ import s from './History.module.css';
 
 /** The lane bay's height, which the lanes in it share, a hairline between each two. */
 const BAY_PX = 184;
+/** A step of a minute, at which a clock label reads to the minute. */
+const MINUTE_SEC = 60;
 /** How far the hover box stands from the cursor. */
 const BOX_GAP_PX = 12;
 
@@ -79,9 +79,9 @@ export function History(props: { track: Track }) {
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
   // Signals, as the elements come and go with the group folding and unfolding.
-  const [bay, setBay] = createSignal<HTMLDivElement>();
+  const [top, setTop] = createSignal<HTMLDivElement>();
   const [labels, setLabels] = createSignal<HTMLDivElement>();
-  const width = trackWidth(bay);
+  const width = trackWidth(top);
   /** The axis labels line up with the plots, so their width is the plots'. */
   const plotWidth = trackWidth(labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
@@ -104,10 +104,6 @@ export function History(props: { track: Track }) {
   };
 
   const reorder = trackReorder(movePlotLane);
-  const reset = () => {
-    resetPlotted();
-    setSpan(WHOLE);
-  };
 
   return (
     <div class={cx(s.history, !historyOpen() && s.folded)}>
@@ -120,16 +116,37 @@ export function History(props: { track: Track }) {
         >
           <span class={s.chevron}>{historyOpen() ? '▾' : '▸'}</span>
           HISTORY
-          <Show when={historyOpen()}>
-            : {clockTime(visible().from)} – {clockTime(visible().to)}Z
-          </Show>
         </button>
-        <Show when={historyOpen()}>
-          <Button onClick={reset}>RESET</Button>
-        </Show>
       </div>
       <Show when={historyOpen()}>
-        <div ref={setBay} class={s.bay} style={{ height: `${BAY_PX}px` }}>
+        <div ref={setTop} class={s.span}>
+          {spanLabel(visible())}
+        </div>
+        <Timeline
+          samples={samples()}
+          lanes={lanes().map((lane) => readingsIn(plotted(), lane))}
+          contact={contact()}
+          visible={visible()}
+          width={width()}
+          hover={hoverInstant()}
+          onSpan={setSpan}
+        />
+        <div class={s.ends}>
+          <span>{clockLabel(contact().from, MINUTE_SEC)}</span>
+          <span>{clockLabel(contact().to, MINUTE_SEC)}</span>
+        </div>
+        <div class={s.axis}>
+          <div ref={setLabels} class={s.labels}>
+            <For each={tickTimes()}>
+              {(t) => (
+                <span class={s.label} style={{ left: `${x(t)}px` }}>
+                  {clockLabel(t, step())}
+                </span>
+              )}
+            </For>
+          </div>
+        </div>
+        <div class={s.bay} style={{ height: `${BAY_PX}px` }}>
           <Show
             when={lanes().length > 0}
             fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
@@ -174,25 +191,6 @@ export function History(props: { track: Track }) {
             </Show>
           </div>
         </div>
-        <div class={s.axis}>
-          <div ref={setLabels} class={s.labels}>
-            <For each={tickTimes()}>
-              {(t) => (
-                <span class={s.label} style={{ left: `${x(t)}px` }}>
-                  {clockLabel(t, step())}
-                </span>
-              )}
-            </For>
-          </div>
-        </div>
-        <Timeline
-          samples={samples()}
-          lanes={lanes().map((lane) => readingsIn(plotted(), lane))}
-          contact={contact()}
-          visible={visible()}
-          width={width()}
-          onSpan={setSpan}
-        />
       </Show>
     </div>
   );

@@ -41,7 +41,6 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  margin-top: var(--space-4);
 }
 .empty {
   display: flex;
@@ -172,19 +171,39 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/* The axis line closes the bay; the labels under it line up with the plots. */
+/* The visible span, over the right end of the minimap. */
+.span {
+  margin: var(--space-4) 0 var(--space-1);
+  color: var(--text);
+  font-size: var(--text-xs);
+  line-height: 1;
+  letter-spacing: var(--tracking);
+  text-align: right;
+}
+/* When the contact starts and ends, under the minimap's ends. */
+.ends {
+  display: flex;
+  justify-content: space-between;
+  color: var(--plot-label);
+  font-size: var(--text-xs);
+  line-height: 1;
+  letter-spacing: var(--tracking);
+}
+/* The clock over the lanes, a hairline under it. */
 .axis {
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--plot-grid);
-  color: var(--text-dim);
-  font-size: var(--text-sm);
+  margin-top: var(--space-4);
+  border-bottom: 1px solid var(--plot-grid);
+  color: var(--plot-label);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking);
   white-space: nowrap;
 }
 /* Labels line up with the plots; one at an edge may overhang into the grip or close column. */
 .labels {
   position: relative;
-  height: 16px;
+  height: 12px;
   margin: 0 var(--plot-right) 0 var(--plot-left);
+  line-height: 10px;
 }
 /* Over the plots, for the box; the pointer goes through to the lanes. */
 .overlay {
@@ -223,7 +242,6 @@
 .timeline {
   display: block;
   width: 100%;
-  margin-top: var(--space-4);
   overflow: visible;
   touch-action: none;
 }

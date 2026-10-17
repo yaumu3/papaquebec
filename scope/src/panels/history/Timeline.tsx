@@ -23,7 +23,7 @@ import { yOf } from './trace';
 
 import s from './History.module.css';
 
-const HEIGHT_PX = 36;
+const HEIGHT_PX = 30;
 const PAD_PX = 3;
 const HANDLE_W_PX = 5;
 const HANDLE_H_PX = 16;
@@ -50,6 +50,8 @@ export function Timeline(props: {
   contact: Interval;
   visible: Interval;
   width: number;
+  /** The instant the lanes are hovered at, if they are. */
+  hover: number | null;
   onSpan: (span: Span) => void;
 }) {
   let el: SVGSVGElement | undefined;
@@ -174,6 +176,11 @@ export function Timeline(props: {
           />
         )}
       </Index>
+      <Show when={props.hover}>
+        {(t) => (
+          <line class={s.cursor} x1={fixed(x(t()))} x2={fixed(x(t()))} y1="0" y2={HEIGHT_PX} />
+        )}
+      </Show>
       <Show when={selection()}>
         {(sel) => (
           <rect
