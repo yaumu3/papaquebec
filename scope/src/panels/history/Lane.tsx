@@ -281,7 +281,9 @@ export function Lane(props: {
         <Show when={readout()}>
           {(r) => (
             <div class={s.readout}>
-              <span class={cx(props.hovering && s.hovered)}>{r().value}</span>
+              <span class={cx(r().unknown ? s.unknown : props.hovering && s.hovered)}>
+                {r().value}
+              </span>
               <Index each={slots()}>
                 {(slot, i) => (
                   <>

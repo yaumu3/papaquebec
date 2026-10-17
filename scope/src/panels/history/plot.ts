@@ -290,6 +290,19 @@ export function headingHeardNear(s: Sample, t: number): Sample {
 }
 
 /**
+ * The sample less each reading of the lane of `keys` not heard within the gap of it: the track and
+ * the heading each on its own, the values of any other reading together.
+ */
+export function heardNearAt(keys: readonly ReadingKey[], at: Sample): Sample {
+  const s: Sample = keys.includes('trk') ? headingHeardNear(at, at.t) : { ...at };
+  for (const key of keys) {
+    if (key === 'trk' || heardNear(at, HEARD[key], at.t)) continue;
+    for (const value of HEARD[key]) Object.assign(s, { [value]: undefined });
+  }
+  return s;
+}
+
+/**
  * What a heading glyph at `t` reads of a sample, each part only while heard within the gap of
  * `t`, the intent `sel` among them; none when neither the track nor the heading was.
  */

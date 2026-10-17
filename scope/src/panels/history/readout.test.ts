@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import { makeSample as sample } from '../../state/sampleFixture';
+import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
 import { altTargets, heldIntents, readoutOf, readoutSlots } from './readout';
+import { GAP_SEC } from './trace';
 
 describe('altTargets', () => {
   it('puts first the target the aircraft levels at first: the lower in a climb, the higher in a descent', () => {
@@ -79,7 +80,7 @@ describe('altTargets', () => {
 describe('readoutOf', () => {
   it('reads the lane as the table does, without its unit, but for a bound', () => {
     // Arrange
-    const s = sample(1, { gs: 462, verticalRate: 1800, nic: 8, rc: 186 });
+    const s = heardSample(1, { gs: 462, verticalRate: 1800, nic: 8, rc: 186 });
     const lanes = [['gs'], ['vs'], ['nic']] as const;
 
     // Act
@@ -113,8 +114,8 @@ describe('readoutOf', () => {
     // Arrange
     const climbing = { alt: 29_600, verticalRate: 1800 };
     const samples = [
-      sample(1, { ...climbing, selAlt: 32_000, fmsAlt: 34_000 }),
-      sample(1, { ...climbing, selAlt: 34_000, fmsAlt: 34_000 }),
+      heardSample(1, { ...climbing, selAlt: 32_000, fmsAlt: 34_000 }),
+      heardSample(1, { ...climbing, selAlt: 34_000, fmsAlt: 34_000 }),
     ];
 
     // Act
@@ -133,7 +134,7 @@ describe('readoutOf', () => {
 
   it('reads only the targets plotted in the lane', () => {
     // Arrange
-    const s = sample(1, { alt: 29_600, verticalRate: 1800, selAlt: 32_000, fmsAlt: 34_000 });
+    const s = heardSample(1, { alt: 29_600, verticalRate: 1800, selAlt: 32_000, fmsAlt: 34_000 });
 
     // Act
     const readout = readoutOf(['alt', 'fmsAlt'], s);
@@ -157,6 +158,50 @@ describe('readoutOf', () => {
 
     // Assert
     expect(readout).toEqual({ value: '090° / ---', first: { key: 'selHdg', text: '310°' } });
+  });
+});
+
+describe('readoutOf, for readings heard a gap before the cursor', () => {
+  it("reads each lane's reading only while heard within the gap, a reading of reception always", () => {
+    // Arrange
+    const stale = 100 - GAP_SEC - 1;
+    const rows = [
+      { keys: ['gs'], s: sample(100, { gs: 290, heard: { gs: 100 } }) },
+      { keys: ['gs'], s: sample(100, { gs: 290, heard: { gs: stale } }) },
+      { keys: ['msgs'], s: sample(100, { messageRate: 4.2 }) },
+      {
+        keys: ['wind'],
+        s: sample(100, { windDir: 270, windSpeed: 25, heard: { windDir: 100, windSpeed: stale } }),
+      },
+    ] as const;
+
+    // Act
+    const readouts = rows.map((r) => readoutOf(r.keys, r.s));
+
+    // Assert
+    expect(readouts).toEqual([
+      { value: '290' },
+      { value: '---', unknown: true },
+      { value: '4.2' },
+      { value: '---', unknown: true },
+    ]);
+  });
+
+  it('leaves a target heard a gap before the cursor unknown in its slot, the altitude read', () => {
+    // Arrange
+    const s = sample(100, {
+      alt: 29_600,
+      verticalRate: 1800,
+      selAlt: 32_000,
+      fmsAlt: 34_000,
+      heard: { alt: 100, verticalRate: 100, selAlt: 100 - GAP_SEC - 1, fmsAlt: 100 },
+    });
+
+    // Act
+    const slots = readoutSlots(readoutOf(['alt', 'selAlt', 'fmsAlt'], s), ['selAlt', 'fmsAlt']);
+
+    // Assert
+    expect(slots).toEqual([{ key: 'fmsAlt', text: 'FL340' }, { key: 'selAlt' }]);
   });
 });
 

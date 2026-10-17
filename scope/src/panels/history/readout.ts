@@ -2,7 +2,7 @@ import { climbState } from '../../lib/format';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { NONE, READINGS } from '../readings';
-import { headingHeardNear, plotText } from './plot';
+import { heardNearAt, plotText } from './plot';
 import { PLOTS } from './plots';
 
 /**
@@ -75,6 +75,8 @@ export interface IntentText {
  */
 export interface LaneReadout {
   value: string;
+  /** The lane's own reading is unknown, `value` its blank. */
+  unknown?: true;
   first?: IntentText;
   other?: IntentText;
   agreed?: true;
@@ -108,19 +110,22 @@ function intentsOf(
   };
 }
 
-/** What the lane of `keys`, its own reading then the intents drawn in it, reads at the sample `at`. */
+/**
+ * What the lane of `keys`, its own reading then the intents drawn in it, reads at the sample `at`;
+ * each reading unknown unless heard within the gap of it.
+ */
 export function readoutOf(keys: readonly ReadingKey[], at: Sample): LaneReadout {
   const [lane] = keys;
-  // As the glyphs draw them: a track, heading or selection heard a gap ago is unknown.
-  const s = lane === 'trk' ? headingHeardNear(at, at.t) : at;
-  const value = (lane && textOf(lane, s)) ?? NONE.v;
+  const s = heardNearAt(keys, at);
+  const own = lane && textOf(lane, s);
   const intents = intentsOf(keys, s);
   const [first, other] = intents.keys.flatMap((key) => {
     const text = textOf(key, s);
     return text === undefined ? [] : [{ key, text }];
   });
   return {
-    value,
+    value: own ?? NONE.v,
+    ...(own === undefined && { unknown: true as const }),
     ...(first && { first }),
     ...(other && { other }),
     ...(intents.agreed && { agreed: true as const }),
