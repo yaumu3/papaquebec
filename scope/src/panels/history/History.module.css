@@ -392,6 +392,11 @@
   color: var(--plot-intent-dim);
   stroke: var(--plot-intent-dim);
 }
+/* An intent the contact has had, unknown at the cursor's instant: dimmed as the table dims it. */
+.unknown {
+  color: var(--text-dim);
+  stroke: var(--text-dim);
+}
 .dim {
   fill: var(--panel-bg);
   fill-opacity: 0.6;

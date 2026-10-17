@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { makeSample as sample } from '../../state/sampleFixture';
-import { altTargets, readoutOf } from './readout';
+import { altTargets, heldIntents, readoutOf, readoutSlots } from './readout';
 
 describe('altTargets', () => {
   it('puts first the target the aircraft levels at first: the lower in a climb, the higher in a descent', () => {
@@ -122,7 +122,7 @@ describe('readoutOf', () => {
         first: { key: 'selAlt', text: 'FL320' },
         other: { key: 'fmsAlt', text: 'FL340' },
       },
-      { value: 'FL296', first: { key: 'selAlt', text: 'FL340' } },
+      { value: 'FL296', first: { key: 'selAlt', text: 'FL340' }, agreed: true },
     ]);
   });
 
@@ -135,5 +135,76 @@ describe('readoutOf', () => {
 
     // Assert
     expect(readout).toEqual({ value: 'FL296', first: { key: 'fmsAlt', text: 'FL340' } });
+  });
+});
+
+describe('heldIntents', () => {
+  it('takes the intents plotted in the lane that the contact ever had a value of', () => {
+    // Arrange
+    const keys = ['alt', 'selAlt', 'fmsAlt'] as const;
+    const contacts = [
+      [sample(1, { alt: 30_000 }), sample(2, { alt: 30_100 })],
+      [sample(1, { selAlt: 32_000 }), sample(2, { selAlt: 32_000 })],
+      [sample(1, { selAlt: 32_000, fmsAlt: 34_000 }), sample(2, { selAlt: 32_000 })],
+      [sample(1, { fmsAlt: 34_000 }), sample(2), sample(3, { selAlt: 32_000 })],
+    ];
+
+    // Act
+    const held = contacts.map((samples) => heldIntents(keys, samples));
+
+    // Assert
+    expect(held).toEqual([[], ['selAlt'], ['selAlt', 'fmsAlt'], ['selAlt', 'fmsAlt']]);
+  });
+
+  it('leaves out an intent the lane does not plot, and a heading selection that never steered', () => {
+    // Arrange
+    const rows = [
+      { keys: ['alt', 'selAlt'], samples: [sample(1, { selAlt: 32_000, fmsAlt: 34_000 })] },
+      { keys: ['trk', 'selHdg'], samples: [sample(1, { selHeading: 310, navModes: ['lnav'] })] },
+      {
+        keys: ['trk', 'selHdg'],
+        samples: [sample(1, { selHeading: 310, navModes: ['autopilot'] })],
+      },
+    ] as const;
+
+    // Act
+    const held = rows.map((r) => heldIntents(r.keys, r.samples));
+
+    // Assert
+    expect(held).toEqual([['selAlt'], [], ['selHdg']]);
+  });
+});
+
+describe('readoutSlots', () => {
+  it('gives each intent the contact had a slot, the one levelled at first leading, one unknown now a placeholder, one that agrees blank', () => {
+    // Arrange
+    const both = ['selAlt', 'fmsAlt'] as const;
+    const sel = { key: 'selAlt', text: 'FL320' } as const;
+    const fms = { key: 'fmsAlt', text: 'FL340' } as const;
+    const rows = [
+      { r: { value: 'FL296', first: fms, other: sel }, held: both },
+      { r: { value: 'FL296', first: sel }, held: both },
+      { r: { value: 'FL296', first: sel, agreed: true as const }, held: both },
+      { r: { value: 'FL296', first: fms }, held: both },
+      { r: { value: 'FL296' }, held: both },
+      { r: { value: 'FL296', first: sel }, held: ['selAlt'] as const },
+      { r: { value: 'FL296' }, held: ['selAlt'] as const },
+      { r: { value: 'FL296' }, held: [] as const },
+    ];
+
+    // Act
+    const slots = rows.map(({ r, held }) => readoutSlots(r, held));
+
+    // Assert
+    expect(slots).toEqual([
+      [fms, sel],
+      [sel, { key: 'fmsAlt' }],
+      [sel, { key: 'fmsAlt', blank: true }],
+      [fms, { key: 'selAlt' }],
+      [{ key: 'selAlt' }, { key: 'fmsAlt' }],
+      [sel],
+      [{ key: 'selAlt' }],
+      [],
+    ]);
   });
 });

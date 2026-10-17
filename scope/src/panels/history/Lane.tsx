@@ -4,7 +4,7 @@ import { cx } from '../../design/cx';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { stepFromKey } from '../../ui/reorder';
-import { READINGS } from '../readings';
+import { NONE, READINGS } from '../readings';
 import { clearOfEnds, clockStep, ticks } from './axis';
 import {
   atTicks,
@@ -20,7 +20,7 @@ import {
   scaleLabels,
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
-import { readoutOf } from './readout';
+import { heldIntents, readoutOf, readoutSlots, type Slot } from './readout';
 import { type Interval, xOf } from './span';
 import { barsOf, gapsIn, type Read, yOf } from './trace';
 
@@ -43,9 +43,14 @@ const GLYPH_PITCH_PX = 36;
 
 /** The widest each intent reads, in characters, so that its slot in the readout keeps one width. */
 const INTENT_CH: Partial<Record<ReadingKey, number>> = { selAlt: 5, fmsAlt: 5, selHdg: 4 };
-/** The sample of the other target's line in the readout. */
+/** The sample of the second slot's line in the readout. */
 const SAMPLE_PX = 12;
 const SAMPLE_H_PX = 8;
+
+/** What a readout slot reads: its intent, the blank of the unknown, or nothing when it agrees with the other. */
+const slotText = (slot: Slot): string => (slot.blank ? '' : (slot.text ?? NONE.v));
+/** Whether a readout slot holds an intent unknown at the instant. */
+const unknown = (slot: Slot): boolean => slot.text === undefined && !slot.blank;
 
 /** The class that dashes a trace, if any. */
 export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
@@ -151,8 +156,14 @@ export function Lane(props: {
     ).map((h) => headingGlyph(x(h.t), mid(), h));
   });
   const readout = createMemo(() => (props.at ? readoutOf(props.keys, props.at) : null));
-  /** How wide the intents' slots are: as wide as the widest intent plotted in the lane. */
-  const slotCh = () => Math.max(0, ...props.keys.slice(1).map((key) => INTENT_CH[key] ?? 0));
+  /** The intents the contact had, over all of it, so that panning moves no slot. */
+  const held = createMemo(() => heldIntents(props.keys, props.samples));
+  const slots = () => {
+    const r = readout();
+    return r ? readoutSlots(r, held()) : [];
+  };
+  /** How wide the intents' slots are: as wide as the widest of them. */
+  const slotCh = () => Math.max(0, ...held().map((key) => INTENT_CH[key] ?? 0));
 
   return (
     <div class={s.lane} style={{ height: `${props.height}px` }}>
@@ -286,29 +297,40 @@ export function Lane(props: {
           {(r) => (
             <div class={s.readout}>
               <span class={cx(props.hovering && s.hovered)}>{r().value}</span>
-              <Show when={slotCh() > 0}>
-                <span class={cx(s.slot, s.intentText)} style={{ width: `${slotCh()}ch` }}>
-                  {r().first?.text}
-                </span>
-              </Show>
-              <Show when={props.keys.length > 2}>
-                <svg class={s.sample} width={SAMPLE_PX} height={SAMPLE_H_PX}>
-                  <Show when={r().other}>
-                    {(o) => (
-                      <line
-                        class={cx(s.trace, dashClass(dashOf(o().key)), s.intentDim)}
-                        x1="0"
-                        x2={SAMPLE_PX}
-                        y1={SAMPLE_H_PX / 2}
-                        y2={SAMPLE_H_PX / 2}
-                      />
-                    )}
-                  </Show>
-                </svg>
-                <span class={cx(s.slot, s.intentDim)} style={{ width: `${slotCh()}ch` }}>
-                  {r().other?.text}
-                </span>
-              </Show>
+              <Index each={slots()}>
+                {(slot, i) => (
+                  <>
+                    <Show when={i === 1}>
+                      <svg class={s.sample} width={SAMPLE_PX} height={SAMPLE_H_PX}>
+                        <Show when={!slot().blank}>
+                          <line
+                            class={cx(
+                              s.trace,
+                              dashClass(dashOf(slot().key)),
+                              s.intentDim,
+                              unknown(slot()) && s.unknown,
+                            )}
+                            x1="0"
+                            x2={SAMPLE_PX}
+                            y1={SAMPLE_H_PX / 2}
+                            y2={SAMPLE_H_PX / 2}
+                          />
+                        </Show>
+                      </svg>
+                    </Show>
+                    <span
+                      class={cx(
+                        s.slot,
+                        i === 0 ? s.intentText : s.intentDim,
+                        unknown(slot()) && s.unknown,
+                      )}
+                      style={{ width: `${slotCh()}ch` }}
+                    >
+                      {slotText(slot())}
+                    </span>
+                  </>
+                )}
+              </Index>
             </div>
           )}
         </Show>
