@@ -191,7 +191,8 @@ Conventions:
   - Lifeguard and minimum fuel are a priority, not an emergency: an amber `MED` or `FUEL` tag, no
     red, filtered like any target.
   - An active resolution advisory tags the block `RA` in the same red, and an ident `ID` in white;
-    the tags share one line: emergency, advisory, priority, ident.
+    the tags share one line: emergency, advisory, priority, ident, the last left out where they
+    would overrun the block.
   - The detail panel turns an emergency squawk red with its shorthand (`7700 EM`) and puts an
     active advisory at the right, in the words TCAS says it in.
 - **The detail panel** heads with the flight (callsign, squawk, tags) over the airframe (type,

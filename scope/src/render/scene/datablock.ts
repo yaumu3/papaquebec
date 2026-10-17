@@ -1,6 +1,14 @@
 import { type Altimeter, formatAltitude, holdsSelected, uncorrected } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
-import { blockHeight, DB_FONT_PX, DB_LINE, DB_WIDTH, leader, leaderTip } from '../../lib/datablock';
+import {
+  blockHeight,
+  DB_COLUMNS,
+  DB_FONT_PX,
+  DB_LINE,
+  DB_WIDTH,
+  leader,
+  leaderTip,
+} from '../../lib/datablock';
 import {
   climbArrow,
   emergencyCode,
@@ -45,9 +53,22 @@ const ident = (text: string): Run => ({ text, tone: 'ident' });
 /** The word a block tags each priority with. */
 const PRIORITY_TAGS: Record<Priority, string> = { minfuel: 'FUEL', lifeguard: 'MED' };
 
+/** The leading tags that fit one line of the block, a space between each. */
+function fitting(tags: Run[]): Run[] {
+  const kept: Run[] = [];
+  let width = -1;
+  for (const tag of tags) {
+    width += 1 + tag.text.length;
+    if (width > DB_COLUMNS) break;
+    kept.push(tag);
+  }
+  return kept;
+}
+
 /**
  * The tags above the block in order of precedence: the emergency, then an active advisory, both
- * alerts, then a priority in amber, then the ident in white.
+ * alerts, then a priority in amber, then the ident in white; those that would run past the block
+ * are left out, least precedence first.
  */
 function tagsOf(t: Track): Run[] {
   const code = emergencyCode(t.squawk, t.emergency);
@@ -58,7 +79,7 @@ function tagsOf(t: Track): Run[] {
     ...(priority ? [caution(PRIORITY_TAGS[priority])] : []),
     ...(t.ident ? [ident('ID')] : []),
   ];
-  return tags.flatMap((tag, i) => (i === 0 ? [tag] : [plain(' '), tag]));
+  return fitting(tags).flatMap((tag, i) => (i === 0 ? [tag] : [plain(' '), tag]));
 }
 
 /** Data block lines beyond the standard two. */

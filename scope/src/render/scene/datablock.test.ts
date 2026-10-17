@@ -68,19 +68,31 @@ describe('dataBlock', () => {
   it('tags the emergency and the advisory as alerts, then the priority, then the ident', () => {
     // Arrange
     const ra = { multipleThreats: false, terminated: false };
-    const t = track({ squawk: '7700', emergency: 'minfuel', ra, ident: true });
+    const t = track({ squawk: '7700', emergency: 'lifeguard', ra, ident: true });
 
     // Act
     const block = dataBlock(t, 0, STANDARD_ALTIMETER);
 
     // Assert
-    expect(text(block.tags)).toBe('EM RA FUEL ID');
+    expect(text(block.tags)).toBe('EM RA MED ID');
     expect(block.tags.filter((r) => r.text !== ' ').map((r) => r.tone)).toEqual([
       'alert',
       'alert',
       'caution',
       'ident',
     ]);
+  });
+
+  it('drops the tags of least precedence that would run past the block', () => {
+    // Arrange
+    const ra = { multipleThreats: false, terminated: false };
+    const t = track({ squawk: '7700', emergency: 'minfuel', ra, ident: true });
+
+    // Act
+    const block = dataBlock(t, 0, STANDARD_ALTIMETER);
+
+    // Assert
+    expect(text(block.tags)).toBe('EM RA FUEL');
   });
 
   it('tags minimum fuel and lifeguard as a priority, not an emergency', () => {
