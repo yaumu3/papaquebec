@@ -22,12 +22,21 @@ function bindings(a: ScopeActions): Record<string, (e: KeyEvent) => void> {
   };
 }
 
-/** The keyboard's shortcuts; keys typed into an input are left alone. */
+/** The history's root, which handles its own keys. */
+export const HISTORY_SELECTOR = '[data-history]';
+
+/** Whether a key pressed at `t` is another's to handle: typed into an input, or pressed in the history. */
+export function ownsKeys(t: EventTarget | null): boolean {
+  if (!t) return false;
+  if ('tagName' in t && t.tagName === 'INPUT') return true;
+  return 'closest' in t && typeof t.closest === 'function' && t.closest(HISTORY_SELECTOR) !== null;
+}
+
+/** The keyboard's shortcuts; keys typed into an input or pressed in the history are left alone. */
 export function keyHandler(a: ScopeActions): (e: KeyEvent) => void {
   const b = bindings(a);
   return (e) => {
-    const t = e.target;
-    if (t && 'tagName' in t && t.tagName === 'INPUT') return;
+    if (ownsKeys(e.target)) return;
     b[e.key.length === 1 ? e.key.toLowerCase() : e.key]?.(e);
   };
 }

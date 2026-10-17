@@ -168,6 +168,17 @@ export function formatMach(m: number | undefined): string {
 }
 
 /**
+ * A bank to the whole degree, with R or L for the side the wing is down; level has no side. The
+ * roll angle of the track and turn report, register 5,0, is positive right wing down, in steps of
+ * 45/256° (ICAO Doc 9871, RTCA DO-260B).
+ */
+export function formatRoll(deg: number): string {
+  const r = Math.round(deg);
+  if (r === 0) return '0°';
+  return `${r > 0 ? 'R' : 'L'}${Math.abs(r)}°`;
+}
+
+/**
  * A quantity in tenths while those read below `wholeFrom`, whole from there on, either rounded by
  * `round`: to the nearest unless told otherwise.
  */

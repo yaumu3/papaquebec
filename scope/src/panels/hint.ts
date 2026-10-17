@@ -35,6 +35,16 @@ export const HINT: readonly HintBlock[] = [
     ],
   },
   {
+    title: 'HISTORY',
+    columns: [
+      [
+        { keys: ['ALT', '↑'], action: 'LANE UP' },
+        { keys: ['ALT', '↓'], action: 'LANE DOWN' },
+      ],
+      [key('DEL', 'REMOVE LANE')],
+    ],
+  },
+  {
     title: 'MOUSE',
     columns: [
       [key('DRAG', 'PAN'), key('DRAG SELECTED', 'RBL')],

@@ -12,6 +12,7 @@ import {
   formatMach,
   clockTime,
   formatModes,
+  formatRoll,
   modeNames,
   padBearing,
   sourceName,
@@ -331,5 +332,18 @@ describe('formatBoundM', () => {
       { v: '<186', unit: 'm' },
       { v: '<0.1', unit: 'NM' },
     ]);
+  });
+});
+
+describe('formatRoll', () => {
+  it('reads a bank to the whole degree with its side, and level without one', () => {
+    // Arrange
+    const banks = [15, -5, 0, 0.4, -0.4, -0, 14.6, -9.67, 35];
+
+    // Act
+    const out = banks.map(formatRoll);
+
+    // Assert
+    expect(out).toEqual(['R15°', 'L5°', '0°', '0°', '0°', '0°', 'R15°', 'L10°', 'R35°']);
   });
 });

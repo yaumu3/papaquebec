@@ -198,6 +198,20 @@ describe('laneTraces with the instants each reading is heard at', () => {
     expect(traces.map(([tr]) => tr?.runs.map((run) => run.length))).toEqual([[1, 1], [40]]);
   });
 
+  it('breaks the bank where its replies stop', () => {
+    // Arrange
+    const again = 2 + GAP_SEC;
+    const samples = Array.from({ length: 40 }, (_, k) =>
+      sample(k + 1, { roll: 20, heard: { roll: k + 1 < again ? 1 : again } }),
+    );
+
+    // Act
+    const [trace] = laneTraces(samples, ['roll'], ALL);
+
+    // Assert
+    expect(trace?.runs.map((run) => run.length)).toEqual([1, 1]);
+  });
+
   it('joins every sample of a reading of the reception itself', () => {
     // Arrange
     const samples = [1, 2, 3].map((t) => sample(t, { messageRate: 4 }));
@@ -383,6 +397,8 @@ describe('snapped', () => {
       { lane: 'msgs', r: { lo: 1.2, hi: 3.8 } },
       { lane: 'msgs', r: { lo: 6.2, hi: 11.3 } },
       { lane: 'age', r: { lo: 0.4, hi: 5.4 } },
+      { lane: 'roll', r: { lo: -3, hi: 4 } },
+      { lane: 'roll', r: flat(0) },
     ] as const;
 
     // Act
@@ -406,6 +422,8 @@ describe('snapped', () => {
       { lo: 0, hi: 5 },
       { lo: 5, hi: 15 },
       { lo: 0, hi: 6 },
+      { lo: -10, hi: 10 },
+      { lo: 0, hi: 10 },
     ]);
   });
 
@@ -466,6 +484,7 @@ describe('scaleLabels', () => {
       { lane: 'nic', r: { lo: Math.log10(0.1 * 1852), hi: Math.log10(1852) } },
       { lane: 'nacp', r: { lo: Math.log10(20), hi: Math.log10(100) } },
       { lane: 'modes', r: { lo: 0, hi: 1 } },
+      { lane: 'roll', r: { lo: -10, hi: 20 } },
     ] as const;
 
     // Act
@@ -479,6 +498,7 @@ describe('scaleLabels', () => {
       ['<1 NM', '<0.1 NM'],
       ['<100 m', '<20 m'],
       [],
+      ['R20°', 'L10°'],
     ]);
   });
 

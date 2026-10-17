@@ -3,9 +3,10 @@ import { createMemo, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { stepFromKey } from '../../ui/reorder';
 import { NONE, READINGS } from '../readings';
 import { clearOfEnds, clockStep, ticks } from './axis';
+import type { LanePart } from './laneDrag';
+import { type LaneMoves, onMoveKey } from './moves';
 import {
   atTicks,
   barbPath,
@@ -62,7 +63,7 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
   return p.kind === 'intent' ? p.dash : undefined;
 };
 
-/** One lane of the bay: a top row with its grip, name and close button, then its scale and its plot over the visible span. */
+/** One lane of the bay: a top row with the dropdown of its name, then its scale and its plot over the visible span. */
 export function Lane(props: {
   lane: ReadingKey;
   /** Its place among the lanes, and how many there are. */
@@ -78,11 +79,18 @@ export function Lane(props: {
   /** The sample the lane is read at, and whether it is an earlier one than the latest. */
   at: Sample | null;
   past: boolean;
-  onClose: () => void;
-  onGripDown: (y: number) => void;
-  onGripMove: (y: number) => void;
-  /** The arrow keys move the lane a place up or down. */
-  onGripStep: (step: -1 | 1) => void;
+  /** The lane itself, which keeps the focus for it. */
+  laneRef: (el: HTMLDivElement) => void;
+  moves: LaneMoves;
+  /** Whether the lane's palette is open, and the dropdown of its name that opens it. */
+  menuOpen: boolean;
+  onMenu: (anchor: HTMLElement) => void;
+  onGrab: (e: PointerEvent, part: LanePart) => void;
+  /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
+  place: number;
+  /** How far a finger has swiped the top row left, while one does. */
+  swipeX: number | null;
+  slot: boolean;
 }) {
   const spec = PLOTS[props.lane];
   const label = READINGS[props.lane].label;
@@ -149,9 +157,25 @@ export function Lane(props: {
   };
   /** How wide the intents' slots are: as wide as the widest of them. */
   const slotCh = () => Math.max(0, ...held().map((key) => INTENT_CH[key] ?? 0));
+  let top: HTMLDivElement | undefined;
 
   return (
-    <div class={s.lane} style={{ height: `${props.height}px` }}>
+    <div
+      ref={props.laneRef}
+      data-lane
+      class={cx(s.lane, props.slot && s.hole)}
+      style={{ height: `${props.height}px`, order: props.place }}
+      tabindex="0"
+      role="group"
+      aria-roledescription="lane"
+      aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget) onMoveKey(props.moves, e);
+      }}
+      onPointerDown={(e) =>
+        props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
+      }
+    >
       <div class={s.plot}>
         <svg class={s.svg} height={props.height}>
           <Index each={gaps()}>
@@ -246,37 +270,22 @@ export function Lane(props: {
           )}
         </Index>
       </div>
-      <div class={s.top}>
+      <div
+        ref={(el) => {
+          top = el;
+        }}
+        class={cx(s.top, props.swipeX !== null && s.swiping)}
+        style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
+      >
         <button
           type="button"
-          class={s.grip}
-          aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag or press an arrow key to move it.`}
-          onKeyDown={(e) => {
-            const step = stepFromKey(e.key);
-            if (step === null) return;
-            e.preventDefault();
-            props.onGripStep(step);
-            // The lane moved in the DOM, which blurs its grip.
-            e.currentTarget.focus();
-          }}
-          onPointerDown={(e) => {
-            e.currentTarget.setPointerCapture(e.pointerId);
-            props.onGripDown(e.clientY);
-          }}
-          onPointerMove={(e) => {
-            if (e.currentTarget.hasPointerCapture(e.pointerId)) props.onGripMove(e.clientY);
-          }}
+          class={cx(s.menu, props.menuOpen && s.open)}
+          aria-haspopup="dialog"
+          aria-expanded={props.menuOpen}
+          onClick={(e) => props.onMenu(e.currentTarget)}
         >
-          ⋮⋮
-        </button>
-        <span class={s.name}>{label}</span>
-        <button
-          type="button"
-          class={s.close}
-          aria-label={`Close the ${label} lane`}
-          onClick={() => props.onClose()}
-        >
-          ×
+          {label}
+          <span class={s.caret}>{props.menuOpen ? '▲' : '▼'}</span>
         </button>
         <Show when={readout()}>
           {(r) => (

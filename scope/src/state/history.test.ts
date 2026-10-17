@@ -1,15 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  closePlotLane,
+  addPlotLane,
   historyOpen,
   hoverInstant,
   movePlotLane,
   plotted,
+  removePlotLane,
   setHoverInstant,
   setPlotted,
+  switchPlotLane,
   toggleHistory,
-  togglePlot,
 } from './history';
 import { DEFAULT_PLOTTED } from './plotted';
 import { persisted } from './settings';
@@ -26,23 +27,12 @@ describe('history state', () => {
     expect(keys).toEqual(defaults);
   });
 
-  it('toggles a reading on, in a lane of its own', () => {
-    // Arrange
-    setPlotted(DEFAULT_PLOTTED);
-
-    // Act
-    togglePlot('vs');
-
-    // Assert
-    expect(plotted()).toEqual([...DEFAULT_PLOTTED, 'vs']);
-  });
-
-  it('closes a lane with the intents drawn in it', () => {
+  it('removes a lane', () => {
     // Arrange
     setPlotted([...DEFAULT_PLOTTED, 'vs']);
 
     // Act
-    closePlotLane('alt');
+    removePlotLane('alt');
 
     // Assert
     expect(plotted()).toEqual(['gs', 'vs']);
@@ -57,6 +47,28 @@ describe('history state', () => {
 
     // Assert
     expect(plotted()).toEqual(['vs', 'gs']);
+  });
+
+  it('switches a lane to another in its place', () => {
+    // Arrange
+    setPlotted(['alt', 'gs']);
+
+    // Act
+    switchPlotLane('alt', 'roll');
+
+    // Assert
+    expect(plotted()).toEqual(['roll', 'gs']);
+  });
+
+  it('adds a lane at the end', () => {
+    // Arrange
+    setPlotted(['alt', 'gs']);
+
+    // Act
+    addPlotLane('roll');
+
+    // Assert
+    expect(plotted()).toEqual(['alt', 'gs', 'roll']);
   });
 
   it('starts with the history group open and folds it on a toggle', () => {

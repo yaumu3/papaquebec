@@ -3,7 +3,7 @@ import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
 import { NM_IN_METERS } from '../../lib/geo';
 import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
-import { laneOf, type ReadingKey } from '../../state/plotted';
+import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { type Reading, READINGS } from '../readings';
 import { type Dash, HEARD, type Heading, PLOTS } from './plots';
@@ -98,7 +98,7 @@ const within = (m: number, round: number): boolean =>
  * would have none, a flat line on a step lying along the bottom.
  */
 export function snapped(r: Range, lane: ReadingKey): Range {
-  const spec = PLOTS[laneOf(lane)];
+  const spec = PLOTS[lane];
   if (spec.kind !== 'line' && spec.kind !== 'pair') return r;
   if (spec.log) {
     const lo = BOUNDS_M.findLast((m) => m <= 10 ** r.lo * (1 + EPS)) ?? 10 ** r.lo;

@@ -120,7 +120,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-1);
 }
-/* A cell is a button: it plots its reading, or centres. Nothing frames it. */
+/* A cell reads out its reading; the position's is a button that centres the scope. Nothing frames it. */
 .cell {
   min-width: 0;
   padding: var(--space-2) var(--space-3);
@@ -128,7 +128,7 @@
   text-align: left;
   white-space: nowrap;
 }
-.cell:hover {
+.action:hover {
   background: var(--row-hover);
 }
 .span2 {
@@ -149,15 +149,4 @@
 }
 .dim {
   --value: var(--text-dim);
-}
-/* With :hover too: a touch leaves it behind, and it must not outrank the on state. */
-.on,
-.on:hover {
-  --value: var(--control-on-text);
-  --value-quiet: var(--control-on-text);
-  background: var(--control-on-bg);
-}
-.on .k,
-.on .glyph {
-  color: var(--control-on-text);
 }

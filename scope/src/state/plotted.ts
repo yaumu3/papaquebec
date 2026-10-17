@@ -1,4 +1,4 @@
-/** The readings of the detail table that the history lanes can plot. */
+/** The readings of a target the history lanes draw. */
 export const READING_KEYS = [
   'alt',
   'selAlt',
@@ -6,6 +6,7 @@ export const READING_KEYS = [
   'vs',
   'trk',
   'selHdg',
+  'roll',
   'gs',
   'qnh',
   'modes',
@@ -25,65 +26,59 @@ export const READING_KEYS = [
 
 export type ReadingKey = (typeof READING_KEYS)[number];
 
-/** Plotted on first use. */
-export const DEFAULT_PLOTTED: readonly ReadingKey[] = ['alt', 'selAlt', 'fmsAlt', 'gs'];
-export const MAX_LANES = 4;
+/** The lanes by group, in the order the palette offers them. */
+export const LANE_GROUPS = [
+  { name: 'FLT', lanes: ['alt', 'vs', 'gs', 'trk', 'roll'] },
+  { name: 'NAV', lanes: ['qnh', 'modes'] },
+  { name: 'AIR', lanes: ['ias', 'tas', 'mach', 'wind', 'oat', 'tat'] },
+  { name: 'POS', lanes: ['nic', 'nacp'] },
+  { name: 'RX', lanes: ['src', 'rssi', 'msgs', 'age'] },
+] as const satisfies readonly { name: string; lanes: readonly ReadingKey[] }[];
 
-/** An intent reading is drawn in the lane of the reading it is an intent for, on its scale. */
-const LANE_OF: Partial<Record<ReadingKey, ReadingKey>> = {
-  selAlt: 'alt',
-  fmsAlt: 'alt',
-  selHdg: 'trk',
+/** A reading with a lane of its own. */
+export type LaneKey = (typeof LANE_GROUPS)[number]['lanes'][number];
+
+export const LANE_KEYS: readonly LaneKey[] = LANE_GROUPS.flatMap((g) => g.lanes);
+
+export const isLaneKey = (k: unknown): k is LaneKey => LANE_KEYS.some((lane) => lane === k);
+
+/** The intents drawn in a lane, on its scale, whenever reported. */
+export const INTENTS: Partial<Record<LaneKey, readonly ReadingKey[]>> = {
+  alt: ['selAlt', 'fmsAlt'],
+  trk: ['selHdg'],
 };
 
-/** The reading whose lane `key` is drawn in: itself unless it is an intent. */
-export const laneOf = (key: ReadingKey): ReadingKey => LANE_OF[key] ?? key;
+/** The readings drawn in a lane: its own first, then its intents. */
+export const readingsIn = (lane: LaneKey): ReadingKey[] => [lane, ...(INTENTS[lane] ?? [])];
 
-/** The lanes open for `plotted`, each once, in order of the first reading drawn in it. */
-export function lanesOf(plotted: readonly ReadingKey[]): ReadingKey[] {
-  return [...new Set(plotted.map(laneOf))];
+/** Plotted on first use. */
+export const DEFAULT_PLOTTED: readonly LaneKey[] = ['alt', 'gs'];
+
+export function removeLane(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
+  return plotted.filter((k) => k !== lane);
 }
 
-/** The readings drawn in `lane`: its own first, then the intents plotted in it, in their order. */
-export function readingsIn(plotted: readonly ReadingKey[], lane: ReadingKey): ReadingKey[] {
-  return [lane, ...plotted.filter((k) => k !== lane && laneOf(k) === lane)];
-}
-
-/** Removes the lane and every reading drawn in it. */
-export function closeLane(plotted: readonly ReadingKey[], lane: ReadingKey): ReadingKey[] {
-  return plotted.filter((k) => laneOf(k) !== lane);
-}
-
-/**
- * The plotted readings after a tap on `key`: off when on; else on, opening its lane when that is
- * not open yet, unless the lane would be one past the limit, when nothing changes.
- */
-export function togglePlotted(plotted: readonly ReadingKey[], key: ReadingKey): ReadingKey[] {
-  if (plotted.includes(key)) return plotted.filter((k) => k !== key && laneOf(k) !== key);
-  const lane = laneOf(key);
-  const lanes = lanesOf(plotted);
-  if (lanes.includes(lane)) return [...plotted, key];
-  if (lanes.length >= MAX_LANES) return [...plotted];
-  return lane === key ? [...plotted, key] : [...plotted, lane, key];
-}
-
-/** The plotted readings lane by lane in the order given, each lane's own reading first, nothing twice. */
-const byLanes = (lanes: readonly ReadingKey[], plotted: readonly ReadingKey[]): ReadingKey[] => [
-  ...new Set(lanes.flatMap((lane) => readingsIn(plotted, lane))),
-];
-
-/** Moves the lane at `from` to `to`, the readings drawn in each lane travelling together. */
-export function moveLane(plotted: readonly ReadingKey[], from: number, to: number): ReadingKey[] {
-  const lanes = lanesOf(plotted);
+/** Moves the lane at `from` to `to`. */
+export function moveLane(plotted: readonly LaneKey[], from: number, to: number): LaneKey[] {
+  const lanes = [...plotted];
   const [moved] = lanes.splice(from, 1);
   if (moved !== undefined) lanes.splice(to, 0, moved);
-  return byLanes(lanes, plotted);
+  return lanes;
 }
 
-/**
- * A plot as the lanes can show it: the first lanes within the limit, each with the readings drawn
- * in it and its own reading opening it, the rest dropped with their intents.
- */
-export function canonical(plotted: readonly ReadingKey[]): ReadingKey[] {
-  return byLanes(lanesOf(plotted).slice(0, MAX_LANES), plotted);
+/** The lanes with `to` in the place of `from`, unless `to` is open already or `from` is not. */
+export function switchLane(plotted: readonly LaneKey[], from: LaneKey, to: LaneKey): LaneKey[] {
+  if (plotted.includes(to)) return [...plotted];
+  return plotted.map((k) => (k === from ? to : k));
+}
+
+/** The lanes with `lane` at the end, unless it is open already. */
+export function addLane(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
+  return plotted.includes(lane) ? [...plotted] : [...plotted, lane];
+}
+
+/** The lane that follows `lane`; null after the last, or for one not open. */
+export function laneAfter(plotted: readonly LaneKey[], lane: LaneKey): LaneKey | null {
+  const at = plotted.indexOf(lane);
+  return at < 0 ? null : (plotted[at + 1] ?? null);
 }

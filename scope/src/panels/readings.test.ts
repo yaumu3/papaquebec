@@ -58,6 +58,21 @@ describe('READINGS', () => {
     expect(r).toEqual({ v: '269° / 36', unit: 'kt' });
   });
 
+  it('reads the bank with its side, blank when unknown', () => {
+    // Arrange
+    const samples = [
+      makeSample(1000, { roll: 15.2 }),
+      makeSample(1000, { roll: -4.9 }),
+      makeSample(1000),
+    ];
+
+    // Act
+    const readings = samples.map((s) => READINGS.roll.format(s));
+
+    // Assert
+    expect(readings).toEqual([{ v: 'R15°' }, { v: 'L5°' }, NONE]);
+  });
+
   it('reads the NIC as its radius of containment, and blank for NIC 0 or without a position', () => {
     // Arrange
     const samples = [

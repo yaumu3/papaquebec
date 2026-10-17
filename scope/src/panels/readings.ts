@@ -7,6 +7,7 @@ import {
   formatBoundM,
   formatMach,
   formatModes,
+  formatRoll,
   padBearing,
   sourceName,
 } from '../lib/format';
@@ -117,6 +118,8 @@ const celsius = (v: number | undefined) => signed(v, '°C');
 const dB = (v: number | undefined) => num(v, 'dB', 1);
 const perSecond = (v: number | undefined) => num(v, '/s', 1);
 const inHgReading = (v: number | undefined) => num(v, 'inHg', 2);
+const bank = (deg: number | undefined): Reading =>
+  deg === undefined ? NONE : { v: formatRoll(deg) };
 const machReading = (v: number | undefined): Reading =>
   v === undefined ? NONE : { v: formatMach(v) };
 
@@ -127,7 +130,7 @@ export interface ReadingSpec {
   value?: (v: number) => Reading;
 }
 
-/** Every reading the detail table shows of a target, as it is labeled and printed. */
+/** Every reading of a target, as it is labeled and printed. */
 export const READINGS: Record<ReadingKey, ReadingSpec> = {
   alt: { label: 'ALT', format: altitudeReading, value: selectedReading },
   selAlt: { label: 'SEL ALT', format: (r) => selectedReading(r.selAlt) },
@@ -135,6 +138,7 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   vs: { label: 'VS', format: (r) => fpm(r.verticalRate), value: fpm },
   trk: { label: 'TRK / HDG', format: trackReading },
   selHdg: { label: 'SEL HDG', format: (r) => bearing(steeringHeading(r)) },
+  roll: { label: 'ROLL', format: (r) => bank(r.roll), value: bank },
   gs: { label: 'GS', format: (r) => kt(r.gs), value: kt },
   qnh: { label: 'QNH', format: (r) => inHgReading(inHg(r.navQnh)), value: inHgReading },
   modes: { label: 'MODES', format: (r) => plain(formatModes(r.navModes)) },

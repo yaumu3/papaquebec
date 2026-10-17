@@ -1,129 +1,94 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  canonical,
-  closeLane,
+  addLane,
   DEFAULT_PLOTTED,
-  lanesOf,
-  MAX_LANES,
+  INTENTS,
+  LANE_GROUPS,
+  laneAfter,
+  LANE_KEYS,
+  type LaneKey,
   moveLane,
-  type ReadingKey,
+  READING_KEYS,
   readingsIn,
-  togglePlotted,
+  removeLane,
+  switchLane,
 } from './plotted';
 
-describe('lanesOf', () => {
-  it('names each lane once, in order of the first reading drawn in it', () => {
+describe('LANE_GROUPS', () => {
+  it('lists the lanes by group, as the palette offers them', () => {
     // Arrange
-    const plotted: ReadingKey[] = ['selAlt', 'gs', 'alt', 'fmsAlt', 'selHdg'];
+    const expected = [
+      { name: 'FLT', lanes: ['alt', 'vs', 'gs', 'trk', 'roll'] },
+      { name: 'NAV', lanes: ['qnh', 'modes'] },
+      { name: 'AIR', lanes: ['ias', 'tas', 'mach', 'wind', 'oat', 'tat'] },
+      { name: 'POS', lanes: ['nic', 'nacp'] },
+      { name: 'RX', lanes: ['src', 'rssi', 'msgs', 'age'] },
+    ];
 
     // Act
-    const lanes = lanesOf(plotted);
+    const groups: { name: string; lanes: string[] }[] = LANE_GROUPS.map((g) => ({
+      name: g.name,
+      lanes: [...g.lanes],
+    }));
 
     // Assert
-    expect(lanes).toEqual(['alt', 'gs', 'trk']);
+    expect(groups).toEqual(expected);
+  });
+
+  it('gives every reading one home: a lane of its own, or the one lane it is drawn in', () => {
+    // Arrange
+    const homes = [...LANE_KEYS, ...Object.values(INTENTS).flat()];
+
+    // Act
+    const counts = READING_KEYS.map((k) => homes.filter((home) => home === k).length);
+
+    // Assert
+    expect(counts).toEqual(READING_KEYS.map(() => 1));
   });
 });
 
 describe('readingsIn', () => {
-  it("lists a lane's own reading first, then the intents plotted in it, in their order", () => {
+  it("lists a lane's own reading first, then the intents always drawn in it", () => {
     // Arrange
-    const plotted: ReadingKey[] = ['fmsAlt', 'gs', 'alt', 'selAlt'];
+    const lanes: LaneKey[] = ['alt', 'trk', 'gs'];
 
     // Act
-    const keys = readingsIn(plotted, 'alt');
+    const keys = lanes.map(readingsIn);
 
     // Assert
-    expect(keys).toEqual(['alt', 'fmsAlt', 'selAlt']);
+    expect(keys).toEqual([['alt', 'selAlt', 'fmsAlt'], ['trk', 'selHdg'], ['gs']]);
   });
 });
 
-describe('togglePlotted', () => {
-  it('plots a reading that is off at the end', () => {
+describe('removeLane', () => {
+  it('removes the lane, the rest keeping their order', () => {
     // Arrange
-    const plotted: ReadingKey[] = ['alt'];
+    const plotted: LaneKey[] = ['alt', 'gs', 'vs'];
 
     // Act
-    const next = togglePlotted(plotted, 'vs');
+    const next = removeLane(plotted, 'gs');
 
     // Assert
     expect(next).toEqual(['alt', 'vs']);
   });
-
-  it('removes a reading that is on', () => {
-    // Arrange
-    const plotted: ReadingKey[] = ['alt', 'gs'];
-
-    // Act
-    const next = togglePlotted(plotted, 'gs');
-
-    // Assert
-    expect(next).toEqual(['alt']);
-  });
-
-  it('takes the readings drawn in a lane away with the lane', () => {
-    // Arrange
-    const plotted: ReadingKey[] = ['alt', 'selAlt', 'gs', 'fmsAlt'];
-
-    // Act
-    const next = togglePlotted(plotted, 'alt');
-
-    // Assert
-    expect(next).toEqual(['gs']);
-  });
-
-  it('opens the lane an intent reading is drawn in when it is not open', () => {
-    // Arrange
-    const plotted: ReadingKey[] = ['alt'];
-
-    // Act
-    const next = togglePlotted(plotted, 'selHdg');
-
-    // Assert
-    expect(next).toEqual(['alt', 'trk', 'selHdg']);
-  });
-
-  it('refuses a reading that would open a lane past the limit, not one drawn in an open lane', () => {
-    // Arrange
-    const full: ReadingKey[] = ['alt', 'gs', 'trk', 'ias'];
-    expect(full).toHaveLength(MAX_LANES);
-
-    // Act
-    const next = [togglePlotted(full, 'vs'), togglePlotted(full, 'selAlt')];
-
-    // Assert
-    expect(next).toEqual([full, ['alt', 'gs', 'trk', 'ias', 'selAlt']]);
-  });
-});
-
-describe('closeLane', () => {
-  it('removes the lane and every reading drawn in it', () => {
-    // Arrange
-    const plotted: ReadingKey[] = ['alt', 'selAlt', 'fmsAlt', 'gs'];
-
-    // Act
-    const next = closeLane(plotted, 'alt');
-
-    // Assert
-    expect(next).toEqual(['gs']);
-  });
 });
 
 describe('moveLane', () => {
-  it('moves a lane with the readings drawn in it, the rest keeping their order', () => {
+  it('moves a lane, the rest keeping their order', () => {
     // Arrange
-    const plotted: ReadingKey[] = ['alt', 'selAlt', 'gs', 'trk', 'selHdg'];
+    const plotted: LaneKey[] = ['alt', 'gs', 'trk'];
 
     // Act
     const next = moveLane(plotted, 0, 2);
 
     // Assert
-    expect(next).toEqual(['gs', 'trk', 'selHdg', 'alt', 'selAlt']);
+    expect(next).toEqual(['gs', 'trk', 'alt']);
   });
 
   it('leaves the order alone when the lane goes where it is', () => {
     // Arrange
-    const plotted: ReadingKey[] = ['alt', 'gs'];
+    const plotted: LaneKey[] = ['alt', 'gs'];
 
     // Act
     const next = moveLane(plotted, 1, 1);
@@ -133,39 +98,68 @@ describe('moveLane', () => {
   });
 });
 
-describe('canonical', () => {
-  it('keeps the first lanes allowed with their intents, and drops the rest with theirs', () => {
-    // Arrange
-    const plotted: ReadingKey[] = ['alt', 'selAlt', 'gs', 'trk', 'selHdg', 'ias', 'vs', 'fmsAlt'];
-
-    // Act
-    const kept = canonical(plotted);
-
-    // Assert
-    expect(kept).toEqual(['alt', 'selAlt', 'fmsAlt', 'gs', 'trk', 'selHdg', 'ias']);
-  });
-
-  it('opens the lane an intent is drawn in when that was left out, and lists nothing twice', () => {
-    // Arrange
-    const plotted: ReadingKey[] = ['selAlt', 'gs', 'gs', 'selAlt'];
-
-    // Act
-    const kept = canonical(plotted);
-
-    // Assert
-    expect(kept).toEqual(['alt', 'selAlt', 'gs']);
-  });
-});
-
 describe('DEFAULT_PLOTTED', () => {
-  it('plots altitude with both intents and ground speed on first use', () => {
+  it('plots altitude and ground speed on first use', () => {
     // Arrange
-    const expected: ReadingKey[] = ['alt', 'selAlt', 'fmsAlt', 'gs'];
+    const expected: LaneKey[] = ['alt', 'gs'];
 
     // Act
     const plotted = [...DEFAULT_PLOTTED];
 
     // Assert
     expect(plotted).toEqual(expected);
+  });
+});
+
+describe('switchLane', () => {
+  it('puts the lane picked in the place of the one switched, unless it is open or that is not', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['alt', 'gs', 'vs'];
+    const switches: [LaneKey, LaneKey][] = [
+      ['gs', 'ias'],
+      ['gs', 'vs'],
+      ['trk', 'ias'],
+    ];
+
+    // Act
+    const next = switches.map(([from, to]) => switchLane(plotted, from, to));
+
+    // Assert
+    expect(next).toEqual([
+      ['alt', 'ias', 'vs'],
+      ['alt', 'gs', 'vs'],
+      ['alt', 'gs', 'vs'],
+    ]);
+  });
+});
+
+describe('addLane', () => {
+  it('adds a lane at the end, unless it is open', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['alt', 'gs'];
+    const added: LaneKey[] = ['roll', 'alt'];
+
+    // Act
+    const next = added.map((lane) => addLane(plotted, lane));
+
+    // Assert
+    expect(next).toEqual([
+      ['alt', 'gs', 'roll'],
+      ['alt', 'gs'],
+    ]);
+  });
+});
+
+describe('laneAfter', () => {
+  it('names the lane that follows, none after the last or for one not open', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['alt', 'gs', 'vs'];
+    const lanes: LaneKey[] = ['alt', 'gs', 'vs', 'trk'];
+
+    // Act
+    const after = lanes.map((lane) => laneAfter(plotted, lane));
+
+    // Assert
+    expect(after).toEqual(['gs', 'vs', null, null]);
   });
 });

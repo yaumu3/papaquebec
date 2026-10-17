@@ -38,6 +38,8 @@
   --plot-label: #6a6a66;
   /* A plot's value lines, and the thumb of scrolled lanes. */
   --plot-scale: var(--panel-border);
+  /* The bin a dragged lane is dropped in to remove it. */
+  --bin-bg: color-mix(in srgb, var(--color-emergency) 12%, var(--panel-bg));
 
   /* Type */
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;

@@ -74,7 +74,7 @@ const inHg = (hpa: number | undefined): number | undefined =>
 const logOf = (m: number | undefined): number | undefined =>
   m === undefined ? undefined : Math.log10(m);
 
-/** How each reading is drawn; `laneOf` in `state/plotted.ts` says which lane an intent goes in. */
+/** How each reading is drawn; `INTENTS` in `state/plotted.ts` says which lane an intent goes in. */
 export const PLOTS: Record<ReadingKey, PlotSpec> = {
   // As the crew reads it, so that an aircraft holding its selected altitude sits on that line.
   alt: {
@@ -88,6 +88,7 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   vs: { kind: 'line', y: (s) => s.verticalRate, quantum: 500 },
   trk: { kind: 'heading', heading },
   selHdg: { kind: 'intent', y: steeringHeading },
+  roll: { kind: 'line', y: (s) => s.roll, quantum: 10 },
   gs: { kind: 'line', y: (s) => s.gs, quantum: 10 },
   qnh: { kind: 'line', y: (s) => inHg(s.navQnh), quantum: 0.01 },
   modes: { kind: 'gantt', names: (s) => s.navModes && modeNames(s.navModes) },
@@ -123,6 +124,7 @@ export const HEARD: Record<ReadingKey, readonly HeardKey[]> = {
   vs: ['verticalRate'],
   trk: ['track', 'heading'],
   selHdg: ['selHeading'],
+  roll: ['roll'],
   gs: ['gs'],
   qnh: ['navQnh'],
   modes: ['navModes'],
