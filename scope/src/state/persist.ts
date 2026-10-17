@@ -2,7 +2,7 @@ import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
-import { canonical, isLaneKey, type LaneKey } from './plotted';
+import { isLaneKey, type LaneKey } from './plotted';
 import {
   LABEL_DENSITIES,
   LAYER_KEYS,
@@ -119,12 +119,12 @@ function sortFrom(raw: unknown, fallback: ListSort): ListSort {
 }
 
 /**
- * The lanes known, within the limit, each once; an empty list is a choice to plot nothing. A plot
- * saved before lanes stood alone lists intents too, which are dropped.
+ * The lanes known, each once; an empty list is a choice to plot nothing. A plot saved before
+ * lanes stood alone lists intents too, which are dropped.
  */
 function plottedFrom(raw: unknown, fallback: readonly LaneKey[]): readonly LaneKey[] {
   if (!Array.isArray(raw)) return fallback;
-  return canonical(raw.filter(isLaneKey));
+  return [...new Set(raw.filter(isLaneKey))];
 }
 
 /** Field-by-field validation: anything unexpected falls back to the default for that field. */

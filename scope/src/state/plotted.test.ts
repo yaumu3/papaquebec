@@ -1,13 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  canonical,
   DEFAULT_PLOTTED,
   INTENTS,
   LANE_GROUPS,
   LANE_KEYS,
   type LaneKey,
-  MAX_LANES,
   moveLane,
   READING_KEYS,
   readingsIn,
@@ -84,17 +82,15 @@ describe('togglePlotted', () => {
     expect(next).toEqual(['gs']);
   });
 
-  it('refuses a lane past the limit', () => {
+  it('plots any number of lanes', () => {
     // Arrange
-    const full: LaneKey[] = ['alt', 'gs', 'trk', 'ias'];
-    // Precondition: the plot is full.
-    expect(full).toHaveLength(MAX_LANES);
+    const plotted: LaneKey[] = ['alt', 'gs', 'trk', 'ias'];
 
     // Act
-    const next = togglePlotted(full, 'vs');
+    const next = togglePlotted(plotted, 'vs');
 
     // Assert
-    expect(next).toEqual(full);
+    expect(next).toEqual(['alt', 'gs', 'trk', 'ias', 'vs']);
   });
 });
 
@@ -132,19 +128,6 @@ describe('moveLane', () => {
 
     // Assert
     expect(next).toEqual(['alt', 'gs']);
-  });
-});
-
-describe('canonical', () => {
-  it('keeps the first lanes allowed, each once', () => {
-    // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs', 'alt', 'trk', 'ias', 'vs'];
-
-    // Act
-    const kept = canonical(plotted);
-
-    // Assert
-    expect(kept).toEqual(['alt', 'gs', 'trk', 'ias']);
   });
 });
 

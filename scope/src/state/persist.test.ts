@@ -185,17 +185,17 @@ describe('loadPersisted plotted from before lanes stood alone', () => {
 });
 
 describe('loadPersisted plotted lanes', () => {
-  it('keeps a stored plot within the lanes allowed', () => {
+  it('keeps every lane of a stored plot, however many', () => {
     // Arrange
     const storage = memoryStorage({
-      [PERSIST_KEY]: JSON.stringify({ plotted: ['alt', 'gs', 'trk', 'ias', 'vs'] }),
+      [PERSIST_KEY]: JSON.stringify({ plotted: ['alt', 'gs', 'trk', 'ias', 'vs', 'roll'] }),
     });
 
     // Act
     const { plotted } = loadPersisted(storage, DEFAULTS);
 
     // Assert
-    expect(plotted).toEqual(['alt', 'gs', 'trk', 'ias']);
+    expect(plotted).toEqual(['alt', 'gs', 'trk', 'ias', 'vs', 'roll']);
   });
 });
 

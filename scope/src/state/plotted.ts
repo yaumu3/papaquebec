@@ -53,12 +53,11 @@ export const readingsIn = (lane: LaneKey): ReadingKey[] => [lane, ...(INTENTS[la
 
 /** Plotted on first use. */
 export const DEFAULT_PLOTTED: readonly LaneKey[] = ['alt', 'gs'];
-export const MAX_LANES = 4;
 
-/** The lanes after a tap on `lane`: off when on; else on at the end, unless past the limit. */
+/** The lanes after a tap on `lane`: off when on, else on at the end. */
 export function togglePlotted(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
   if (plotted.includes(lane)) return removeLane(plotted, lane);
-  return plotted.length < MAX_LANES ? [...plotted, lane] : [...plotted];
+  return [...plotted, lane];
 }
 
 export function removeLane(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
@@ -71,9 +70,4 @@ export function moveLane(plotted: readonly LaneKey[], from: number, to: number):
   const [moved] = lanes.splice(from, 1);
   if (moved !== undefined) lanes.splice(to, 0, moved);
   return lanes;
-}
-
-/** A plot as the lanes can show it: the first lanes within the limit, each once. */
-export function canonical(plotted: readonly LaneKey[]): LaneKey[] {
-  return [...new Set(plotted)].slice(0, MAX_LANES);
 }
