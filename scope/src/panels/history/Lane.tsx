@@ -166,6 +166,8 @@ export function Lane(props: {
       class={cx(s.lane, props.slot && s.hole)}
       style={{ height: `${props.height}px`, order: props.place }}
       tabindex="0"
+      role="group"
+      aria-roledescription="lane"
       aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget) onMoveKey(props.moves, e);
