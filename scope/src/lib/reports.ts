@@ -18,6 +18,13 @@ export const ADVISORY_SEC = 18;
  */
 export const EMERGENCY_SEC = 10;
 
+/**
+ * How long a value on the ND holds after it was last heard. An SSR scans an en-route sector every
+ * 10 to 12 s, and the Comm-B registers that carry the heading and the air data are read once a
+ * scan at best: a value read every scan must not blink out between two of them.
+ */
+export const INSTRUMENT_SEC = 15;
+
 /** Whether a report heard at `heardAt` still holds at `now`: heard less than `lapseSec` before. */
 export function holds(heardAt: number | undefined, now: number, lapseSec: number): boolean {
   return heardAt !== undefined && now - heardAt < lapseSec;
