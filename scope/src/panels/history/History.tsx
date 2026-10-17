@@ -18,7 +18,7 @@ import type { Sample, Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { trackReorder } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
-import { axisStep, chipAt, clearOf, clockLabel, spanLabel, ticks } from './axis';
+import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
 import { Lane } from './Lane';
 import { type ScrollView, scrollView } from './scroll';
 import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
@@ -124,16 +124,22 @@ export function History(props: { track: Track }) {
   /** The chip's width: its time, padding and border. */
   const chipWidth = () => chipTextWidth() + 2 * (CHIP_PAD_PX + 1);
   const chipLeft = (px: number) => chipAt(px, chipWidth(), plotWidth());
+  /** Half a clock label's width: the labels of one step are as long as each other, in the chip's characters. */
+  const labelHalf = () => {
+    const first = tickTimes()[0];
+    return first === undefined
+      ? 0
+      : (clockLabel(first, step()).length * chipTextWidth()) / CHIP_CHARS / 2;
+  };
+  /** The ticks whose labels fit whole over the plots. */
+  const labelTimes = createMemo(() => clearOfEnds(tickTimes(), x, plotWidth(), labelHalf()));
   /** Whether each clock label stands clear of the chip, which hides those it would overlap. */
   const clockClear = createMemo(() => {
-    const times = tickTimes();
+    const times = labelTimes();
     const cursor = cursorX();
-    const first = times[0];
-    if (cursor === null || first === undefined) return times.map(() => true);
-    // The labels of one step are as long as each other, in the chip's characters.
-    const halfPx = (clockLabel(first, step()).length * chipTextWidth()) / CHIP_CHARS / 2;
+    if (cursor === null) return times.map(() => true);
     const left = chipLeft(cursor);
-    return clearOf(times.map(x), left, left + chipWidth(), halfPx);
+    return clearOf(times.map(x), left, left + chipWidth(), labelHalf());
   });
 
   const reorder = trackReorder(movePlotLane);
@@ -193,7 +199,7 @@ export function History(props: { track: Track }) {
         </div>
         <div class={s.axis}>
           <div ref={setLabels} class={s.labels}>
-            <For each={tickTimes()}>
+            <For each={labelTimes()}>
               {(t, i) => (
                 <Show when={clockClear()[i()]}>
                   <span class={s.label} style={{ left: `${x(t)}px` }}>
