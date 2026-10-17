@@ -195,7 +195,7 @@ describe('pfdReadouts speed', () => {
     const out = pfdReadouts(t, NOW);
 
     // Assert
-    expect(out).toEqual({ ias: 262, mach: '.790' });
+    expect(out).toEqual({ ias: 262, mach: '.790', roll: undefined });
   });
 
   it('blanks the speed and the Mach when stale, never reported or lost', () => {
@@ -211,7 +211,25 @@ describe('pfdReadouts speed', () => {
     const out = targets.map((t) => pfdReadouts(t, NOW));
 
     // Assert
-    const blank = { ias: undefined, mach: '' };
+    const blank = { ias: undefined, mach: '', roll: undefined };
     expect(out).toEqual([blank, blank, blank]);
+  });
+});
+
+describe('pfdReadouts roll', () => {
+  it('reads the roll while it holds, none when stale, never reported or lost', () => {
+    // Arrange
+    const targets = [
+      makeSample(NOW, { roll: -12, heard: { roll: FRESH } }),
+      makeSample(NOW, { roll: -12, heard: { roll: STALE } }),
+      makeSample(NOW, { heard: {} }),
+      makeSample(NOW, { roll: -12, heard: { roll: FRESH }, seen: INSTRUMENT_SEC }),
+    ];
+
+    // Act
+    const out = targets.map((t) => pfdReadouts(t, NOW).roll);
+
+    // Assert
+    expect(out).toEqual([-12, undefined, undefined, undefined]);
   });
 });

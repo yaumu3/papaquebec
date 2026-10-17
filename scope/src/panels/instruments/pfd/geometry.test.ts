@@ -3,6 +3,9 @@ import { describe, expect, it } from 'bun:test';
 import {
   altitudeStripPath,
   apY,
+  attitude,
+  bankIndexPath,
+  bankScalePath,
   fmaBandPath,
   fmaColumnX,
   fmaRulesPath,
@@ -13,6 +16,7 @@ import {
   speedStripPath,
   speedTape,
   tapeY,
+  windowRect,
 } from './geometry';
 
 describe('pfdGeometry', () => {
@@ -241,5 +245,102 @@ describe('speedReadout', () => {
 
     // Assert
     expect(out).toEqual({ midX: 31, hiX: 28, drum: { x: 29, y: 106, w: 10, h: 34 }, drumTop: -10 });
+  });
+});
+
+describe('attitude horizon', () => {
+  it('passes through the centre, cutting the window at its edges for ±60° and 0° of roll', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+    const rolls = [60, -60, 0];
+
+    // Act
+    const out = rolls.map((roll) => attitude(g, roll).horizon);
+
+    // Assert
+    expect(out).toEqual([
+      'M196.0 52.0L114.0 194.0',
+      'M114.0 52.0L196.0 194.0',
+      'M242.0 123.0L68.0 123.0',
+    ]);
+  });
+
+  it('fills the sky above the horizon and the ground below it at level flight', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = attitude(g, 0);
+
+    // Assert
+    expect(out.sky).toBe('M68.0 52.0L242.0 52.0L242.0 123.0L68.0 123.0Z');
+    expect(out.ground).toBe('M242.0 123.0L242.0 194.0L68.0 194.0L68.0 123.0Z');
+  });
+});
+
+describe('attitude ladder', () => {
+  it('drops the rungs that would leave the window, and numbers those at 10° at both ends', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = attitude(g, 0);
+
+    // Assert
+    expect((out.ladder.match(/M/g) ?? []).length).toBe(11);
+    expect(out.labels.map((l) => l.text)).toEqual(['10', '10', '10', '10']);
+  });
+});
+
+describe('attitude pointer', () => {
+  it('is a triangle at the top of the scale for level flight', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = attitude(g, 0).pointer;
+
+    // Assert
+    expect(out).toBe('M155.0 66.0L150.9 76.2L159.1 76.2Z');
+  });
+});
+
+describe('bankScalePath', () => {
+  it('ticks ±10, 20, 30, 45 and 60°, longer at 30° and 60°', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = bankScalePath(g);
+
+    // Assert
+    expect((out.match(/M/g) ?? []).length).toBe(10);
+    expect(out.startsWith('M103.9 93.5L94.4 88.0')).toBe(true);
+  });
+});
+
+describe('bankIndexPath', () => {
+  it('is a triangle at the top of the scale', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = bankIndexPath(g);
+
+    // Assert
+    expect(out).toBe('M155.0 64.0l-6 -9h12Z');
+  });
+});
+
+describe('windowRect', () => {
+  it('is the attitude window with its rounded corners', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = windowRect(g);
+
+    // Assert
+    expect(out).toEqual({ x: 68, y: 52, width: 174, height: 142, rx: 12 });
   });
 });

@@ -107,3 +107,35 @@
   transform: translate(-50%, -50%);
   white-space: nowrap;
 }
+.sky {
+  fill: var(--pfd-sky);
+}
+.ground {
+  fill: var(--pfd-ground);
+}
+.ladder {
+  stroke: var(--text);
+  stroke-width: 1.3;
+}
+.horizon {
+  stroke: var(--text);
+  stroke-width: 1.6;
+}
+.bank {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+.index {
+  fill: var(--text);
+}
+.pointer {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
+.rungLabel {
+  position: absolute;
+  color: var(--text);
+  font-size: var(--text-xs);
+  font-style: italic;
+  line-height: 1;
+}

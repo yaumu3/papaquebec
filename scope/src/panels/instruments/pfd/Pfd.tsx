@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Index, Show } from 'solid-js';
+import { createMemo, createSignal, createUniqueId, For, Index, Show } from 'solid-js';
 
 import { cx } from '../../../design/cx';
 import type { Track } from '../../../state/track';
@@ -8,6 +8,9 @@ import { isLost } from '../freshness';
 import {
   altitudeStripPath,
   apY,
+  attitude,
+  bankIndexPath,
+  bankScalePath,
   FMA_CENTRE_Y,
   fmaBandPath,
   fmaColumnX,
@@ -18,6 +21,7 @@ import {
   speedReadout,
   speedStripPath,
   speedTape,
+  windowRect,
 } from './geometry';
 import { pfdFma, pfdReadouts } from './readout';
 
@@ -40,6 +44,15 @@ function Mode(props: { text: string | undefined; x: number; boxed: boolean }) {
   );
 }
 
+/** The flag of a value that does not hold, centred on (x, y). */
+function Flag(props: { text: string; x: number; y: number }) {
+  return (
+    <span class={cx(flags.flag, s.flag)} style={{ left: `${props.x}px`, top: `${props.y}px` }}>
+      {props.text}
+    </span>
+  );
+}
+
 /** The primary flight display of a target: its modes, speed, attitude, altitude and vertical speed. */
 export function Pfd(props: { t: Track }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
@@ -52,6 +65,11 @@ export function Pfd(props: { t: Track }) {
     return ias === undefined ? undefined : { tape: speedTape(g(), ias), digits: speedDigits(ias) };
   });
   const speedAt = createMemo(() => speedReadout(g()));
+  const windowClip = createUniqueId();
+  const attitudeNow = createMemo(() => {
+    const roll = readouts().roll;
+    return roll === undefined ? undefined : { roll, ...attitude(g(), roll) };
+  });
   const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
   return (
     <div
@@ -64,14 +82,25 @@ export function Pfd(props: { t: Track }) {
         <svg class={s.svg} aria-hidden="true">
           <path class={s.strip} d={speedStripPath(g())} />
           <path class={s.strip} d={altitudeStripPath(g())} />
-          <rect
-            class={s.window}
-            x={g().wx}
-            y={g().wy}
-            width={g().wxr - g().wx}
-            height={g().wyb - g().wy}
-            rx="12"
-          />
+          <defs>
+            <clipPath id={windowClip}>
+              <rect {...windowRect(g())} />
+            </clipPath>
+          </defs>
+          <rect class={s.window} {...windowRect(g())} />
+          <Show when={attitudeNow()}>
+            {(a) => (
+              <g clip-path={`url(#${windowClip})`}>
+                <path class={s.sky} d={a().sky} />
+                <path class={s.ground} d={a().ground} />
+                <path class={s.ladder} d={a().ladder} />
+                <path class={s.horizon} d={a().horizon} />
+                <path class={s.bank} d={bankScalePath(g())} />
+                <path class={s.index} d={bankIndexPath(g())} />
+                <path class={s.pointer} d={a().pointer} />
+              </g>
+            )}
+          </Show>
           <Show when={speed()}>
             {(v) => (
               <>
@@ -83,6 +112,24 @@ export function Pfd(props: { t: Track }) {
           <path class={s.fma} d={fmaBandPath(g())} />
           <path class={s.rules} d={fmaRulesPath(g())} />
         </svg>
+        <Show when={attitudeNow()} fallback={<Flag text="ATT" x={g().acx} y={g().yc} />}>
+          {(a) => (
+            <Index each={a().labels}>
+              {(l) => (
+                <div
+                  class={s.rungLabel}
+                  style={{
+                    left: `${l().x}px`,
+                    top: `${l().y}px`,
+                    transform: `translate(-50%, -50%) rotate(${-a().roll}deg)`,
+                  }}
+                >
+                  {l().text}
+                </div>
+              )}
+            </Index>
+          )}
+        </Show>
         <Show when={speed()}>
           {(v) => (
             <>
@@ -113,12 +160,7 @@ export function Pfd(props: { t: Track }) {
           )}
         </Show>
         <Show when={speed() === undefined}>
-          <span
-            class={cx(flags.flag, s.flag)}
-            style={{ left: `${speedAt().midX}px`, top: `${g().yc}px` }}
-          >
-            SPD
-          </span>
+          <Flag text="SPD" x={speedAt().midX} y={g().yc} />
         </Show>
         <div class={s.mach} style={{ left: `${speedAt().midX}px`, top: `${g().footY}px` }}>
           {readouts().mach}

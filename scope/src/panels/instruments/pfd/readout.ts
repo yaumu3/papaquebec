@@ -82,15 +82,18 @@ export interface PfdReadouts {
   ias: number | undefined;
   /** The Mach as the tape's foot prints it; empty when it does not hold. */
   mach: string;
+  /** The roll in degrees, positive to the right; undefined for the ATT flag. */
+  roll: number | undefined;
 }
 
 const machText = (mach: number): string => mach.toFixed(3).replace(/^0/, '');
 
 /** The values of the instrument, each while its keys hold and the target is not lost. */
 export function pfdReadouts(t: Readout, now: number): PfdReadouts {
-  const live = (key: 'ias' | 'mach') => !isLost(t) && holdsAll(t, [key], now);
+  const live = (key: 'ias' | 'mach' | 'roll') => !isLost(t) && holdsAll(t, [key], now);
   return {
     ias: live('ias') && t.ias !== undefined ? Math.round(t.ias) : undefined,
     mach: live('mach') && t.mach !== undefined ? machText(t.mach) : '',
+    roll: live('roll') ? t.roll : undefined,
   };
 }
