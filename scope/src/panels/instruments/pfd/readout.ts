@@ -1,5 +1,5 @@
 import type { HeardKey } from '../../../lib/aircraft';
-import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
+import { type Altimeter, crewAltitudeFt, selectedFt } from '../../../lib/altitude';
 import { turn } from '../../../lib/geo';
 import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
@@ -96,6 +96,9 @@ export interface PfdReadouts {
   /** The flight path vector's angles; undefined while it is not shown. */
   fpv: Fpv | undefined;
   altitude: PfdAltitude;
+  /** The selected altitude and the FMS one in feet; the latter hidden when it is the former. */
+  selAlt: number | undefined;
+  fmsAlt: number | undefined;
 }
 
 const machText = (mach: number): string => mach.toFixed(3).replace(/^0/, '');
@@ -140,14 +143,30 @@ function altitudeOf(t: Readout, now: number, altimeter: Altimeter): PfdAltitude 
   return ft === undefined ? { kind: 'flag' } : { kind: 'feet', ft };
 }
 
+/** A reading of the target while it holds and the target is not lost. */
+const liveValue = (
+  t: Readout,
+  key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt',
+  now: number,
+): number | undefined => (!isLost(t) && holdsAll(t, [key], now) ? t[key] : undefined);
+
+const asSet = (ft: number | undefined): number | undefined =>
+  ft === undefined ? undefined : selectedFt(ft);
+
 /** The values of the instrument, each while its keys hold and the target is not lost. */
 export function pfdReadouts(t: Readout, now: number, altimeter: Altimeter): PfdReadouts {
-  const live = (key: 'ias' | 'mach' | 'roll') => !isLost(t) && holdsAll(t, [key], now);
+  const ias = liveValue(t, 'ias', now);
+  const mach = liveValue(t, 'mach', now);
+  const roll = liveValue(t, 'roll', now);
+  const selAlt = asSet(liveValue(t, 'selAlt', now));
+  const fmsAlt = asSet(liveValue(t, 'fmsAlt', now));
   return {
-    ias: live('ias') && t.ias !== undefined ? Math.round(t.ias) : undefined,
-    mach: live('mach') && t.mach !== undefined ? machText(t.mach) : '',
-    roll: live('roll') ? t.roll : undefined,
+    ias: ias === undefined ? undefined : Math.round(ias),
+    mach: mach === undefined ? '' : machText(mach),
+    roll,
     fpv: fpvOf(t, now),
     altitude: altitudeOf(t, now, altimeter),
+    selAlt,
+    fmsAlt: fmsAlt === selAlt ? undefined : fmsAlt,
   };
 }

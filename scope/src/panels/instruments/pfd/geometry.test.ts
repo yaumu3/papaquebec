@@ -11,11 +11,15 @@ import {
   bankIndexPath,
   bankScalePath,
   fpvAt,
+  fmsLinePath,
   fpvPath,
   fmaBandPath,
   fmaColumnX,
   fmaRulesPath,
   pfdGeometry,
+  selBugPath,
+  selClipRect,
+  selDigits,
   speedBoxPath,
   speedDigits,
   speedReadout,
@@ -505,5 +509,78 @@ describe('altitudeReadout', () => {
       drum: { x: 303, y: 106, w: 17, h: 34 },
       drumTop: -8.5,
     });
+  });
+});
+
+describe('selDigits', () => {
+  it('splits the selected altitude into thousands and three digits', () => {
+    // Arrange
+    const selected = [32000, 4500];
+
+    // Act
+    const out = selected.map(selDigits);
+
+    // Assert
+    expect(out).toEqual([
+      { hi: '32', lo: '000' },
+      { hi: '4', lo: '500' },
+    ]);
+  });
+});
+
+describe('selBugPath', () => {
+  it('straddles the tape edge, centred on the readout on capture', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = selBugPath(g, 29600, 29600);
+
+    // Assert
+    expect(out).toBe('M249.0 103.0H275.0V143.0H249.0V129.0L255.0 123.0L249.0 117.0Z');
+  });
+
+  it('parks at the end of the tape, its centre on that end, when off the scale', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+    const cases = [
+      [29600, 32000],
+      [18000, 14000],
+    ] as const;
+
+    // Act
+    const out = cases.map(([ft, sel]) => selBugPath(g, ft, sel));
+
+    // Assert
+    expect(out).toEqual([
+      'M249.0 16.0H275.0V56.0H249.0V42.0L255.0 36.0L249.0 30.0Z',
+      'M249.0 190.0H275.0V230.0H249.0V216.0L255.0 210.0L249.0 204.0Z',
+    ]);
+  });
+});
+
+describe('selClipRect', () => {
+  it('clips the bug to the tape rows, the bug itself standing beyond the edge', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = selClipRect(g);
+
+    // Assert
+    expect(out).toEqual({ x: 246, y: 36, width: 74, height: 174 });
+  });
+});
+
+describe('fmsLinePath', () => {
+  it('crosses the tape at the altitude when in view, and is none when out of it', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = [fmsLinePath(g, 29600, 29900), fmsLinePath(g, 29600, 32000)];
+
+    // Assert
+    expect(out).toEqual(['M258.0 65.0H316.0', undefined]);
   });
 });

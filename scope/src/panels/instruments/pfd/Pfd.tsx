@@ -19,10 +19,14 @@ import {
   FMA_CENTRE_Y,
   fmaBandPath,
   fmaColumnX,
+  fmaRulesPath,
+  fmsLinePath,
   fpvAt,
   fpvPath,
-  fmaRulesPath,
   pfdGeometry,
+  selBugPath,
+  selClipRect,
+  selDigits,
   speedBoxPath,
   speedDigits,
   speedReadout,
@@ -51,6 +55,9 @@ function Mode(props: { text: string | undefined; x: number; boxed: boolean }) {
   );
 }
 
+/** A value in a box, so that a zero still tests as set. */
+const boxed = (ft: number | undefined) => (ft === undefined ? undefined : { ft });
+
 /** The flag of a value that does not hold, centred on (x, y). */
 function Flag(props: { text: string; x: number; y: number }) {
   return (
@@ -73,6 +80,7 @@ export function Pfd(props: { t: Track }) {
   });
   const speedAt = createMemo(() => speedReadout(g()));
   const windowClip = createUniqueId();
+  const bugClip = createUniqueId();
   const attitudeNow = createMemo(() => {
     const roll = readouts().roll;
     return roll === undefined ? undefined : { roll, ...attitude(g(), roll) };
@@ -86,8 +94,10 @@ export function Pfd(props: { t: Track }) {
   const altitude = createMemo(() => {
     const read = readouts().altitude;
     if (read.kind !== 'feet') return undefined;
-    return { tape: altitudeTape(g(), read.ft), digits: altitudeDigits(read.ft) };
+    return { ft: read.ft, tape: altitudeTape(g(), read.ft), digits: altitudeDigits(read.ft) };
   });
+  const selSet = createMemo(() => boxed(readouts().selAlt));
+  const fmsSet = createMemo(() => boxed(readouts().fmsAlt));
   const altitudeAt = createMemo(() => altitudeReadout(g()));
   const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
   return (
@@ -102,6 +112,9 @@ export function Pfd(props: { t: Track }) {
           <path class={s.strip} d={speedStripPath(g())} />
           <path class={s.strip} d={altitudeStripPath(g())} />
           <defs>
+            <clipPath id={bugClip}>
+              <rect {...selClipRect(g())} />
+            </clipPath>
             <clipPath id={windowClip}>
               <rect {...windowRect(g())} />
             </clipPath>
@@ -141,6 +154,22 @@ export function Pfd(props: { t: Track }) {
               <>
                 <path class={s.ticks} d={v().tape.ticks} />
                 <path class={s.bars} d={v().tape.bars} />
+                <Show when={fmsSet()}>
+                  {(fms) => (
+                    <Show when={fmsLinePath(g(), v().ft, fms().ft)}>
+                      {(d) => <path class={s.fms} d={d()} />}
+                    </Show>
+                  )}
+                </Show>
+                <Show when={selSet()}>
+                  {(sel) => (
+                    <path
+                      class={s.bug}
+                      clip-path={`url(#${bugClip})`}
+                      d={selBugPath(g(), v().ft, sel().ft)}
+                    />
+                  )}
+                </Show>
               </>
             )}
           </Show>
@@ -238,6 +267,14 @@ export function Pfd(props: { t: Track }) {
                 </div>
               </div>
             </>
+          )}
+        </Show>
+        <Show when={selSet()}>
+          {(sel) => (
+            <div class={s.sel} style={{ left: `${altitudeAt().tapeX}px`, top: `${g().selY}px` }}>
+              <span class={s.thousands}>{selDigits(sel().ft).hi}</span>
+              <span class={s.hundreds}>{selDigits(sel().ft).lo}</span>
+            </div>
           )}
         </Show>
         <Show when={readouts().altitude.kind === 'ground'}>

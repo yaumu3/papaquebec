@@ -549,3 +549,50 @@ export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
     drumTop: READOUT_HALF_HEIGHT_PX - 1 - ALTITUDE_DRUM_LINE_PX / 2 - ALTITUDE_DRUM_LINE_PX,
   };
 }
+
+/** The digits of a selected altitude: its thousands and its last three digits. */
+export function selDigits(sel: number): { hi: string; lo: string } {
+  return {
+    hi: String(Math.floor(sel / ALTITUDE_THOUSAND_FT)),
+    lo: String(sel % ALTITUDE_THOUSAND_FT).padStart(3, '0'),
+  };
+}
+
+const BUG_OUT_PX = 9;
+const BUG_IN_PX = 17;
+const BUG_HALF_HEIGHT_PX = 20;
+const BUG_NOTCH_PX = 6;
+
+/**
+ * The selected-altitude bug: it straddles the tape's left edge, taller than the readout, with a
+ * notch facing out. Off the scale it parks with its centre on the tape's end.
+ */
+export function selBugPath(g: PfdGeometry, ft: number, sel: number): string {
+  const y = clamp(tapeY(g, sel, ft, ALTITUDE_SPAN_FT), g.yTop, g.yBot);
+  const left = g.aL - BUG_OUT_PX;
+  const right = g.aL + BUG_IN_PX;
+  const half = BUG_HALF_HEIGHT_PX;
+  return (
+    `M${fixed(left)} ${fixed(y - half)}H${fixed(right)}V${fixed(y + half)}H${fixed(left)}` +
+    `V${fixed(y + BUG_NOTCH_PX)}L${fixed(left + BUG_NOTCH_PX)} ${fixed(y)}` +
+    `L${fixed(left)} ${fixed(y - BUG_NOTCH_PX)}Z`
+  );
+}
+
+const BUG_CLIP_LEFT_PX = 12;
+const BUG_CLIP_RIGHT_PX = 4;
+
+/** The rectangle the bug is clipped to: the tape's rows, and its width with the bug's overhang. */
+export const selClipRect = (g: PfdGeometry) => ({
+  x: g.aL - BUG_CLIP_LEFT_PX,
+  y: g.yTop,
+  width: g.aR - g.aL + BUG_CLIP_LEFT_PX + BUG_CLIP_RIGHT_PX,
+  height: g.yBot - g.yTop,
+});
+
+/** The dotted line across the tape at the FMS altitude; none when it is off the tape. */
+export function fmsLinePath(g: PfdGeometry, ft: number, fms: number): string | undefined {
+  const y = tapeY(g, fms, ft, ALTITUDE_SPAN_FT);
+  if (y < g.yTop || y > g.yBot) return undefined;
+  return `M${fixed(g.aL)} ${fixed(y)}H${fixed(g.aR)}`;
+}

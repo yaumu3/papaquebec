@@ -22,6 +22,11 @@ const targetOf = (first: Sample, ...rest: Sample[]) => ({
   samples: [first, ...rest],
 });
 
+const selectedOf = (t: Sample) => {
+  const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER);
+  return [out.selAlt, out.fmsAlt];
+};
+
 const altitudeOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).altitude;
 
 /** A sample at `t` reporting these modes, heard at `t`. */
@@ -210,6 +215,8 @@ describe('pfdReadouts speed', () => {
       roll: undefined,
       fpv: undefined,
       altitude: { kind: 'flag' },
+      selAlt: undefined,
+      fmsAlt: undefined,
     });
   });
 
@@ -232,6 +239,8 @@ describe('pfdReadouts speed', () => {
       roll: undefined,
       fpv: undefined,
       altitude: { kind: 'flag' },
+      selAlt: undefined,
+      fmsAlt: undefined,
     };
     expect(out).toEqual([blank, blank, blank]);
   });
@@ -357,6 +366,90 @@ describe('pfdReadouts altitude', () => {
       { kind: 'feet', ft: crew },
       { kind: 'feet', ft: crew },
       { kind: 'feet', ft: 37000 },
+    ]);
+  });
+});
+
+describe('pfdReadouts selected altitudes', () => {
+  it('reads the selected and the FMS altitude while they hold', () => {
+    // Arrange
+    const t = makeSample(NOW, {
+      selAlt: 32000,
+      fmsAlt: 34000,
+      heard: { selAlt: FRESH, fmsAlt: FRESH },
+    });
+
+    // Act
+    const out = selectedOf(t);
+
+    // Assert
+    expect(out).toEqual([32000, 34000]);
+  });
+
+  it('reads both as the crew set them, in steps of 100 ft', () => {
+    // Arrange
+    const t = makeSample(NOW, {
+      selAlt: 14016,
+      fmsAlt: 13984,
+      heard: { selAlt: FRESH, fmsAlt: FRESH },
+    });
+
+    // Act
+    const out = selectedOf(t);
+
+    // Assert
+    expect(out).toEqual([14000, undefined]);
+  });
+
+  it('shows a selected altitude of zero', () => {
+    // Arrange
+    const t = makeSample(NOW, { selAlt: 0, heard: { selAlt: FRESH } });
+
+    // Act
+    const out = selectedOf(t);
+
+    // Assert
+    expect(out).toEqual([0, undefined]);
+  });
+
+  it('hides the FMS altitude when it equals the selected one', () => {
+    // Arrange
+    const t = makeSample(NOW, {
+      selAlt: 32000,
+      fmsAlt: 32000,
+      heard: { selAlt: FRESH, fmsAlt: FRESH },
+    });
+
+    // Act
+    const out = selectedOf(t);
+
+    // Assert
+    expect(out).toEqual([32000, undefined]);
+  });
+
+  it('blanks each when stale, never reported, and both when lost', () => {
+    // Arrange
+    const reported = { selAlt: 32000, fmsAlt: 34000 };
+    const targets = [
+      makeSample(NOW, { ...reported, heard: { selAlt: STALE, fmsAlt: FRESH } }),
+      makeSample(NOW, { ...reported, heard: { selAlt: FRESH, fmsAlt: STALE } }),
+      makeSample(NOW, { heard: {} }),
+      makeSample(NOW, {
+        ...reported,
+        heard: { selAlt: FRESH, fmsAlt: FRESH },
+        seen: INSTRUMENT_SEC,
+      }),
+    ];
+
+    // Act
+    const out = targets.map(selectedOf);
+
+    // Assert
+    expect(out).toEqual([
+      [undefined, 34000],
+      [32000, undefined],
+      [undefined, undefined],
+      [undefined, undefined],
     ]);
   });
 });

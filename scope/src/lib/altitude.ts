@@ -92,3 +92,10 @@ export function formatAltitude(alt: number | 'ground' | undefined, a: Altimeter)
   if (level === 'ground') return 'GND';
   return String(Math.max(0, level)).padStart(3, '0');
 }
+
+/**
+ * A selected altitude as the crew set it: to the nearest 100 ft, the step an MCP or FCU selects in,
+ * which the 32 ft step of RTCA DO-260B's Target State and Status message and the 16 ft step of
+ * Comm-B register 4,0 only approximate.
+ */
+export const selectedFt = (ft: number): number => Math.round(ft / 100) * 100;
