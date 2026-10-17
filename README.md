@@ -188,9 +188,10 @@ Conventions:
 - **Emergency** is additive: red plus a two-letter tag (`HJ` `RF` `EM`), never hidden by filters.
   - It comes from the squawk (7500, 7600, 7700) or, while it keeps arriving, from the ADS-B
     status: general, no communications, unlawful interference or downed.
-  - Lifeguard and minimum fuel are a priority, not an emergency: no red, filtered like any target.
-  - An active resolution advisory tags the block `RA` in the same red, and an ident `ID` in the
-    block's own tone; the tags share one line in that order.
+  - Lifeguard and minimum fuel are a priority, not an emergency: an amber `MED` or `FUEL` tag, no
+    red, filtered like any target.
+  - An active resolution advisory tags the block `RA` in the same red, and an ident `ID` in white;
+    the tags share one line: emergency, advisory, priority, ident.
   - The detail panel badges them beside the callsign, the advisory in the words TCAS says it in.
 - **Data blocks** put the callsign over the altitude with climb arrow and, flipping every eight
   seconds in step across all blocks, the type or ground speed with wake letter.

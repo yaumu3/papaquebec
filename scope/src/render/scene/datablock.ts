@@ -1,7 +1,14 @@
 import { type Altimeter, formatAltitude, holdsSelected, uncorrected } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { blockHeight, DB_FONT_PX, DB_LINE, DB_WIDTH, leader, leaderTip } from '../../lib/datablock';
-import { climbArrow, emergencyCode, formatGsWake, padBearing } from '../../lib/format';
+import {
+  climbArrow,
+  emergencyCode,
+  formatGsWake,
+  padBearing,
+  type Priority,
+  statusTags,
+} from '../../lib/format';
 import type { Track } from '../../state/track';
 import type { Anchor, LineBatch, TextBatch } from './pack';
 import { THEME, trackLabel, typeLabel } from './rules';
@@ -10,9 +17,9 @@ const DATA_BLOCK_PERIOD_SEC = 8;
 
 /**
  * The tone of a stretch of block text: the block's own, the dimmed one of downlinked intent,
- * an alert, or the white of the ident.
+ * an alert, the amber of a priority, or the white of the ident.
  */
-export type Tone = 'plain' | 'intent' | 'alert' | 'ident';
+export type Tone = 'plain' | 'intent' | 'alert' | 'caution' | 'ident';
 
 /** A stretch of block text in one tone. */
 export interface Run {
@@ -21,7 +28,7 @@ export interface Run {
 }
 
 export interface DataBlock {
-  /** The line above the identity: the emergency, an advisory and the ident, when any. */
+  /** The line above the identity: the emergency, an advisory, a priority and the ident, when any. */
   tags: Run[];
   line1: string;
   line2: Run[];
@@ -32,17 +39,23 @@ export interface DataBlock {
 const plain = (text: string): Run => ({ text, tone: 'plain' });
 const intent = (text: string): Run => ({ text, tone: 'intent' });
 const alert = (text: string): Run => ({ text, tone: 'alert' });
+const caution = (text: string): Run => ({ text, tone: 'caution' });
 const ident = (text: string): Run => ({ text, tone: 'ident' });
 
+/** The word a block tags each priority with. */
+const PRIORITY_TAGS: Record<Priority, string> = { minfuel: 'FUEL', lifeguard: 'MED' };
+
 /**
- * The tags above the block in order of precedence: the emergency, then an active advisory,
- * then the ident; alerts but the last, which reads in white.
+ * The tags above the block in order of precedence: the emergency, then an active advisory, both
+ * alerts, then a priority in amber, then the ident in white.
  */
 function tagsOf(t: Track): Run[] {
   const code = emergencyCode(t.squawk, t.emergency);
+  const { priority } = statusTags(t.squawk, t.emergency);
   const tags = [
     ...(code ? [alert(code)] : []),
     ...(t.ra && !t.ra.terminated ? [alert('RA')] : []),
+    ...(priority ? [caution(PRIORITY_TAGS[priority])] : []),
     ...(t.ident ? [ident('ID')] : []),
   ];
   return tags.flatMap((tag, i) => (i === 0 ? [tag] : [plain(' '), tag]));
@@ -166,6 +179,7 @@ export function drawDataBlock(
     plain: color,
     intent: dim(color, INTENT_TONE),
     alert: THEME.emergency,
+    caution: THEME.caution,
     ident: THEME.ident,
   };
   const top = block.tags.length > 0 ? 1 : 0;

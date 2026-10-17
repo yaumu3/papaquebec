@@ -12,6 +12,7 @@
   --color-emergency: #d04040;
 
   /* Chrome */
+  --color-caution: #e8b848;
   --panel-bg: #161616;
   --panel-glass: color-mix(in srgb, var(--panel-bg) 86%, transparent);
   --panel-border: #4a4a47;

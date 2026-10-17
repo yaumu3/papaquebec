@@ -9,4 +9,5 @@ export const PALETTE = {
   selected: '#ffffff',
   selbox: '#ff9040',
   emergency: '#d04040',
+  caution: '#e8b848',
 } as const;
