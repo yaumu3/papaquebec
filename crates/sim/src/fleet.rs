@@ -115,6 +115,8 @@ struct Plan {
     callsign: bool,
     category: EmitterCategory,
     squawk: u32,
+    /// The emergency/priority status it broadcasts, when not the one its squawk goes with.
+    status: Option<EmergencyPriorityStatus>,
     /// Offset from the site in NM, x east and y north.
     x: f64,
     y: f64,
@@ -211,6 +213,10 @@ fn fleet() -> Vec<Plan> {
             ..plan(10, true, large, 0o2201, (0.6, -0.4), 0.0, 18.0, 340.0, 0.0, "A321") },
         Plan { ground: true,
             ..plan(11, true, heavy, 0o3112, (-0.5, 0.3), 0.0, 6.0, 160.0, 0.0, "B773") },
+        Plan { status: Some(EmergencyPriorityStatus::MinimumFuel),
+            ..plan(12, true, large, 0o2253, (-22.0, -18.0), 12_000.0, 280.0, 300.0, 1500.0, "A320") },
+        Plan { status: Some(EmergencyPriorityStatus::GeneralEmergency),
+            ..plan(13, true, large, 0o3305, (24.0, -12.0), 6000.0, 230.0, 320.0, -900.0, "B738") },
     ]
 }
 
@@ -478,7 +484,7 @@ impl Flying {
         }
         if second.is_multiple_of(5) {
             let status = Status {
-                emergency_priority_status: emergency(plan.squawk),
+                emergency_priority_status: plan.status.unwrap_or_else(|| emergency(plan.squawk)),
                 mode_a_code: Some(plan.squawk),
             };
             fields.push(status.write());
@@ -829,7 +835,7 @@ mod tests {
 
         // Assert
         let reserved = 0x00d0_0000..=0x00df_ffff;
-        assert_eq!(registered.len(), 11 + 50);
+        assert_eq!(registered.len(), 13 + 50);
         assert!(
             registered
                 .iter()

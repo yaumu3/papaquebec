@@ -110,7 +110,7 @@ fn every_aircraft_is_heard_and_placed_near_the_site() {
         a.reception.is_some_and(|r| r.heard_ms == snapshot.now_ms)
             && a.position.is_some_and(|p| p.heard_ms == snapshot.now_ms)
     };
-    assert_eq!(snapshot.aircraft.len(), 11);
+    assert_eq!(snapshot.aircraft.len(), 13);
     assert!(snapshot.aircraft.iter().all(near));
     assert!(snapshot.aircraft.iter().all(timed));
 }
@@ -159,7 +159,7 @@ fn fleet_exercises_every_glyph_and_color() {
     assert_eq!(count(&|a| a.selected_altitude_mcp_ft.is_some()), 5);
     let qualified =
         |a: &Aircraft| a.position.is_some_and(|p| p.nic == 8) && reported(a.nac_p) == Some(9);
-    assert_eq!(count(&qualified), 11);
+    assert_eq!(count(&qualified), 13);
 }
 
 #[test]
@@ -181,6 +181,32 @@ fn emergency_is_on_a_target_without_a_callsign() {
     assert_eq!(
         emergencies[0].emergency.map(|e| e.status()),
         Some(EmergencyPriorityStatus::GeneralEmergency)
+    );
+}
+
+#[test]
+fn a_status_of_its_own_is_broadcast_with_an_ordinary_squawk() {
+    // Arrange
+    let mut heard = Heard::new(0);
+
+    // Act
+    let snapshot = heard.placed();
+
+    // Assert
+    let declared = [12, 13].map(|number| {
+        let aircraft = numbered(&snapshot, number);
+        let squawk = reported(aircraft.mode_a_code);
+        (squawk, aircraft.emergency.map(|e| e.status()))
+    });
+    assert_eq!(
+        declared,
+        [
+            (Some(0o2253), Some(EmergencyPriorityStatus::MinimumFuel)),
+            (
+                Some(0o3305),
+                Some(EmergencyPriorityStatus::GeneralEmergency)
+            ),
+        ]
     );
 }
 
@@ -216,7 +242,7 @@ fn air_data_are_heard_of_every_aircraft_in_the_air() {
     // standard temperature at the level to what the steps of the Mach
     // number and the airspeed allow
     let airborne: Vec<_> = snapshot.aircraft.iter().filter(|a| !on_ground(a)).collect();
-    assert_eq!(airborne.len(), 9);
+    assert_eq!(airborne.len(), 11);
     let speeds = |a: &&Aircraft| {
         a.true_airspeed_kt.is_some() && a.indicated_airspeed_kt.is_some() && a.mach.is_some()
     };
@@ -361,8 +387,8 @@ fn extra_traffic_is_added_within_the_bounds() {
         a.place()
             .is_some_and(|place| SITE.distance_nm(place) < 60.0)
     };
-    assert_eq!(snapshot.aircraft.len(), 11 + 500);
-    assert_eq!(addresses.len(), 11 + 500);
+    assert_eq!(snapshot.aircraft.len(), 13 + 500);
+    assert_eq!(addresses.len(), 13 + 500);
     assert!(snapshot.aircraft.iter().all(near));
 }
 
@@ -386,7 +412,7 @@ fn every_identity_is_fictional_and_registered() {
         let designator = registry.and_then(|r| r.type_designator.as_deref());
         registration.is_some_and(|r| r.starts_with("TEST-")) && designator.is_some()
     };
-    assert_eq!(callsigns.len(), 9 + 50);
+    assert_eq!(callsigns.len(), 11 + 50);
     assert!(
         callsigns
             .iter()
@@ -424,7 +450,7 @@ async fn fleet_served_to_a_connection_is_followed_into_the_feed() {
                     .iter()
                     .filter(|a| a.place().is_some())
                     .count()
-                    == 11
+                    == 13
             {
                 break snapshot;
             }
