@@ -78,8 +78,8 @@ export function Lane(props: {
   /** The sample the lane is read at, and whether it is an earlier one than the latest. */
   at: Sample | null;
   past: boolean;
-  /** The top row, the lane's handle, which keeps the focus for it. */
-  rowRef: (el: HTMLDivElement) => void;
+  /** The lane itself, which keeps the focus for it. */
+  laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
   /** Whether the lane's palette is open, and the dropdown of its name that opens it. */
   menuOpen: boolean;
@@ -159,9 +159,15 @@ export function Lane(props: {
 
   return (
     <div
+      ref={props.laneRef}
       data-lane
       class={cx(s.lane, props.slot && s.hole)}
       style={{ height: `${props.height}px`, order: props.place }}
+      tabindex="0"
+      aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
+      onKeyDown={(e) => {
+        if (e.target === e.currentTarget) onMoveKey(props.moves, e);
+      }}
     >
       <div class={s.plot}>
         <svg class={s.svg} height={props.height}>
@@ -258,15 +264,9 @@ export function Lane(props: {
         </Index>
       </div>
       <div
-        ref={props.rowRef}
         class={cx(s.top, props.swipeX !== null && s.swiping)}
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
-        tabindex="0"
-        aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
         onPointerDown={(e) => props.onGrab(e)}
-        onKeyDown={(e) => {
-          if (e.target === e.currentTarget) onMoveKey(props.moves, e);
-        }}
       >
         <button
           type="button"

@@ -160,8 +160,8 @@ export function History(props: { track: Track }) {
 
   const [bay, setBay] = createSignal<HTMLDivElement>();
   const bayBox = () => bay()?.getBoundingClientRect();
-  /** The top row of each lane, its handle, which keeps the focus for it. */
-  const rows = new Map<LaneKey, HTMLElement>();
+  /** Each lane, which keeps the focus for it. */
+  const lanes = new Map<LaneKey, HTMLElement>();
   /** The button under the lanes that opens the palette to add one. */
   let add: HTMLButtonElement | undefined;
   /** The palette open, if one is: for a lane, or with none to add one; under its anchor. */
@@ -181,11 +181,11 @@ export function History(props: { track: Track }) {
     const below = anchor.getBoundingClientRect().bottom - (bay()?.getBoundingClientRect().top ?? 0);
     setMenu({ own, anchor, top: below + PALETTE_GAP_PX });
   };
-  /** Brings a lane into view and gives its top row the focus; with none, + LANE. */
+  /** Brings a lane into view and gives it the focus; with none, + LANE. */
   const reveal = (lane: LaneKey | null) => {
-    const el = (lane && rows.get(lane)) || add;
+    const el = (lane && lanes.get(lane)) || add;
     if (!el) return;
-    (el.closest('[data-lane]') ?? el).scrollIntoView({ block: 'nearest' });
+    el.scrollIntoView({ block: 'nearest' });
     el.focus({ preventScroll: true });
   };
   const pick = (lane: LaneKey) => {
@@ -356,7 +356,7 @@ export function History(props: { track: Track }) {
             >
               <For each={plotted()}>
                 {(lane, i) => {
-                  onCleanup(() => rows.delete(lane));
+                  onCleanup(() => lanes.delete(lane));
                   return (
                     <Lane
                       lane={lane}
@@ -371,7 +371,7 @@ export function History(props: { track: Track }) {
                       at={at()}
                       past={past()}
                       menuOpen={menu()?.own === lane}
-                      rowRef={(el) => rows.set(lane, el)}
+                      laneRef={(el) => lanes.set(lane, el)}
                       moves={movesOf(lane)}
                       onMenu={(anchor) => toggleMenu(lane, anchor)}
                       onGrab={(e) => grab(e, lane)}

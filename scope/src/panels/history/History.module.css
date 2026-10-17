@@ -47,6 +47,8 @@
  * the bottom, so that the cursor runs on unbroken from the chip's notch.
  */
 .viewport {
+  /* How deep the fade at a cut edge runs. */
+  --fade: var(--space-6);
   --fade-top: 0px;
   --fade-bottom: 0px;
   --cursor-left: -1px;
@@ -71,10 +73,10 @@
   mask-composite: add;
 }
 .cutTop {
-  --fade-top: var(--space-6);
+  --fade-top: var(--fade);
 }
 .cutBottom {
-  --fade-bottom: var(--space-6);
+  --fade-bottom: var(--fade);
 }
 /*
  * Four lanes and their hairlines at the most, and + LANE under them; past them the lanes scroll,
@@ -198,6 +200,20 @@
   position: relative;
   box-sizing: content-box;
   border-bottom: 1px solid var(--plot-grid);
+  /* Scrolled to, clear of the fades. */
+  scroll-margin-block: var(--fade);
+}
+.lane:focus-visible {
+  outline: none;
+}
+/* The focus ring, round the lane and its hairline, in front of all in it; inside, as the scroll clips. */
+.lane:focus-visible::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 -1px;
+  z-index: 3;
+  border: 1px solid var(--text);
+  pointer-events: none;
 }
 .plot {
   position: absolute;
@@ -237,7 +253,7 @@
 .top {
   position: absolute;
   top: var(--space-1);
-  left: 0;
+  left: var(--space-1);
   right: 0;
   display: flex;
   align-items: center;
@@ -257,10 +273,6 @@
   .top {
     transition: none;
   }
-}
-.top:focus-visible {
-  outline: 1px solid var(--text);
-  outline-offset: 1px;
 }
 /* On the panel's ground, so that the time cursor passes behind them. */
 .top > * {
