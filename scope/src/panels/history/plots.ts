@@ -38,8 +38,8 @@ interface Logarithmic {
 
 /**
  * How a reading is drawn: a lane of its own, as a line, a pair of lines with the second dashed or
- * dotted, gantt bars, wind barbs or heading glyphs; or an intent, in its parent's lane: a line
- * with its dash on that lane's scale, or on the lane's glyphs, where the dash goes unused.
+ * dotted, gantt bars, wind barbs or heading glyphs; or an intent, in its parent's lane: a line,
+ * solid or with its dash, on that lane's scale, or on the lane's glyphs, where a dash goes unused.
  */
 export type PlotSpec =
   | ({
@@ -52,7 +52,7 @@ export type PlotSpec =
   | { kind: 'gantt'; names: (s: Sample) => readonly string[] | undefined }
   | { kind: 'barbs'; barb: (s: Sample) => Wind | undefined }
   | { kind: 'heading'; heading: (s: Sample) => Heading | undefined }
-  | { kind: 'intent'; y: Read; dash: Dash };
+  | { kind: 'intent'; y: Read; dash?: Dash };
 
 const wind = (s: Sample): Wind | undefined =>
   s.windDir === undefined || s.windSpeed === undefined
@@ -83,11 +83,11 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
     quantum: 1000,
     floor: (s) => s.alt === 'ground',
   },
-  selAlt: { kind: 'intent', y: (s) => s.selAlt, dash: 'dashed' },
+  selAlt: { kind: 'intent', y: (s) => s.selAlt },
   fmsAlt: { kind: 'intent', y: (s) => s.fmsAlt, dash: 'dotted' },
   vs: { kind: 'line', y: (s) => s.verticalRate, quantum: 500 },
   trk: { kind: 'heading', heading },
-  selHdg: { kind: 'intent', y: steeringHeading, dash: 'dashed' },
+  selHdg: { kind: 'intent', y: steeringHeading },
   gs: { kind: 'line', y: (s) => s.gs, quantum: 10 },
   qnh: { kind: 'line', y: (s) => inHg(s.navQnh), quantum: 0.01 },
   modes: { kind: 'gantt', names: (s) => s.navModes && modeNames(s.navModes) },

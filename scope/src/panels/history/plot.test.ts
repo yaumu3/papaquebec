@@ -25,7 +25,7 @@ const metres = (v: number) => Number((10 ** v).toPrecision(6));
 const flat = (v: number): Range => ({ lo: v, hi: v });
 
 describe('laneTraces', () => {
-  it('draws the lane its own reading first, then each intent plotted in it with its dash, marked as one', () => {
+  it('draws the lane its own reading first, then each intent plotted in it with its dash if any, marked as one', () => {
     // Arrange
     const samples = [heardSample(1, { alt: 11000, selAlt: 12000, fmsAlt: 13000 })];
 
@@ -36,7 +36,7 @@ describe('laneTraces', () => {
     expect(traces.map((tr) => [tr.key, tr.dash, tr.intent ?? false, tr.runs])).toEqual([
       ['alt', undefined, false, [[{ t: 1, v: 11000 }]]],
       ['fmsAlt', 'dotted', true, [[{ t: 1, v: 13000 }]]],
-      ['selAlt', 'dashed', true, [[{ t: 1, v: 12000 }]]],
+      ['selAlt', undefined, true, [[{ t: 1, v: 12000 }]]],
     ]);
   });
 
