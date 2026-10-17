@@ -32,6 +32,10 @@ import {
   speedReadout,
   speedStripPath,
   speedTape,
+  vsiDigits,
+  vsiNeedlePath,
+  vsiScale,
+  vsiStripPath,
   windowRect,
 } from './geometry';
 import { pfdFma, pfdReadouts } from './readout';
@@ -98,6 +102,13 @@ export function Pfd(props: { t: Track }) {
   });
   const selSet = createMemo(() => boxed(readouts().selAlt));
   const fmsSet = createMemo(() => boxed(readouts().fmsAlt));
+  const scale = createMemo(() => vsiScale(g()));
+  const needle = createMemo(() => {
+    const vs = readouts().vs;
+    return vs === undefined
+      ? undefined
+      : { path: vsiNeedlePath(g(), vs), digits: vsiDigits(g(), vs) };
+  });
   const altitudeAt = createMemo(() => altitudeReadout(g()));
   const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
   return (
@@ -176,6 +187,9 @@ export function Pfd(props: { t: Track }) {
           <Show when={readouts().altitude.kind !== 'flag'}>
             <path class={s.readout} d={altitudeBoxPath(g())} />
           </Show>
+          <path class={s.strip} d={vsiStripPath(g())} />
+          <path class={s.scale} d={scale().ticks} />
+          <Show when={needle()}>{(n) => <path class={s.needle} d={n().path} />}</Show>
           <path class={s.fma} d={fmaBandPath(g())} />
           <path class={s.rules} d={fmaRulesPath(g())} />
         </svg>
@@ -274,6 +288,20 @@ export function Pfd(props: { t: Track }) {
             <div class={s.sel} style={{ left: `${altitudeAt().tapeX}px`, top: `${g().selY}px` }}>
               <span class={s.thousands}>{selDigits(sel().ft).hi}</span>
               <span class={s.hundreds}>{selDigits(sel().ft).lo}</span>
+            </div>
+          )}
+        </Show>
+        <Index each={scale().labels}>
+          {(l) => (
+            <div class={s.vsiLabel} style={{ left: `${l().x}px`, top: `${l().y}px` }}>
+              {l().text}
+            </div>
+          )}
+        </Index>
+        <Show when={needle()?.digits}>
+          {(d) => (
+            <div class={s.vsiDigits} style={{ left: `${d().x}px`, top: `${d().y}px` }}>
+              {d().text}
             </div>
           )}
         </Show>

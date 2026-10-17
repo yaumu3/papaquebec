@@ -102,6 +102,8 @@ export interface PfdReadouts {
   fmsAlt: number | undefined;
   /** The crew's altimeter setting in inches of mercury; empty when it does not hold. */
   baro: string;
+  /** The vertical rate in feet per minute; undefined for no needle and no digits. */
+  vs: number | undefined;
 }
 
 const machText = (mach: number): string => mach.toFixed(3).replace(/^0/, '');
@@ -149,7 +151,7 @@ function altitudeOf(t: Readout, now: number, altimeter: Altimeter): PfdAltitude 
 /** A reading of the target while it holds and the target is not lost. */
 const liveValue = (
   t: Readout,
-  key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt' | 'navQnh',
+  key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt' | 'navQnh' | 'verticalRate',
   now: number,
 ): number | undefined => (!isLost(t) && holdsAll(t, [key], now) ? t[key] : undefined);
 
@@ -172,6 +174,7 @@ export function pfdReadouts(t: Readout, now: number, altimeter: Altimeter): PfdR
     altitude: altitudeOf(t, now, altimeter),
     selAlt,
     fmsAlt: fmsAlt === selAlt ? undefined : fmsAlt,
+    vs: liveValue(t, 'verticalRate', now),
     baro: qnh === undefined ? '' : hpaToInHg(qnh).toFixed(2),
   };
 }

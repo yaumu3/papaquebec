@@ -220,6 +220,7 @@ describe('pfdReadouts speed', () => {
       selAlt: undefined,
       fmsAlt: undefined,
       baro: '',
+      vs: undefined,
     });
   });
 
@@ -245,6 +246,7 @@ describe('pfdReadouts speed', () => {
       selAlt: undefined,
       fmsAlt: undefined,
       baro: '',
+      vs: undefined,
     };
     expect(out).toEqual([blank, blank, blank]);
   });
@@ -485,5 +487,27 @@ describe('pfdReadouts baro', () => {
 
     // Assert
     expect(out).toEqual(['', '', '']);
+  });
+});
+
+describe('pfdReadouts vertical rate', () => {
+  it('reads the vertical rate while it holds, none when stale, never reported or lost', () => {
+    // Arrange
+    const targets = [
+      makeSample(NOW, { verticalRate: -2200, heard: { verticalRate: FRESH } }),
+      makeSample(NOW, { verticalRate: -2200, heard: { verticalRate: STALE } }),
+      makeSample(NOW, { heard: {} }),
+      makeSample(NOW, {
+        verticalRate: -2200,
+        heard: { verticalRate: FRESH },
+        seen: INSTRUMENT_SEC,
+      }),
+    ];
+
+    // Act
+    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).vs);
+
+    // Assert
+    expect(out).toEqual([-2200, undefined, undefined, undefined]);
   });
 });
