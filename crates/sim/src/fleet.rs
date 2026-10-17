@@ -377,6 +377,26 @@ impl Flying {
         self.leg = 1;
     }
 
+    /// The most it can turn in `elapsed` seconds at its airspeed through the wind, degrees.
+    fn most_turn_deg(&self, elapsed: f64) -> f64 {
+        let (_, airspeed) = air::through_air(self.plan.track, self.plan.gs, WIND);
+        turn_rate_deg_per_s(airspeed) * elapsed
+    }
+
+    /// Turns its track by `turn` degrees, right positive, over `elapsed` seconds, at the rate that is.
+    fn turn_by(&mut self, turn: f64, elapsed: f64) {
+        self.plan.track = (self.plan.track + turn).rem_euclid(360.0);
+        self.turning = if elapsed > 0.0 { turn / elapsed } else { 0.0 };
+    }
+
+    /// Turns the short way toward the point as fast as its speed allows, in `elapsed` seconds.
+    fn steer_toward(&mut self, x: f64, y: f64, elapsed: f64) {
+        let wanted = bearing(self.x, self.y, x, y);
+        let off = signed_bearing(wanted - self.plan.track);
+        let most = self.most_turn_deg(elapsed);
+        self.turn_by(off.clamp(-most, most), elapsed);
+    }
+
     /// Turns toward the leg's waypoint as fast as its speed allows, flies at the speed of the
     /// one it left, and climbs or descends so as to be at its level there; past the last
     /// waypoint it starts over.
@@ -386,13 +406,7 @@ impl Flying {
         };
         self.plan.gs = route.get(self.leg - 1).map_or(target.gs, |from| from.gs);
         let to_go = (target.x - self.x).hypot(target.y - self.y);
-        let wanted = bearing(self.x, self.y, target.x, target.y);
-        let off = signed_bearing(wanted - self.plan.track);
-        let (_, airspeed) = air::through_air(self.plan.track, self.plan.gs, WIND);
-        let most = turn_rate_deg_per_s(airspeed) * elapsed;
-        let turn = off.clamp(-most, most);
-        self.plan.track = (self.plan.track + turn).rem_euclid(360.0);
-        self.turning = if elapsed > 0.0 { turn / elapsed } else { 0.0 };
+        self.steer_toward(target.x, target.y, elapsed);
         let distance = self.fly_straight(elapsed);
         let minutes = (to_go / self.plan.gs.max(1.0) * 60.0).max(elapsed / 60.0);
         self.baro_rate = ((target.alt - self.alt) / minutes).clamp(-STEEPEST_FPM, STEEPEST_FPM);
