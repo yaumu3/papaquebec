@@ -93,6 +93,26 @@ export function emergencyCode(
   return (squawk && SQUAWK_CODES[squawk]) || (emergency && STATUS_CODES[emergency]) || null;
 }
 
+/** A priority an emergency/priority status asks for that is not an emergency. */
+export type Priority = 'lifeguard' | 'minfuel';
+
+/** What a squawk and an emergency/priority status tell, each told once. */
+export interface StatusTags {
+  /** The shorthand of the emergency code the squawk is. */
+  code: EmergencyCode | null;
+  /** The emergency the status declares, unless the code already says it. */
+  status: EmergencyCode | 'DOWNED' | null;
+  priority: Priority | null;
+}
+
+export function statusTags(squawk: string | undefined, emergency: string | undefined): StatusTags {
+  const code = (squawk && SQUAWK_CODES[squawk]) || null;
+  const declared =
+    emergency === 'downed' ? 'DOWNED' : (emergency && STATUS_CODES[emergency]) || null;
+  const priority = emergency === 'lifeguard' || emergency === 'minfuel' ? emergency : null;
+  return { code, status: declared === code ? null : declared, priority };
+}
+
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /** Hours, minutes and seconds of the UTC clock, from seconds since the epoch. */
