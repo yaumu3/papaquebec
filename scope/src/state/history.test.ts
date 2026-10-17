@@ -6,32 +6,52 @@ import {
   hoverInstant,
   movePlotLane,
   plotted,
-  resetPlotted,
   setHoverInstant,
+  setPlotted,
   toggleHistory,
   togglePlot,
 } from './history';
 import { DEFAULT_PLOTTED } from './plotted';
 
 describe('history state', () => {
-  it('plots the default readings until told otherwise', () => {
+  it('starts with the default readings plotted', () => {
     // Arrange
-    resetPlotted();
+    const defaults = [...DEFAULT_PLOTTED];
 
     // Act
     const keys = plotted();
 
     // Assert
-    expect(keys).toEqual([...DEFAULT_PLOTTED]);
+    expect(keys).toEqual(defaults);
   });
 
-  it('toggles a reading, closes a lane and moves one', () => {
+  it('toggles a reading on, in a lane of its own', () => {
     // Arrange
-    resetPlotted();
+    setPlotted(DEFAULT_PLOTTED);
 
     // Act
     togglePlot('vs');
+
+    // Assert
+    expect(plotted()).toEqual([...DEFAULT_PLOTTED, 'vs']);
+  });
+
+  it('closes a lane with the intents drawn in it', () => {
+    // Arrange
+    setPlotted([...DEFAULT_PLOTTED, 'vs']);
+
+    // Act
     closePlotLane('alt');
+
+    // Assert
+    expect(plotted()).toEqual(['gs', 'vs']);
+  });
+
+  it('moves a lane to another place', () => {
+    // Arrange
+    setPlotted(['gs', 'vs']);
+
+    // Act
     movePlotLane(1, 0);
 
     // Assert

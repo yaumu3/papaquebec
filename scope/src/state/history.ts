@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
 
-import { closeLane, DEFAULT_PLOTTED, moveLane, type ReadingKey, togglePlotted } from './plotted';
+import { closeLane, moveLane, type ReadingKey, togglePlotted } from './plotted';
 import { persisted } from './settings';
 
 /** The readings the history lanes plot, in lane order; see `plotted.ts` for what that means. */
@@ -16,10 +16,6 @@ export function closePlotLane(lane: ReadingKey): void {
 
 export function movePlotLane(from: number, to: number): void {
   setPlotted((p) => moveLane(p, from, to));
-}
-
-export function resetPlotted(): void {
-  setPlotted(DEFAULT_PLOTTED);
 }
 
 /** Whether the history group is unfolded in the detail panel. */
