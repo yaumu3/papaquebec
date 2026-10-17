@@ -280,9 +280,9 @@ describe('drawDataBlock', () => {
     const g = glyphs(t, level);
 
     // Assert
-    const amber = g.map(({ rgb }) => near(rgb, [0xe8 / 255, 0xb8 / 255, 0x48 / 255]));
-    expect(amber.slice(0, 'FUEL'.length)).toEqual([true, true, true, true]);
-    expect(amber.slice('FUEL'.length).some(Boolean)).toBe(false);
+    expect(g.map(({ rgb }) => near(rgb, [0xe8 / 255, 0xb8 / 255, 0x48 / 255]))).toEqual(
+      g.map((_, i) => i < 'FUEL'.length),
+    );
   });
 
   it('ends the text at the right edge of a block west of its target', () => {

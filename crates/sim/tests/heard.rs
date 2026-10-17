@@ -193,13 +193,12 @@ fn a_status_of_its_own_is_broadcast_with_an_ordinary_squawk() {
     let snapshot = heard.placed();
 
     // Assert
-    let declared = [12, 13].map(|number| {
-        let aircraft = numbered(&snapshot, number);
-        let squawk = reported(aircraft.mode_a_code);
-        (squawk, aircraft.emergency.map(|e| e.status()))
-    });
     assert_eq!(
-        declared,
+        [12, 13].map(|number| {
+            let aircraft = numbered(&snapshot, number);
+            let status = aircraft.emergency.map(|e| e.status());
+            (reported(aircraft.mode_a_code), status)
+        }),
         [
             (Some(0o2253), Some(EmergencyPriorityStatus::MinimumFuel)),
             (

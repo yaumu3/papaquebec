@@ -243,9 +243,11 @@ describe('createTrackStore', () => {
     store.ingest(snapshot(1000, aircraft));
 
     // Assert
-    const [fresh, lapsed] = ['fresh', 'lapsed'].map((hex) => store.tracks.get(hex));
-    expect([fresh?.emergency, lapsed?.emergency]).toEqual(['general', undefined]);
-    expect(lapsed?.squawk).toBe('2253');
+    expect(['fresh', 'lapsed'].map((hex) => store.tracks.get(hex)?.emergency)).toEqual([
+      'general',
+      undefined,
+    ]);
+    expect(store.tracks.get('lapsed')?.squawk).toBe('2253');
   });
 
   it('derives the message rate from the snapshot message counter', () => {
