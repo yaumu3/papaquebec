@@ -14,6 +14,7 @@ const DEFAULTS: Persisted = {
   listSort: DEFAULT_SORT,
   plotted: ['alt', 'gs'],
   detailTab: 'now',
+  ndRangeNm: 20,
 };
 
 describe('loadPersisted', () => {
@@ -74,6 +75,7 @@ describe('savePersisted', () => {
       listSort: { key: 'alt', dir: 'desc' },
       plotted: ['trk', 'gs'],
       detailTab: 'history',
+      ndRangeNm: 80,
     };
     savePersisted(storage, state);
 
@@ -224,5 +226,20 @@ describe('loadPersisted detailTab', () => {
 
     // Assert
     expect(tabs).toEqual(['history', 'now']);
+  });
+});
+
+describe('loadPersisted ndRangeNm', () => {
+  it('keeps a range of the scale, and falls back for any other value or an old entry', () => {
+    // Arrange
+    const stores = [40, 30, '40', null, undefined].map((ndRangeNm) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ ndRangeNm }) }),
+    );
+
+    // Act
+    const ranges = stores.map((st) => loadPersisted(st, DEFAULTS).ndRangeNm);
+
+    // Assert
+    expect(ranges).toEqual([40, 20, 20, 20, 20]);
   });
 });

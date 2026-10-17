@@ -4,6 +4,7 @@ import { DEFAULT_LIST_SORT } from './listSort';
 import { loadPersisted, type Persisted, savePersisted } from './persist';
 import { DEFAULT_PLOTTED } from './plotted';
 import {
+  DEFAULT_ND_RANGE_NM,
   DEFAULT_PANELS,
   DEFAULT_SETTINGS,
   type LayerKey,
@@ -23,6 +24,7 @@ const DEFAULTS: Persisted = {
   listSort: DEFAULT_LIST_SORT,
   plotted: DEFAULT_PLOTTED,
   detailTab: 'now',
+  ndRangeNm: DEFAULT_ND_RANGE_NM,
 };
 
 /** Settings and panel visibility as last saved in this browser, or the defaults. */

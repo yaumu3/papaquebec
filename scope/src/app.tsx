@@ -18,6 +18,7 @@ import { detailTab, plotted } from './state/history';
 import { keepUnscrolled } from './state/layout';
 import { setDeclinationAt } from './state/magnetic';
 import { setBuiltinAero } from './state/mapsets';
+import { ndRangeNm } from './state/nd';
 import { qnhReport } from './state/qnh';
 import { listSort, panels, setCoast, setTick } from './state/scope';
 import { persist, setSettings, settings } from './state/settings';
@@ -57,6 +58,7 @@ export function App() {
       listSort: listSort(),
       plotted: plotted(),
       detailTab: detailTab(),
+      ndRangeNm: ndRangeNm(),
     }),
   );
 
