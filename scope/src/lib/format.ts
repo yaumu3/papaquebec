@@ -82,6 +82,12 @@ const STATUS_CODES: Readonly<Record<string, EmergencyCode>> = {
   downed: 'EM',
 };
 
+const squawkCode = (squawk: string | undefined): EmergencyCode | null =>
+  (squawk && SQUAWK_CODES[squawk]) || null;
+
+const statusCode = (emergency: string | undefined): EmergencyCode | null =>
+  (emergency && STATUS_CODES[emergency]) || null;
+
 /**
  * The shorthand of the emergency a squawk or an emergency/priority status declares, the code's
  * before the status's; null when neither declares one.
@@ -90,7 +96,7 @@ export function emergencyCode(
   squawk: string | undefined,
   emergency: string | undefined,
 ): EmergencyCode | null {
-  return (squawk && SQUAWK_CODES[squawk]) || (emergency && STATUS_CODES[emergency]) || null;
+  return squawkCode(squawk) ?? statusCode(emergency);
 }
 
 /** A priority an emergency/priority status asks for that is not an emergency. */
@@ -106,9 +112,8 @@ export interface StatusTags {
 }
 
 export function statusTags(squawk: string | undefined, emergency: string | undefined): StatusTags {
-  const code = (squawk && SQUAWK_CODES[squawk]) || null;
-  const declared =
-    emergency === 'downed' ? 'DOWNED' : (emergency && STATUS_CODES[emergency]) || null;
+  const code = squawkCode(squawk);
+  const declared = emergency === 'downed' ? 'DOWNED' : statusCode(emergency);
   const priority = emergency === 'lifeguard' || emergency === 'minfuel' ? emergency : null;
   return { code, status: declared === code ? null : declared, priority };
 }
