@@ -41,7 +41,7 @@ const BARB_PITCH_PX = 32;
 /** The same for heading glyphs, which are wider: about 30 px across at the most. */
 const GLYPH_PITCH_PX = 36;
 
-/** The widest each intent reads, in characters, so that its slot in the readout keeps one width. */
+/** The most characters each intent reads in. */
 const INTENT_CH: Partial<Record<ReadingKey, number>> = { selAlt: 5, fmsAlt: 5, selHdg: 4 };
 /** The sample of the second slot's line in the readout. */
 const SAMPLE_PX = 12;

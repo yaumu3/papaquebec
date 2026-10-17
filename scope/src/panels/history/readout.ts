@@ -131,10 +131,7 @@ function hasValue(key: ReadingKey, s: Sample): boolean {
   return spec.kind === 'intent' && spec.y(s) !== undefined;
 }
 
-/**
- * The intents plotted in the lane of `keys` that the contact ever had a value of, in their order;
- * the readout keeps a slot for each, wherever the cursor stands.
- */
+/** The intents plotted in the lane of `keys` that the contact ever had a value of, in their order. */
 export function heldIntents(keys: readonly ReadingKey[], samples: readonly Sample[]): ReadingKey[] {
   return keys.slice(1).filter((key) => samples.some((s) => hasValue(key, s)));
 }

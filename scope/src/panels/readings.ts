@@ -123,7 +123,7 @@ const machReading = (v: number | undefined): Reading =>
 export interface ReadingSpec {
   label: string;
   format: (r: Readout) => Reading;
-  /** A number the reading may hold, in its own unit, as it reads; for a reading plotted on a scale. */
+  /** A number of the reading, in its own unit, as it reads. */
   value?: (v: number) => Reading;
 }
 
