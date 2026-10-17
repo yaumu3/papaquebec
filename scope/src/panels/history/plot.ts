@@ -280,13 +280,11 @@ export interface HeadingMark extends Heading {
 
 /** The sample less each of its track, heading and selected heading not heard within the gap of `t`. */
 export function headingHeardNear(s: Sample, t: number): Sample {
-  const near = (key: HeardKey) => heardNear(s, [key], t);
-  return {
-    ...s,
-    track: near('track') ? s.track : undefined,
-    heading: near('heading') ? s.heading : undefined,
-    selHeading: near('selHeading') ? s.selHeading : undefined,
-  };
+  const out = { ...s };
+  for (const key of [...HEARD.trk, ...HEARD.selHdg]) {
+    if (!heardNear(s, [key], t)) Object.assign(out, { [key]: undefined });
+  }
+  return out;
 }
 
 /**
