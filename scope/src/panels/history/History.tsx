@@ -156,8 +156,8 @@ export function History(props: { track: Track }) {
   const reorder = trackReorder(movePlotLane);
 
   const [bay, setBay] = createSignal<HTMLDivElement>();
-  /** The dropdown of each lane's name, which opens its palette and keeps the focus for it. */
-  const menus = new Map<LaneKey, HTMLElement>();
+  /** The top row of each lane, its handle, which keeps the focus for it. */
+  const rows = new Map<LaneKey, HTMLElement>();
   /** The button under the lanes that opens the palette to add one. */
   let add: HTMLButtonElement | undefined;
   /** The palette open, if one is: for a lane, or with none to add one; under its anchor. */
@@ -177,9 +177,9 @@ export function History(props: { track: Track }) {
     const below = anchor.getBoundingClientRect().bottom - (bay()?.getBoundingClientRect().top ?? 0);
     setMenu({ own, anchor, top: below + PALETTE_GAP_PX });
   };
-  /** Brings a lane into view and gives its dropdown the focus; with none, + LANE. */
+  /** Brings a lane into view and gives its top row the focus; with none, + LANE. */
   const reveal = (lane: LaneKey | null) => {
-    const el = (lane && menus.get(lane)) || add;
+    const el = (lane && rows.get(lane)) || add;
     if (!el) return;
     (el.closest('[data-lane]') ?? el).scrollIntoView({ block: 'nearest' });
     el.focus({ preventScroll: true });
@@ -333,7 +333,7 @@ export function History(props: { track: Track }) {
             >
               <For each={plotted()}>
                 {(lane, i) => {
-                  onCleanup(() => menus.delete(lane));
+                  onCleanup(() => rows.delete(lane));
                   return (
                     <Lane
                       lane={lane}
@@ -348,13 +348,11 @@ export function History(props: { track: Track }) {
                       at={at()}
                       past={past()}
                       menuOpen={menu()?.own === lane}
-                      menuRef={(el) => menus.set(lane, el)}
+                      rowRef={(el) => rows.set(lane, el)}
+                      moves={movesOf(lane)}
                       onMenu={(anchor) => toggleMenu(lane, anchor)}
                       onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, plotted().length)}
                       onGripMove={(y) => reorder.move(y)}
-                      onGripStep={(by) =>
-                        movePlotLane(i(), clamp(i() + by, 0, plotted().length - 1))
-                      }
                     />
                   );
                 }}

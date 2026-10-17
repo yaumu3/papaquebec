@@ -170,7 +170,10 @@
   line-height: 1;
   white-space: nowrap;
 }
-/* Over the plot: the lane's grip, name and close button at the left. */
+/*
+ * Over the plot: the lane's handle, nothing marking it but the cursor, with the dropdown of its
+ * name at the left and its readout at the right.
+ */
 .top {
   position: absolute;
   top: var(--space-1);
@@ -180,7 +183,11 @@
   align-items: center;
   gap: var(--space-2);
   height: var(--lane-top);
-  pointer-events: none;
+  cursor: grab;
+}
+.top:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: 1px;
 }
 /* On the panel's ground, so that the time cursor passes behind them. */
 .top > * {

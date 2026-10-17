@@ -7,7 +7,6 @@ import {
   placeOf,
   reorderKey,
   slotAt,
-  stepFromKey,
   trackReorder,
 } from './reorder';
 
@@ -50,19 +49,6 @@ describe('trackReorder', () => {
       [1, 2],
       [2, 0],
     ]);
-  });
-});
-
-describe('stepFromKey', () => {
-  it('reads the arrow keys as a step up or down, and nothing else as one', () => {
-    // Arrange
-    const keys = ['ArrowUp', 'ArrowDown', 'Enter', ' '];
-
-    // Act
-    const steps = keys.map(stepFromKey);
-
-    // Assert
-    expect(steps).toEqual([-1, 1, null, null]);
   });
 });
 

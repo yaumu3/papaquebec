@@ -27,18 +27,6 @@ export function trackReorder(move: (from: number, to: number) => void) {
   };
 }
 
-/** The step an arrow key asks of a reorderable item: up or down a place; null for any other key. */
-export function stepFromKey(key: string): -1 | 1 | null {
-  switch (key) {
-    case 'ArrowUp':
-      return -1;
-    case 'ArrowDown':
-      return 1;
-    default:
-      return null;
-  }
-}
-
 /** The slot of `count` items `pitch` apart that a pointer `y` down their content is over. */
 export const slotAt = (y: number, pitch: number, count: number): number =>
   clamp(Math.floor(y / pitch), 0, count - 1);

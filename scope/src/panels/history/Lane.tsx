@@ -3,9 +3,9 @@ import { createMemo, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { stepFromKey } from '../../ui/reorder';
 import { NONE, READINGS } from '../readings';
 import { clearOfEnds, clockStep, ticks } from './axis';
+import { type LaneMoves, onMoveKey } from './moves';
 import {
   atTicks,
   barbPath,
@@ -78,14 +78,14 @@ export function Lane(props: {
   /** The sample the lane is read at, and whether it is an earlier one than the latest. */
   at: Sample | null;
   past: boolean;
-  /** Whether the lane's palette is open, and the dropdown that opens it. */
+  /** The top row, the lane's handle, which keeps the focus for it. */
+  rowRef: (el: HTMLDivElement) => void;
+  moves: LaneMoves;
+  /** Whether the lane's palette is open, and the dropdown of its name that opens it. */
   menuOpen: boolean;
-  menuRef: (el: HTMLButtonElement) => void;
   onMenu: (anchor: HTMLElement) => void;
   onGripDown: (y: number) => void;
   onGripMove: (y: number) => void;
-  /** The arrow keys move the lane a place up or down. */
-  onGripStep: (step: -1 | 1) => void;
 }) {
   const spec = PLOTS[props.lane];
   const label = READINGS[props.lane].label;
@@ -249,19 +249,20 @@ export function Lane(props: {
           )}
         </Index>
       </div>
-      <div class={s.top}>
+      <div
+        ref={props.rowRef}
+        class={s.top}
+        tabindex="0"
+        aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
+        onKeyDown={(e) => {
+          if (e.target === e.currentTarget) onMoveKey(props.moves, e);
+        }}
+      >
         <button
           type="button"
           class={s.grip}
-          aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag or press an arrow key to move it.`}
-          onKeyDown={(e) => {
-            const step = stepFromKey(e.key);
-            if (step === null) return;
-            e.preventDefault();
-            props.onGripStep(step);
-            // The lane moved in the DOM, which blurs its grip.
-            e.currentTarget.focus();
-          }}
+          tabindex="-1"
+          aria-hidden="true"
           onPointerDown={(e) => {
             e.currentTarget.setPointerCapture(e.pointerId);
             props.onGripDown(e.clientY);
@@ -273,7 +274,6 @@ export function Lane(props: {
           ⋮⋮
         </button>
         <button
-          ref={props.menuRef}
           type="button"
           class={cx(s.menu, props.menuOpen && s.open)}
           aria-haspopup="dialog"
