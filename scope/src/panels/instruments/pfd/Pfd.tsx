@@ -20,11 +20,14 @@ import { pfdFma } from './readout';
 import s from './Pfd.module.css';
 
 /** The text of a column of the annunciator, centred on `x`; nothing for an empty column. */
-function Mode(props: { text: string | undefined; x: number }) {
+function Mode(props: { text: string | undefined; x: number; boxed: boolean }) {
   return (
     <Show when={props.text}>
       {(text) => (
-        <div class={s.mode} style={{ left: `${props.x}px`, top: `${FMA_CENTRE_Y}px` }}>
+        <div
+          class={cx(s.mode, props.boxed && s.boxed)}
+          style={{ left: `${props.x}px`, top: `${FMA_CENTRE_Y}px` }}
+        >
           {text()}
         </div>
       )}
@@ -61,8 +64,8 @@ export function Pfd(props: { t: Track }) {
           <path class={s.fma} d={fmaBandPath(g())} />
           <path class={s.rules} d={fmaRulesPath(g())} />
         </svg>
-        <Mode text={fma().lateral} x={fmaColumnX(g())[1]} />
-        <Mode text={fma().vertical} x={fmaColumnX(g())[2]} />
+        <Mode text={fma().lateral} x={fmaColumnX(g())[1]} boxed={fma().boxed.lateral} />
+        <Mode text={fma().vertical} x={fmaColumnX(g())[2]} boxed={fma().boxed.vertical} />
         <Show when={fma().ap}>
           <div class={s.ap} style={{ left: `${g().acx}px`, top: `${apY(g())}px` }}>
             AP

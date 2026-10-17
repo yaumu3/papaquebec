@@ -53,3 +53,6 @@
   line-height: 1;
   transform: translate(-50%, -50%);
 }
+.boxed {
+  border-color: var(--color-level);
+}
