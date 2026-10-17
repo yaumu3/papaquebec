@@ -14,6 +14,7 @@ const DEFAULTS: Persisted = {
   listSort: DEFAULT_SORT,
   plotted: ['alt', 'gs'],
   historyOpen: true,
+  detailTab: 'now',
 };
 
 describe('loadPersisted', () => {
@@ -74,6 +75,7 @@ describe('savePersisted', () => {
       listSort: { key: 'alt', dir: 'desc' },
       plotted: ['trk', 'gs'],
       historyOpen: false,
+      detailTab: 'history',
     };
     savePersisted(storage, state);
 
@@ -211,5 +213,20 @@ describe('loadPersisted historyOpen', () => {
 
     // Assert
     expect(open).toEqual([false, true]);
+  });
+});
+
+describe('loadPersisted detailTab', () => {
+  it('keeps the open tab, and falls back when it is not one of the tabs', () => {
+    // Arrange
+    const stores = ['history', 'graphs'].map((detailTab) =>
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ detailTab }) }),
+    );
+
+    // Act
+    const tabs = stores.map((st) => loadPersisted(st, DEFAULTS).detailTab);
+
+    // Assert
+    expect(tabs).toEqual(['history', 'now']);
   });
 });

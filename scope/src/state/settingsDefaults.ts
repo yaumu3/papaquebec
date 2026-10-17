@@ -84,3 +84,8 @@ export type Panels = Record<PanelId, boolean>;
 /** Every panel, in the order the bars list them. */
 export const PANEL_IDS: readonly PanelId[] = ['display', 'maps', 'list', 'detail'];
 export const DEFAULT_PANELS: Panels = { display: true, maps: true, list: true, detail: true };
+
+/** A tab of the detail panel. */
+export type DetailTab = 'now' | 'history';
+/** Every detail tab, in the order its tab bar lists them. */
+export const DETAIL_TABS: readonly DetailTab[] = ['now', 'history'];

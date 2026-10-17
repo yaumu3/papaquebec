@@ -23,6 +23,7 @@ const DEFAULTS: Persisted = {
   listSort: DEFAULT_LIST_SORT,
   plotted: DEFAULT_PLOTTED,
   historyOpen: true,
+  detailTab: 'now',
 };
 
 /** Settings and panel visibility as last saved in this browser, or the defaults. */

@@ -4,6 +4,8 @@ import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
 import { isLaneKey, type LaneKey } from './plotted';
 import {
+  DETAIL_TABS,
+  type DetailTab,
   LABEL_DENSITIES,
   LAYER_KEYS,
   type Layers,
@@ -32,6 +34,8 @@ export interface Persisted {
   plotted: readonly LaneKey[];
   /** Whether the detail panel's history group is unfolded. */
   historyOpen: boolean;
+  /** The tab the detail panel has open. */
+  detailTab: DetailTab;
 }
 
 const oneOf = <T>(steps: readonly T[], v: unknown, fallback: T): T =>
@@ -137,6 +141,7 @@ export function loadPersisted(storage: Storage, defaults: Persisted): Persisted 
     listSort: sortFrom(r.listSort, defaults.listSort),
     plotted: plottedFrom(r.plotted, defaults.plotted),
     historyOpen: bool(r.historyOpen, defaults.historyOpen),
+    detailTab: oneOf(DETAIL_TABS, r.detailTab, defaults.detailTab),
   };
 }
 

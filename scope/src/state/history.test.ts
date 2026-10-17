@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   addPlotLane,
+  detailTab,
   historyOpen,
   hoverInstant,
   movePlotLane,
@@ -69,6 +70,17 @@ describe('history state', () => {
 
     // Assert
     expect(plotted()).toEqual(['alt', 'gs', 'roll']);
+  });
+
+  it('starts on the persisted tab, NOW with nothing stored', () => {
+    // Arrange
+    const stored = persisted.detailTab;
+
+    // Act
+    const tab = detailTab();
+
+    // Assert
+    expect([stored, tab]).toEqual(['now', 'now']);
   });
 
   it('starts with the history group open and folds it on a toggle', () => {

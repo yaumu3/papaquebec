@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js';
 
 import { addLane, type LaneKey, moveLane, removeLane, switchLane } from './plotted';
-import { persisted } from './settings';
+import { type DetailTab, persisted } from './settings';
 
 /** The lanes of the history, in order. */
 export const [plotted, setPlotted] = createSignal<readonly LaneKey[]>(persisted.plotted);
@@ -21,6 +21,9 @@ export function switchPlotLane(from: LaneKey, to: LaneKey): void {
 export function addPlotLane(lane: LaneKey): void {
   setPlotted((p) => addLane(p, lane));
 }
+
+/** The tab the detail panel has open. */
+export const [detailTab, setDetailTab] = createSignal<DetailTab>(persisted.detailTab);
 
 /** Whether the history group is unfolded in the detail panel. */
 export const [historyOpen, setHistoryOpen] = createSignal(persisted.historyOpen);
