@@ -14,6 +14,7 @@ import {
   selBugPath,
   selClipRect,
   selDigits,
+  type SlotRow,
 } from './geometry';
 import type { PfdAltitude } from './readout';
 import { Wheel } from './Wheel';
@@ -31,6 +32,12 @@ export function altitudeView(g: PfdGeometry, read: PfdAltitude): AltitudeView | 
   if (read.kind !== 'feet') return undefined;
   return { ft: read.ft, tape: altitudeTape(g, read.ft), digits: altitudeDigits(read.ft) };
 }
+
+/** What a slot row shows for now: its digit, the minus sign for NEG, and nothing for a hatch. */
+const slotText = (row: SlotRow): string => {
+  if (row.kind === 'neg') return '−';
+  return row.kind === 'digit' ? row.text : '';
+};
 
 /** A target altitude in a box, so that a zero still tests as set. */
 export interface Target {
@@ -106,7 +113,12 @@ export function AltitudeText(props: AltitudeProps & { baro: string }) {
                 </div>
               )}
             </For>
-            <Wheel cell={at().tenThousands} wheel={v().digits.tenThousands} class={s.thousands} />
+            <Wheel
+              cell={at().tenThousands}
+              wheel={v().digits.tenThousands}
+              row={slotText}
+              class={s.thousands}
+            />
             <Wheel cell={at().thousands} wheel={v().digits.thousands} class={s.thousands} />
             <Wheel cell={at().hundreds} wheel={v().digits.hundreds} class={s.hundreds} />
             <Wheel cell={at().drum} wheel={v().digits.drum} class={s.hundreds} />

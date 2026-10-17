@@ -1,19 +1,21 @@
-import { Index } from 'solid-js';
+import { Index, type JSX } from 'solid-js';
 
 import { cx } from '../../../design/cx';
 import { type Wheel as WheelData, type WheelCell, wheelTop } from './geometry';
 
 import s from './Pfd.module.css';
 
-interface WheelProps {
+interface WheelProps<T> {
   cell: WheelCell;
-  wheel: WheelData;
+  wheel: WheelData<T>;
+  /** What a row shows; its text by default. */
+  row?: (row: T) => JSX.Element;
   /** The font of the rows. */
   class: string | undefined;
 }
 
 /** A digit wheel: its rows in a clipped window, the column turned by the wheel's fraction of a row. */
-export function Wheel(props: WheelProps) {
+export function Wheel<T = string>(props: WheelProps<T>) {
   const top = () => wheelTop(props.cell.h, props.cell.lineH, props.cell.above, props.wheel.turned);
   return (
     <div
@@ -30,7 +32,11 @@ export function Wheel(props: WheelProps) {
         style={{ top: `${top()}px`, 'line-height': `${props.cell.lineH}px` }}
       >
         <Index each={props.wheel.rows}>
-          {(row) => <div style={{ height: `${props.cell.lineH}px` }}>{row()}</div>}
+          {(row) => (
+            <div style={{ height: `${props.cell.lineH}px` }}>
+              {props.row ? props.row(row()) : String(row())}
+            </div>
+          )}
         </Index>
       </div>
     </div>

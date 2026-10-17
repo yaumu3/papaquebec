@@ -169,8 +169,8 @@ const READOUT_HALF_HEIGHT_PX = 18;
  * A digit wheel of a readout: its rows top to bottom, and how far it has turned toward the row
  * above the one at rest.
  */
-export interface Wheel {
-  rows: readonly string[];
+export interface Wheel<T = string> {
+  rows: readonly T[];
   /** From 0, at rest, up to but not including 1, the next row fully in. */
   turned: number;
 }
@@ -201,7 +201,7 @@ export interface WheelCell {
 }
 
 /** A digit wheel of `place`, rolling from this digit to the next through the last `step` before it. */
-const carryWheel = (a: number, place: number, step: number, rows: [string, string]): Wheel => ({
+const carryWheel = <T>(a: number, place: number, step: number, rows: [T, T]): Wheel<T> => ({
   rows,
   turned: carried(a, place, step),
 });
@@ -578,8 +578,11 @@ export function altitudeBoxPath(g: PfdGeometry): string {
   );
 }
 
+/** What the slot of the ten-thousands shows: a digit, a hatch below 10,000 ft, NEG below zero. */
+export type SlotRow = { kind: 'digit'; text: string } | { kind: 'hatch' } | { kind: 'neg' };
+
 export interface AltitudeDigits {
-  tenThousands: Wheel;
+  tenThousands: Wheel<SlotRow>;
   thousands: Wheel;
   hundreds: Wheel;
   /** The last two digits, rows base + 40 down to base − 20 ft. */
@@ -593,12 +596,13 @@ const TEN_THOUSAND_FT = 10000;
 /** The last two digits of a non-negative number. */
 const twoDigits = (n: number): string => String(n % 100).padStart(2, '0');
 
-/** The sign of a negative altitude takes the place of the leading digit, which is blank at zero. */
-const leadingDigit = (ft: number): string => {
-  if (ft < 0) return MINUS;
-  const ten = Math.floor(ft / TEN_THOUSAND_FT);
-  return ten === 0 ? '' : String(ten);
-};
+const slotDigit = (n: number): SlotRow => ({ kind: 'digit', text: String(n) });
+
+/** The slot's row at rest: NEG below zero, a hatch under 10,000 ft, else the ten-thousands digit. */
+function slotRow(ft: number): SlotRow {
+  if (ft < 0) return { kind: 'neg' };
+  return ft < TEN_THOUSAND_FT ? { kind: 'hatch' } : slotDigit(Math.floor(ft / TEN_THOUSAND_FT));
+}
 
 const digitAt = (a: number, place: number, next = 0): string =>
   String((Math.floor(a / place) + next) % 10);
@@ -613,8 +617,8 @@ export function altitudeDigits(ft: number): AltitudeDigits {
   const base = Math.floor(a / DRUM_STEP_FT) * DRUM_STEP_FT;
   return {
     tenThousands: carryWheel(a, TEN_THOUSAND_FT, DRUM_STEP_FT, [
-      String(Math.floor(a / TEN_THOUSAND_FT) + 1),
-      leadingDigit(ft),
+      slotDigit(Math.floor(a / TEN_THOUSAND_FT) + 1),
+      slotRow(ft),
     ]),
     thousands: carryWheel(a, ALTITUDE_THOUSAND_FT, DRUM_STEP_FT, [
       digitAt(a, ALTITUDE_THOUSAND_FT, 1),
@@ -633,8 +637,8 @@ export function altitudeDigits(ft: number): AltitudeDigits {
 
 const ALTITUDE_THOUSANDS_PX = 17;
 const ALTITUDE_HUNDREDS_PX = 13;
-const ALTITUDE_DIGITS_GAP_PX = 20;
-const ALTITUDE_DRUM_GAP_PX = 18;
+const ALTITUDE_DIGITS_GAP_PX = 18;
+const ALTITUDE_DRUM_GAP_PX = 17;
 const ALTITUDE_DRUM_LINE_PX = 17;
 
 export interface AltitudeReadout {
