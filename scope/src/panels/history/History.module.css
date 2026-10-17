@@ -110,20 +110,16 @@
   box-sizing: content-box;
   border-bottom: 1px solid var(--plot-grid);
 }
-.grip,
-.close {
+.grip {
   color: var(--text-dim);
   font-size: var(--text-xl);
   line-height: 1;
-}
-.grip:hover,
-.close:hover {
-  color: var(--text);
-}
-.grip {
   letter-spacing: -3px;
   cursor: grab;
   touch-action: none;
+}
+.grip:hover {
+  color: var(--text);
 }
 .plot {
   position: absolute;
@@ -268,11 +264,32 @@
 .bar {
   fill: var(--text-dim);
 }
-.name {
+/* The lane's name, a dropdown that opens its palette; lit while it is open. */
+.menu {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  height: 100%;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--panel-border);
   color: var(--text-dim);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-wide);
-  pointer-events: none;
+  white-space: nowrap;
+}
+.menu:hover,
+.open,
+.open:hover {
+  color: var(--text);
+}
+.open,
+.open:hover {
+  border-color: var(--text-dim);
+}
+.caret {
+  font-size: var(--text-xs);
+  letter-spacing: 0;
 }
 .tab {
   position: absolute;

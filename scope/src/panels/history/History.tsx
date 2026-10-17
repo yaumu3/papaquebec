@@ -4,22 +4,26 @@ import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
 import {
+  addPlotLane,
   historyOpen,
   hoverInstant,
   movePlotLane,
   plotted,
   removePlotLane,
   setHoverInstant,
+  switchPlotLane,
   toggleHistory,
 } from '../../state/history';
-import { readingsIn } from '../../state/plotted';
+import { laneAfter, type LaneKey, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { trackReorder } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
+import { chipOf } from './chips';
 import { Lane } from './Lane';
+import { type LaneMoves, Palette } from './Palette';
 import { type ScrollView, scrollView } from './scroll';
 import { type Interval, resolveSpan, type Span, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
@@ -43,6 +47,8 @@ const CHIP_GAP_PX = 4;
 /** The notch under the chip, pointing down the cursor. */
 const NOTCH_W_PX = 7;
 const NOTCH_H_PX = 4;
+/** Between a palette and the control it hangs from. */
+const PALETTE_GAP_PX = 2;
 
 /** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
 export function History(props: { track: Track }) {
@@ -148,6 +154,66 @@ export function History(props: { track: Track }) {
 
   const reorder = trackReorder(movePlotLane);
 
+  const [bay, setBay] = createSignal<HTMLDivElement>();
+  /** The dropdown of each lane's name, which opens its palette and keeps the focus for it. */
+  const menus = new Map<LaneKey, HTMLElement>();
+  /** The palette open, if one is: for a lane, or with none to add one; under its anchor. */
+  const [menu, setMenu] = createSignal<{
+    own: LaneKey | null;
+    anchor: HTMLElement;
+    top: number;
+  } | null>(null);
+  const closeMenu = () => setMenu(null);
+  createEffect(on(hex, closeMenu, { defer: true }));
+  /** Opens the palette under `anchor`, or closes it when it is open there already. */
+  const toggleMenu = (own: LaneKey | null, anchor: HTMLElement) => {
+    if (menu()?.anchor === anchor) {
+      closeMenu();
+      return;
+    }
+    const below = anchor.getBoundingClientRect().bottom - (bay()?.getBoundingClientRect().top ?? 0);
+    setMenu({ own, anchor, top: below + PALETTE_GAP_PX });
+  };
+  /** Brings a lane into view and gives its dropdown the focus. */
+  const reveal = (lane: LaneKey | null) => {
+    const el = lane && menus.get(lane);
+    if (!el) return;
+    el.closest('[data-lane]')?.scrollIntoView({ block: 'nearest' });
+    el.focus({ preventScroll: true });
+  };
+  const pick = (lane: LaneKey) => {
+    const m = menu();
+    if (!m) return;
+    closeMenu();
+    const chip = chipOf(plotted(), m.own, lane);
+    if (chip === 'free') {
+      if (m.own) switchPlotLane(m.own, lane);
+      else addPlotLane(lane);
+    }
+    reveal(lane);
+  };
+  /** The LANE row of the palette of `own`. */
+  const movesOf = (own: LaneKey): LaneMoves => {
+    const i = () => plotted().indexOf(own);
+    const move = (to: number) => {
+      closeMenu();
+      movePlotLane(i(), to);
+      reveal(own);
+    };
+    return {
+      first: i() === 0,
+      last: i() === plotted().length - 1,
+      onUp: () => move(i() - 1),
+      onDown: () => move(i() + 1),
+      onRemove: () => {
+        const next = laneAfter(plotted(), own);
+        closeMenu();
+        removePlotLane(own);
+        reveal(next);
+      },
+    };
+  };
+
   const [scroller, setScroller] = createSignal<HTMLDivElement>();
   const [view, setView] = createSignal<ScrollView>(scrollView(0, 0, 0));
   const measure = () => {
@@ -244,7 +310,7 @@ export function History(props: { track: Track }) {
             </Show>
           </div>
         </div>
-        <div class={s.bay}>
+        <div ref={setBay} class={s.bay}>
           <div
             class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}
             style={(() => {
@@ -255,7 +321,10 @@ export function History(props: { track: Track }) {
             <div
               ref={setScroller}
               class={s.scroller}
-              onScroll={measure}
+              onScroll={() => {
+                measure();
+                closeMenu();
+              }}
               onPointerMove={pointerAt}
               onPointerLeave={() => setHoverPx(null)}
             >
@@ -264,27 +333,32 @@ export function History(props: { track: Track }) {
                 fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
               >
                 <For each={plotted()}>
-                  {(lane, i) => (
-                    <Lane
-                      lane={lane}
-                      index={i()}
-                      count={plotted().length}
-                      keys={readingsIn(lane)}
-                      samples={samples()}
-                      visible={visible()}
-                      ticks={tickTimes()}
-                      width={plotWidth()}
-                      height={LANE_PX}
-                      at={at()}
-                      past={past()}
-                      onClose={() => removePlotLane(lane)}
-                      onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, plotted().length)}
-                      onGripMove={(y) => reorder.move(y)}
-                      onGripStep={(by) =>
-                        movePlotLane(i(), clamp(i() + by, 0, plotted().length - 1))
-                      }
-                    />
-                  )}
+                  {(lane, i) => {
+                    onCleanup(() => menus.delete(lane));
+                    return (
+                      <Lane
+                        lane={lane}
+                        index={i()}
+                        count={plotted().length}
+                        keys={readingsIn(lane)}
+                        samples={samples()}
+                        visible={visible()}
+                        ticks={tickTimes()}
+                        width={plotWidth()}
+                        height={LANE_PX}
+                        at={at()}
+                        past={past()}
+                        menuOpen={menu()?.own === lane}
+                        menuRef={(el) => menus.set(lane, el)}
+                        onMenu={(anchor) => toggleMenu(lane, anchor)}
+                        onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, plotted().length)}
+                        onGripMove={(y) => reorder.move(y)}
+                        onGripStep={(by) =>
+                          movePlotLane(i(), clamp(i() + by, 0, plotted().length - 1))
+                        }
+                      />
+                    );
+                  }}
                 </For>
               </Show>
             </div>
@@ -302,6 +376,22 @@ export function History(props: { track: Track }) {
               <div
                 class={s.thumb}
                 style={{ top: `${thumb().top}px`, height: `${thumb().height}px` }}
+              />
+            )}
+          </Show>
+          <Show when={menu()}>
+            {(m) => (
+              <Palette
+                own={m().own}
+                plotted={plotted()}
+                top={m().top}
+                anchor={m().anchor}
+                moves={(() => {
+                  const own = m().own;
+                  return own === null ? undefined : movesOf(own);
+                })()}
+                onPick={pick}
+                onClose={closeMenu}
               />
             )}
           </Show>

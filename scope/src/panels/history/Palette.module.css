@@ -1,0 +1,92 @@
+/*
+ * The lanes by group, hung under the control that opened it as wide as the lanes, over them: a
+ * column of group names, then each group's chips.
+ */
+.palette {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: var(--space-6);
+  row-gap: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+}
+.name {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-height);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--panel-border);
+  color: var(--text);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  white-space: nowrap;
+}
+.chip:hover {
+  background: var(--control-hover);
+}
+/* The lane the palette is for. */
+.own,
+.own:hover {
+  border-color: var(--text);
+}
+/* A lane open elsewhere, which a pick goes to. */
+.elsewhere {
+  border-color: var(--control-hover);
+  color: var(--text-muted);
+}
+.dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: 50%;
+  background: currentColor;
+}
+.chip:disabled,
+.chip:disabled:hover {
+  background: none;
+  color: var(--text-muted);
+}
+.chip:disabled .key {
+  color: inherit;
+}
+/* What a chip's key is, as quiet as a unit. */
+.key {
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking);
+}
+.rule {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin: var(--space-1) 0;
+  border: none;
+  border-top: 1px solid var(--plot-grid);
+}
+/* UP and DOWN as one pair of chips, a hairline between them. */
+.pair {
+  display: flex;
+}
+.pair > .chip + .chip {
+  border-left: none;
+}
+.remove {
+  margin-left: auto;
+  border-color: var(--color-emergency);
+  color: var(--color-emergency);
+}

@@ -62,7 +62,7 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
   return p.kind === 'intent' ? p.dash : undefined;
 };
 
-/** One lane of the bay: a top row with its grip, name and close button, then its scale and its plot over the visible span. */
+/** One lane of the bay: a top row with its grip and the dropdown of its name, then its scale and its plot over the visible span. */
 export function Lane(props: {
   lane: ReadingKey;
   /** Its place among the lanes, and how many there are. */
@@ -78,7 +78,10 @@ export function Lane(props: {
   /** The sample the lane is read at, and whether it is an earlier one than the latest. */
   at: Sample | null;
   past: boolean;
-  onClose: () => void;
+  /** Whether the lane's palette is open, and the dropdown that opens it. */
+  menuOpen: boolean;
+  menuRef: (el: HTMLButtonElement) => void;
+  onMenu: (anchor: HTMLElement) => void;
   onGripDown: (y: number) => void;
   onGripMove: (y: number) => void;
   /** The arrow keys move the lane a place up or down. */
@@ -151,7 +154,7 @@ export function Lane(props: {
   const slotCh = () => Math.max(0, ...held().map((key) => INTENT_CH[key] ?? 0));
 
   return (
-    <div class={s.lane} style={{ height: `${props.height}px` }}>
+    <div data-lane class={s.lane} style={{ height: `${props.height}px` }}>
       <div class={s.plot}>
         <svg class={s.svg} height={props.height}>
           <Index each={gaps()}>
@@ -269,14 +272,16 @@ export function Lane(props: {
         >
           ⋮⋮
         </button>
-        <span class={s.name}>{label}</span>
         <button
+          ref={props.menuRef}
           type="button"
-          class={s.close}
-          aria-label={`Close the ${label} lane`}
-          onClick={() => props.onClose()}
+          class={cx(s.menu, props.menuOpen && s.open)}
+          aria-haspopup="dialog"
+          aria-expanded={props.menuOpen}
+          onClick={(e) => props.onMenu(e.currentTarget)}
         >
-          ×
+          {label}
+          <span class={s.caret}>{props.menuOpen ? '▲' : '▼'}</span>
         </button>
         <Show when={readout()}>
           {(r) => (
