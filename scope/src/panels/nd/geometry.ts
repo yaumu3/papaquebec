@@ -237,3 +237,17 @@ export function trendPath(points: readonly (readonly [number, number])[]): strin
       .join(''),
   ).join('');
 }
+
+/** The level-off arc is drawn only this far from the aircraft symbol, and short of the compass arc. */
+const LEVEL_OFF_MIN_PX = 14;
+/** How far either side of the track the level-off arc reaches. */
+const LEVEL_OFF_HALF_SPAN_DEG = 11;
+
+/** The arc across the track at the distance a climb or descent will level off at; empty when it falls outside the compass. */
+export function levelOffPath(g: NdGeometry, at: number, nm: number, rangeNm: number): string {
+  const rpx = (nm * g.r) / rangeNm;
+  if (rpx <= LEVEL_OFF_MIN_PX || rpx >= g.r) return '';
+  const from = toward(g.cx, g.cy, at - LEVEL_OFF_HALF_SPAN_DEG)(rpx);
+  const to = toward(g.cx, g.cy, at + LEVEL_OFF_HALF_SPAN_DEG)(rpx);
+  return `M${from}A${fixed(rpx)} ${fixed(rpx)} 0 0 1 ${to}`;
+}

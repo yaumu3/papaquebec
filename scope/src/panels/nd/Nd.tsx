@@ -3,6 +3,7 @@ import { createMemo, createSignal, For, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import { turn } from '../../lib/geo';
 import { ndRangeNm } from '../../state/nd';
+import { settings } from '../../state/settings';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { trackWidth } from '../../ui/size';
@@ -13,6 +14,7 @@ import {
   compass,
   diamondPath,
   lastHeardY,
+  levelOffPath,
   lubberPath,
   ndGeometry,
   rangeAnchors,
@@ -45,7 +47,7 @@ export function Nd(props: { t: Track }) {
   const marks = createMemo(() => compass(g(), frame().orient));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
   const anchors = createMemo(() => rangeAnchors(g()));
-  const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now));
+  const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
   const relative = (deg: number | undefined) =>
     deg === undefined ? undefined : turn(frame().orient, deg);
   const track = createMemo(() => {
@@ -53,6 +55,11 @@ export function Nd(props: { t: Track }) {
     return rel === undefined
       ? undefined
       : { rel, line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
+  });
+  const levelOff = createMemo(() => {
+    const at = track();
+    const nm = symbols().levelOffNm;
+    return at && nm !== undefined ? levelOffPath(g(), at.rel, nm, ndRangeNm()) : undefined;
   });
   const trend = createMemo(() => {
     const at = track();
@@ -73,6 +80,7 @@ export function Nd(props: { t: Track }) {
           <path class={s.major} d={marks().major} />
           <path class={s.lubber} d={lubberPath(g())} />
           <Show when={track()}>{(p) => <path class={s.trackLine} d={p().line} />}</Show>
+          <Show when={levelOff()}>{(d) => <path class={s.levelOff} d={d()} />}</Show>
           <Show when={trend()}>{(d) => <path class={s.trend} d={d()} />}</Show>
           <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
           <Show when={track()}>{(p) => <path class={s.diamond} d={p().diamond} />}</Show>

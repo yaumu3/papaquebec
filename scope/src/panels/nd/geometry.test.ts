@@ -7,6 +7,7 @@ import {
   compass,
   diamondPath,
   lastHeardY,
+  levelOffPath,
   lubberPath,
   type NdGeometry,
   ndGeometry,
@@ -317,5 +318,31 @@ describe('trend vector', () => {
     // Assert
     expect(segments(path)).toBe(3);
     expect(path.startsWith('M173.0 179.3L173.0 178.5')).toBe(true);
+  });
+});
+
+describe('levelOffPath', () => {
+  const g = ndGeometry(346);
+
+  it('draws an arc of 11° either side of the track at the distance, on the scale of the range', () => {
+    // Arrange
+    const nm = 10;
+
+    // Act
+    const path = levelOffPath(g, 0, nm, 20);
+
+    // Assert
+    expect(path).toBe('M158.8 115.9A74.5 74.5 0 0 1 187.2 115.9');
+  });
+
+  it('draws none too near the aircraft or at or beyond the arc', () => {
+    // Arrange
+    const nms = [1, 25, 20];
+
+    // Act
+    const paths = nms.map((nm) => levelOffPath(g, 0, nm, 20));
+
+    // Assert
+    expect(paths).toEqual(['', '', '']);
   });
 });

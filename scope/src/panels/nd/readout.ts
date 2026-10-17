@@ -1,4 +1,5 @@
 import type { Heard, HeardKey } from '../../lib/aircraft';
+import { type Altimeter, crewAltitudeFt } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { padBearing } from '../../lib/format';
 import { holds, INSTRUMENT_SEC } from '../../lib/reports';
@@ -128,13 +129,15 @@ export interface NdSymbols {
   track?: number | undefined;
   sel?: number | undefined;
   trend?: Trend | undefined;
+  /** The distance, in nautical miles, at which the aircraft levels off at its selected altitude. */
+  levelOffNm?: number | undefined;
 }
 
 /** A turn slower than this, in degrees per second, is flight in a straight line: no trend is drawn. */
 const TREND_MIN_RATE_DEG_S = 0.3;
 
 /** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
-export function ndSymbols(t: Readout, now: number): NdSymbols {
+export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymbols {
   const mode = modeOf(t, now);
   if (mode !== 'heading' && mode !== 'track') return {};
   const live = (keys: readonly HeardKey[], v: number | undefined) =>
@@ -143,6 +146,7 @@ export function ndSymbols(t: Readout, now: number): NdSymbols {
     track: live(['track'], magneticTrack(t)),
     sel: live(['selHeading', 'navModes'], steeringHeading(t)),
     trend: trendOf(t, now),
+    levelOffNm: levelOffOf(t, now, altimeter),
   };
 }
 
@@ -153,4 +157,19 @@ function trendOf(t: Readout, now: number): Trend | undefined {
   if (!holdsAll(t, ['trackRate', 'gs'], now)) return undefined;
   if (Math.abs(rateDegS) < TREND_MIN_RATE_DEG_S || gsKt <= 0) return undefined;
   return { rateDegS, gsKt };
+}
+
+/**
+ * How far ahead the aircraft levels off, while it climbs or descends toward its selected altitude
+ * as the crew reads it, the reference `holdsSelected` compares on: the altitude still to go at the
+ * rate of climb, flown at the ground speed.
+ */
+function levelOffOf(t: Readout, now: number, altimeter: Altimeter): number | undefined {
+  const { selAlt, verticalRate: vs, gs } = t;
+  if (selAlt === undefined || vs === undefined || gs === undefined) return undefined;
+  if (!holdsAll(t, ['alt', 'selAlt', 'verticalRate', 'gs'], now)) return undefined;
+  const crew = crewAltitudeFt(t, altimeter);
+  if (crew === undefined || vs === 0 || Math.sign(selAlt - crew) !== Math.sign(vs))
+    return undefined;
+  return (gs * Math.abs(selAlt - crew)) / Math.abs(vs) / 60;
 }

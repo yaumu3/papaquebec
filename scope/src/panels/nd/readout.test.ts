@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import { STANDARD_ALTIMETER } from '../../lib/altitude';
 import { INSTRUMENT_SEC } from '../../lib/reports';
 import { setDeclinationAt } from '../../state/magnetic';
 import { makeSample } from '../../state/sampleFixture';
@@ -276,7 +277,7 @@ describe('ndSymbols', () => {
     const t = makeSample(NOW, { seen: 1, ...fields, at: AT, heard: heardAll(KEYS, FRESH) });
 
     // Act
-    const symbols = ndSymbols(t, NOW);
+    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols).toEqual({ track: 282, sel: 310 });
@@ -288,7 +289,7 @@ describe('ndSymbols', () => {
     const t = makeSample(NOW, { seen: 1, ...fields, heard });
 
     // Act
-    const symbols = ndSymbols(t, NOW);
+    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols).toEqual({ sel: 310 });
@@ -300,7 +301,7 @@ describe('ndSymbols', () => {
     const lost = makeSample(NOW, { seen: 34, ...fields, heard: heardAll(KEYS, FRESH) });
 
     // Act
-    const symbols = [blank, lost].map((t) => ndSymbols(t, NOW));
+    const symbols = [blank, lost].map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER));
 
     // Assert
     expect(symbols).toEqual([{}, {}]);
@@ -324,7 +325,7 @@ describe('ndSymbols trend', () => {
     const t = turningSample({});
 
     // Act
-    const symbols = ndSymbols(t, NOW);
+    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.trend).toEqual({ rateDegS: 1, gsKt: 360 });
@@ -341,7 +342,7 @@ describe('ndSymbols trend', () => {
     ];
 
     // Act
-    const trends = quiet.map((t) => ndSymbols(t, NOW).trend);
+    const trends = quiet.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).trend);
 
     // Assert
     expect(trends).toEqual(Array(5).fill(undefined));
@@ -352,9 +353,72 @@ describe('ndSymbols trend', () => {
     const turning = [0.3, -0.3].map((trackRate) => turningSample({ trackRate }));
 
     // Act
-    const trends = turning.map((t) => ndSymbols(t, NOW).trend?.rateDegS);
+    const trends = turning.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).trend?.rateDegS);
 
     // Assert
     expect(trends).toEqual([0.3, -0.3]);
+  });
+});
+
+const climbingSample = (over: Partial<Parameters<typeof makeSample>[1]>, heard = {}) =>
+  makeSample(NOW, {
+    seen: 1,
+    heading: 284,
+    track: 289,
+    alt: 29000,
+    selAlt: 32000,
+    verticalRate: 1800,
+    gs: 420,
+    ...over,
+    heard: {
+      heading: FRESH,
+      track: FRESH,
+      alt: FRESH,
+      selAlt: FRESH,
+      verticalRate: FRESH,
+      gs: FRESH,
+      ...heard,
+    },
+  });
+
+describe('ndSymbols level-off', () => {
+  it('gives the distance to the selected altitude at the rate and ground speed of the climb', () => {
+    // Arrange
+    const t = climbingSample({});
+
+    // Act
+    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+
+    // Assert
+    expect(symbols.levelOffNm).toBeCloseTo(11.667, 3);
+  });
+
+  it('gives the distance of a descent toward a lower selected altitude', () => {
+    // Arrange
+    const t = climbingSample({ selAlt: 25000, verticalRate: -1800 });
+
+    // Act
+    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+
+    // Assert
+    expect(symbols.levelOffNm).toBeCloseTo(15.556, 3);
+  });
+
+  it('gives none when level, moving away from the selected altitude, or an input has lapsed', () => {
+    // Arrange
+    const rows = [
+      climbingSample({ verticalRate: 0 }),
+      climbingSample({ selAlt: 27000 }),
+      climbingSample({ selAlt: 32000, verticalRate: -1800 }),
+      climbingSample({}, { selAlt: STALE }),
+      climbingSample({}, { alt: STALE }),
+      climbingSample({ selAlt: undefined }, { selAlt: undefined }),
+    ];
+
+    // Act
+    const out = rows.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).levelOffNm);
+
+    // Assert
+    expect(out).toEqual(Array(6).fill(undefined));
   });
 });
