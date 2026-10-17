@@ -104,6 +104,22 @@ fn bank_deg(true_airspeed_kt: f64, turn_deg_per_s: f64) -> f64 {
     (centripetal / GRAVITY_M_PER_S2).atan().to_degrees()
 }
 
+/// A holding pattern as ICAO Doc 8168 (PANS-OPS) Vol I, Part II, Section 6 (holding procedures)
+/// flies a standard one: right turns, and an outbound leg timed one minute at or below 14 000 ft
+/// (a minute and a half above), the turns at 3° a second or, where that banks the aircraft more,
+/// at 25° of bank. The values are as the PANS-OPS section is restated by `SKYbrary`'s "Holding
+/// Pattern" and the AIPs' ENR 1.5.
+#[derive(Clone, Copy)]
+struct Hold {
+    /// The fix, NM east and north of the site.
+    x: f64,
+    y: f64,
+    /// The inbound course, degrees true.
+    inbound_deg: f64,
+    /// How long the outbound leg is flown, seconds.
+    leg_s: f64,
+}
+
 /// One aircraft as it starts out.
 #[derive(Clone, Copy, Default)]
 struct Plan {
@@ -136,6 +152,8 @@ struct Plan {
     kind: &'static str,
     /// Beyond this it is put back across the site; the fleet's bounds when 0.
     bounds: f64,
+    /// The pattern it flies for good, in place of any route or straight flight.
+    hold: Option<Hold>,
 }
 
 const AUTOPILOT: Modes = Modes {
@@ -204,7 +222,8 @@ fn fleet() -> Vec<Plan> {
         Plan { mlat: true,
             ..plan(5, false, light, 0o1200, (-13.0, -11.0), 2500.0, 95.0, 0.0, 0.0, "C172") },
         Plan { sel_alt: Some(14_000.0), modes: Some(Modes { lnav: true, ..HOLDING }),
-            ..plan(6, true, large, 0o3452, (20.0, 19.0), 14_000.0, 340.0, 255.0, 0.0, "A320") },
+            hold: Some(Hold { x: 12.0, y: 14.0, inbound_deg: 225.0, leg_s: 60.0 }),
+            ..plan(6, true, large, 0o3452, (14.71, 16.71), 14_000.0, 230.0, 225.0, 0.0, "A320") },
         Plan { sel_alt: Some(21_000.0), sel_heading: Some(260.0), modes: Some(HOLDING), shown: Some(Shown::Advisory),
             ..plan(7, true, heavy, 0o5512, (-8.0, 31.0), 17_000.0, 380.0, 260.0, 0.0, "B74F") },
         plan(8, true, large, 0o7012, (32.0, 7.0), 7500.0, 240.0, 250.0, -600.0, "CRJ7"),
@@ -310,6 +329,19 @@ fn extra_fleet(count: u32) -> Vec<Plan> {
     )
 }
 
+/// Where a holding aircraft is in its pattern.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Phase {
+    /// Flying in to the fix.
+    Inbound,
+    /// Turning right from the inbound course to its reciprocal.
+    TurningOut,
+    /// Flying away from the fix, wings level, for the seconds left.
+    Outbound { left_s: f64 },
+    /// Turning right from the reciprocal back to the inbound course.
+    TurningIn,
+}
+
 /// One aircraft under way.
 struct Flying {
     plan: Plan,
@@ -331,6 +363,8 @@ struct Flying {
     turning: f64,
     /// Whether it has reached the end of its route.
     landed: bool,
+    /// Where it is in its holding pattern, when it flies one.
+    holding: Phase,
 }
 
 impl Flying {
@@ -350,6 +384,7 @@ impl Flying {
             leg: 0,
             turning: 0.0,
             landed: false,
+            holding: Phase::Inbound,
         }
     }
 
@@ -377,6 +412,26 @@ impl Flying {
         self.leg = 1;
     }
 
+    /// The most it can turn in `elapsed` seconds at its airspeed through the wind, degrees.
+    fn most_turn_deg(&self, elapsed: f64) -> f64 {
+        let (_, airspeed) = air::through_air(self.plan.track, self.plan.gs, WIND);
+        turn_rate_deg_per_s(airspeed) * elapsed
+    }
+
+    /// Turns its track by `turn` degrees, right positive, over `elapsed` seconds, at the rate that is.
+    fn turn_by(&mut self, turn: f64, elapsed: f64) {
+        self.plan.track = (self.plan.track + turn).rem_euclid(360.0);
+        self.turning = if elapsed > 0.0 { turn / elapsed } else { 0.0 };
+    }
+
+    /// Turns the short way toward the point as fast as its speed allows, in `elapsed` seconds.
+    fn steer_toward(&mut self, x: f64, y: f64, elapsed: f64) {
+        let wanted = bearing(self.x, self.y, x, y);
+        let off = signed_bearing(wanted - self.plan.track);
+        let most = self.most_turn_deg(elapsed);
+        self.turn_by(off.clamp(-most, most), elapsed);
+    }
+
     /// Turns toward the leg's waypoint as fast as its speed allows, flies at the speed of the
     /// one it left, and climbs or descends so as to be at its level there; past the last
     /// waypoint it starts over.
@@ -386,13 +441,7 @@ impl Flying {
         };
         self.plan.gs = route.get(self.leg - 1).map_or(target.gs, |from| from.gs);
         let to_go = (target.x - self.x).hypot(target.y - self.y);
-        let wanted = bearing(self.x, self.y, target.x, target.y);
-        let off = signed_bearing(wanted - self.plan.track);
-        let (_, airspeed) = air::through_air(self.plan.track, self.plan.gs, WIND);
-        let most = turn_rate_deg_per_s(airspeed) * elapsed;
-        let turn = off.clamp(-most, most);
-        self.plan.track = (self.plan.track + turn).rem_euclid(360.0);
-        self.turning = if elapsed > 0.0 { turn / elapsed } else { 0.0 };
+        self.steer_toward(target.x, target.y, elapsed);
         let distance = self.fly_straight(elapsed);
         let minutes = (to_go / self.plan.gs.max(1.0) * 60.0).max(elapsed / 60.0);
         self.baro_rate = ((target.alt - self.alt) / minutes).clamp(-STEEPEST_FPM, STEEPEST_FPM);
@@ -420,9 +469,63 @@ impl Flying {
         distance
     }
 
+    /// Flies the next `elapsed` seconds of the hold: in to the fix, then right round to the
+    /// reciprocal, out wings level for the leg's time, and right round to the inbound course.
+    /// The level is not touched, so it stays the one it was started at.
+    fn hold_for(&mut self, hold: Hold, elapsed: f64) {
+        match self.holding {
+            Phase::Inbound => {
+                let to_go = (hold.x - self.x).hypot(hold.y - self.y);
+                self.steer_toward(hold.x, hold.y, elapsed);
+                let distance = self.fly_straight(elapsed);
+                if to_go <= AT_NM.max(distance) {
+                    self.holding = Phase::TurningOut;
+                }
+            }
+            Phase::TurningOut => {
+                let outbound = Phase::Outbound { left_s: hold.leg_s };
+                self.turn_right_to(hold.inbound_deg + 180.0, elapsed, outbound);
+            }
+            Phase::Outbound { left_s } => {
+                self.turn_by(0.0, elapsed);
+                self.fly_straight(elapsed);
+                let left_s = left_s - elapsed;
+                self.holding = if left_s > 0.0 {
+                    Phase::Outbound { left_s }
+                } else {
+                    Phase::TurningIn
+                };
+            }
+            Phase::TurningIn => self.turn_right_to(hold.inbound_deg, elapsed, Phase::Inbound),
+        }
+    }
+
+    /// The most it turns in `elapsed` seconds in a hold: at the rate for the highest airspeed
+    /// the wind can give it, so that it never banks beyond the most. The rate is the same on
+    /// every heading, as the turn out and the turn in must be equal for the pattern to close.
+    fn hold_turn_deg(&self, elapsed: f64) -> f64 {
+        turn_rate_deg_per_s(self.plan.gs + WIND.speed_kt) * elapsed
+    }
+
+    /// Turns right toward the course at the hold's rate of turn, and goes on to `next` in the
+    /// step that completes the turn.
+    fn turn_right_to(&mut self, course_deg: f64, elapsed: f64, next: Phase) {
+        let remaining = (course_deg - self.plan.track).rem_euclid(360.0);
+        let turn = self.hold_turn_deg(elapsed).min(remaining);
+        self.turn_by(turn, elapsed);
+        self.fly_straight(elapsed);
+        if turn >= remaining {
+            self.holding = next;
+        }
+    }
+
     fn advance(&mut self, now: f64, elapsed: f64) {
         if let Some(route) = self.route.clone() {
             self.follow(&route, elapsed);
+            return;
+        }
+        if let Some(hold) = self.plan.hold {
+            self.hold_for(hold, elapsed);
             return;
         }
         self.fly_straight(elapsed);
@@ -759,7 +862,7 @@ fn ticks(seconds: f64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Fleet, Flying, Plan, turn_rate_deg_per_s};
+    use super::{Fleet, Flying, Phase, Plan, fleet as planned, turn_rate_deg_per_s};
     use crate::testing::{SITE, hand_clock};
     use tracker::field::{Field, Status};
     use tracker::proto::EmergencyPriorityStatus;
@@ -809,6 +912,150 @@ mod tests {
             roll.is_some_and(|roll| (roll - expected).abs() < 0.2)
         };
         assert!(near(rolls[0], 24.4) && near(rolls[1], -24.4), "{rolls:?}");
+    }
+
+    /// TEST06's fix, NM east and north of the site.
+    const HOLD_FIX: (f64, f64) = (12.0, 14.0);
+
+    /// What the hold's aircraft is doing at the end of one second.
+    struct Step {
+        x: f64,
+        y: f64,
+        track: f64,
+        turning: f64,
+        alt: f64,
+        baro_rate: f64,
+        roll: f64,
+        phase: Phase,
+    }
+
+    /// TEST06 flown from its start for `seconds`, one second at a time.
+    fn hold_flown(seconds: u32) -> Vec<Step> {
+        let plan = planned()
+            .into_iter()
+            .find(|plan| plan.number == 6)
+            .expect("TEST06 is in the fleet");
+        let mut flying = Flying::new(plan, 0.0);
+        (0..seconds)
+            .map(|second| {
+                flying.advance(f64::from(second), 1.0);
+                let report = TrackAndTurn::read(flying.answers(0.0)[0]);
+                Step {
+                    x: flying.x,
+                    y: flying.y,
+                    track: flying.plan.track,
+                    turning: flying.turning,
+                    alt: flying.alt,
+                    baro_rate: flying.baro_rate,
+                    roll: report
+                        .and_then(|report| report.roll_deg)
+                        .unwrap_or(f64::NAN),
+                    phase: flying.holding,
+                }
+            })
+            .collect()
+    }
+
+    /// The indices at which a step is the first of a run of steps of the phase.
+    fn entered(steps: &[Step], phase: fn(&Phase) -> bool) -> Vec<usize> {
+        (0..steps.len())
+            .filter(|&i| phase(&steps[i].phase) && (i == 0 || !phase(&steps[i - 1].phase)))
+            .collect()
+    }
+
+    #[test]
+    fn holding_aircraft_comes_back_over_its_fix_having_turned_right_through_360() {
+        // Arrange: twenty minutes, about four patterns
+        let minutes = 20;
+
+        // Act
+        let steps = hold_flown(minutes * 60);
+
+        // Assert: between two passes of the fix, which start its turn out, it turned a full
+        // circle to the right, and each pass is on the inbound course
+        let passes = entered(&steps, |phase| matches!(phase, Phase::TurningOut));
+        assert!(passes.len() >= 3, "{passes:?}");
+        for pair in passes.windows(2) {
+            let turned: f64 = steps[pair[0]..pair[1]]
+                .iter()
+                .map(|step| step.turning)
+                .sum();
+            assert!((turned - 360.0).abs() < 5.0, "{turned}");
+        }
+        for &pass in &passes {
+            let off = (steps[pass].track - 225.0 + 540.0).rem_euclid(360.0) - 180.0;
+            assert!(off.abs() < 10.0, "{off}");
+        }
+    }
+
+    #[test]
+    fn holding_aircraft_stays_near_its_fix_at_its_level() {
+        // Arrange: half an hour
+        let minutes = 30;
+
+        // Act
+        let steps = hold_flown(minutes * 60);
+
+        // Assert
+        let far = steps
+            .iter()
+            .map(|step| (step.x - HOLD_FIX.0).hypot(step.y - HOLD_FIX.1))
+            .fold(0.0, f64::max);
+        assert!(far < 8.0, "{far}");
+        assert!(steps.iter().all(|step| (step.alt - 14_000.0).abs() < 1e-9));
+        assert!(steps.iter().all(|step| step.baro_rate.abs() < 1e-9));
+    }
+
+    #[test]
+    fn holding_aircraft_banks_right_in_its_turns_and_flies_wings_level_outbound() {
+        // Arrange: two patterns
+        let minutes = 10;
+
+        // Act
+        let steps = hold_flown(minutes * 60);
+
+        // Assert
+        let turning_phase = |phase: Phase| matches!(phase, Phase::TurningOut | Phase::TurningIn);
+        let turns: Vec<_> = (1..steps.len())
+            .filter(|&i| turning_phase(steps[i].phase) && steps[i - 1].phase == steps[i].phase)
+            .map(|i| &steps[i])
+            .collect();
+        let outbound: Vec<_> = steps
+            .iter()
+            .filter(|step| {
+                matches!(step.phase, Phase::Outbound { .. }) && step.turning.abs() < 1e-9
+            })
+            .collect();
+        assert!(!turns.is_empty() && !outbound.is_empty());
+        assert!(turns.iter().all(|step| (15.0..=25.5).contains(&step.roll)));
+        assert!(outbound.iter().all(|step| step.roll.abs() < 0.5));
+        assert!(steps.iter().all(|step| step.roll > -5.0));
+    }
+
+    #[test]
+    fn holding_aircraft_flies_its_outbound_leg_for_a_minute() {
+        // Arrange: four patterns
+        let minutes = 20;
+
+        // Act
+        let steps = hold_flown(minutes * 60);
+
+        // Assert: each leg, from its first second to its last, is a minute long
+        let outbound = |phase: &Phase| matches!(phase, Phase::Outbound { .. });
+        let legs: Vec<usize> = entered(&steps, outbound)
+            .into_iter()
+            .map(|start| {
+                steps[start..]
+                    .iter()
+                    .take_while(|step| outbound(&step.phase))
+                    .count()
+            })
+            .collect();
+        assert!(legs.len() >= 3, "{legs:?}");
+        assert!(
+            legs.iter().all(|&seconds| (59..=61).contains(&seconds)),
+            "{legs:?}"
+        );
     }
 
     #[test]

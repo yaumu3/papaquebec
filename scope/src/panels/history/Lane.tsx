@@ -5,6 +5,7 @@ import type { ReadingKey } from '../../state/plotted';
 import { type Interval, xOf } from '../../state/span';
 import type { Sample } from '../../state/track';
 import { NONE, READINGS } from '../readings';
+import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
 import type { LanePart } from './laneDrag';
 import { type LaneMoves, onMoveKey } from './moves';
@@ -12,7 +13,6 @@ import {
   atTicks,
   barbPath,
   barbReach,
-  fixed,
   GLYPH_REACH_PX,
   headingAt,
   headingGlyph,

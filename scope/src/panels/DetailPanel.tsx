@@ -23,6 +23,7 @@ import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
 import { advisoryBelow } from './header';
 import { History } from './history/History';
+import { Nd } from './nd/Nd';
 import { NONE, positionReading, type Reading, READINGS } from './readings';
 import { Value } from './Value';
 
@@ -245,26 +246,20 @@ function Tabs() {
 function Readings(props: { t: Track }) {
   return (
     <div class={s.readings}>
+      <Nd t={props.t} />
       <Group name="FLT">
         <ReadingCell of="alt" t={props.t} />
         <ReadingCell of="vs" t={props.t} />
-        <ReadingCell of="gs" t={props.t} />
-        <ReadingCell of="trk" t={props.t} />
       </Group>
       <Group name="NAV">
         <ReadingCell of="selAlt" t={props.t} />
         <ReadingCell of="fmsAlt" t={props.t} />
-        <ReadingCell of="selHdg" t={props.t} />
         <ReadingCell of="qnh" t={props.t} />
         <ReadingCell of="modes" t={props.t} span={4} />
       </Group>
       <Group name="AIR">
         <ReadingCell of="ias" t={props.t} />
-        <ReadingCell of="tas" t={props.t} />
         <ReadingCell of="mach" t={props.t} />
-        <ReadingCell of="wind" t={props.t} />
-        <ReadingCell of="oat" t={props.t} />
-        <ReadingCell of="tat" t={props.t} />
       </Group>
       <Group name="POS">
         <PositionCell t={props.t} />

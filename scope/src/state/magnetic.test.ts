@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { magneticTrack, setDeclinationAt } from './magnetic';
+import { magneticBearing, magneticTrack, setDeclinationAt } from './magnetic';
 import { setSite } from './scope';
 
 /** The model made simple: 8° west up to 135°E, 7° west beyond. */
@@ -52,5 +52,20 @@ describe('magneticTrack', () => {
 
     // Assert
     expect(out).toEqual([10, 10]);
+  });
+});
+
+describe('magneticBearing', () => {
+  it('reads a true bearing against the declination at a point, and at the site for none', () => {
+    // Arrange
+    setDeclinationAt(() => stepped);
+    setSite({ lat: 35, lon: 140 });
+    const points = [{ lat: 34, lon: 130 }, { lat: 34, lon: 140 }, undefined];
+
+    // Act
+    const out = points.map((at) => magneticBearing(10, at));
+
+    // Assert
+    expect(out).toEqual([18, 17, 17]);
   });
 });

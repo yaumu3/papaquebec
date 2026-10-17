@@ -43,8 +43,11 @@ export function positionReading(p: Position): { k: string; r: Reading } {
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>
   v === undefined ? NONE : { v: v.toFixed(digits), unit };
 
-const signed = (v: number | undefined, unit: string): Reading =>
-  v === undefined ? NONE : { v: `${v > 0 ? '+' : ''}${Math.round(v)}`, unit };
+const signed = (v: number | undefined, unit: string): Reading => {
+  if (v === undefined) return NONE;
+  const n = Math.round(v);
+  return { v: `${n > 0 ? '+' : ''}${n}`, unit };
+};
 
 /** A bearing with its degree mark, or the blank of the unknown. */
 const degrees = (deg: number | undefined): string =>

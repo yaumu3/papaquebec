@@ -89,3 +89,9 @@ export const DEFAULT_PANELS: Panels = { display: true, maps: true, list: true, d
 export type DetailTab = 'now' | 'history';
 /** Every detail tab, in the order its tab bar lists them. */
 export const DETAIL_TABS: readonly DetailTab[] = ['now', 'history'];
+
+/** The ranges of the ND, in nautical miles, from the closest in. */
+export const ND_RANGES_NM = [10, 20, 40, 80] as const;
+export type NdRangeNm = (typeof ND_RANGES_NM)[number];
+/** The range the ND opens on. */
+export const DEFAULT_ND_RANGE_NM: NdRangeNm = 20;

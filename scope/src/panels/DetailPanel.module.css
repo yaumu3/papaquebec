@@ -201,7 +201,3 @@
   min-height: 0;
   overflow-y: auto;
 }
-/* The tab bar's rule stands for the first group's. */
-.readings > .group:first-child {
-  border-top: 0;
-}

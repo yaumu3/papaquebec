@@ -9,6 +9,8 @@ import {
   LABEL_DENSITIES,
   LAYER_KEYS,
   type Layers,
+  ND_RANGES_NM,
+  type NdRangeNm,
   PANEL_IDS,
   type Panels,
   QNH_MAX_INHG,
@@ -34,6 +36,8 @@ export interface Persisted {
   plotted: readonly LaneKey[];
   /** The tab the detail panel has open. */
   detailTab: DetailTab;
+  /** The range of the ND, one for all targets. */
+  ndRangeNm: NdRangeNm;
 }
 
 const oneOf = <T>(steps: readonly T[], v: unknown, fallback: T): T =>
@@ -139,6 +143,7 @@ export function loadPersisted(storage: Storage, defaults: Persisted): Persisted 
     listSort: sortFrom(r.listSort, defaults.listSort),
     plotted: plottedFrom(r.plotted, defaults.plotted),
     detailTab: oneOf(DETAIL_TABS, r.detailTab, defaults.detailTab),
+    ndRangeNm: oneOf(ND_RANGES_NM, r.ndRangeNm, defaults.ndRangeNm),
   };
 }
 

@@ -13,6 +13,9 @@ export function trueToMagnetic(trueDeg: number, declinationDeg: number): number 
   return m < 0 ? m + 360 : m;
 }
 
+/** Degrees from `from` round to `to` the short way, to the right positive. */
+export const turn = (from: number, to: number): number => ((to - from + 540) % 360) - 180;
+
 /** Velocity components in knots from ground speed and true track. */
 export function velocityNm(gsKt: number, trackDeg: number): Vec2 {
   const t = trackDeg * RAD;
