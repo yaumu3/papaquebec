@@ -463,7 +463,8 @@ impl Flying {
 
     /// The message fields it broadcasts in the second of the count: a position
     /// in one format and then the other, the velocity and what is selected
-    /// every second, and the rest at the longer periods of DO-260B.
+    /// every second, a set emergency/priority status every second too (DO-260B
+    /// has it every 0.7 to 0.9 s), and the rest at the longer periods of DO-260B.
     fn broadcasts(&self, site: Position, second: u64) -> Vec<Bits> {
         let plan = &self.plan;
         let odd = !second.is_multiple_of(2);
@@ -482,12 +483,16 @@ impl Flying {
             };
             fields.push(status.write());
         }
-        if second.is_multiple_of(5) {
+        let emergency_priority_status = plan.status.unwrap_or_else(|| emergency(plan.squawk));
+        let set = emergency_priority_status != EmergencyPriorityStatus::NoEmergency;
+        if set || second.is_multiple_of(5) {
             let status = Status {
-                emergency_priority_status: plan.status.unwrap_or_else(|| emergency(plan.squawk)),
+                emergency_priority_status,
                 mode_a_code: Some(plan.squawk),
             };
             fields.push(status.write());
+        }
+        if second.is_multiple_of(5) {
             let identification = plan.callsign.then(|| Identification {
                 identification: Some(self.name("TEST")),
                 emitter_category: plan.category,
@@ -756,7 +761,8 @@ fn ticks(seconds: f64) -> u64 {
 mod tests {
     use super::{Fleet, Flying, Plan, turn_rate_deg_per_s};
     use crate::testing::{SITE, hand_clock};
-    use tracker::field::Field;
+    use tracker::field::{Field, Status};
+    use tracker::proto::EmergencyPriorityStatus;
     use tracker::register::TrackAndTurn;
 
     /// A fleet at second 1000 and the hand that moves its clock.
@@ -803,6 +809,32 @@ mod tests {
             roll.is_some_and(|roll| (roll - expected).abs() < 0.2)
         };
         assert!(near(rolls[0], 24.4) && near(rolls[1], -24.4), "{rolls:?}");
+    }
+
+    #[test]
+    fn a_set_status_is_broadcast_every_second_and_none_every_five() {
+        // Arrange: one with minimum fuel, one with no status set
+        let flying = [Some(EmergencyPriorityStatus::MinimumFuel), None].map(|status| {
+            let plan = Plan {
+                status,
+                squawk: 0o2253,
+                ..Plan::default()
+            };
+            Flying::new(plan, 0.0)
+        });
+
+        // Act
+        let broadcast = flying.map(|aircraft| {
+            (1..=5)
+                .filter(|&second| {
+                    let fields = aircraft.broadcasts(SITE, second);
+                    fields.into_iter().any(|bits| Status::read(bits).is_some())
+                })
+                .count()
+        });
+
+        // Assert
+        assert_eq!(broadcast, [5, 1]);
     }
 
     #[test]
