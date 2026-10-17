@@ -91,10 +91,28 @@ export const altitudeStripPath = (g: PfdGeometry): string => box(g.aL, g.yTop, g
 /** The band of the flight mode annunciator across the attitude window's width. */
 export const fmaBandPath = (g: PfdGeometry): string => box(g.wx, FMA_TOP_PX, g.wxr, FMA_BOTTOM_PX);
 
+const fmaColumnWidth = (g: PfdGeometry): number => (g.wxr - g.wx) / FMA_COLUMNS;
+
 /** The two rules that split the band into its columns. */
 export function fmaRulesPath(g: PfdGeometry): string {
-  const column = (g.wxr - g.wx) / FMA_COLUMNS;
   return [1, 2]
-    .map((i) => `M${fixed(g.wx + i * column)} ${fixed(FMA_TOP_PX)}V${fixed(FMA_BOTTOM_PX)}`)
+    .map(
+      (i) => `M${fixed(g.wx + i * fmaColumnWidth(g))} ${fixed(FMA_TOP_PX)}V${fixed(FMA_BOTTOM_PX)}`,
+    )
     .join('');
 }
+
+/** The horizontal centre of each column of the band. */
+export const fmaColumnX = (g: PfdGeometry): [number, number, number] => [
+  g.wx + fmaColumnWidth(g) * 0.5,
+  g.wx + fmaColumnWidth(g) * 1.5,
+  g.wx + fmaColumnWidth(g) * 2.5,
+];
+
+/** The centre line of the band. */
+export const FMA_CENTRE_Y = (FMA_TOP_PX + FMA_BOTTOM_PX) / 2;
+
+const AP_RISE_PX = 10;
+
+/** The centre line of the autopilot's label, just above the attitude window. */
+export const apY = (g: PfdGeometry): number => g.wy - AP_RISE_PX;

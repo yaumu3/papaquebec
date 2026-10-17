@@ -2,7 +2,9 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   altitudeStripPath,
+  apY,
   fmaBandPath,
+  fmaColumnX,
   fmaRulesPath,
   pfdGeometry,
   speedStripPath,
@@ -111,5 +113,31 @@ describe('altitudeStripPath', () => {
 
     // Assert
     expect(out).toBe('M258.0 36.0H316.0V210.0H258.0Z');
+  });
+});
+
+describe('fmaColumnX', () => {
+  it('centres each column of the band', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = fmaColumnX(g);
+
+    // Assert
+    expect(out).toEqual([97, 155, 213]);
+  });
+});
+
+describe('apY', () => {
+  it('stands just above the attitude window', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = apY(g);
+
+    // Assert
+    expect(out).toBe(42);
   });
 });

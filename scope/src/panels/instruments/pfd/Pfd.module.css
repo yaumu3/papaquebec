@@ -33,3 +33,23 @@
   stroke: var(--pfd-ink);
   stroke-width: 1.2;
 }
+.mode {
+  position: absolute;
+  box-sizing: border-box;
+  height: 13px;
+  padding: 0 4px;
+  border: 1px solid transparent;
+  color: var(--color-level);
+  font-size: var(--text-sm);
+  line-height: 11px;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+}
+.ap {
+  position: absolute;
+  color: var(--color-level);
+  font-size: var(--text-lg);
+  letter-spacing: var(--tracking-wide);
+  line-height: 1;
+  transform: translate(-50%, -50%);
+}
