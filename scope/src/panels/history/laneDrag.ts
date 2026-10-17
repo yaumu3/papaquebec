@@ -87,6 +87,12 @@ export function createLaneDrag(deps: {
       }
       frame = requestAnimationFrame(scroll);
     };
+    /** Picks the lane up, the pointer at `x`, `y`. */
+    const pickUp = (x: number, y: number) => {
+      setDrag(at({ lane, from, slot: from, overBin: false, x: x0, y: y0, grabX }, x, y));
+      window.addEventListener('keydown', onKey, { capture: true });
+      frame = requestAnimationFrame(scroll);
+    };
     const onMove = (m: PointerEvent) => {
       const d = drag();
       const s = swipe();
@@ -101,12 +107,7 @@ export function createLaneDrag(deps: {
       const dx = m.clientX - x0;
       const gesture = gestureOf(m.pointerType, axisOf(dx, m.clientY - y0, SLOP_PX));
       if (gesture === 'swipe') setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
-      if (gesture !== 'drag') return;
-      setDrag(
-        at({ lane, from, slot: from, overBin: false, x: x0, y: y0, grabX }, m.clientX, m.clientY),
-      );
-      window.addEventListener('keydown', onKey, { capture: true });
-      frame = requestAnimationFrame(scroll);
+      if (gesture === 'drag') pickUp(m.clientX, m.clientY);
     };
     const onUp = () => {
       const d = drag();
