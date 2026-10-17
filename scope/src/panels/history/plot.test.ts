@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { makeSample as sample } from '../../state/sampleFixture';
+import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
 import {
   atTicks,
   barbPath,
@@ -20,7 +20,7 @@ const ALL: Interval = { from: 0, to: 10_000 };
 describe('laneTraces', () => {
   it('draws the lane its own reading first, then each intent plotted in it with its dash, marked as one', () => {
     // Arrange
-    const samples = [sample(1, { alt: 11000, selAlt: 12000, fmsAlt: 13000 })];
+    const samples = [heardSample(1, { alt: 11000, selAlt: 12000, fmsAlt: 13000 })];
 
     // Act
     const traces = laneTraces(samples, ['alt', 'fmsAlt', 'selAlt'], ALL);
@@ -172,13 +172,44 @@ describe('headingGlyph with a selected heading', () => {
   });
 });
 
+describe('laneTraces with the instants each reading is heard at', () => {
+  it('breaks a line where its reading went unheard, while the target kept being heard', () => {
+    // Arrange
+    const again = 2 + GAP_SEC;
+    const samples = Array.from({ length: 40 }, (_, k) =>
+      sample(k + 1, {
+        alt: 11000,
+        verticalRate: 0,
+        heard: { alt: k + 1 < again ? 1 : again, verticalRate: k + 1 },
+      }),
+    );
+
+    // Act
+    const traces = [laneTraces(samples, ['alt'], ALL), laneTraces(samples, ['vs'], ALL)];
+
+    // Assert
+    expect(traces.map(([tr]) => tr?.runs.map((run) => run.length))).toEqual([[1, 1], [40]]);
+  });
+
+  it('joins every sample of a reading of the reception itself', () => {
+    // Arrange
+    const samples = [1, 2, 3].map((t) => sample(t, { messageRate: 4 }));
+
+    // Act
+    const traces = laneTraces(samples, ['msgs'], ALL);
+
+    // Assert
+    expect(traces.map((tr) => tr.runs.map((run) => run.length))).toEqual([[3]]);
+  });
+});
+
 describe('laneTraces on the ground', () => {
   it('draws the stretch on the ground along the floor, apart from the altitudes', () => {
     // Arrange
     const samples = [
-      sample(1, { alt: 'ground' }),
-      sample(2, { alt: 'ground' }),
-      sample(3, { alt: 500 }),
+      heardSample(1, { alt: 'ground' }),
+      heardSample(2, { alt: 'ground' }),
+      heardSample(3, { alt: 500 }),
     ];
 
     // Act
@@ -322,9 +353,9 @@ describe('laneRange', () => {
   it('spans the own reading and its intents on one scale, off the floor, at least the lane span', () => {
     // Arrange
     const samples = [
-      sample(1, { alt: 'ground' }),
-      sample(2, { alt: 35_000, selAlt: 35_100 }),
-      sample(3, { alt: 35_020, selAlt: 35_100 }),
+      heardSample(1, { alt: 'ground' }),
+      heardSample(2, { alt: 35_000, selAlt: 35_100 }),
+      heardSample(3, { alt: 35_020, selAlt: 35_100 }),
     ];
     const traces = laneTraces(samples, ['alt', 'selAlt'], ALL);
 

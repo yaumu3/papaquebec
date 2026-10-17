@@ -2,7 +2,7 @@ import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Dash, type Heading, minSpanOf, PLOTS } from './plots';
+import { type Dash, HEARD, type Heading, minSpanOf, PLOTS } from './plots';
 import type { Interval } from './span';
 import {
   barbMarks,
@@ -42,7 +42,7 @@ export function laneTraces(
   if (lane === undefined) return [];
   const own = PLOTS[lane];
   if (own.kind !== 'line' && own.kind !== 'pair') return [];
-  const read = (y: Read) => runsOf(samples, y, visible);
+  const read = (y: Read, key: ReadingKey = lane) => runsOf(samples, y, visible, HEARD[key]);
   const floor = own.kind === 'line' ? own.floor : undefined;
   const floorRuns = floor ? read((s) => (floor(s) ? 0 : undefined)) : [];
   const floored: LaneTrace[] =
@@ -51,7 +51,7 @@ export function laneTraces(
   const drawn = intents.flatMap((key) => {
     const spec = PLOTS[key];
     if (spec.kind !== 'intent') return [];
-    return [{ key, runs: read(spec.y), dash: spec.dash, intent: true as const }];
+    return [{ key, runs: read(spec.y, key), dash: spec.dash, intent: true as const }];
   });
   return [{ key: lane, runs: read(own.y) }, ...floored, ...second, ...drawn];
 }

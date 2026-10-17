@@ -1,4 +1,5 @@
 import { epuM } from '../../lib/accuracy';
+import type { HeardKey } from '../../lib/aircraft';
 import { crewAltitudeFt } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { modeNames, sourceName } from '../../lib/format';
@@ -90,6 +91,31 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   rssi: { kind: 'line', y: (s) => s.rssi, minSpan: 6 },
   msgs: { kind: 'line', y: (s) => s.messageRate, minSpan: 4 },
   age: { kind: 'pair', y: (s) => s.seen, y2: (s) => s.seenPos, dash: 'dashed', minSpan: 5 },
+};
+
+/** The values each reading is made of, by the instants they are heard at; none for the reception's own. */
+export const HEARD: Record<ReadingKey, readonly HeardKey[]> = {
+  alt: ['alt'],
+  selAlt: ['selAlt'],
+  fmsAlt: ['fmsAlt'],
+  vs: ['verticalRate'],
+  trk: ['track', 'heading'],
+  selHdg: ['selHeading'],
+  gs: ['gs'],
+  qnh: ['navQnh'],
+  modes: ['navModes'],
+  ias: ['ias'],
+  tas: ['tas'],
+  mach: ['mach'],
+  wind: ['windSpeed', 'windDir'],
+  oat: ['oat'],
+  tat: ['tat'],
+  nic: ['nic', 'rc'],
+  nacp: ['nacP'],
+  src: [],
+  rssi: [],
+  msgs: [],
+  age: [],
 };
 
 /** The least span of the scale `key` is drawn on: its lane's, none for a lane of bars, barbs or glyphs. */
