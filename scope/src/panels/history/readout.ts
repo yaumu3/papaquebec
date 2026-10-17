@@ -2,7 +2,7 @@ import { climbState } from '../../lib/format';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { NONE, READINGS } from '../readings';
-import { plotText } from './plot';
+import { headingHeardNear, plotText } from './plot';
 import { PLOTS } from './plots';
 
 /**
@@ -108,9 +108,11 @@ function intentsOf(
   };
 }
 
-/** What the lane of `keys`, its own reading then the intents drawn in it, reads at `s`. */
-export function readoutOf(keys: readonly ReadingKey[], s: Sample): LaneReadout {
+/** What the lane of `keys`, its own reading then the intents drawn in it, reads at the sample `at`. */
+export function readoutOf(keys: readonly ReadingKey[], at: Sample): LaneReadout {
   const [lane] = keys;
+  // As the glyphs draw them: a track, heading or selection heard a gap ago is unknown.
+  const s = lane === 'trk' ? headingHeardNear(at, at.t) : at;
   const value = (lane && textOf(lane, s)) ?? NONE.v;
   const intents = intentsOf(keys, s);
   const [first, other] = intents.keys.flatMap((key) => {

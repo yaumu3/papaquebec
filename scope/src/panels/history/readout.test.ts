@@ -91,7 +91,12 @@ describe('readoutOf', () => {
 
   it('reads the selected heading after the track and heading, when it is plotted and steers', () => {
     // Arrange
-    const s = sample(1, { heading: 284, selHeading: 310, navModes: ['autopilot'] });
+    const s = sample(1, {
+      heading: 284,
+      selHeading: 310,
+      navModes: ['autopilot'],
+      heard: { heading: 1, selHeading: 1 },
+    });
     const lanes = [['trk', 'selHdg'], ['trk']] as const;
 
     // Act
@@ -135,6 +140,23 @@ describe('readoutOf', () => {
 
     // Assert
     expect(readout).toEqual({ value: 'FL296', first: { key: 'fmsAlt', text: 'FL340' } });
+  });
+
+  it('reads a heading heard longer ago than the gap as unknown, as the glyph leaves it out', () => {
+    // Arrange
+    const s = sample(100, {
+      track: 90,
+      heading: 85,
+      selHeading: 310,
+      navModes: ['autopilot'],
+      heard: { track: 100, heading: 59, selHeading: 100 },
+    });
+
+    // Act
+    const readout = readoutOf(['trk', 'selHdg'], s);
+
+    // Assert
+    expect(readout).toEqual({ value: '090° / ---', first: { key: 'selHdg', text: '310°' } });
   });
 });
 

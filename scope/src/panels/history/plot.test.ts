@@ -6,6 +6,7 @@ import {
   barbPath,
   barbReach,
   GLYPH_REACH_PX,
+  headingAt,
   headingGlyph,
   laneRange,
   laneTraces,
@@ -490,5 +491,34 @@ describe('scaleLabels', () => {
 
     // Assert
     expect(labels.map((l) => l.v)).toEqual([465, 430]);
+  });
+});
+
+describe('headingAt', () => {
+  it('reads each of the track, heading and selected heading only while heard within the gap of the tick', () => {
+    // Arrange
+    const steering = { track: 90, heading: 85, selHeading: 120, navModes: ['autopilot'] };
+    const stale = 100 - GAP_SEC - 11;
+    const rows = [
+      { track: 100, heading: stale, selHeading: 100 },
+      { track: 100, heading: 100, selHeading: 100 },
+      { track: stale, heading: 100, selHeading: 100 },
+      { track: stale, heading: stale, selHeading: 100 },
+      { track: 100, heading: 100, selHeading: stale },
+    ];
+
+    // Act
+    const marks = rows.map((heard) =>
+      headingAt(sample(100, { ...steering, heard }), 100, 'selHdg'),
+    );
+
+    // Assert
+    expect(marks).toEqual([
+      { trk: 90, hdg: undefined, sel: 120 },
+      { trk: 90, hdg: 85, sel: 120 },
+      { trk: undefined, hdg: 85, sel: 120 },
+      undefined,
+      { trk: 90, hdg: 85, sel: undefined },
+    ]);
   });
 });

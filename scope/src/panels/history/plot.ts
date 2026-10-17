@@ -164,14 +164,15 @@ export interface Preference {
 }
 
 /**
- * One reading per tick, from the sample nearest it or the nearest one preferred, unless that lies
- * a gap away or lacks it, or its reading, of the `heard` instants, was heard a gap away. A
- * preferred sample a gap away gives way to the nearest, however far the preference reaches.
+ * One reading per tick, from the sample nearest it or the nearest one preferred, read at the
+ * tick, unless that lies a gap away or lacks it, or its reading, of the `heard` instants, was heard
+ * a gap away. A preferred sample a gap away gives way to the nearest, however far the preference
+ * reaches.
  */
 export function atTicks<T extends object>(
   samples: readonly Sample[],
   ticks: readonly number[],
-  read: (s: Sample) => T | undefined,
+  read: (s: Sample, t: number) => T | undefined,
   prefer?: Preference,
   heard: readonly HeardKey[] = [],
 ): (T & { t: number })[] {
@@ -180,7 +181,8 @@ export function atTicks<T extends object>(
   return ticks.flatMap((t) => {
     const near = nearestInTime(preferred, t);
     const s = near && Math.abs(near.t - t) <= reach ? near : nearestInTime(samples, t);
-    const value = s && Math.abs(s.t - t) <= GAP_SEC && heardNear(s, heard, t) ? read(s) : undefined;
+    const value =
+      s && Math.abs(s.t - t) <= GAP_SEC && heardNear(s, heard, t) ? read(s, t) : undefined;
     return value ? [{ ...value, t }] : [];
   });
 }
@@ -274,6 +276,29 @@ const turn = (from: number, to: number): number => ((to - from + 540) % 360) - 1
 /** The heading glyph's readings: the track and heading, and the selected heading while it steers. */
 export interface HeadingMark extends Heading {
   sel?: number | undefined;
+}
+
+/** The sample less each of its track, heading and selected heading not heard within the gap of `t`. */
+export function headingHeardNear(s: Sample, t: number): Sample {
+  const near = (key: HeardKey) => heardNear(s, [key], t);
+  return {
+    ...s,
+    track: near('track') ? s.track : undefined,
+    heading: near('heading') ? s.heading : undefined,
+    selHeading: near('selHeading') ? s.selHeading : undefined,
+  };
+}
+
+/**
+ * What a heading glyph at `t` reads of a sample, each part only while heard within the gap of
+ * `t`, the intent `sel` among them; none when neither the track nor the heading was.
+ */
+export function headingAt(s: Sample, t: number, sel?: ReadingKey): HeadingMark | undefined {
+  const spec = PLOTS.trk;
+  const intent = sel === undefined ? undefined : PLOTS[sel];
+  const heard = headingHeardNear(s, t);
+  const h = spec.kind === 'heading' ? spec.heading(heard) : undefined;
+  return h && { ...h, sel: intent?.kind === 'intent' ? intent.y(heard) : undefined };
 }
 
 export interface HeadingGlyph {

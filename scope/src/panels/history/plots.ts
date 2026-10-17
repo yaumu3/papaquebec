@@ -121,7 +121,7 @@ export const HEARD: Record<ReadingKey, readonly HeardKey[]> = {
   selAlt: ['selAlt'],
   fmsAlt: ['fmsAlt'],
   vs: ['verticalRate'],
-  trk: ['track', 'heading'],
+  trk: ['track'],
   selHdg: ['selHeading'],
   gs: ['gs'],
   qnh: ['navQnh'],
