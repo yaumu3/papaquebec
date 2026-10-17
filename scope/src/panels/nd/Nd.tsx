@@ -76,7 +76,12 @@ export function Nd(props: { t: Track }) {
     return rel === undefined ? undefined : bugPath(g(), rel);
   });
   return (
-    <div ref={setRoot} class={cx(s.nd, lastFrame() && s.last)} style={{ height: `${g().h}px` }}>
+    <div
+      data-nd
+      ref={setRoot}
+      class={cx(s.nd, lastFrame() && s.last)}
+      style={{ height: `${g().h}px` }}
+    >
       <Show when={width() > 0}>
         <svg class={s.svg} aria-hidden="true">
           <path class={s.ring} d={ringPath(g())} />
