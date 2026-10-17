@@ -639,6 +639,17 @@ impl Flying {
         vec![position.write(), velocity.write()]
     }
 
+    /// The modes it reports: the plan's, with altitude hold also engaged while it flies level with a
+    /// level selected.
+    #[allow(clippy::float_cmp)]
+    fn modes(&self) -> Option<Modes> {
+        let level = self.baro_rate == 0.0 && self.sel_alt.is_some();
+        self.plan.modes.map(|modes| Modes {
+            altitude_hold: modes.altitude_hold || level,
+            ..modes
+        })
+    }
+
     /// What is selected on the autopilot, when the aircraft reports any of it.
     fn selected(&self) -> Option<TargetStateAndStatus> {
         let plan = &self.plan;
@@ -647,7 +658,7 @@ impl Flying {
             selected_altitude_fms_ft: None,
             selected_heading_deg: plan.sel_heading,
             baro_setting_hpa: self.sel_alt.map(|_| 1013.6),
-            modes: plan.modes.map(ModesReported::from).unwrap_or_default(),
+            modes: self.modes().map(ModesReported::from).unwrap_or_default(),
         };
         let reports = target != TargetState::default();
         reports.then_some(TargetStateAndStatus {
@@ -862,9 +873,9 @@ fn ticks(seconds: f64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Fleet, Flying, Phase, Plan, fleet as planned, turn_rate_deg_per_s};
+    use super::{Fleet, Flying, MANAGED, Phase, Plan, fleet as planned, turn_rate_deg_per_s};
     use crate::testing::{SITE, hand_clock};
-    use tracker::field::{Field, Status};
+    use tracker::field::{Field, ModesReported, Status};
     use tracker::proto::EmergencyPriorityStatus;
     use tracker::register::TrackAndTurn;
 
@@ -912,6 +923,63 @@ mod tests {
             roll.is_some_and(|roll| (roll - expected).abs() < 0.2)
         };
         assert!(near(rolls[0], 24.4) && near(rolls[1], -24.4), "{rolls:?}");
+    }
+
+    /// The modes an aircraft with this plan reports at the start.
+    fn reported_modes(plan: Plan) -> ModesReported {
+        let selected = Flying::new(plan, 0.0).selected();
+        selected.expect("the plan selects a level").target.modes
+    }
+
+    /// An aircraft at 7000 ft with 7000 ft selected, on managed modes, climbing at `baro_rate`.
+    fn selected_plan(baro_rate: f64) -> Plan {
+        Plan {
+            alt: 7000.0,
+            baro_rate,
+            sel_alt: Some(7000.0),
+            modes: Some(MANAGED),
+            ..Plan::default()
+        }
+    }
+
+    #[test]
+    fn aircraft_level_at_its_selected_level_on_the_autopilot_reports_altitude_hold() {
+        // Arrange
+        let plan = selected_plan(0.0);
+
+        // Act
+        let modes = reported_modes(plan);
+
+        // Assert
+        assert_eq!(modes.altitude_hold, Some(true));
+        assert_eq!(modes.vnav, Some(true));
+    }
+
+    #[test]
+    fn aircraft_climbing_on_the_autopilot_does_not_report_altitude_hold() {
+        // Arrange
+        let plan = selected_plan(1500.0);
+
+        // Act
+        let modes = reported_modes(plan);
+
+        // Assert
+        assert_eq!(modes.altitude_hold, Some(false));
+    }
+
+    #[test]
+    fn aircraft_with_no_modes_reports_none_even_when_level() {
+        // Arrange
+        let plan = Plan {
+            modes: None,
+            ..selected_plan(0.0)
+        };
+
+        // Act
+        let modes = reported_modes(plan);
+
+        // Assert
+        assert_eq!(modes, ModesReported::default());
     }
 
     /// TEST06's fix, NM east and north of the site.
