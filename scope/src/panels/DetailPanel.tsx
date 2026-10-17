@@ -1,10 +1,19 @@
-import { createMemo, createSignal, For, type JSX, onCleanup, Show } from 'solid-js';
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  type JSX,
+  on,
+  onCleanup,
+  Show,
+} from 'solid-js';
 
 import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { isStale, trackLabel } from '../render/scene/rules';
-import { detailTab, plotted, setDetailTab } from '../state/history';
+import { detailTab, keepViewOf, plotted, setDetailTab } from '../state/history';
 import type { ReadingKey } from '../state/plotted';
 import { selected, setPan, snapshotVersion } from '../state/scope';
 import { DETAIL_TABS, type DetailTab } from '../state/settings';
@@ -278,6 +287,7 @@ export function DetailPanel() {
     const hex = selected();
     return hex ? (trackStore.tracks.get(hex) ?? null) : null;
   });
+  createEffect(on(createMemo(selected), keepViewOf));
   return (
     <Window id="detail" bodyClass={s.body}>
       <Show

@@ -1,20 +1,32 @@
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js';
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+} from 'solid-js';
 
 import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
 import {
   addPlotLane,
+  historyView,
   hoverInstant,
   movePlotLane,
   plotted,
   removePlotLane,
+  setHistorySpan,
   setHoverInstant,
+  setLaneScroll,
   switchPlotLane,
 } from '../../state/history';
 import { laneAfter, type LaneKey, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
-import { type Interval, resolveSpan, type Span, WHOLE, xOf } from '../../state/span';
+import { type Interval, resolveSpan, type Span, xOf } from '../../state/span';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { placeOf } from '../../ui/reorder';
@@ -58,21 +70,13 @@ const LIFT_GAP_PX = 4;
 
 /** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
 export function History(props: { track: Track }) {
-  const [span, setSpan] = createSignal<Span>(WHOLE);
   /** How far across the plots the pointer is, if it is over them. */
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
-  // A memo, so that only another target resets the span, not every snapshot of this one.
+  // A memo, so that only another target resets the hover, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
-  createEffect(
-    on(
-      hex,
-      () => {
-        setSpan(WHOLE);
-        setHoverPx(null);
-      },
-      { defer: true },
-    ),
-  );
+  const span = () => historyView(hex()).span;
+  const setSpan = (next: Span) => setHistorySpan(hex(), next);
+  createEffect(on(hex, () => setHoverPx(null), { defer: true }));
   onCleanup(() => setHoverInstant(null));
 
   /** The samples, told apart from the last snapshot's though the store appends to one array. */
@@ -241,6 +245,14 @@ export function History(props: { track: Track }) {
       reveal(lane);
     },
   });
+  const restoreScroll = () => {
+    const el = scroller();
+    if (!el) return;
+    el.scrollTop = historyView(hex()).scrollTop;
+    measure();
+  };
+  onMount(restoreScroll);
+  createEffect(on(hex, restoreScroll, { defer: true }));
   // Lanes come and go, which changes how far they scroll.
   createEffect(() => {
     plotted();
@@ -330,7 +342,8 @@ export function History(props: { track: Track }) {
           <div
             ref={setScroller}
             class={s.scroller}
-            onScroll={() => {
+            onScroll={(e) => {
+              setLaneScroll(hex(), e.currentTarget.scrollTop);
               measure();
               closeMenu();
             }}
