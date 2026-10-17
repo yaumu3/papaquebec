@@ -36,8 +36,10 @@ const cursorLeft = (px: number): string =>
   `calc(var(--lane-overhang) + var(--plot-left) + ${px - 0.5}px)`;
 /** The chip's padding either side of its time. */
 const CHIP_PAD_PX = 3;
-/** The characters of the chip's time, which reads to the second. */
-const CHIP_CHARS = 8;
+/** A clock time to the second, measured for the clock labels' width per character. */
+const RULER = '00:00:00';
+/** The least room between the chip and a clock label. */
+const CHIP_GAP_PX = 4;
 /** The notch under the chip, pointing down the cursor. */
 const NOTCH_W_PX = 7;
 const NOTCH_H_PX = 4;
@@ -118,6 +120,8 @@ export function History(props: { track: Track }) {
 
   const [chipText, setChipText] = createSignal<HTMLSpanElement>();
   const chipTextWidth = trackWidth(chipText);
+  const [ruler, setRuler] = createSignal<HTMLSpanElement>();
+  const rulerWidth = trackWidth(ruler);
   /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere without a lane. */
   const cursorX = () => {
     const a = at();
@@ -133,7 +137,7 @@ export function History(props: { track: Track }) {
     const first = tickTimes()[0];
     return first === undefined
       ? 0
-      : (clockLabel(first, step()).length * chipTextWidth()) / CHIP_CHARS / 2;
+      : (clockLabel(first, step()).length * rulerWidth()) / RULER.length / 2;
   };
   /** The ticks whose labels fit whole over the plots. */
   const labelTimes = createMemo(() => clearOfEnds(tickTimes(), x, plotWidth(), labelHalf()));
@@ -143,7 +147,7 @@ export function History(props: { track: Track }) {
     const cursor = cursorX();
     if (cursor === null) return times.map(() => true);
     const left = chipLeft(cursor);
-    return clearOf(times.map(x), left, left + chipWidth(), labelHalf());
+    return clearOf(times.map(x), left, left + chipWidth(), labelHalf() + CHIP_GAP_PX);
   });
 
   const reorder = trackReorder(movePlotLane);
@@ -171,7 +175,7 @@ export function History(props: { track: Track }) {
   return (
     <div
       class={cx(s.history, !historyOpen() && s.folded)}
-      style={{ '--lane-height': `${LANE_PX}px` }}
+      style={{ '--lane-height': `${LANE_PX}px`, '--notch-height': `${NOTCH_H_PX}px` }}
     >
       <div class={s.title}>
         <button
@@ -211,6 +215,9 @@ export function History(props: { track: Track }) {
                 </Show>
               )}
             </For>
+            <span ref={setRuler} class={cx(s.label, s.ruler)} aria-hidden="true">
+              {RULER}
+            </span>
             <Show when={cursorX() !== null && at()}>
               {(a) => (
                 <>

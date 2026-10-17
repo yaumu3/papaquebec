@@ -307,16 +307,26 @@
   letter-spacing: var(--tracking);
   white-space: nowrap;
 }
-/* Labels line up with the plots; one at an edge may overhang into the grip or close column. */
+/*
+ * Labels line up with the plots; the cursor's chip stands among them, its notch below reaching
+ * down over the hairline to the first lane's top edge.
+ */
 .labels {
+  --chip-height: 14px;
   position: relative;
-  height: 12px;
+  height: calc(var(--chip-height) + var(--notch-height) - 1px);
   margin: 0 var(--plot-right) 0 var(--plot-left);
-  line-height: 10px;
 }
+/* On the chip time's baseline: its box as tall, less the chip's border either side. */
 .label {
   position: absolute;
+  top: 1px;
+  line-height: calc(var(--chip-height) - 2px);
   transform: translateX(-50%);
+}
+/* A clock label never shown, measured for the labels' width. */
+.ruler {
+  visibility: hidden;
 }
 /*
  * The time cursor: a chip on the clock with a notch down to the lanes, and one line through them,
@@ -329,7 +339,9 @@
   top: 0;
   z-index: 1;
   box-sizing: border-box;
-  height: 12px;
+  height: var(--chip-height);
+  font-size: var(--text-sm);
+  line-height: calc(var(--chip-height) - 2px);
   border: 1px solid currentColor;
   background: var(--panel-bg);
   color: var(--text-dim);
@@ -341,7 +353,7 @@
 }
 .notch {
   position: absolute;
-  top: 100%;
+  top: var(--chip-height);
   z-index: 1;
   fill: currentColor;
   color: var(--text-dim);
