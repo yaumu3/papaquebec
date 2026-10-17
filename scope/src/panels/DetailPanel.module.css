@@ -3,31 +3,97 @@
   font-size: var(--text-sm);
   letter-spacing: var(--tracking);
 }
+/* Who it is: the flight, then the airframe, an advisory at the right end of either. */
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: var(--space-4);
+  row-gap: var(--space-3);
+  align-items: center;
+  padding-top: var(--space-3);
+}
+/* On a phone the grabber already stands above it. */
+@media (max-width: 720px) {
+  .head {
+    padding-top: 0;
+  }
+}
+/* As wide as its text, so that the callsign is never cut. */
+.flight {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: max-content;
+  white-space: nowrap;
+}
+.ra {
+  grid-area: 1 / 2;
+  justify-self: end;
+}
+.airframe {
+  grid-area: 2 / 1;
+  display: flex;
+  gap: var(--space-5);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking);
+  white-space: nowrap;
+}
+.raBelow .flight {
+  grid-column: 1 / -1;
+}
+.raBelow .ra {
+  grid-row: 2;
+}
+/* Copied by selecting it, which the page otherwise turns off. */
+.text {
+  user-select: text;
+  -webkit-user-select: text;
+}
 .callsign {
   color: var(--color-selected);
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: var(--tracking);
 }
-/* A badge is an alert; a tag says only that something is on, in the tone of a control that is. */
-.badge,
-.tag {
-  margin-left: var(--space-4);
+.squawk {
+  color: var(--text);
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking);
+}
+/*
+ * An emergency reads inverse in red, the ident in the tone of a control that is on, a priority
+ * outlined in amber; every tag in a box of one height.
+ */
+.code,
+.emergency,
+.tag,
+.priority {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
   padding: 0 5px;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+}
+.code,
+.emergency {
   background: var(--color-emergency);
   color: var(--panel-bg);
-  font-size: var(--text-sm);
-  vertical-align: 2px;
+}
+.code {
+  font-size: var(--text-md);
+  font-weight: 600;
 }
 .tag {
   background: var(--control-on-bg);
   color: var(--control-on-text);
 }
-/* Who it is. */
-.head {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-6);
+.priority {
+  padding: 0 4px;
+  border: 1px solid var(--color-caution);
+  color: var(--color-caution);
 }
 /* Each group rules itself off above, closer than the panel's dividers sit. */
 .group {
@@ -50,7 +116,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-1);
 }
-/* A cell is a button: it plots its reading, or copies or centres. Nothing frames it. */
+/* A cell is a button: it plots its reading, or centres. Nothing frames it. */
 .cell {
   min-width: 0;
   padding: var(--space-2) var(--space-3);
@@ -77,10 +143,6 @@
 .glyph {
   color: var(--text-muted);
 }
-.alert {
-  --value: var(--color-emergency);
-}
-/* After the tones so a missing value reads dim whatever its tone. */
 .dim {
   --value: var(--text-dim);
 }

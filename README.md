@@ -192,7 +192,10 @@ Conventions:
     red, filtered like any target.
   - An active resolution advisory tags the block `RA` in the same red, and an ident `ID` in white;
     the tags share one line: emergency, advisory, priority, ident.
-  - The detail panel badges them beside the callsign, the advisory in the words TCAS says it in.
+  - The detail panel turns an emergency squawk red with its shorthand (`7700 EM`) and puts an
+    active advisory at the right, in the words TCAS says it in.
+- **The detail panel** heads with the flight (callsign, squawk, tags) over the airframe (type,
+  registration, address), which select and copy as text.
 - **Data blocks** put the callsign over the altitude with climb arrow and, flipping every eight
   seconds in step across all blocks, the type or ground speed with wake letter.
   - Each hangs on a short leader at one of eight bearings round its target, reading away from the
