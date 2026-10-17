@@ -119,7 +119,7 @@ function Squawk(props: { squawk: string | undefined; code: EmergencyCode | null 
  * at the right end of the first, or of the second when the first has no room for it.
  */
 function Header(props: { t: Track }) {
-  const tags = () => statusTags(props.t.squawk, props.t.emergency);
+  const tags = createMemo(() => statusTags(props.t.squawk, props.t.emergency));
   const ra = () => (props.t.ra?.terminated ? undefined : props.t.ra);
   const [raBelow, setRaBelow] = createSignal(false);
   let head!: HTMLDivElement;
