@@ -1,8 +1,6 @@
 /*
  * Left of each plot, the gutter its scale is labelled in; the plots run to the right edge. Padding
- * below, not a margin, so the room under the timeline does not collapse into the next rule's;
- * as much as the title's ink stands from the rule above, which is less once the group is folded
- * and the title's line is all that is left.
+ * below, not a margin, so the room under the timeline does not collapse into the next rule's.
  */
 .history {
   --lane-gutter: 32px;
@@ -12,31 +10,6 @@
   /* How far a long scale label may run left of the lanes: the panel's side padding (DetailPanel .body). */
   --lane-overhang: var(--space-6);
   padding-bottom: var(--space-5);
-}
-.folded {
-  padding-bottom: var(--space-2);
-}
-/* The line's leading leaves the ink a pixel nearer the rule above than the one below. */
-.folded .title {
-  padding-top: 1px;
-}
-.title {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-/* The title folds the group; the chevron tells which way. */
-.toggle {
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking);
-}
-.toggle:hover {
-  color: var(--text);
-}
-.chevron {
-  display: inline-block;
-  width: 1.5ch;
 }
 /* The lanes, and the thumb beside them in the margin. */
 .bay {

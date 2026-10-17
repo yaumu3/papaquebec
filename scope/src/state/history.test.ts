@@ -3,7 +3,6 @@ import { describe, expect, it } from 'bun:test';
 import {
   addPlotLane,
   detailTab,
-  historyOpen,
   hoverInstant,
   movePlotLane,
   plotted,
@@ -11,7 +10,6 @@ import {
   setHoverInstant,
   setPlotted,
   switchPlotLane,
-  toggleHistory,
 } from './history';
 import { DEFAULT_PLOTTED } from './plotted';
 import { persisted } from './settings';
@@ -81,17 +79,6 @@ describe('history state', () => {
 
     // Assert
     expect([stored, tab]).toEqual(['now', 'now']);
-  });
-
-  it('starts with the history group open and folds it on a toggle', () => {
-    // Arrange
-    const before = historyOpen();
-
-    // Act
-    toggleHistory();
-
-    // Assert
-    expect([before, historyOpen()]).toEqual([true, false]);
   });
 
   it('starts with no instant under the pointer and takes one', () => {

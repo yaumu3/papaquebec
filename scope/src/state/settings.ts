@@ -22,7 +22,6 @@ const DEFAULTS: Persisted = {
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_LIST_SORT,
   plotted: DEFAULT_PLOTTED,
-  historyOpen: true,
   detailTab: 'now',
 };
 

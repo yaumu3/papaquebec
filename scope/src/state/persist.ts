@@ -32,8 +32,6 @@ export interface Persisted {
   listSort: ListSort;
   /** The lanes of the history, in order. */
   plotted: readonly LaneKey[];
-  /** Whether the detail panel's history group is unfolded. */
-  historyOpen: boolean;
   /** The tab the detail panel has open. */
   detailTab: DetailTab;
 }
@@ -140,7 +138,6 @@ export function loadPersisted(storage: Storage, defaults: Persisted): Persisted 
     panels: panelsFrom(r.panels, defaults.panels),
     listSort: sortFrom(r.listSort, defaults.listSort),
     plotted: plottedFrom(r.plotted, defaults.plotted),
-    historyOpen: bool(r.historyOpen, defaults.historyOpen),
     detailTab: oneOf(DETAIL_TABS, r.detailTab, defaults.detailTab),
   };
 }
