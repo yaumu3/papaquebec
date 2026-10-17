@@ -1,6 +1,6 @@
 import type { HeardKey } from '../../lib/aircraft';
 import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
-import { NM_IN_METERS } from '../../lib/geo';
+import { NM_IN_METERS, turn } from '../../lib/geo';
 import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
@@ -269,9 +269,6 @@ const toward = (x: number, y: number, deg: number) => {
 
 /** To a tenth, as precise as the drawing. */
 const tenth = (n: number): number => Math.round(n * 10) / 10;
-
-/** Degrees from `from` round to `to` the short way, to the right positive. */
-const turn = (from: number, to: number): number => ((to - from + 540) % 360) - 180;
 
 /** The heading glyph's readings: the track and heading, and the selected heading while it steers. */
 export interface HeadingMark extends Heading {
