@@ -104,6 +104,8 @@ export function createLaneDrag(deps: {
     const el = e.currentTarget;
     if (e.button !== 0 || !(el instanceof HTMLElement)) return;
     if (e.target instanceof Element && e.target.closest('button')) return;
+    // A lane is the first pointer's: another finger's press is left alone.
+    if (!e.isPrimary) return;
     end?.();
     held = lane;
     el.setPointerCapture(e.pointerId);
@@ -133,7 +135,10 @@ export function createLaneDrag(deps: {
       setDrag(at({ lane, from, slot: from, overBin: false, x: x0, y: y0, grabX }, x, y));
       frame = requestAnimationFrame(scroll);
     };
+    /** Whether an event is the pointer's that took hold of the lane. */
+    const own = (p: PointerEvent) => p.pointerId === e.pointerId;
     const onMove = (m: PointerEvent) => {
+      if (!own(m)) return;
       const d = drag();
       const s = swipe();
       if (d) {
@@ -157,7 +162,8 @@ export function createLaneDrag(deps: {
       if (gesture === 'swipe') setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
       if (gesture === 'drag') pickUp(m.clientX, m.clientY);
     };
-    const onUp = () => {
+    const onUp = (u: PointerEvent) => {
+      if (!own(u)) return;
       const d = drag();
       const s = swipe();
       end?.();
@@ -169,7 +175,9 @@ export function createLaneDrag(deps: {
       k.stopPropagation();
       if (dragKeyOf(k.key) === 'cancel') end?.();
     };
-    const cancel = () => end?.();
+    const cancel = (c: PointerEvent) => {
+      if (own(c)) end?.();
+    };
     const touchPlot = part === 'plot' && e.pointerType === 'touch';
     setHolding(touchPlot);
     const hold = touchPlot
