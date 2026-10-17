@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { INSTRUMENT_SEC } from '../../../lib/reports';
 import { makeSample } from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
-import { fmaColumns, modeChangedAt, pfdFma } from './readout';
+import { fmaColumns, modeChangedAt, pfdFma, pfdReadouts } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
@@ -183,5 +183,35 @@ describe('pfdFma boxes', () => {
       ap: false,
       boxed: { lateral: false, vertical: false },
     });
+  });
+});
+
+describe('pfdReadouts speed', () => {
+  it('reads the speed rounded and the Mach without its leading zero while they hold', () => {
+    // Arrange
+    const t = makeSample(NOW, { ias: 261.6, mach: 0.79, heard: { ias: FRESH, mach: FRESH } });
+
+    // Act
+    const out = pfdReadouts(t, NOW);
+
+    // Assert
+    expect(out).toEqual({ ias: 262, mach: '.790' });
+  });
+
+  it('blanks the speed and the Mach when stale, never reported or lost', () => {
+    // Arrange
+    const reported = { ias: 262, mach: 0.79 };
+    const targets = [
+      makeSample(NOW, { ...reported, heard: { ias: STALE, mach: STALE } }),
+      makeSample(NOW, { heard: {} }),
+      makeSample(NOW, { ...reported, heard: { ias: FRESH, mach: FRESH }, seen: INSTRUMENT_SEC }),
+    ];
+
+    // Act
+    const out = targets.map((t) => pfdReadouts(t, NOW));
+
+    // Assert
+    const blank = { ias: undefined, mach: '' };
+    expect(out).toEqual([blank, blank, blank]);
   });
 });

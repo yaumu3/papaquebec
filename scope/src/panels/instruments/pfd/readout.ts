@@ -76,3 +76,21 @@ export function pfdFma(t: Readout & Pick<Track, 'samples'>, now: number): PfdFma
     boxed: { lateral: boxed('lateral'), vertical: boxed('vertical') },
   };
 }
+
+export interface PfdReadouts {
+  /** The speed in knots, rounded; undefined for the SPD flag. */
+  ias: number | undefined;
+  /** The Mach as the tape's foot prints it; empty when it does not hold. */
+  mach: string;
+}
+
+const machText = (mach: number): string => mach.toFixed(3).replace(/^0/, '');
+
+/** The values of the instrument, each while its keys hold and the target is not lost. */
+export function pfdReadouts(t: Readout, now: number): PfdReadouts {
+  const live = (key: 'ias' | 'mach') => !isLost(t) && holdsAll(t, [key], now);
+  return {
+    ias: live('ias') && t.ias !== undefined ? Math.round(t.ias) : undefined,
+    mach: live('mach') && t.mach !== undefined ? machText(t.mach) : '',
+  };
+}

@@ -116,3 +116,107 @@ const AP_RISE_PX = 10;
 
 /** The centre line of the autopilot's label, just above the attitude window. */
 export const apY = (g: PfdGeometry): number => g.wy - AP_RISE_PX;
+
+/** A number to a tenth of a pixel, as the drawing is. */
+const tenth = (n: number): number => Number(fixed(n));
+
+/** Where `value` stands on a tape that shows `span` either side of `at` over its half-height. */
+export const tapeY = (g: PfdGeometry, value: number, at: number, span: number): number =>
+  g.yc - ((value - at) * (g.yc - g.yTop)) / span;
+
+const SPEED_SPAN_KT = 45;
+const SPEED_STEP_KT = 10;
+const SPEED_LABEL_STEP_KT = 20;
+const SPEED_TICK_PX = 8;
+const SPEED_END_MARGIN_PX = 4;
+const SPEED_LABEL_CLEAR_PX = 22;
+const SPEED_LABEL_GAP_PX = 11;
+/** How far past the visible span a tick is still worked out, so that none is missed at the ends. */
+const SPEED_REACH_KT = 50;
+
+export interface TapeLabel {
+  text: string;
+  x: number;
+  y: number;
+}
+
+export interface SpeedTape {
+  ticks: string;
+  labels: TapeLabel[];
+}
+
+/** The ticks of the speed tape at the inner edge, every 10 kt, and its labels every 20 kt clear of the readout. */
+export function speedTape(g: PfdGeometry, ias: number): SpeedTape {
+  const out: SpeedTape = { ticks: '', labels: [] };
+  const first = Math.max(0, Math.ceil((ias - SPEED_REACH_KT) / SPEED_STEP_KT) * SPEED_STEP_KT);
+  for (let v = first; v <= ias + SPEED_REACH_KT; v += SPEED_STEP_KT) {
+    const y = tapeY(g, v, ias, SPEED_SPAN_KT);
+    if (y < g.yTop + SPEED_END_MARGIN_PX || y > g.yBot - SPEED_END_MARGIN_PX) continue;
+    out.ticks += `M${fixed(g.sR)} ${fixed(y)}h${-SPEED_TICK_PX}`;
+    if (v % SPEED_LABEL_STEP_KT === 0 && Math.abs(y - g.yc) > SPEED_LABEL_CLEAR_PX) {
+      out.labels.push({ text: String(v), x: g.sR - SPEED_LABEL_GAP_PX, y: tenth(y) });
+    }
+  }
+  return out;
+}
+
+const SPEED_BOX_OUT_PX = 4;
+const SPEED_BOX_IN_PX = 14;
+const READOUT_HALF_HEIGHT_PX = 18;
+const SPIKE_PX = 5;
+
+/** The speed readout: a box inset from the tape's edge, with a spike to the right at the centre line. */
+export function speedBoxPath(g: PfdGeometry): string {
+  const left = g.sL - SPEED_BOX_OUT_PX;
+  const right = g.sR - SPEED_BOX_IN_PX;
+  const { yc } = g;
+  const top = yc - READOUT_HALF_HEIGHT_PX;
+  const bottom = yc + READOUT_HALF_HEIGHT_PX;
+  return (
+    `M${fixed(left)} ${fixed(top)}H${fixed(right)}V${fixed(yc - SPIKE_PX)}` +
+    `L${fixed(right + SPIKE_PX)} ${fixed(yc)}L${fixed(right)} ${fixed(yc + SPIKE_PX)}` +
+    `V${fixed(bottom)}H${fixed(left)}Z`
+  );
+}
+
+export interface SpeedDigits {
+  hi: string;
+  /** The ones digit with its neighbours: above (+1), at, below (-1). */
+  drum: [string, string, string];
+}
+
+/** The hundreds and tens of a speed, and the three digits of its drum. */
+export function speedDigits(ias: number): SpeedDigits {
+  const ones = ias % 10;
+  return {
+    hi: String(Math.floor(ias / 10)),
+    drum: [String((ones + 1) % 10), String(ones), String((ones + 9) % 10)],
+  };
+}
+
+const SPEED_DRUM_GAP_PX = 12;
+const SPEED_DRUM_LINE_PX = 18;
+
+export interface SpeedReadout {
+  /** The tape's centre, where its flag and its Mach stand. */
+  midX: number;
+  /** Where the tens stand, right-aligned. */
+  hiX: number;
+  /** The window the ones drum is clipped to. */
+  drum: { x: number; y: number; w: number; h: number };
+  /** Where the drum's column starts inside its window. */
+  drumTop: number;
+}
+
+/** Where the speed readout's texts stand. */
+export function speedReadout(g: PfdGeometry): SpeedReadout {
+  const right = g.sR - SPEED_BOX_IN_PX;
+  const hiX = right - SPEED_DRUM_GAP_PX;
+  const h = 2 * READOUT_HALF_HEIGHT_PX - 2;
+  return {
+    midX: (g.sL + g.sR) / 2,
+    hiX,
+    drum: { x: hiX + 1, y: g.yc - READOUT_HALF_HEIGHT_PX + 1, w: right - hiX - 2, h },
+    drumTop: READOUT_HALF_HEIGHT_PX - 1 - SPEED_DRUM_LINE_PX / 2 - SPEED_DRUM_LINE_PX,
+  };
+}

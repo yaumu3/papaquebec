@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show } from 'solid-js';
+import { createMemo, createSignal, For, Index, Show } from 'solid-js';
 
 import { cx } from '../../../design/cx';
 import type { Track } from '../../../state/track';
@@ -13,10 +13,15 @@ import {
   fmaColumnX,
   fmaRulesPath,
   pfdGeometry,
+  speedBoxPath,
+  speedDigits,
+  speedReadout,
   speedStripPath,
+  speedTape,
 } from './geometry';
-import { pfdFma } from './readout';
+import { pfdFma, pfdReadouts } from './readout';
 
+import flags from '../flag.module.css';
 import s from './Pfd.module.css';
 
 /** The text of a column of the annunciator, centred on `x`; nothing for an empty column. */
@@ -41,6 +46,12 @@ export function Pfd(props: { t: Track }) {
   const width = trackWidth(root);
   const g = createMemo(() => pfdGeometry(width()));
   const lost = createMemo(() => isLost(props.t));
+  const readouts = createMemo(() => pfdReadouts(props.t, trackStore.stats.now));
+  const speed = createMemo(() => {
+    const ias = readouts().ias;
+    return ias === undefined ? undefined : { tape: speedTape(g(), ias), digits: speedDigits(ias) };
+  });
+  const speedAt = createMemo(() => speedReadout(g()));
   const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
   return (
     <div
@@ -61,9 +72,57 @@ export function Pfd(props: { t: Track }) {
             height={g().wyb - g().wy}
             rx="12"
           />
+          <Show when={speed()}>
+            {(v) => (
+              <>
+                <path class={s.ticks} d={v().tape.ticks} />
+                <path class={s.readout} d={speedBoxPath(g())} />
+              </>
+            )}
+          </Show>
           <path class={s.fma} d={fmaBandPath(g())} />
           <path class={s.rules} d={fmaRulesPath(g())} />
         </svg>
+        <Show when={speed()}>
+          {(v) => (
+            <>
+              <For each={v().tape.labels}>
+                {(l) => (
+                  <div class={s.speedLabel} style={{ left: `${l.x}px`, top: `${l.y}px` }}>
+                    {l.text}
+                  </div>
+                )}
+              </For>
+              <div class={s.speed} style={{ left: `${speedAt().hiX}px`, top: `${g().yc}px` }}>
+                {v().digits.hi}
+              </div>
+              <div
+                class={s.drum}
+                style={{
+                  left: `${speedAt().drum.x}px`,
+                  top: `${speedAt().drum.y}px`,
+                  width: `${speedAt().drum.w}px`,
+                  height: `${speedAt().drum.h}px`,
+                }}
+              >
+                <div class={s.digits} style={{ top: `${speedAt().drumTop}px` }}>
+                  <Index each={v().digits.drum}>{(d) => <div>{d()}</div>}</Index>
+                </div>
+              </div>
+            </>
+          )}
+        </Show>
+        <Show when={speed() === undefined}>
+          <span
+            class={cx(flags.flag, s.flag)}
+            style={{ left: `${speedAt().midX}px`, top: `${g().yc}px` }}
+          >
+            SPD
+          </span>
+        </Show>
+        <div class={s.mach} style={{ left: `${speedAt().midX}px`, top: `${g().footY}px` }}>
+          {readouts().mach}
+        </div>
         <Mode text={fma().lateral} x={fmaColumnX(g())[1]} boxed={fma().boxed.lateral} />
         <Mode text={fma().vertical} x={fmaColumnX(g())[2]} boxed={fma().boxed.vertical} />
         <Show when={fma().ap}>

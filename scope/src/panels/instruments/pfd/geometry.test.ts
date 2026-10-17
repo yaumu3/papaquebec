@@ -7,7 +7,12 @@ import {
   fmaColumnX,
   fmaRulesPath,
   pfdGeometry,
+  speedBoxPath,
+  speedDigits,
+  speedReadout,
   speedStripPath,
+  speedTape,
+  tapeY,
 } from './geometry';
 
 describe('pfdGeometry', () => {
@@ -139,5 +144,102 @@ describe('apY', () => {
 
     // Assert
     expect(out).toBe(42);
+  });
+});
+
+describe('tapeY', () => {
+  it('puts the value at the centre line, and the ends of the span at the ends of the tape', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = [tapeY(g, 262, 262, 45), tapeY(g, 307, 262, 45), tapeY(g, 217, 262, 45)];
+
+    // Assert
+    expect(out).toEqual([g.yc, g.yTop, g.yBot]);
+  });
+});
+
+describe('speedTape', () => {
+  it('ticks every 10 kt short of the tape ends and labels every 20 kt clear of the readout', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = speedTape(g, 262);
+
+    // Assert
+    expect(out.ticks).toBe(
+      'M54.0 204.2h-8M54.0 184.9h-8M54.0 165.5h-8M54.0 146.2h-8M54.0 126.9h-8' +
+        'M54.0 107.5h-8M54.0 88.2h-8M54.0 68.9h-8M54.0 49.5h-8',
+    );
+    expect(out.labels).toEqual([
+      { text: '220', x: 43, y: 204.2 },
+      { text: '240', x: 43, y: 165.5 },
+      { text: '280', x: 43, y: 88.2 },
+      { text: '300', x: 43, y: 49.5 },
+    ]);
+  });
+
+  it('draws nothing below 0 kt', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+    const speeds = [20, 0];
+
+    // Act
+    const out = speeds.map((ias) => speedTape(g, ias));
+
+    // Assert
+    expect(out.map((tape) => tape.ticks)).toEqual([
+      'M54.0 161.7h-8M54.0 142.3h-8M54.0 123.0h-8M54.0 103.7h-8M54.0 84.3h-8M54.0 65.0h-8M54.0 45.7h-8',
+      'M54.0 123.0h-8M54.0 103.7h-8M54.0 84.3h-8M54.0 65.0h-8M54.0 45.7h-8',
+    ]);
+    expect(out.map((tape) => tape.labels.map((l) => l.text))).toEqual([
+      ['0', '40', '60'],
+      ['20', '40'],
+    ]);
+  });
+});
+
+describe('speedBoxPath', () => {
+  it('is a box with a spike to the right at the centre line', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = speedBoxPath(g);
+
+    // Assert
+    expect(out).toBe('M4.0 105.0H40.0V118.0L45.0 123.0L40.0 128.0V141.0H4.0Z');
+  });
+});
+
+describe('speedDigits', () => {
+  it('reads the tens, and the ones with the neighbours the drum shows', () => {
+    // Arrange
+    const speeds = [262, 279, 270];
+
+    // Act
+    const out = speeds.map(speedDigits);
+
+    // Assert
+    expect(out).toEqual([
+      { hi: '26', drum: ['3', '2', '1'] },
+      { hi: '27', drum: ['0', '9', '8'] },
+      { hi: '27', drum: ['1', '0', '9'] },
+    ]);
+  });
+});
+
+describe('speedReadout', () => {
+  it('anchors the tens and the clipped drum inside the box', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = speedReadout(g);
+
+    // Assert
+    expect(out).toEqual({ midX: 31, hiX: 28, drum: { x: 29, y: 106, w: 10, h: 34 }, drumTop: -10 });
   });
 });
