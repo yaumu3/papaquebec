@@ -5,6 +5,7 @@ import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { NONE, READINGS } from '../readings';
 import { clearOfEnds, clockStep, ticks } from './axis';
+import type { LanePart } from './laneDrag';
 import { type LaneMoves, onMoveKey } from './moves';
 import {
   atTicks,
@@ -84,7 +85,7 @@ export function Lane(props: {
   /** Whether the lane's palette is open, and the dropdown of its name that opens it. */
   menuOpen: boolean;
   onMenu: (anchor: HTMLElement) => void;
-  onGrab: (e: PointerEvent) => void;
+  onGrab: (e: PointerEvent, part: LanePart) => void;
   /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
   place: number;
   /** How far a finger has swiped the top row left, while one does. */
@@ -156,6 +157,7 @@ export function Lane(props: {
   };
   /** How wide the intents' slots are: as wide as the widest of them. */
   const slotCh = () => Math.max(0, ...held().map((key) => INTENT_CH[key] ?? 0));
+  let top: HTMLDivElement | undefined;
 
   return (
     <div
@@ -168,6 +170,9 @@ export function Lane(props: {
       onKeyDown={(e) => {
         if (e.target === e.currentTarget) onMoveKey(props.moves, e);
       }}
+      onPointerDown={(e) =>
+        props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
+      }
     >
       <div class={s.plot}>
         <svg class={s.svg} height={props.height}>
@@ -264,9 +269,11 @@ export function Lane(props: {
         </Index>
       </div>
       <div
+        ref={(el) => {
+          top = el;
+        }}
         class={cx(s.top, props.swipeX !== null && s.swiping)}
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
-        onPointerDown={(e) => props.onGrab(e)}
       >
         <button
           type="button"

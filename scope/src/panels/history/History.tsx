@@ -374,7 +374,7 @@ export function History(props: { track: Track }) {
                       laneRef={(el) => lanes.set(lane, el)}
                       moves={movesOf(lane)}
                       onMenu={(anchor) => toggleMenu(lane, anchor)}
-                      onGrab={(e) => grab(e, lane)}
+                      onGrab={(e, part) => grab(e, lane, part)}
                       place={(() => {
                         const d = drag();
                         return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();

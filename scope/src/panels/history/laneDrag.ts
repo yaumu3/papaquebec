@@ -5,22 +5,25 @@ import { edgeSpeed, slotAt } from '../../ui/reorder';
 import { dropOf, overBin } from './drag';
 import { axisOf, gestureOf, swipeRemoves } from './swipe';
 
-/** How far a pointer travels from where it took hold of a lane's top row before it drags the lane. */
+/** How far a pointer travels from where it took hold of a lane before it drags the lane. */
 const SLOP_PX = 4;
 
-/** A lane dragged by its top row: where it came from, the slot it is over, and the pointer. */
+/** Where on a lane a pointer took hold of it: its top row, or the plot under it. */
+export type LanePart = 'row' | 'plot';
+
+/** A lane dragged: where it came from, the slot it is over, and the pointer. */
 export interface LaneDrag {
   lane: LaneKey;
   from: number;
   slot: number;
   overBin: boolean;
-  /** The pointer, CSS px in the viewport, and how far right of the row's left it took hold. */
+  /** The pointer, CSS px in the viewport, and how far right of the lane's left it took hold. */
   x: number;
   y: number;
   grabX: number;
 }
 
-/** A lane's top row swiped by a finger `dx` across, the row `width` wide. */
+/** A lane's top row swiped by a finger `dx` across, the lane `width` wide. */
 export interface LaneSwipe {
   lane: LaneKey;
   dx: number;
@@ -28,10 +31,10 @@ export interface LaneSwipe {
 }
 
 /**
- * The drag of lanes by their top rows, `pitch` apart down `scroller`: the slot under the pointer
- * as it moves, the view scrolling near its edges, and over `bin` the lane's removal. Esc, or the
- * pointer lost, cancels. A finger moving sideways swipes the row instead, which removes the lane
- * past a third of its width.
+ * The drag of lanes, `pitch` apart down `scroller`: the slot under the pointer as it moves, the
+ * view scrolling near its edges, and over `bin` the lane's removal. Esc, or the pointer lost,
+ * cancels. A finger drags a lane by its top row only; moving sideways there it swipes the row
+ * instead, which removes the lane past a third of its width.
  */
 export function createLaneDrag(deps: {
   scroller: () => HTMLElement | undefined;
@@ -42,7 +45,7 @@ export function createLaneDrag(deps: {
 }): {
   drag: Accessor<LaneDrag | null>;
   swipe: Accessor<LaneSwipe | null>;
-  grab: (e: PointerEvent, lane: LaneKey) => void;
+  grab: (e: PointerEvent, lane: LaneKey, part: LanePart) => void;
 } {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
   const [swipe, setSwipe] = createSignal<LaneSwipe | null>(null);
@@ -59,16 +62,17 @@ export function createLaneDrag(deps: {
     return { ...d, x, y, slot, overBin: !!bin && overBin(x, y, bin, sc) };
   };
 
-  const grab = (e: PointerEvent, lane: LaneKey) => {
-    const row = e.currentTarget;
-    if (e.button !== 0 || !(row instanceof HTMLElement)) return;
+  const grab = (e: PointerEvent, lane: LaneKey, part: LanePart) => {
+    const el = e.currentTarget;
+    if (e.button !== 0 || !(el instanceof HTMLElement)) return;
     if (e.target instanceof Element && e.target.closest('button')) return;
+    if (part === 'plot' && e.pointerType === 'touch') return;
     end?.();
-    row.setPointerCapture(e.pointerId);
+    el.setPointerCapture(e.pointerId);
     const from = deps.lanes().indexOf(lane);
     const x0 = e.clientX;
     const y0 = e.clientY;
-    const grabX = x0 - row.getBoundingClientRect().left;
+    const grabX = x0 - el.getBoundingClientRect().left;
     let frame = 0;
     const scroll = () => {
       const d = drag();
@@ -96,7 +100,7 @@ export function createLaneDrag(deps: {
       }
       const dx = m.clientX - x0;
       const gesture = gestureOf(m.pointerType, axisOf(dx, m.clientY - y0, SLOP_PX));
-      if (gesture === 'swipe') setSwipe({ lane, dx, width: row.getBoundingClientRect().width });
+      if (gesture === 'swipe') setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
       if (gesture !== 'drag') return;
       setDrag(
         at({ lane, from, slot: from, overBin: false, x: x0, y: y0, grabX }, m.clientX, m.clientY),
@@ -118,19 +122,19 @@ export function createLaneDrag(deps: {
       end?.();
     };
     const cancel = () => end?.();
-    row.addEventListener('pointermove', onMove);
-    row.addEventListener('pointerup', onUp);
-    row.addEventListener('pointercancel', cancel);
-    row.addEventListener('lostpointercapture', cancel);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    el.addEventListener('pointercancel', cancel);
+    el.addEventListener('lostpointercapture', cancel);
     end = () => {
       end = null;
       cancelAnimationFrame(frame);
-      row.removeEventListener('pointermove', onMove);
-      row.removeEventListener('pointerup', onUp);
-      row.removeEventListener('pointercancel', cancel);
-      row.removeEventListener('lostpointercapture', cancel);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      el.removeEventListener('pointercancel', cancel);
+      el.removeEventListener('lostpointercapture', cancel);
       window.removeEventListener('keydown', onKey, { capture: true });
-      if (row.hasPointerCapture(e.pointerId)) row.releasePointerCapture(e.pointerId);
+      if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
       setDrag(null);
       setSwipe(null);
     };
