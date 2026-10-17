@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { axisOf, gestureOf, swipeOffset, swipeRemoves } from './swipe';
+import { axisOf, swipeOffset, swipeRemoves } from './swipe';
 
 describe('axisOf', () => {
   it('tells nothing within the slop, then the axis the finger went further along', () => {
@@ -43,24 +43,5 @@ describe('swipeRemoves', () => {
 
     // Assert
     expect(removes).toEqual([true, false, false, false]);
-  });
-});
-
-describe('gestureOf', () => {
-  it('drags with a mouse or pen whichever way, and with a finger swipes sideways and drags up or down', () => {
-    // Arrange
-    const moves = [
-      ['mouse', 'x'],
-      ['pen', 'y'],
-      ['touch', 'x'],
-      ['touch', 'y'],
-      ['touch', null],
-    ] as const;
-
-    // Act
-    const gestures = moves.map(([pointer, axis]) => gestureOf(pointer, axis));
-
-    // Assert
-    expect(gestures).toEqual(['drag', 'drag', 'swipe', 'drag', null]);
   });
 });

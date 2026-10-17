@@ -177,7 +177,7 @@
 .lane {
   position: relative;
   box-sizing: content-box;
-  border-bottom: 1px solid var(--plot-grid);
+  border-bottom: 1px solid var(--plot-rule);
   /* Scrolled to, clear of the fades. */
   scroll-margin-block: var(--fade);
   cursor: grab;
@@ -240,8 +240,8 @@
   align-items: center;
   gap: var(--space-2);
   height: var(--lane-top);
-  /* A finger on it drags or swipes the lane rather than scrolling. */
-  touch-action: none;
+  /* A finger on it scrolls the lanes, swipes the row or, held, drags the lane, as on the plot. */
+  touch-action: pan-y;
   /* A swipe short of removing the lane springs back. */
   transition: transform var(--sheet-ms) var(--sheet-ease);
 }
@@ -414,7 +414,7 @@
 /* The clock over the lanes, a hairline under it. */
 .axis {
   margin-top: var(--space-4);
-  border-bottom: 1px solid var(--plot-grid);
+  border-bottom: 1px solid var(--plot-rule);
   color: var(--plot-label);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking);

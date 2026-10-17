@@ -3,8 +3,8 @@ import { type Accessor, createEffect, createSignal, onCleanup } from 'solid-js';
 import type { LaneKey } from '../../state/plotted';
 import { edgeSpeed, slotAt } from '../../ui/reorder';
 import { dragKeyOf, dropOf, overBin } from './drag';
-import { HOLD_MS, plotGestureOf } from './hold';
-import { axisOf, gestureOf, swipeRemoves } from './swipe';
+import { HOLD_MS, laneGestureOf } from './hold';
+import { swipeRemoves } from './swipe';
 
 /** How far a pointer travels from where it took hold of a lane before it drags the lane. */
 const SLOP_PX = 4;
@@ -37,8 +37,8 @@ export interface LaneSwipe {
 /**
  * The drag of lanes, `pitch` apart down `scroller`: the slot under the pointer as it moves, the
  * view scrolling near its edges, and over `bin` the lane's removal. Esc, or the pointer lost,
- * cancels. A finger drags a lane by its top row, or by its plot once held there; moving sideways
- * on the row it swipes the row instead, which removes the lane past a third of its width.
+ * cancels. A finger drags a lane once held on it; moving sideways first on the top row it swipes
+ * the row instead, which removes the lane past a third of its width.
  */
 export function createLaneDrag(deps: {
   scroller: () => HTMLElement | undefined;
@@ -49,7 +49,7 @@ export function createLaneDrag(deps: {
 }): {
   drag: Accessor<LaneDrag | null>;
   swipe: Accessor<LaneSwipe | null>;
-  /** Whether a finger rests on a lane's plot, not yet holding it long enough to pick it up. */
+  /** Whether a finger rests on a lane, not yet holding it long enough to pick it up. */
   holding: Accessor<boolean>;
   grab: (e: PointerEvent, lane: LaneKey, part: LanePart) => void;
 } {
@@ -66,12 +66,12 @@ export function createLaneDrag(deps: {
     if (held !== null && !lanes.includes(held)) end?.();
   });
   /**
-   * Keeps a finger's moves over the lanes from the page: from scrolling them while it drags one,
-   * and from the sheet while it drags or rests on a plot.
+   * Keeps a finger's moves over the lanes from the page: from scrolling them while it drags or
+   * swipes one, and from the sheet while it also rests on one.
    */
   const keep = (t: TouchEvent) => {
-    if (drag()) t.preventDefault();
-    if (drag() || holding()) t.stopPropagation();
+    if (drag() || swipe()) t.preventDefault();
+    if (drag() || swipe() || holding()) t.stopPropagation();
   };
   /** Reads a dragged lane's slot again as the lanes scroll under a still pointer. */
   const reread = () => {
@@ -152,15 +152,13 @@ export function createLaneDrag(deps: {
       last = { x: m.clientX, y: m.clientY };
       const dx = m.clientX - x0;
       const dy = m.clientY - y0;
-      if (part === 'plot') {
-        const g = plotGestureOf(m.pointerType, dx, dy, m.timeStamp - e.timeStamp, SLOP_PX);
-        if (g === 'pass') end?.();
-        if (g === 'drag') pickUp(m.clientX, m.clientY);
-        return;
+      const g = laneGestureOf(part, m.pointerType, dx, dy, m.timeStamp - e.timeStamp, SLOP_PX);
+      if (g === 'pass') end?.();
+      if (g === 'swipe') {
+        setHolding(false);
+        setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
       }
-      const gesture = gestureOf(m.pointerType, axisOf(dx, dy, SLOP_PX));
-      if (gesture === 'swipe') setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
-      if (gesture === 'drag') pickUp(m.clientX, m.clientY);
+      if (g === 'drag') pickUp(m.clientX, m.clientY);
     };
     const onUp = (u: PointerEvent) => {
       if (!own(u)) return;
@@ -178,11 +176,11 @@ export function createLaneDrag(deps: {
     const cancel = (c: PointerEvent) => {
       if (own(c)) end?.();
     };
-    const touchPlot = part === 'plot' && e.pointerType === 'touch';
-    setHolding(touchPlot);
-    const hold = touchPlot
+    const touch = e.pointerType === 'touch';
+    setHolding(touch);
+    const hold = touch
       ? setTimeout(() => {
-          const g = plotGestureOf(e.pointerType, last.x - x0, last.y - y0, HOLD_MS, SLOP_PX);
+          const g = laneGestureOf(part, e.pointerType, last.x - x0, last.y - y0, HOLD_MS, SLOP_PX);
           if (!drag() && g === 'drag') pickUp(last.x, last.y);
         }, HOLD_MS)
       : undefined;
