@@ -496,6 +496,17 @@ describe('altitudeTape', () => {
     expect(out.bars).toBe('M269.0 36.7H314.0M269.0 54.7H314.0');
   });
 
+  it('leaves out a bar that falls off the tape', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = altitudeTape(g, 29575);
+
+    // Assert
+    expect(out.bars).toBe('M269.0 49.8H314.0');
+  });
+
   it('signs the labels below zero', () => {
     // Arrange
     const g = pfdGeometry(346);

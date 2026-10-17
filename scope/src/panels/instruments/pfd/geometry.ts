@@ -555,7 +555,9 @@ export function altitudeTape(g: PfdGeometry, ft: number): AltitudeTape {
     });
     if (a % ALTITUDE_THOUSAND_FT !== 0) continue;
     const bar = (at: number) =>
-      `M${fixed(g.aL + BAR_FROM_PX)} ${fixed(at)}H${fixed(g.aR - BAR_TO_INSET_PX)}`;
+      at < g.yTop || at > g.yBot
+        ? ''
+        : `M${fixed(g.aL + BAR_FROM_PX)} ${fixed(at)}H${fixed(g.aR - BAR_TO_INSET_PX)}`;
     out.bars += bar(y - BAR_OFF_PX) + bar(y + BAR_OFF_PX);
   }
   return out;
