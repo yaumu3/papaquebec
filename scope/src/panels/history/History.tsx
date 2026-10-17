@@ -31,6 +31,9 @@ import s from './History.module.css';
 const LANE_PX = 84;
 /** A step of a minute, at which a clock label reads to the minute. */
 const MINUTE_SEC = 60;
+/** The left edge of a cursor `px` across the plots, as the viewport, wider by the overhang and the gutter, places it. */
+const cursorLeft = (px: number): string =>
+  `calc(var(--lane-overhang) + var(--plot-left) + ${px - 0.5}px)`;
 /** The chip's padding either side of its time, which reads to the second. */
 const CHIP_PAD_PX = 3;
 const CHIP_CHARS = 8;
@@ -107,10 +110,12 @@ export function History(props: { track: Track }) {
 
   const [chipText, setChipText] = createSignal<HTMLSpanElement>();
   const chipTextWidth = trackWidth(chipText);
-  /** Where the cursor stands across the plots, kept whole inside them. */
+  /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere without a lane. */
   const cursorX = () => {
     const a = at();
-    return a ? clamp(x(a.t), 0.5, plotWidth() - 0.5) : null;
+    return a && lanes().length > 0
+      ? clamp(Math.floor(x(a.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5)
+      : null;
   };
   /** The chip's width: its time, padding and border. */
   const chipWidth = () => chipTextWidth() + 2 * (CHIP_PAD_PX + 1);
@@ -185,7 +190,7 @@ export function History(props: { track: Track }) {
                 </Show>
               )}
             </For>
-            <Show when={at()}>
+            <Show when={cursorX() !== null && at()}>
               {(a) => (
                 <>
                   <span
@@ -213,7 +218,13 @@ export function History(props: { track: Track }) {
           </div>
         </div>
         <div class={s.bay}>
-          <div class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}>
+          <div
+            class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}
+            style={(() => {
+              const px = cursorX();
+              return px === null ? {} : { '--cursor-left': cursorLeft(px) };
+            })()}
+          >
             <div
               ref={setScroller}
               class={s.scroller}
@@ -252,9 +263,7 @@ export function History(props: { track: Track }) {
               {(px) => (
                 <div
                   class={cx(s.timeCursor, hover() && s.live)}
-                  style={{
-                    left: `calc(var(--lane-overhang) + var(--plot-left) + ${px() - 0.5}px)`,
-                  }}
+                  style={{ left: cursorLeft(px()) }}
                 />
               )}
             </Show>

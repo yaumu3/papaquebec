@@ -42,19 +42,33 @@
 .bay {
   position: relative;
 }
-/* A lane cut by an edge fades into the panel ground there. */
+/*
+ * A lane cut by an edge fades into the panel ground there. The time cursor's column fades only at
+ * the bottom, so that the cursor runs on unbroken from the chip's notch.
+ */
 .viewport {
   --fade-top: 0px;
   --fade-bottom: 0px;
+  --cursor-left: -2px;
   position: relative;
   margin-left: calc(-1 * var(--lane-overhang));
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--fade-top),
-    #000 calc(100% - var(--fade-bottom)),
-    transparent
-  );
+  mask-image:
+    linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--fade-top),
+      #000 calc(100% - var(--fade-bottom)),
+      transparent
+    ),
+    linear-gradient(to bottom, #000 calc(100% - var(--fade-bottom)), transparent);
+  mask-size:
+    100% 100%,
+    2px 100%;
+  mask-position:
+    0 0,
+    calc(var(--cursor-left) - 0.5px) 0;
+  mask-repeat: no-repeat;
+  mask-composite: add;
 }
 .cutTop {
   --fade-top: var(--space-6);
