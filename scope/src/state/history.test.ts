@@ -12,14 +12,15 @@ import {
   togglePlot,
 } from './history';
 import { DEFAULT_PLOTTED } from './plotted';
+import { persisted } from './settings';
 
 describe('history state', () => {
-  it('starts with the default readings plotted', () => {
+  it('starts from the persisted plot, the default readings with nothing stored', () => {
     // Arrange
     const defaults = [...DEFAULT_PLOTTED];
 
     // Act
-    const keys = plotted();
+    const keys = persisted.plotted;
 
     // Assert
     expect(keys).toEqual(defaults);
