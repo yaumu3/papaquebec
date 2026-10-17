@@ -2,20 +2,11 @@ import { For, onCleanup, onMount, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import { LANE_GROUPS, type LaneKey } from '../../state/plotted';
-import { reorderKey } from '../../ui/reorder';
 import { READINGS } from '../readings';
 import { chipOf } from './chips';
+import { type LaneMoves, onMoveKey } from './moves';
 
 import s from './Palette.module.css';
-
-/** What the LANE row of a lane's palette can do to it. */
-export interface LaneMoves {
-  first: boolean;
-  last: boolean;
-  onUp: () => void;
-  onDown: () => void;
-  onRemove: () => void;
-}
 
 /**
  * The lanes by group as chips, to switch the lane `own` to another or, with none, to add one;
@@ -66,14 +57,7 @@ export function Palette(props: {
       class={s.palette}
       style={{ top: `${props.top}px` }}
       onKeyDown={(e) => {
-        const m = props.moves;
-        const ask = reorderKey(e);
-        if (!m || ask === null) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (ask === 'up' && !m.first) m.onUp();
-        else if (ask === 'down' && !m.last) m.onDown();
-        else if (ask === 'remove') m.onRemove();
+        if (props.moves) onMoveKey(props.moves, e);
       }}
     >
       <For each={LANE_GROUPS}>
