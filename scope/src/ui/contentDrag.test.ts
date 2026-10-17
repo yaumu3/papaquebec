@@ -160,17 +160,25 @@ describe('trackContentTouches', () => {
     expect(pulls).toEqual([]);
   });
 
-  it('leaves a finger that moves once text is selected to the selection', () => {
+  it('leaves a finger on selected text to the selection, and pulls with one elsewhere', () => {
     // Arrange
-    const { pulls, t } = subject({ selecting: () => true });
-    t.start(fingers(0, [finger(1, 500)]));
+    const selected = new EventTarget();
+    const elsewhere = new EventTarget();
+    const runs = [selected, elsewhere].map((target) => ({
+      target,
+      sheet: subject({ selecting: (on) => on === selected }),
+    }));
+    for (const { sheet, target } of runs)
+      sheet.t.start({ ...fingers(0, [finger(1, 500)]), target });
 
     // Act
-    const claimed = t.move(fingers(600, [finger(1, 480)]));
+    const claimed = runs.map(({ sheet, target }) =>
+      sheet.t.move({ ...fingers(600, [finger(1, 480)]), target }),
+    );
 
     // Assert
-    expect(claimed).toBe(false);
-    expect(pulls).toEqual([]);
+    expect(claimed).toEqual([false, true]);
+    expect(runs.map(({ sheet }) => sheet.pulls.length)).toEqual([0, 2]);
   });
 
   it('leaves the content to scroll where the sheet would not move that way', () => {

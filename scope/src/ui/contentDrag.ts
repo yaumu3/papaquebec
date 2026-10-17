@@ -36,8 +36,8 @@ export interface ContentReads {
   /** Whether the content under `target` is scrolled to its top, or has nothing to scroll. */
   atTop(target: EventTarget | null): boolean;
   atLargest(): boolean;
-  /** Whether the page holds a text selection, which a finger works rather than the sheet. */
-  selecting(): boolean;
+  /** Whether `target` is in selected text, which a finger on it works rather than the sheet. */
+  selecting(target: EventTarget | null): boolean;
 }
 
 /** Whether what the finger landed on takes drags itself, as a slider does, keeping them from the sheet. */
@@ -59,13 +59,22 @@ function scrolledToTop(target: Element, sheet: Element): boolean {
   return true;
 }
 
+/** Whether text of `node` itself, not of what it holds, is in the text the page has selected. */
+function onSelection(node: Node): boolean {
+  const selection = document.getSelection();
+  if (selection === null || selection.isCollapsed) return false;
+  return Array.from(node.childNodes).some(
+    (child) => child.nodeType === Node.TEXT_NODE && selection.containsNode(child, true),
+  );
+}
+
 /** The finger `id` among `list`, if it is there. */
 const fingerOf = (list: ArrayLike<Finger>, id: number) =>
   Array.from(list).find((f) => f.identifier === id);
 
 /**
  * Tells which fingers on a sheet's content pull the sheet: a lone finger that, once past a tap's
- * wobble, goes where the content would not scroll while no text is selected, followed by its
+ * wobble, goes where the content would not scroll and is not on selected text, followed by its
  * identifier until it lifts, whatever other fingers do meanwhile. `move` returns true when the
  * move is the sheet's, so that the content must not scroll.
  */
@@ -96,7 +105,7 @@ export function trackContentTouches(
         const across = first.clientX - landed.x;
         if (Math.hypot(up, across) < DECIDE_PX) return false;
         const moves =
-          !read.selecting() &&
+          !read.selecting(e.target) &&
           contentMovesSheet({
             up,
             across,
@@ -143,7 +152,7 @@ export function dragFromContent(
       free: (target) => isPhone() && target instanceof Element && !ownsDrag(target, sheet),
       atTop: (target) => target instanceof Element && scrolledToTop(target, sheet),
       atLargest,
-      selecting: () => !(document.getSelection()?.isCollapsed ?? true),
+      selecting: (target) => target instanceof Node && onSelection(target),
     },
   );
   const start = (e: TouchEvent) => fingers.start(e);
