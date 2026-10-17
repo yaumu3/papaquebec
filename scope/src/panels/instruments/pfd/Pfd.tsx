@@ -277,6 +277,14 @@ export function Pfd(props: { t: Track }) {
             </div>
           )}
         </Show>
+        <Show when={readouts().baro}>
+          {(baro) => (
+            <div class={s.baro} style={{ left: `${altitudeAt().tapeX}px`, top: `${g().footY}px` }}>
+              {baro()}
+              <span class={s.unit}> IN</span>
+            </div>
+          )}
+        </Show>
         <Show when={readouts().altitude.kind === 'ground'}>
           <div class={s.gnd} style={{ left: `${altitudeAt().midX}px`, top: `${g().yc}px` }}>
             GND

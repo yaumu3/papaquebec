@@ -1,6 +1,7 @@
 import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt, selectedFt } from '../../../lib/altitude';
 import { turn } from '../../../lib/geo';
+import { hpaToInHg } from '../../../lib/metar';
 import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { magneticTrack } from '../../../state/magnetic';
@@ -99,6 +100,8 @@ export interface PfdReadouts {
   /** The selected altitude and the FMS one in feet; the latter hidden when it is the former. */
   selAlt: number | undefined;
   fmsAlt: number | undefined;
+  /** The crew's altimeter setting in inches of mercury; empty when it does not hold. */
+  baro: string;
 }
 
 const machText = (mach: number): string => mach.toFixed(3).replace(/^0/, '');
@@ -146,7 +149,7 @@ function altitudeOf(t: Readout, now: number, altimeter: Altimeter): PfdAltitude 
 /** A reading of the target while it holds and the target is not lost. */
 const liveValue = (
   t: Readout,
-  key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt',
+  key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt' | 'navQnh',
   now: number,
 ): number | undefined => (!isLost(t) && holdsAll(t, [key], now) ? t[key] : undefined);
 
@@ -160,6 +163,7 @@ export function pfdReadouts(t: Readout, now: number, altimeter: Altimeter): PfdR
   const roll = liveValue(t, 'roll', now);
   const selAlt = asSet(liveValue(t, 'selAlt', now));
   const fmsAlt = asSet(liveValue(t, 'fmsAlt', now));
+  const qnh = liveValue(t, 'navQnh', now);
   return {
     ias: ias === undefined ? undefined : Math.round(ias),
     mach: mach === undefined ? '' : machText(mach),
@@ -168,5 +172,6 @@ export function pfdReadouts(t: Readout, now: number, altimeter: Altimeter): PfdR
     altitude: altitudeOf(t, now, altimeter),
     selAlt,
     fmsAlt: fmsAlt === selAlt ? undefined : fmsAlt,
+    baro: qnh === undefined ? '' : hpaToInHg(qnh).toFixed(2),
   };
 }

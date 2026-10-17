@@ -27,6 +27,8 @@ const selectedOf = (t: Sample) => {
   return [out.selAlt, out.fmsAlt];
 };
 
+const baroOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).baro;
+
 const altitudeOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).altitude;
 
 /** A sample at `t` reporting these modes, heard at `t`. */
@@ -217,6 +219,7 @@ describe('pfdReadouts speed', () => {
       altitude: { kind: 'flag' },
       selAlt: undefined,
       fmsAlt: undefined,
+      baro: '',
     });
   });
 
@@ -241,6 +244,7 @@ describe('pfdReadouts speed', () => {
       altitude: { kind: 'flag' },
       selAlt: undefined,
       fmsAlt: undefined,
+      baro: '',
     };
     expect(out).toEqual([blank, blank, blank]);
   });
@@ -451,5 +455,35 @@ describe('pfdReadouts selected altitudes', () => {
       [undefined, undefined],
       [undefined, undefined],
     ]);
+  });
+});
+
+describe('pfdReadouts baro', () => {
+  it('reads the setting in inches of mercury to two decimals, as reported', () => {
+    // Arrange
+    const targets = [1013.25, 1010.9].map((hpa) =>
+      makeSample(NOW, { navQnh: hpa, heard: { navQnh: FRESH } }),
+    );
+
+    // Act
+    const out = targets.map(baroOf);
+
+    // Assert
+    expect(out).toEqual(['29.92', '29.85']);
+  });
+
+  it('is blank when stale, never reported or lost', () => {
+    // Arrange
+    const targets = [
+      makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: STALE } }),
+      makeSample(NOW, { heard: {} }),
+      makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: FRESH }, seen: INSTRUMENT_SEC }),
+    ];
+
+    // Act
+    const out = targets.map(baroOf);
+
+    // Assert
+    expect(out).toEqual(['', '', '']);
   });
 });

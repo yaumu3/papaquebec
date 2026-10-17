@@ -71,7 +71,8 @@
 .altitudeLabel,
 .altitude,
 .gnd,
-.sel {
+.sel,
+.baro {
   position: absolute;
   color: var(--pfd-ink);
   line-height: 1;
@@ -200,4 +201,12 @@
   stroke: var(--plot-intent);
   stroke-width: 1.8;
   stroke-linejoin: miter;
+}
+.baro {
+  color: var(--color-level);
+  font-size: var(--text-lg);
+  transform: translate(-50%, -50%);
+}
+.unit {
+  font-size: var(--text-xs);
 }
