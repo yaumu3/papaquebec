@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { INSTRUMENT_SEC } from '../../lib/reports';
 import { setDeclinationAt } from '../../state/magnetic';
 import { makeSample } from '../../state/sampleFixture';
-import { ndFrame, oldestHeard } from './readout';
+import { ndFrame, type NdReadouts, ndReadouts, oldestHeard } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
@@ -119,5 +119,147 @@ describe('ndFrame', () => {
 
     // Assert
     expect(lines).toEqual(['LAST HEARD 34 s', undefined]);
+  });
+});
+
+const texts = (r: NdReadouts) =>
+  [r.gs, r.tas, r.wind, r.sel, r.trk, r.tat, r.sat].map((x) => x.text);
+
+describe('ndReadouts', () => {
+  it('reads every value of the corners, the wind and the track magnetic', () => {
+    // Arrange
+    setDeclinationAt(() => () => 7);
+    const heard = Object.fromEntries(
+      ['gs', 'tas', 'windDir', 'windSpeed', 'selHeading', 'navModes', 'track', 'tat', 'oat'].map(
+        (k) => [k, FRESH],
+      ),
+    );
+    const t = makeSample(NOW, {
+      seen: 1,
+      gs: 462,
+      tas: 438,
+      windDir: 276,
+      windSpeed: 63.6,
+      selHeading: 310,
+      navModes: ['autopilot'],
+      track: 289,
+      tat: -4,
+      oat: -56,
+      at: AT,
+      heard,
+    });
+
+    // Act
+    const readouts = ndReadouts(t, NOW);
+
+    // Assert
+    expect(texts(readouts)).toEqual(['462', '438', '269°/64', '310°', '282°', '-4°C', '-56°C']);
+  });
+
+  it('prints no sign on a temperature of zero and a plus on a positive one', () => {
+    // Arrange
+    const rows = [0.2, 3].map((v) =>
+      makeSample(NOW, { seen: 1, tat: v, oat: v, heard: { tat: FRESH, oat: FRESH } }),
+    );
+
+    // Act
+    const readouts = rows.map((t) => ndReadouts(t, NOW));
+
+    // Assert
+    expect(readouts.map((r) => [r.tat.text, r.sat.text])).toEqual([
+      ['0°C', '0°C'],
+      ['+3°C', '+3°C'],
+    ]);
+  });
+
+  it('reads a blank with the degree mark only where the value carries one', () => {
+    // Arrange
+    const t = makeSample(NOW, { seen: 1 });
+
+    // Act
+    const readouts = ndReadouts(t, NOW);
+
+    // Assert
+    expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
+    expect(Object.values(readouts).map((r) => r.known)).toEqual(Array(7).fill(false));
+  });
+
+  it('lets a value lapse at exactly INSTRUMENT_SEC', () => {
+    // Arrange
+    const t = makeSample(NOW, {
+      seen: 1,
+      gs: 462,
+      tas: 438,
+      heard: { gs: STALE, tas: STALE + 1 },
+    });
+
+    // Act
+    const readouts = ndReadouts(t, NOW);
+
+    // Assert
+    expect([readouts.gs.text, readouts.tas.text]).toEqual(['---', '438']);
+  });
+
+  it('is as old as the oldest of the inputs of a derived value', () => {
+    // Arrange
+    const sel = (modesAt: number | undefined) =>
+      makeSample(NOW, {
+        seen: 1,
+        selHeading: 310,
+        navModes: modesAt === undefined ? undefined : ['autopilot'],
+        windDir: 276,
+        windSpeed: 40,
+        heard: {
+          selHeading: FRESH,
+          ...(modesAt === undefined ? {} : { navModes: modesAt }),
+          windDir: FRESH,
+          windSpeed: modesAt ?? FRESH,
+        },
+      });
+    const rows = [sel(NOW - 16), sel(NOW - 14), sel(undefined)];
+
+    // Act
+    const readouts = rows.map((t) => ndReadouts(t, NOW));
+
+    // Assert
+    expect(readouts.map((r) => [r.sel.text, r.wind.text])).toEqual([
+      ['---°', '---'],
+      ['310°', '276°/40'],
+      ['310°', '276°/40'],
+    ]);
+  });
+
+  it('blanks every value of a target not heard for INSTRUMENT_SEC', () => {
+    // Arrange
+    const t = makeSample(NOW, {
+      seen: 34,
+      gs: 462,
+      oat: -56,
+      track: 289,
+      heard: { gs: FRESH, oat: FRESH, track: FRESH },
+    });
+
+    // Act
+    const readouts = ndReadouts(t, NOW);
+
+    // Assert
+    expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
+  });
+
+  it('keeps the values that still hold when neither heading nor track does', () => {
+    // Arrange
+    const t = makeSample(NOW, {
+      seen: 1,
+      gs: 462,
+      oat: -56,
+      track: 289,
+      heard: { gs: FRESH, oat: FRESH, track: STALE },
+    });
+
+    // Act
+    const readouts = ndReadouts(t, NOW);
+
+    // Assert
+    expect(texts(readouts)).toEqual(['462', '---', '---', '---°', '---°', '---', '-56°C']);
   });
 });

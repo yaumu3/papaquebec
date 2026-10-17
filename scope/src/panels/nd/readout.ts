@@ -1,8 +1,10 @@
 import type { Heard, HeardKey } from '../../lib/aircraft';
+import { steeringHeading } from '../../lib/autopilot';
 import { padBearing } from '../../lib/format';
 import { holds, INSTRUMENT_SEC } from '../../lib/reports';
-import { magneticTrack } from '../../state/magnetic';
+import { magneticBearing, magneticTrack } from '../../state/magnetic';
 import type { Readout } from '../../state/track';
+import { NONE, type Reading, READINGS } from '../readings';
 
 /** The state of the instrument: oriented on the heading, on the track, or blank for want of both. */
 export type NdMode = 'heading' | 'track' | 'lost' | 'blank';
@@ -66,5 +68,52 @@ export function ndFrame(t: Readout, now: number): NdFrame {
     box: live ? padBearing(orient) : BLANK_BOX,
     flags: FLAGS[mode],
     lastHeard: mode === 'lost' ? `LAST HEARD ${Math.round(t.seen)} s` : undefined,
+  };
+}
+
+/** What a corner of the ND prints, and whether it is a value or the blank of an unknown. */
+export interface NdText {
+  text: string;
+  known: boolean;
+}
+
+export interface NdReadouts {
+  gs: NdText;
+  tas: NdText;
+  wind: NdText;
+  sel: NdText;
+  trk: NdText;
+  tat: NdText;
+  sat: NdText;
+}
+
+const degrees = (deg: number | undefined): string | undefined =>
+  deg === undefined ? undefined : `${padBearing(deg)}°`;
+
+/** A reading's value, with its unit when `withUnit`; undefined for the reading of the unknown. */
+const shown = (r: Reading, withUnit = false): string | undefined =>
+  r === NONE ? undefined : `${r.v}${withUnit ? (r.unit ?? '') : ''}`;
+
+/** The corners of the ND: each value on its own freshness, all blank once the target is lost. */
+export function ndReadouts(t: Readout, now: number): NdReadouts {
+  const lost = isLost(t);
+  const read = (keys: readonly HeardKey[], text: () => string | undefined, degree = false) => {
+    const fresh = !lost && holds(oldestHeard(t.heard, keys), now, INSTRUMENT_SEC);
+    const value = fresh ? text() : undefined;
+    if (value !== undefined) return { text: value, known: true };
+    return { text: degree ? '---°' : '---', known: false };
+  };
+  const wind = () =>
+    t.windDir === undefined || t.windSpeed === undefined
+      ? undefined
+      : `${padBearing(magneticBearing(t.windDir, t.at))}°/${Math.round(t.windSpeed)}`;
+  return {
+    gs: read(['gs'], () => shown(READINGS.gs.format(t))),
+    tas: read(['tas'], () => shown(READINGS.tas.format(t))),
+    wind: read(['windDir', 'windSpeed'], wind),
+    sel: read(['selHeading', 'navModes'], () => degrees(steeringHeading(t)), true),
+    trk: read(['track'], () => degrees(magneticTrack(t)), true),
+    tat: read(['tat'], () => shown(READINGS.tat.format(t), true)),
+    sat: read(['oat'], () => shown(READINGS.oat.format(t), true)),
   };
 }

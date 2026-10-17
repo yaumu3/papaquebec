@@ -15,9 +15,19 @@ import {
   rangeAnchors,
   ringPath,
 } from './geometry';
-import { ndFrame } from './readout';
+import { ndFrame, type NdText, ndReadouts } from './readout';
 
 import s from './Nd.module.css';
+
+/** The small dim name of a value. */
+function Label(props: { children: string }) {
+  return <span class={s.name}>{props.children}</span>;
+}
+
+/** A value of a corner: dim for the blank of an unknown, else in its own tone. */
+function Value(props: { r: NdText; class?: string | undefined }) {
+  return <span class={props.r.known ? props.class : s.unknown}>{props.r.text}</span>;
+}
 
 /** The navigation display of a target: its compass, oriented on the heading or else the track. */
 export function Nd(props: { t: Track }) {
@@ -25,6 +35,7 @@ export function Nd(props: { t: Track }) {
   const width = trackWidth(root);
   const g = createMemo(() => ndGeometry(width()));
   const frame = createMemo(() => ndFrame(props.t, trackStore.stats.now));
+  const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
   const marks = createMemo(() => compass(g(), frame().orient));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
   const anchors = createMemo(() => rangeAnchors(g()));
@@ -60,6 +71,31 @@ export function Nd(props: { t: Track }) {
           style={{ left: `${anchors().half.x}px`, top: `${anchors().half.y}px` }}
         >
           {ndRangeNm() / 2}
+        </div>
+        <div class={cx(s.corner, s.topLeft)}>
+          <div>
+            <Label>GS </Label>
+            <Value r={readouts().gs} class={s.strong} />
+            <Label>{'  TAS '}</Label>
+            <Value r={readouts().tas} />
+          </div>
+          <Value r={readouts().wind} />
+        </div>
+        <div class={cx(s.corner, s.topRight)}>
+          <div>
+            <Label>SEL </Label>
+            <Value r={readouts().sel} class={s.sel} />
+          </div>
+          <div>
+            <Label>TRK </Label>
+            <Value r={readouts().trk} class={s.trk} />
+          </div>
+        </div>
+        <div class={cx(s.corner, s.temps)}>
+          <Label>TAT</Label>
+          <Value r={readouts().tat} />
+          <Label>SAT</Label>
+          <Value r={readouts().sat} />
         </div>
         <div class={s.top}>
           <span class={cx(s.label, s.modeLabel)}>{frame().label}</span>
