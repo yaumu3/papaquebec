@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { recordActions } from '../recordActions';
-import { type KeyEvent, keyHandler } from './keyboard';
+import { HISTORY_SELECTOR, type KeyEvent, keyHandler } from './keyboard';
 
 const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): KeyEvent => ({
   key: k,
@@ -57,5 +57,35 @@ describe('keyHandler', () => {
 
     // Assert
     expect(calls).toEqual([]);
+  });
+
+  it('leaves keys pressed inside the history to it', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const inHistory = Object.assign(new EventTarget(), {
+      tagName: 'DIV',
+      closest: (selector: string) => (selector === HISTORY_SELECTOR ? {} : null),
+    });
+    const presses = ['Delete', 'Backspace', 'Escape'].map((k) => key(k, false, inHistory));
+
+    // Act
+    for (const press of presses) onKey(press);
+
+    // Assert
+    expect(calls).toEqual([]);
+  });
+
+  it('takes keys pressed elsewhere on the page', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const elsewhere = Object.assign(new EventTarget(), { tagName: 'DIV', closest: () => null });
+
+    // Act
+    onKey(key('Escape', false, elsewhere));
+
+    // Assert
+    expect(calls).toEqual([['cancel']]);
   });
 });

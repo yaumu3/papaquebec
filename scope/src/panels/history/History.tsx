@@ -170,6 +170,7 @@ export function History(props: { track: Track }) {
 
   return (
     <div
+      data-history
       class={cx(s.history, !historyOpen() && s.folded)}
       style={{ '--lane-height': `${LANE_PX}px`, '--notch-height': `${NOTCH_H_PX}px` }}
     >
