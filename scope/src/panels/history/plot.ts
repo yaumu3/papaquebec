@@ -4,10 +4,10 @@ import { NM_IN_METERS } from '../../lib/geo';
 import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
+import type { Interval } from '../../state/span';
 import type { Sample } from '../../state/track';
 import { type Reading, READINGS } from '../readings';
 import { type Dash, HEARD, type Heading, PLOTS } from './plots';
-import type { Interval } from './span';
 import {
   barbMarks,
   GAP_SEC,

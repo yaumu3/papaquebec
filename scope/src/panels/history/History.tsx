@@ -16,6 +16,7 @@ import {
 } from '../../state/history';
 import { laneAfter, type LaneKey, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
+import { type Interval, resolveSpan, type Span, WHOLE, xOf } from '../../state/span';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { placeOf } from '../../ui/reorder';
@@ -30,7 +31,6 @@ import type { LaneMoves } from './moves';
 import { Palette } from './Palette';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
-import { type Interval, resolveSpan, type Span, WHOLE, xOf } from './span';
 import { swipeOffset } from './swipe';
 import { Timeline } from './Timeline';
 import { restSample, sampleAt, seesAll } from './trace';

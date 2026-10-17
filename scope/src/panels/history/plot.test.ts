@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
+import type { Interval } from '../../state/span';
 import {
   atTicks,
   barbPath,
@@ -14,7 +15,6 @@ import {
   scaleLabels,
   snapped,
 } from './plot';
-import type { Interval } from './span';
 import { GAP_SEC, type Point, type Range } from './trace';
 
 const ALL: Interval = { from: 0, to: 10_000 };

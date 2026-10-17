@@ -3,9 +3,6 @@ import { createMemo, createSignal, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import { clamp } from '../../lib/math';
 import type { ReadingKey } from '../../state/plotted';
-import type { Sample } from '../../state/track';
-import { dashClass } from './Lane';
-import { fixed, laneRange, laneTraces, pathOf } from './plot';
 import {
   dragBase,
   dragInterval,
@@ -18,7 +15,10 @@ import {
   timeAt,
   WHOLE,
   xOf,
-} from './span';
+} from '../../state/span';
+import type { Sample } from '../../state/track';
+import { dashClass } from './Lane';
+import { fixed, laneRange, laneTraces, pathOf } from './plot';
 import { yOf } from './trace';
 
 import s from './History.module.css';
