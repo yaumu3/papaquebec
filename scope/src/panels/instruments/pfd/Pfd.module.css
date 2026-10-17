@@ -69,7 +69,6 @@
 .speed,
 .mach,
 .altitudeLabel,
-.altitude,
 .gnd,
 .sel,
 .baro,
@@ -171,19 +170,23 @@
   stroke: var(--pfd-ink);
   stroke-width: 1.2;
 }
-.altitude {
-  font-weight: 600;
-  transform: translate(-100%, -50%);
-}
 .thousands {
   font-size: var(--text-pfd-alt);
 }
 .hundreds {
   font-size: var(--text-lg);
 }
-.altitudeDigits {
-  font-size: var(--text-lg);
-  line-height: 17px;
+.wheel {
+  position: absolute;
+  overflow: hidden;
+}
+.wheelRows {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  color: var(--pfd-ink);
+  font-weight: 600;
+  text-align: center;
 }
 .gnd {
   font-size: var(--text-pfd-alt);

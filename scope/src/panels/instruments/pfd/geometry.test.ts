@@ -26,6 +26,9 @@ import {
   speedStripPath,
   speedTape,
   tapeY,
+  type Wheel,
+  type WheelCell,
+  wheelTop,
   vsiDigits,
   vsiNeedlePath,
   vsiOffset,
@@ -233,6 +236,9 @@ describe('speedBoxPath', () => {
     expect(out).toBe('M4.0 105.0H40.0V118.0L45.0 123.0L40.0 128.0V141.0H4.0Z');
   });
 });
+
+const roundedWheels = (ws: Wheel[]) =>
+  ws.map((w) => ({ ...w, turned: Number(w.turned.toFixed(6)) }));
 
 describe('speedDigits', () => {
   it('reads the tens, and the ones with the neighbours the drum shows', () => {
@@ -482,25 +488,112 @@ describe('altitudeBoxPath', () => {
 });
 
 describe('altitudeDigits', () => {
-  it('rounds to 20 ft and lays the drum out across 00, and the absolute value below zero', () => {
+  it('rolls each digit through the last 20 ft before it changes, the drum at its exact place', () => {
     // Arrange
-    const altitudes = [29600, 29590, 29990, -40];
+    const altitudes = [29575, 29595, 29995, 29600, 30000, 9990, 8640, -40];
 
     // Act
     const out = altitudes.map(altitudeDigits);
 
     // Assert
-    expect(out).toEqual([
-      { thousands: '29', hundreds: '6', drum: ['20', '00', '80'] },
-      { thousands: '29', hundreds: '6', drum: ['20', '00', '80'] },
-      { thousands: '30', hundreds: '0', drum: ['20', '00', '80'] },
-      { thousands: '−0', hundreds: '0', drum: ['60', '40', '20'] },
+    const wheels = out.map((d) => [d.tenThousands, d.thousands, d.hundreds, d.drum]);
+    const rounded = wheels.map((row) =>
+      row.map((w) => ({ ...w, turned: Number(w.turned.toFixed(6)) })),
+    );
+    expect(rounded).toEqual([
+      [
+        { rows: ['3', '2'], turned: 0 },
+        { rows: ['0', '9'], turned: 0 },
+        { rows: ['6', '5'], turned: 0 },
+        { rows: ['00', '80', '60', '40'], turned: 0.75 },
+      ],
+      [
+        { rows: ['3', '2'], turned: 0 },
+        { rows: ['0', '9'], turned: 0 },
+        { rows: ['6', '5'], turned: 0.75 },
+        { rows: ['20', '00', '80', '60'], turned: 0.75 },
+      ],
+      [
+        { rows: ['3', '2'], turned: 0.75 },
+        { rows: ['0', '9'], turned: 0.75 },
+        { rows: ['0', '9'], turned: 0.75 },
+        { rows: ['20', '00', '80', '60'], turned: 0.75 },
+      ],
+      [
+        { rows: ['3', '2'], turned: 0 },
+        { rows: ['0', '9'], turned: 0 },
+        { rows: ['7', '6'], turned: 0 },
+        { rows: ['40', '20', '00', '80'], turned: 0 },
+      ],
+      [
+        { rows: ['4', '3'], turned: 0 },
+        { rows: ['1', '0'], turned: 0 },
+        { rows: ['1', '0'], turned: 0 },
+        { rows: ['40', '20', '00', '80'], turned: 0 },
+      ],
+      [
+        { rows: ['1', ''], turned: 0.5 },
+        { rows: ['0', '9'], turned: 0.5 },
+        { rows: ['0', '9'], turned: 0.5 },
+        { rows: ['20', '00', '80', '60'], turned: 0.5 },
+      ],
+      [
+        { rows: ['1', ''], turned: 0 },
+        { rows: ['9', '8'], turned: 0 },
+        { rows: ['7', '6'], turned: 0 },
+        { rows: ['80', '60', '40', '20'], turned: 0 },
+      ],
+      [
+        { rows: ['1', '−'], turned: 0 },
+        { rows: ['1', '0'], turned: 0 },
+        { rows: ['1', '0'], turned: 0 },
+        { rows: ['80', '60', '40', '20'], turned: 0 },
+      ],
     ]);
   });
 });
 
+describe('altitudeDigits drum near zero', () => {
+  it('reads the absolute value in the row below 00, which is 20 within 20 ft of zero', () => {
+    // Arrange
+    const altitudes = [0, 15, -10, 20, -40];
+
+    // Act
+    const out = altitudes.map((ft) => altitudeDigits(ft).drum);
+
+    // Assert
+    expect(roundedWheels(out)).toEqual([
+      { rows: ['40', '20', '00', '20'], turned: 0 },
+      { rows: ['40', '20', '00', '20'], turned: 0.75 },
+      { rows: ['40', '20', '00', '20'], turned: 0.5 },
+      { rows: ['60', '40', '20', '00'], turned: 0 },
+      { rows: ['80', '60', '40', '20'], turned: 0 },
+    ]);
+  });
+});
+
+describe('wheelTop', () => {
+  it('puts the resting row in the window and moves the column down by the turned part of a row', () => {
+    // Arrange
+    const cases: [number, number, number, number][] = [
+      [34, 17, 2, 0],
+      [34, 17, 2, 0.75],
+      [17, 17, 1, 0],
+      [17, 17, 1, 0.5],
+    ];
+
+    // Act
+    const out = cases.map((c) => wheelTop(...c));
+
+    // Assert
+    expect(out).toEqual([-25.5, -12.75, -17, -8.5]);
+  });
+});
+
+const cellNumbers = (c: WheelCell) => Object.values(c).map((v) => Number(v.toFixed(2)));
+
 describe('altitudeReadout', () => {
-  it('anchors the thousands, the clipped drum and the middle of the box', () => {
+  it('stands a window on each digit, right to left from the drum, on the line the text had', () => {
     // Arrange
     const g = pfdGeometry(346);
 
@@ -508,13 +601,14 @@ describe('altitudeReadout', () => {
     const out = altitudeReadout(g);
 
     // Assert
-    expect(out).toEqual({
-      tapeX: 287,
-      midX: 297,
-      digitsX: 301,
-      drum: { x: 303, y: 106, w: 17, h: 34 },
-      drumTop: -8.5,
-    });
+    expect(out.tapeX).toBe(287);
+    expect(out.midX).toBe(297);
+    expect([out.hundreds, out.thousands, out.tenThousands, out.drum].map(cellNumbers)).toEqual([
+      [293.2, 117.94, 7.8, 13, 13, 1],
+      [283, 114.5, 10.2, 17, 17, 1],
+      [272.8, 114.5, 10.2, 17, 17, 1],
+      [303, 106, 17, 34, 17, 2],
+    ]);
   });
 });
 

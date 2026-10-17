@@ -491,62 +491,149 @@ export function altitudeBoxPath(g: PfdGeometry): string {
   );
 }
 
+/**
+ * A digit wheel of a readout: its rows top to bottom, and how far it has turned toward the row
+ * above the one at rest.
+ */
+export interface Wheel {
+  rows: readonly string[];
+  /** From 0, at rest, up to but not including 1, the next row fully in. */
+  turned: number;
+}
+
+/**
+ * The fraction of its last `step` before the next multiple of `place` that `a` has run: how far a
+ * carry wheel has turned.
+ */
+const carried = (a: number, place: number, step: number): number =>
+  Math.max(0, (a % place) - (place - step)) / step;
+
+/**
+ * The top of a wheel's column in its window: the row `above` rows down in place, moved down by
+ * `turned` of a row.
+ */
+export const wheelTop = (windowH: number, lineH: number, above: number, turned: number): number =>
+  windowH / 2 - lineH / 2 - above * lineH + turned * lineH;
+
+/** Where a wheel's window stands, and how its column is laid out in it. */
+export interface WheelCell {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** The height of a row, and the number of rows above the one at rest. */
+  lineH: number;
+  above: number;
+}
+
 export interface AltitudeDigits {
-  thousands: string;
-  hundreds: string;
-  /** The last two digits with their neighbours 20 ft either side: above (+20), at, below (-20). */
-  drum: [string, string, string];
+  tenThousands: Wheel;
+  thousands: Wheel;
+  hundreds: Wheel;
+  /** The last two digits, rows base + 40 down to base − 20 ft. */
+  drum: Wheel;
 }
 
 const DRUM_STEP_FT = 20;
 const HUNDRED_FT = 100;
+const TEN_THOUSAND_FT = 10000;
 
-const twoDigits = (n: number): string => String(((n % 100) + 100) % 100).padStart(2, '0');
+/** The last two digits of a non-negative number. */
+const twoDigits = (n: number): string => String(n % 100).padStart(2, '0');
 
-/** The digits of an altitude rounded to 20 ft, the absolute value laid out as usual under a sign. */
+/** A digit wheel of the altitude's `place` ft, rolling from this digit to the next. */
+const carryWheel = (a: number, place: number, rows: [string, string]): Wheel => ({
+  rows,
+  turned: carried(a, place, DRUM_STEP_FT),
+});
+
+/** The sign of a negative altitude takes the place of the leading digit, which is blank at zero. */
+const leadingDigit = (ft: number): string => {
+  if (ft < 0) return MINUS;
+  const ten = Math.floor(ft / TEN_THOUSAND_FT);
+  return ten === 0 ? '' : String(ten);
+};
+
+const digitAt = (a: number, place: number, next = 0): string =>
+  String((Math.floor(a / place) + next) % 10);
+
+/**
+ * The digits of an altitude as wheels, the absolute value laid out as usual after a sign. Each
+ * digit rolls through the last 20 ft before it changes, and the drum stands at the exact place
+ * within its 20 ft step.
+ */
 export function altitudeDigits(ft: number): AltitudeDigits {
-  const rounded = Math.round(Math.abs(ft) / DRUM_STEP_FT) * DRUM_STEP_FT;
-  const tens = rounded % HUNDRED_FT;
+  const a = Math.abs(ft);
+  const base = Math.floor(a / DRUM_STEP_FT) * DRUM_STEP_FT;
   return {
-    thousands: signedThousands(ft < 0 ? -rounded : rounded),
-    hundreds: String(Math.floor((rounded % ALTITUDE_THOUSAND_FT) / HUNDRED_FT)),
-    drum: [twoDigits(tens + DRUM_STEP_FT), twoDigits(tens), twoDigits(tens - DRUM_STEP_FT)],
+    tenThousands: carryWheel(a, TEN_THOUSAND_FT, [
+      String(Math.floor(a / TEN_THOUSAND_FT) + 1),
+      leadingDigit(ft),
+    ]),
+    thousands: carryWheel(a, ALTITUDE_THOUSAND_FT, [
+      digitAt(a, ALTITUDE_THOUSAND_FT, 1),
+      digitAt(a, ALTITUDE_THOUSAND_FT),
+    ]),
+    hundreds: carryWheel(a, HUNDRED_FT, [digitAt(a, HUNDRED_FT, 1), digitAt(a, HUNDRED_FT)]),
+    drum: {
+      rows: [2, 1, 0, -1].map((k) => twoDigits(Math.abs(base + k * DRUM_STEP_FT))),
+      turned: (a - base) / DRUM_STEP_FT,
+    },
   };
 }
 
+/** JetBrains Mono: advance 600, ascender 1020, descender 300 of 1000 units per em. */
+const MONO_ADVANCE_EM = 0.6;
+/** The baseline's depth in a box whose line height is its font size: (1 − (1020 + 300) / 1000) / 2 + 1020 / 1000. */
+const MONO_BASELINE_EM = 0.86;
+const ALTITUDE_THOUSANDS_PX = 17;
+const ALTITUDE_HUNDREDS_PX = 13;
 const ALTITUDE_DIGITS_GAP_PX = 20;
 const ALTITUDE_DRUM_GAP_PX = 18;
 const ALTITUDE_DRUM_LINE_PX = 17;
+const DRUM_WINDOW_H_PX = 2 * READOUT_HALF_HEIGHT_PX - 2;
 
 export interface AltitudeReadout {
   /** The middle of the tape, where its flag stands. */
   tapeX: number;
   /** The middle of the box, where GND stands. */
   midX: number;
-  /** Where the thousands and hundreds end, right-aligned. */
-  digitsX: number;
-  /** The window the last two digits' drum is clipped to. */
-  drum: { x: number; y: number; w: number; h: number };
-  /** Where the drum's column starts inside its window. */
-  drumTop: number;
+  tenThousands: WheelCell;
+  thousands: WheelCell;
+  hundreds: WheelCell;
+  drum: WheelCell;
 }
 
-/** Where the altitude readout's texts stand. */
+/** Where the altitude readout's wheels stand. */
 export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
   const left = g.aL + ALTITUDE_BOX_IN_PX;
   const right = g.aR + ALTITUDE_BOX_OUT_PX;
   const drumX = right - ALTITUDE_DRUM_GAP_PX;
+  const baseline = g.yc - ALTITUDE_THOUSANDS_PX / 2 + MONO_BASELINE_EM * ALTITUDE_THOUSANDS_PX;
+  const digit = (edge: number, px: number): WheelCell => ({
+    x: edge - MONO_ADVANCE_EM * px,
+    y: baseline - MONO_BASELINE_EM * px,
+    w: MONO_ADVANCE_EM * px,
+    h: px,
+    lineH: px,
+    above: 1,
+  });
+  const hundreds = digit(right - ALTITUDE_DIGITS_GAP_PX, ALTITUDE_HUNDREDS_PX);
+  const thousands = digit(hundreds.x, ALTITUDE_THOUSANDS_PX);
   return {
     tapeX: (g.aL + g.aR) / 2,
     midX: (left + right) / 2,
-    digitsX: right - ALTITUDE_DIGITS_GAP_PX,
+    tenThousands: digit(thousands.x, ALTITUDE_THOUSANDS_PX),
+    thousands,
+    hundreds,
     drum: {
       x: drumX,
       y: g.yc - READOUT_HALF_HEIGHT_PX + 1,
       w: right - drumX - 1,
-      h: 2 * READOUT_HALF_HEIGHT_PX - 2,
+      h: DRUM_WINDOW_H_PX,
+      lineH: ALTITUDE_DRUM_LINE_PX,
+      above: 2,
     },
-    drumTop: READOUT_HALF_HEIGHT_PX - 1 - ALTITUDE_DRUM_LINE_PX / 2 - ALTITUDE_DRUM_LINE_PX,
   };
 }
 

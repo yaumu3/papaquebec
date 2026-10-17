@@ -1,6 +1,5 @@
-import { createUniqueId, For, Index, Show } from 'solid-js';
+import { createUniqueId, For, Show } from 'solid-js';
 
-import { cx } from '../../../design/cx';
 import { Flag } from './Flag';
 import {
   type AltitudeDigits,
@@ -17,6 +16,7 @@ import {
   selDigits,
 } from './geometry';
 import type { PfdAltitude } from './readout';
+import { Wheel } from './Wheel';
 
 import s from './Pfd.module.css';
 
@@ -106,23 +106,10 @@ export function AltitudeText(props: AltitudeProps & { baro: string }) {
                 </div>
               )}
             </For>
-            <div class={s.altitude} style={{ left: `${at().digitsX}px`, top: `${props.g.yc}px` }}>
-              <span class={s.thousands}>{v().digits.thousands}</span>
-              <span class={s.hundreds}>{v().digits.hundreds}</span>
-            </div>
-            <div
-              class={s.drum}
-              style={{
-                left: `${at().drum.x}px`,
-                top: `${at().drum.y}px`,
-                width: `${at().drum.w}px`,
-                height: `${at().drum.h}px`,
-              }}
-            >
-              <div class={cx(s.digits, s.altitudeDigits)} style={{ top: `${at().drumTop}px` }}>
-                <Index each={v().digits.drum}>{(d) => <div>{d()}</div>}</Index>
-              </div>
-            </div>
+            <Wheel cell={at().tenThousands} wheel={v().digits.tenThousands} class={s.thousands} />
+            <Wheel cell={at().thousands} wheel={v().digits.thousands} class={s.thousands} />
+            <Wheel cell={at().hundreds} wheel={v().digits.hundreds} class={s.hundreds} />
+            <Wheel cell={at().drum} wheel={v().digits.drum} class={s.hundreds} />
           </>
         )}
       </Show>
