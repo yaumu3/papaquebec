@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
-import { axisStep, clockLabel, clockStep, clearOfEnds, ticks } from './axis';
+import {
+  axisStep,
+  chipAt,
+  clearOf,
+  clockLabel,
+  clockStep,
+  clearOfEnds,
+  spanLabel,
+  ticks,
+} from './axis';
 
 /** 12:36:10Z on the first day of the epoch. */
 const T = 12 * 3600 + 36 * 60 + 10;
@@ -72,5 +81,52 @@ describe('clearOfEnds', () => {
 
     // Assert
     expect(kept).toEqual([10, 50, 90]);
+  });
+});
+
+describe('spanLabel', () => {
+  it('reads the ends of the span as its axis does, then how long it is', () => {
+    // Arrange
+    const spans = [
+      { from: T - 10 - 7 * 60, to: T - 10 - 2 * 60 },
+      { from: T, to: T + 90 },
+      { from: T, to: T + 40 },
+    ];
+
+    // Act
+    const labels = spans.map(spanLabel);
+
+    // Assert
+    expect(labels).toEqual([
+      '12:29 – 12:34 · 5 MIN',
+      '12:36:10 – 12:37:40 · 2 MIN',
+      '12:36:10 – 12:36:50 · 40 S',
+    ]);
+  });
+});
+
+describe('chipAt', () => {
+  it('centres the chip on the cursor, kept inside the plot', () => {
+    // Arrange
+    const xs = [150, 10, 295];
+
+    // Act
+    const lefts = xs.map((x) => chipAt(x, 60, 300));
+
+    // Assert
+    expect(lefts).toEqual([120, 0, 240]);
+  });
+});
+
+describe('clearOf', () => {
+  it('tells which labels miss the chip', () => {
+    // Arrange
+    const xs = [60, 180, 230, 300];
+
+    // Act
+    const clear = clearOf(xs, 240, 300, 15);
+
+    // Assert
+    expect(clear).toEqual([true, true, false, false]);
   });
 });
