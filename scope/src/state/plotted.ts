@@ -1,4 +1,4 @@
-/** The readings of the detail table that the history lanes can plot. */
+/** The readings of a target the history lanes draw. */
 export const READING_KEYS = [
   'alt',
   'selAlt',
@@ -6,6 +6,7 @@ export const READING_KEYS = [
   'vs',
   'trk',
   'selHdg',
+  'roll',
   'gs',
   'qnh',
   'modes',
