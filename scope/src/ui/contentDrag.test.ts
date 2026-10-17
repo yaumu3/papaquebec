@@ -22,7 +22,7 @@ const fingers = (timeStamp: number, touches: Finger[], changed: Finger[] = touch
   timeStamp,
 });
 
-/** A tracker over content that is free, scrolled to its top and short of the largest detent unless `reads` says otherwise, recording every pull. */
+/** A tracker over content that is free, scrolled to its top, short of the largest detent and with nothing selected unless `reads` says otherwise, recording every pull. */
 function subject(reads: Partial<ContentReads> = {}) {
   const pulls: [string, number, number][] = [];
   const t = trackContentTouches(
@@ -31,7 +31,13 @@ function subject(reads: Partial<ContentReads> = {}) {
       move: (y, at) => pulls.push(['move', y, at]),
       up: (y, at) => pulls.push(['up', y, at]),
     },
-    { free: () => true, atTop: () => true, atLargest: () => false, ...reads },
+    {
+      free: () => true,
+      atTop: () => true,
+      atLargest: () => false,
+      selecting: () => false,
+      ...reads,
+    },
   );
   return { pulls, t };
 }
@@ -148,6 +154,19 @@ describe('trackContentTouches', () => {
 
     // Act
     const claimed = t.move(fingers(20, [finger(1, 500 + DECIDE_PX)]));
+
+    // Assert
+    expect(claimed).toBe(false);
+    expect(pulls).toEqual([]);
+  });
+
+  it('leaves a finger that moves once text is selected to the selection', () => {
+    // Arrange
+    const { pulls, t } = subject({ selecting: () => true });
+    t.start(fingers(0, [finger(1, 500)]));
+
+    // Act
+    const claimed = t.move(fingers(600, [finger(1, 480)]));
 
     // Assert
     expect(claimed).toBe(false);

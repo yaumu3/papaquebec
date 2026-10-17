@@ -36,6 +36,8 @@ export interface ContentReads {
   /** Whether the content under `target` is scrolled to its top, or has nothing to scroll. */
   atTop(target: EventTarget | null): boolean;
   atLargest(): boolean;
+  /** Whether the page holds a text selection, which a finger works rather than the sheet. */
+  selecting(): boolean;
 }
 
 /** Whether what the finger landed on takes drags itself, as a slider does, keeping them from the sheet. */
@@ -63,9 +65,9 @@ const fingerOf = (list: ArrayLike<Finger>, id: number) =>
 
 /**
  * Tells which fingers on a sheet's content pull the sheet: a lone finger that, once past a tap's
- * wobble, goes where the content would not scroll, followed by its identifier until it lifts,
- * whatever other fingers do meanwhile. `move` returns true when the move is the sheet's, so that the content
- * must not scroll.
+ * wobble, goes where the content would not scroll while no text is selected, followed by its
+ * identifier until it lifts, whatever other fingers do meanwhile. `move` returns true when the
+ * move is the sheet's, so that the content must not scroll.
  */
 export function trackContentTouches(
   pull: {
@@ -93,12 +95,14 @@ export function trackContentTouches(
         const up = landed.y - first.clientY;
         const across = first.clientX - landed.x;
         if (Math.hypot(up, across) < DECIDE_PX) return false;
-        const moves = contentMovesSheet({
-          up,
-          across,
-          atLargest: read.atLargest(),
-          atTop: read.atTop(e.target),
-        });
+        const moves =
+          !read.selecting() &&
+          contentMovesSheet({
+            up,
+            across,
+            atLargest: read.atLargest(),
+            atTop: read.atTop(e.target),
+          });
         if (moves) {
           pulling = landed.id;
           pull.down(landed.y, landed.t);
@@ -139,6 +143,7 @@ export function dragFromContent(
       free: (target) => isPhone() && target instanceof Element && !ownsDrag(target, sheet),
       atTop: (target) => target instanceof Element && scrolledToTop(target, sheet),
       atLargest,
+      selecting: () => !(document.getSelection()?.isCollapsed ?? true),
     },
   );
   const start = (e: TouchEvent) => fingers.start(e);
