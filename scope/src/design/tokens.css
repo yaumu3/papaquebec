@@ -28,8 +28,9 @@
   --row-hover: #2a2a2a;
   --row-selected: #3a3a3a;
   --accent: #fff;
-  /* The ND's ground, its half-range ring and its track line. */
-  --nd-bg: #0b0b0b;
+  /* The instruments' ground. */
+  --instrument-bg: #0b0b0b;
+  /* The ND's half-range ring and its track line. */
   --nd-ring: #3a3a38;
   --nd-track: #6a6a66;
   /* Hairlines inside a plot, and the shade of a stretch with no report. */

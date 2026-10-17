@@ -6,7 +6,7 @@
   --zoom-w: 28px;
   position: relative;
   margin-top: var(--space-4);
-  background: var(--nd-bg);
+  background: var(--instrument-bg);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -223,7 +223,7 @@
   height: 26px;
   padding: 0;
   border: 1px solid var(--panel-border);
-  background: var(--nd-bg);
+  background: var(--instrument-bg);
   color: var(--control-on-bg);
   font: inherit;
   font-size: var(--text-xl);
