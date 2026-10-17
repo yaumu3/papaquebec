@@ -71,3 +71,20 @@ export function moveLane(plotted: readonly LaneKey[], from: number, to: number):
   if (moved !== undefined) lanes.splice(to, 0, moved);
   return lanes;
 }
+
+/** The lanes with `to` in the place of `from`, unless `to` is open already or `from` is not. */
+export function switchLane(plotted: readonly LaneKey[], from: LaneKey, to: LaneKey): LaneKey[] {
+  if (plotted.includes(to)) return [...plotted];
+  return plotted.map((k) => (k === from ? to : k));
+}
+
+/** The lanes with `lane` at the end, unless it is open already. */
+export function addLane(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
+  return plotted.includes(lane) ? [...plotted] : [...plotted, lane];
+}
+
+/** The lane that follows `lane`; null after the last, or for one not open. */
+export function laneAfter(plotted: readonly LaneKey[], lane: LaneKey): LaneKey | null {
+  const at = plotted.indexOf(lane);
+  return at < 0 ? null : (plotted[at + 1] ?? null);
+}

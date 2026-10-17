@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js';
 
-import { type LaneKey, moveLane, removeLane, togglePlotted } from './plotted';
+import { addLane, type LaneKey, moveLane, removeLane, switchLane, togglePlotted } from './plotted';
 import { persisted } from './settings';
 
 /** The lanes of the history, in order. */
@@ -16,6 +16,14 @@ export function removePlotLane(lane: LaneKey): void {
 
 export function movePlotLane(from: number, to: number): void {
   setPlotted((p) => moveLane(p, from, to));
+}
+
+export function switchPlotLane(from: LaneKey, to: LaneKey): void {
+  setPlotted((p) => switchLane(p, from, to));
+}
+
+export function addPlotLane(lane: LaneKey): void {
+  setPlotted((p) => addLane(p, lane));
 }
 
 /** Whether the history group is unfolded in the detail panel. */

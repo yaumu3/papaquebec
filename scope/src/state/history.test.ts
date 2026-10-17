@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  addPlotLane,
   historyOpen,
   hoverInstant,
   movePlotLane,
@@ -8,6 +9,7 @@ import {
   removePlotLane,
   setHoverInstant,
   setPlotted,
+  switchPlotLane,
   toggleHistory,
   togglePlot,
 } from './history';
@@ -57,6 +59,28 @@ describe('history state', () => {
 
     // Assert
     expect(plotted()).toEqual(['vs', 'gs']);
+  });
+
+  it('switches a lane to another in its place', () => {
+    // Arrange
+    setPlotted(['alt', 'gs']);
+
+    // Act
+    switchPlotLane('alt', 'roll');
+
+    // Assert
+    expect(plotted()).toEqual(['roll', 'gs']);
+  });
+
+  it('adds a lane at the end', () => {
+    // Arrange
+    setPlotted(['alt', 'gs']);
+
+    // Act
+    addPlotLane('roll');
+
+    // Assert
+    expect(plotted()).toEqual(['alt', 'gs', 'roll']);
   });
 
   it('starts with the history group open and folds it on a toggle', () => {

@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  addLane,
   DEFAULT_PLOTTED,
   INTENTS,
   LANE_GROUPS,
+  laneAfter,
   LANE_KEYS,
   type LaneKey,
   moveLane,
   READING_KEYS,
   readingsIn,
   removeLane,
+  switchLane,
   togglePlotted,
 } from './plotted';
 
@@ -141,5 +144,58 @@ describe('DEFAULT_PLOTTED', () => {
 
     // Assert
     expect(plotted).toEqual(expected);
+  });
+});
+
+describe('switchLane', () => {
+  it('puts the lane picked in the place of the one switched, unless it is open or that is not', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['alt', 'gs', 'vs'];
+    const switches: [LaneKey, LaneKey][] = [
+      ['gs', 'ias'],
+      ['gs', 'vs'],
+      ['trk', 'ias'],
+    ];
+
+    // Act
+    const next = switches.map(([from, to]) => switchLane(plotted, from, to));
+
+    // Assert
+    expect(next).toEqual([
+      ['alt', 'ias', 'vs'],
+      ['alt', 'gs', 'vs'],
+      ['alt', 'gs', 'vs'],
+    ]);
+  });
+});
+
+describe('addLane', () => {
+  it('adds a lane at the end, unless it is open', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['alt', 'gs'];
+    const added: LaneKey[] = ['roll', 'alt'];
+
+    // Act
+    const next = added.map((lane) => addLane(plotted, lane));
+
+    // Assert
+    expect(next).toEqual([
+      ['alt', 'gs', 'roll'],
+      ['alt', 'gs'],
+    ]);
+  });
+});
+
+describe('laneAfter', () => {
+  it('names the lane that follows, none after the last or for one not open', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['alt', 'gs', 'vs'];
+    const lanes: LaneKey[] = ['alt', 'gs', 'vs', 'trk'];
+
+    // Act
+    const after = lanes.map((lane) => laneAfter(plotted, lane));
+
+    // Assert
+    expect(after).toEqual(['gs', 'vs', null, null]);
   });
 });
