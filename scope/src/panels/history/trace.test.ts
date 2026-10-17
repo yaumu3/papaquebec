@@ -125,6 +125,19 @@ describe('runsOf with the instants a reading is heard at', () => {
     expect(runs).toEqual([[{ t: 1, v: 250 }], [{ t: again, v: 250 }]]);
   });
 
+  it('skips a sample at the start of a stretch whose reading was heard a gap before it', () => {
+    // Arrange
+    const before = [0, 5, 10].map((t) => sample(t, { gs: 300, heard: { gs: t } }));
+    const stale = sample(100, { gs: 300, heard: { gs: 10 } });
+    const after = [101, 110].map((t) => sample(t, { gs: 200, heard: { gs: t } }));
+
+    // Act
+    const runs = runsOf([...before, stale, ...after], gs, { from: 95, to: 115 }, ['gs']);
+
+    // Assert
+    expect(runs.map((run) => run.map((p) => p.t))).toEqual([[10], [101, 110]]);
+  });
+
   it('skips a sample whose reading was never heard', () => {
     // Arrange
     const samples = [sample(1, { gs: 250, heard: { gs: 1 } }), sample(2, { gs: 251 })];

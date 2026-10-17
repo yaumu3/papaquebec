@@ -60,8 +60,8 @@ export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): bool
 
 /**
  * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
- * the `heard` instants of the reading, only a sample with a new report of it is a point, and a run
- * breaks where the reading went unheard longer than the gap.
+ * the `heard` instants of the reading, only a sample with a new report of it, heard within the gap
+ * of the sample, is a point, and a run breaks where the reading went unheard longer than the gap.
  */
 export function runsOf(
   samples: readonly Sample[],
@@ -84,7 +84,7 @@ export function runsOf(
         end();
         continue;
       }
-      if (at === undefined || at === last) continue;
+      if (at === undefined || at === last || !heardNear(s, heard, s.t)) continue;
       if (last !== undefined && at - last > GAP_SEC) end();
       run.push({ t: s.t, v });
       last = at;
