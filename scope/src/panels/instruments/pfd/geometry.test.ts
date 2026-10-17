@@ -6,6 +6,8 @@ import {
   attitude,
   bankIndexPath,
   bankScalePath,
+  fpvAt,
+  fpvPath,
   fmaBandPath,
   fmaColumnX,
   fmaRulesPath,
@@ -342,5 +344,67 @@ describe('windowRect', () => {
 
     // Assert
     expect(out).toEqual({ x: 68, y: 52, width: 174, height: 142, rx: 12 });
+  });
+});
+
+describe('fpvAt', () => {
+  it('stands at the window centre with no climb and no drift', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const out = fpvAt(g, 0, { fpaDeg: 0, driftDeg: 0 });
+
+    // Assert
+    expect(out).toEqual([155, 123]);
+  });
+
+  it('moves up the climb angle and along the drift at the ladder scale, rolled with the sky', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+    const cases = [0, 90];
+
+    // Act
+    const out = cases.map((roll) => fpvAt(g, roll, { fpaDeg: 5, driftDeg: 10 }).map(Math.round));
+
+    // Assert
+    expect(out).toEqual([
+      [191, 105],
+      [137, 87],
+    ]);
+  });
+
+  it('stays whole inside the window at the right and at the bottom', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+    const cases = [
+      { fpaDeg: 0, driftDeg: 40 },
+      { fpaDeg: -30, driftDeg: 0 },
+    ];
+
+    // Act
+    const out = cases.map((fpv) => fpvAt(g, 0, fpv));
+
+    // Assert
+    expect(out).toEqual([
+      [224, 123],
+      [155, 189],
+    ]);
+  });
+});
+
+describe('fpvPath', () => {
+  it('draws a circle with two wings and a fin', () => {
+    // Arrange
+    const at: [number, number] = [155, 123];
+
+    // Act
+    const out = fpvPath(at);
+
+    // Assert
+    expect(out).toBe(
+      'M150.0 123.0A5.0 5.0 0 1 0 160.0 123.0A5.0 5.0 0 1 0 150.0 123.0' +
+        'M150.0 123.0h-13M160.0 123.0h13M155.0 118.0v-7',
+    );
   });
 });

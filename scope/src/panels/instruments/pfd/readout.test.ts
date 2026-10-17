@@ -1,11 +1,16 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
 import { fmaColumns, modeChangedAt, pfdFma, pfdReadouts } from './readout';
 
 const NOW = 1000;
+
+afterEach(() => {
+  setDeclinationAt(() => () => 0);
+});
 const FRESH = NOW - 1;
 const STALE = NOW - INSTRUMENT_SEC;
 
@@ -195,7 +200,7 @@ describe('pfdReadouts speed', () => {
     const out = pfdReadouts(t, NOW);
 
     // Assert
-    expect(out).toEqual({ ias: 262, mach: '.790', roll: undefined });
+    expect(out).toEqual({ ias: 262, mach: '.790', roll: undefined, fpv: undefined });
   });
 
   it('blanks the speed and the Mach when stale, never reported or lost', () => {
@@ -211,7 +216,7 @@ describe('pfdReadouts speed', () => {
     const out = targets.map((t) => pfdReadouts(t, NOW));
 
     // Assert
-    const blank = { ias: undefined, mach: '', roll: undefined };
+    const blank = { ias: undefined, mach: '', roll: undefined, fpv: undefined };
     expect(out).toEqual([blank, blank, blank]);
   });
 });
@@ -231,5 +236,59 @@ describe('pfdReadouts roll', () => {
 
     // Assert
     expect(out).toEqual([-12, undefined, undefined, undefined]);
+  });
+});
+
+describe('pfdReadouts flight path vector', () => {
+  const live = { verticalRate: 1800, gs: 462, roll: 15 };
+  const heard = { verticalRate: FRESH, gs: FRESH, roll: FRESH };
+
+  it('is the climb angle from the vertical rate and ground speed, centred without a heading', () => {
+    // Arrange
+    const t = makeSample(NOW, { ...live, heard });
+
+    // Act
+    const out = pfdReadouts(t, NOW).fpv;
+
+    // Assert
+    expect(out?.fpaDeg).toBeCloseTo(2.203, 3);
+    expect(out?.driftDeg).toBe(0);
+  });
+
+  it('drifts by the turn from the heading to the magnetic track while both hold', () => {
+    // Arrange
+    setDeclinationAt(() => () => 7);
+    const t = makeSample(NOW, {
+      ...live,
+      heading: 100,
+      track: 110,
+      at: { lat: 35.5, lon: 139.8 },
+      heard: { ...heard, heading: FRESH, track: FRESH },
+    });
+    const staleTrack = { ...t, heard: { ...t.heard, track: STALE } };
+
+    // Act
+    const out = [pfdReadouts(t, NOW).fpv?.driftDeg, pfdReadouts(staleTrack, NOW).fpv?.driftDeg];
+
+    // Assert
+    expect(out).toEqual([3, 0]);
+  });
+
+  it('is hidden without the roll, the vertical rate or a ground speed, at a standstill or lost', () => {
+    // Arrange
+    const targets = [
+      makeSample(NOW, { ...live, roll: undefined, heard: { verticalRate: FRESH, gs: FRESH } }),
+      makeSample(NOW, { ...live, heard: { ...heard, roll: STALE } }),
+      makeSample(NOW, { ...live, heard: { ...heard, verticalRate: STALE } }),
+      makeSample(NOW, { ...live, gs: undefined, heard: { verticalRate: FRESH, roll: FRESH } }),
+      makeSample(NOW, { ...live, gs: 0, heard }),
+      makeSample(NOW, { ...live, heard, seen: INSTRUMENT_SEC }),
+    ];
+
+    // Act
+    const out = targets.map((t) => pfdReadouts(t, NOW).fpv);
+
+    // Assert
+    expect(out).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
   });
 });

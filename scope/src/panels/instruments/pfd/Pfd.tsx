@@ -14,6 +14,8 @@ import {
   FMA_CENTRE_Y,
   fmaBandPath,
   fmaColumnX,
+  fpvAt,
+  fpvPath,
   fmaRulesPath,
   pfdGeometry,
   speedBoxPath,
@@ -70,6 +72,12 @@ export function Pfd(props: { t: Track }) {
     const roll = readouts().roll;
     return roll === undefined ? undefined : { roll, ...attitude(g(), roll) };
   });
+  const fpv = createMemo(() => {
+    const { roll, fpv: angles } = readouts();
+    return roll === undefined || angles === undefined
+      ? undefined
+      : fpvPath(fpvAt(g(), roll, angles));
+  });
   const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
   return (
     <div
@@ -98,6 +106,14 @@ export function Pfd(props: { t: Track }) {
                 <path class={s.bank} d={bankScalePath(g())} />
                 <path class={s.index} d={bankIndexPath(g())} />
                 <path class={s.pointer} d={a().pointer} />
+                <Show when={fpv()}>
+                  {(d) => (
+                    <>
+                      <path class={s.fpvHalo} d={d()} />
+                      <path class={s.fpv} d={d()} />
+                    </>
+                  )}
+                </Show>
               </g>
             )}
           </Show>

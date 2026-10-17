@@ -1,6 +1,11 @@
+import type { HeardKey } from '../../../lib/aircraft';
+import { turn } from '../../../lib/geo';
 import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
+import { RAD } from '../../../lib/units';
+import { magneticTrack } from '../../../state/magnetic';
 import type { Readout, Sample, Track } from '../../../state/track';
 import { holdsAll, isLost } from '../freshness';
+import type { Fpv } from './geometry';
 
 /** The labels the PFD gives the modes, in the order a column shows them when two are engaged. */
 const LATERAL_MODES: readonly (readonly [string, string])[] = [
@@ -84,9 +89,40 @@ export interface PfdReadouts {
   mach: string;
   /** The roll in degrees, positive to the right; undefined for the ATT flag. */
   roll: number | undefined;
+  /** The flight path vector's angles; undefined while it is not shown. */
+  fpv: Fpv | undefined;
 }
 
 const machText = (mach: number): string => mach.toFixed(3).replace(/^0/, '');
+
+/** Feet per minute in a knot: 6076.12 ft per nautical mile over 60 minutes. */
+const KT_TO_FPM = 101.27;
+
+/** The climb angle of the path, in degrees, from the vertical rate in ft/min and the ground speed in kt. */
+const pathAngle = (vsFpm: number, gsKt: number): number =>
+  Math.atan2(vsFpm, gsKt * KT_TO_FPM) / RAD;
+
+/** Whether every one of the keys holds on its own: a key never heard does not hold. */
+const allHold = (t: Readout, keys: readonly HeardKey[], now: number): boolean =>
+  keys.every((key) => holdsAll(t, [key], now));
+
+/** The turn from the heading to the magnetic track while both hold, else none. */
+function driftOf(t: Readout, now: number): number {
+  const track = magneticTrack(t);
+  if (t.heading === undefined || track === undefined) return 0;
+  return allHold(t, ['heading', 'track'], now) ? turn(t.heading, track) : 0;
+}
+
+/**
+ * The flight path vector while the roll, the vertical rate and the ground speed hold and the
+ * aircraft is under way. The track's drift off the heading adds to it only while both hold.
+ */
+function fpvOf(t: Readout, now: number): Fpv | undefined {
+  const { verticalRate: vs, gs } = t;
+  if (isLost(t) || vs === undefined || gs === undefined || gs <= 0) return undefined;
+  if (!allHold(t, ['roll', 'verticalRate', 'gs'], now)) return undefined;
+  return { fpaDeg: pathAngle(vs, gs), driftDeg: driftOf(t, now) };
+}
 
 /** The values of the instrument, each while its keys hold and the target is not lost. */
 export function pfdReadouts(t: Readout, now: number): PfdReadouts {
@@ -95,5 +131,6 @@ export function pfdReadouts(t: Readout, now: number): PfdReadouts {
     ias: live('ias') && t.ias !== undefined ? Math.round(t.ias) : undefined,
     mach: live('mach') && t.mach !== undefined ? machText(t.mach) : '',
     roll: live('roll') ? t.roll : undefined,
+    fpv: fpvOf(t, now),
   };
 }

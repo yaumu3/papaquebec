@@ -132,6 +132,18 @@
   stroke: var(--text);
   stroke-width: 1.5;
 }
+.fpvHalo,
+.fpv {
+  stroke-linecap: round;
+}
+.fpvHalo {
+  stroke: var(--instrument-bg);
+  stroke-width: 4;
+}
+.fpv {
+  stroke: var(--text);
+  stroke-width: 1.8;
+}
 .rungLabel {
   position: absolute;
   color: var(--text);

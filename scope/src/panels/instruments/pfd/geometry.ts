@@ -278,14 +278,18 @@ function clipSide(
   return { path, cuts };
 }
 
+/** The directions along the horizon and up from it, in window coordinates, at `rollDeg` of roll. */
+function rolledFrame(rollDeg: number): { along: Point; up: Point } {
+  const r = rollDeg * RAD;
+  return { along: [Math.cos(r), -Math.sin(r)], up: [-Math.sin(r), -Math.cos(r)] };
+}
+
 /**
  * The attitude window at `rollDeg` of roll. Pitch is not broadcast, so the horizon always passes
  * through the window's centre, perpendicular to the rolled up-vector.
  */
 export function attitude(g: PfdGeometry, rollDeg: number): Attitude {
-  const r = rollDeg * RAD;
-  const along: Point = [Math.cos(r), -Math.sin(r)];
-  const up: Point = [-Math.sin(r), -Math.cos(r)];
+  const { along, up } = rolledFrame(rollDeg);
   const corners: Point[] = [
     [g.wx, g.wy],
     [g.wxr, g.wy],
@@ -368,3 +372,47 @@ export const windowRect = (g: PfdGeometry) => ({
   height: g.wyb - g.wy,
   rx: WINDOW_RADIUS_PX,
 });
+
+/** The flight path vector's angles: its climb, and the drift of the track off the heading. */
+export interface Fpv {
+  fpaDeg: number;
+  driftDeg: number;
+}
+
+const FPV_LEFT_PX = 18;
+const FPV_UP_PX = 12;
+const FPV_DOWN_PX = 5;
+
+const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
+
+/**
+ * Where the flight path vector stands, in the rolled frame at the ladder's scale, kept whole
+ * inside the window.
+ */
+export function fpvAt(g: PfdGeometry, rollDeg: number, fpv: Fpv): [number, number] {
+  const { along, up } = rolledFrame(rollDeg);
+  const climb = fpv.fpaDeg * PITCH_PX_PER_DEG;
+  const drift = fpv.driftDeg * PITCH_PX_PER_DEG;
+  const x = g.acx + climb * up[0] + drift * along[0];
+  const y = g.yc + climb * up[1] + drift * along[1];
+  return [
+    clamp(x, g.wx + FPV_LEFT_PX, g.wxr - FPV_LEFT_PX),
+    clamp(y, g.wy + FPV_UP_PX, g.wyb - FPV_DOWN_PX),
+  ];
+}
+
+const FPV_RADIUS_PX = 5;
+const FPV_WING_PX = 13;
+const FPV_FIN_PX = 7;
+
+/** The circle with two wings and a fin, upright, at (x, y). */
+export function fpvPath([x, y]: readonly [number, number]): string {
+  const left = `${fixed(x - FPV_RADIUS_PX)} ${fixed(y)}`;
+  const right = `${fixed(x + FPV_RADIUS_PX)} ${fixed(y)}`;
+  const arc = `A${fixed(FPV_RADIUS_PX)} ${fixed(FPV_RADIUS_PX)} 0 1 0`;
+  return (
+    `M${left}${arc} ${right}${arc} ${left}` +
+    `M${left}h${-FPV_WING_PX}M${right}h${FPV_WING_PX}` +
+    `M${fixed(x)} ${fixed(y - FPV_RADIUS_PX)}v${-FPV_FIN_PX}`
+  );
+}
