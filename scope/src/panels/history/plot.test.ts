@@ -10,6 +10,7 @@ import {
   laneRange,
   laneTraces,
   pathOf,
+  scaleLabels,
   snapped,
   valueAt,
 } from './plot';
@@ -465,5 +466,43 @@ describe('laneRange', () => {
 
     // Assert
     expect(range).toEqual({ lo: 35_000, hi: 36_000 });
+  });
+});
+
+describe('scaleLabels', () => {
+  it('labels the top and bottom of a lane as its reading reads them, bounds with their unit', () => {
+    // Arrange
+    const rows = [
+      { lane: 'alt', r: { lo: 26_000, hi: 34_000 } },
+      { lane: 'vs', r: { lo: 0, hi: 2000 } },
+      { lane: 'gs', r: { lo: 430, hi: 465 } },
+      { lane: 'nic', r: { lo: Math.log10(0.1 * 1852), hi: Math.log10(1852) } },
+      { lane: 'nacp', r: { lo: Math.log10(20), hi: Math.log10(100) } },
+      { lane: 'modes', r: { lo: 0, hi: 1 } },
+    ] as const;
+
+    // Act
+    const labels = rows.map(({ lane, r }) => scaleLabels(lane, r).map((l) => l.text));
+
+    // Assert
+    expect(labels).toEqual([
+      ['FL340', 'FL260'],
+      ['+2000', '0'],
+      ['465', '430'],
+      ['<1 NM', '<0.1 NM'],
+      ['<100 m', '<20 m'],
+      [],
+    ]);
+  });
+
+  it('puts each label at the value it labels', () => {
+    // Arrange
+    const r = { lo: 430, hi: 465 };
+
+    // Act
+    const labels = scaleLabels('gs', r);
+
+    // Assert
+    expect(labels.map((l) => l.v)).toEqual([465, 430]);
   });
 });

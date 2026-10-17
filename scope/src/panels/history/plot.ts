@@ -5,6 +5,7 @@ import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import { laneOf, type ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
+import { READINGS } from '../readings';
 import { type Dash, HEARD, type Heading, PLOTS } from './plots';
 import type { Interval } from './span';
 import {
@@ -110,6 +111,30 @@ export function snapped(r: Range, lane: ReadingKey): Range {
   const lo = clean(Math.floor(r.lo / q + EPS) * q);
   const hi = clean(Math.ceil(r.hi / q - EPS) * q);
   return { lo, hi: hi === lo ? clean(lo + q) : hi };
+}
+
+/** A value on a lane's scale, and how it reads. */
+export interface ScaleLabel {
+  v: number;
+  text: string;
+}
+
+/** The metres a power of ten stands for, to six figures, as a bound reads them. */
+const metresOf = (v: number): number => Number((10 ** v).toPrecision(6));
+
+/**
+ * The top and bottom of a lane's scale as its reading reads them, bounds on a log scale with
+ * their unit, which changes along it; none for a lane without a scale.
+ */
+export function scaleLabels(lane: ReadingKey, r: Range): ScaleLabel[] {
+  const spec = PLOTS[lane];
+  const value = READINGS[lane].value;
+  if (!value || (spec.kind !== 'line' && spec.kind !== 'pair')) return [];
+  const log = spec.kind === 'line' && spec.log;
+  return [r.hi, r.lo].map((v) => {
+    const reading = value(log ? metresOf(v) : v);
+    return { v, text: log && reading.unit ? `${reading.v} ${reading.unit}` : reading.v };
+  });
 }
 
 /** The path of the runs across a lane, each run its own subpath. */

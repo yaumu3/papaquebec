@@ -111,32 +111,43 @@ function nicReading(r: Readout): Reading {
 const nacpReading = (r: Readout): Reading =>
   r.nacP === undefined ? NONE : boundReading(epuM(r.nacP));
 
+const fpm = (v: number | undefined) => signed(v, 'fpm');
+const kt = (v: number | undefined) => num(v, 'kt');
+const celsius = (v: number | undefined) => signed(v, '°C');
+const dB = (v: number | undefined) => num(v, 'dB', 1);
+const perSecond = (v: number | undefined) => num(v, '/s', 1);
+const inHgReading = (v: number | undefined) => num(v, 'inHg', 2);
+const machReading = (v: number | undefined): Reading =>
+  v === undefined ? NONE : { v: formatMach(v) };
+
 export interface ReadingSpec {
   label: string;
   format: (r: Readout) => Reading;
+  /** A number the reading may hold, in its own unit, as it reads; for a reading plotted on a scale. */
+  value?: (v: number) => Reading;
 }
 
 /** Every reading the detail table shows of a target, as it is labeled and printed. */
 export const READINGS: Record<ReadingKey, ReadingSpec> = {
-  alt: { label: 'ALT', format: altitudeReading },
+  alt: { label: 'ALT', format: altitudeReading, value: selectedReading },
   selAlt: { label: 'SEL ALT', format: (r) => selectedReading(r.selAlt) },
   fmsAlt: { label: 'FMS ALT', format: (r) => selectedReading(r.fmsAlt) },
-  vs: { label: 'VS', format: (r) => signed(r.verticalRate, 'fpm') },
+  vs: { label: 'VS', format: (r) => fpm(r.verticalRate), value: fpm },
   trk: { label: 'TRK / HDG', format: trackReading },
   selHdg: { label: 'SEL HDG', format: (r) => bearing(steeringHeading(r)) },
-  gs: { label: 'GS', format: (r) => num(r.gs, 'kt') },
-  qnh: { label: 'QNH', format: (r) => num(inHg(r.navQnh), 'inHg', 2) },
+  gs: { label: 'GS', format: (r) => kt(r.gs), value: kt },
+  qnh: { label: 'QNH', format: (r) => inHgReading(inHg(r.navQnh)), value: inHgReading },
   modes: { label: 'MODES', format: (r) => plain(formatModes(r.navModes)) },
-  ias: { label: 'IAS', format: (r) => num(r.ias, 'kt') },
-  tas: { label: 'TAS', format: (r) => num(r.tas, 'kt') },
-  mach: { label: 'MACH', format: (r) => (r.mach === undefined ? NONE : { v: formatMach(r.mach) }) },
+  ias: { label: 'IAS', format: (r) => kt(r.ias), value: kt },
+  tas: { label: 'TAS', format: (r) => kt(r.tas), value: kt },
+  mach: { label: 'MACH', format: (r) => machReading(r.mach), value: machReading },
   wind: { label: 'WIND', format: windReading },
-  oat: { label: 'OAT', format: (r) => signed(r.oat, '°C') },
-  tat: { label: 'TAT', format: (r) => signed(r.tat, '°C') },
-  nic: { label: 'NIC', format: nicReading },
-  nacp: { label: 'NACP', format: nacpReading },
+  oat: { label: 'OAT', format: (r) => celsius(r.oat), value: celsius },
+  tat: { label: 'TAT', format: (r) => celsius(r.tat), value: celsius },
+  nic: { label: 'NIC', format: nicReading, value: boundReading },
+  nacp: { label: 'NACP', format: nacpReading, value: boundReading },
   src: { label: 'SRC', format: (r) => ({ v: sourceName(r.source) }) },
-  rssi: { label: 'RSSI', format: (r) => num(r.rssi, 'dB', 1) },
-  msgs: { label: 'MSGS', format: (r) => num(r.messageRate, '/s', 1) },
-  age: { label: 'SEEN / POS', format: ageReading },
+  rssi: { label: 'RSSI', format: (r) => dB(r.rssi), value: dB },
+  msgs: { label: 'MSGS', format: (r) => perSecond(r.messageRate), value: perSecond },
+  age: { label: 'SEEN / POS', format: ageReading, value: (v) => ({ v: formatAge(v), unit: 's' }) },
 };
