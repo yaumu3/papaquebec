@@ -22,21 +22,19 @@ import { READINGS } from '../readings';
 import { Value } from '../Value';
 import { axisStep, clockLabel, spanLabel, ticks } from './axis';
 import { Lane } from './Lane';
+import { type ScrollView, scrollView } from './scroll';
 import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
 import { nearestSample } from './trace';
 
 import s from './History.module.css';
 
-/** The lane bay's height, which the lanes in it share, a hairline between each two. */
-const BAY_PX = 184;
+/** Each lane's height, a hairline under it. */
+const LANE_PX = 84;
 /** A step of a minute, at which a clock label reads to the minute. */
 const MINUTE_SEC = 60;
 /** How far the hover box stands from the cursor. */
 const BOX_GAP_PX = 12;
-
-/** The height of each of `count` lanes in the bay, less the hairlines between them. */
-const laneHeight = (count: number) => Math.floor((BAY_PX - (count - 1)) / count);
 
 /** What the lanes plot of the selected target over the visible span, and the box at the hovered sample. */
 export function History(props: { track: Track }) {
@@ -74,7 +72,6 @@ export function History(props: { track: Track }) {
   });
   const visible = createMemo(() => resolveSpan(span(), contact()));
   const lanes = createMemo(() => lanesOf(plotted()));
-  const height = createMemo(() => laneHeight(lanes().length));
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
@@ -105,8 +102,23 @@ export function History(props: { track: Track }) {
 
   const reorder = trackReorder(movePlotLane);
 
+  const [scroller, setScroller] = createSignal<HTMLDivElement>();
+  const [view, setView] = createSignal<ScrollView>(scrollView(0, 0, 0));
+  const measure = () => {
+    const el = scroller();
+    if (el) setView(scrollView(el.scrollTop, el.clientHeight, el.scrollHeight));
+  };
+  // Lanes come and go, which changes how far they scroll.
+  createEffect(() => {
+    lanes();
+    measure();
+  });
+
   return (
-    <div class={cx(s.history, !historyOpen() && s.folded)}>
+    <div
+      class={cx(s.history, !historyOpen() && s.folded)}
+      style={{ '--lane-height': `${LANE_PX}px` }}
+    >
       <div class={s.title}>
         <button
           type="button"
@@ -146,50 +158,62 @@ export function History(props: { track: Track }) {
             </For>
           </div>
         </div>
-        <div class={s.bay} style={{ height: `${BAY_PX}px` }}>
-          <Show
-            when={lanes().length > 0}
-            fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
-          >
-            <For each={lanes()}>
-              {(lane, i) => (
-                <Lane
-                  lane={lane}
-                  index={i()}
-                  count={lanes().length}
-                  keys={readingsIn(plotted(), lane)}
-                  samples={samples()}
-                  visible={visible()}
-                  ticks={tickTimes()}
-                  width={plotWidth()}
-                  height={height()}
-                  hover={hover()}
-                  onHover={hoverAt}
-                  onClose={() => closePlotLane(lane)}
-                  onGripDown={(y) => reorder.down(i(), y, height() + 1, lanes().length)}
-                  onGripMove={(y) => reorder.move(y)}
-                  onGripStep={(by) => movePlotLane(i(), clamp(i() + by, 0, lanes().length - 1))}
-                />
-              )}
-            </For>
-          </Show>
-          <div class={s.overlay}>
-            <Show when={hover()}>
-              {(h) => (
-                <div class={s.box} style={boxStyle(h())}>
-                  <div class={s.time}>{clockTime(h().t)}Z</div>
-                  <For each={lanes().flatMap((lane) => readingsIn(plotted(), lane))}>
-                    {(key) => (
-                      <div class={s.row}>
-                        <span class={s.rowLabel}>{READINGS[key].label}</span>
-                        <Value r={READINGS[key].format(h())} />
-                      </div>
-                    )}
-                  </For>
-                </div>
-              )}
-            </Show>
+        <div class={s.bay}>
+          <div class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}>
+            <div ref={setScroller} class={s.scroller} onScroll={measure}>
+              <Show
+                when={lanes().length > 0}
+                fallback={<div class={s.empty}>Nothing plotted · tap any cell below</div>}
+              >
+                <For each={lanes()}>
+                  {(lane, i) => (
+                    <Lane
+                      lane={lane}
+                      index={i()}
+                      count={lanes().length}
+                      keys={readingsIn(plotted(), lane)}
+                      samples={samples()}
+                      visible={visible()}
+                      ticks={tickTimes()}
+                      width={plotWidth()}
+                      height={LANE_PX}
+                      hover={hover()}
+                      onHover={hoverAt}
+                      onClose={() => closePlotLane(lane)}
+                      onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, lanes().length)}
+                      onGripMove={(y) => reorder.move(y)}
+                      onGripStep={(by) => movePlotLane(i(), clamp(i() + by, 0, lanes().length - 1))}
+                    />
+                  )}
+                </For>
+              </Show>
+            </div>
+            <div class={s.overlay}>
+              <Show when={hover()}>
+                {(h) => (
+                  <div class={s.box} style={boxStyle(h())}>
+                    <div class={s.time}>{clockTime(h().t)}Z</div>
+                    <For each={lanes().flatMap((lane) => readingsIn(plotted(), lane))}>
+                      {(key) => (
+                        <div class={s.row}>
+                          <span class={s.rowLabel}>{READINGS[key].label}</span>
+                          <Value r={READINGS[key].format(h())} />
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                )}
+              </Show>
+            </div>
           </div>
+          <Show when={view().thumb}>
+            {(thumb) => (
+              <div
+                class={s.thumb}
+                style={{ top: `${thumb().top}px`, height: `${thumb().height}px` }}
+              />
+            )}
+          </Show>
         </div>
       </Show>
     </div>

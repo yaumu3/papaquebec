@@ -34,6 +34,8 @@
   --plot-intent: #e864e8;
   /* The labels of a plot's scales and clock. */
   --plot-label: #6a6a66;
+  /* A plot's value lines, and the thumb of scrolled lanes. */
+  --plot-scale: var(--panel-border);
 
   /* Type */
   --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;

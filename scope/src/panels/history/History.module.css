@@ -37,29 +37,64 @@
   display: inline-block;
   width: 1.5ch;
 }
+/* The lanes, and the thumb beside them in the margin. */
 .bay {
   position: relative;
-  display: flex;
-  flex-direction: column;
+}
+/* A lane cut by an edge fades into the panel ground there. */
+.viewport {
+  --fade-top: 0px;
+  --fade-bottom: 0px;
+  position: relative;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent
+  );
+}
+.cutTop {
+  --fade-top: var(--space-6);
+}
+.cutBottom {
+  --fade-bottom: var(--space-6);
+}
+/* Four lanes and their hairlines at the most; past them the lanes scroll, with no bar of their own. */
+.scroller {
+  max-height: calc(4 * (var(--lane-height) + 1px));
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.scroller::-webkit-scrollbar {
+  display: none;
+}
+.thumb {
+  position: absolute;
+  right: calc(-1 * var(--space-3));
+  width: 3px;
+  border-radius: 1.5px;
+  background: var(--plot-scale);
+  pointer-events: none;
 }
 .empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
+  height: var(--lane-height);
   border: 1px dashed var(--plot-grid);
   color: var(--text-muted);
   font-size: var(--text-sm);
   letter-spacing: var(--tracking);
 }
+/* A hairline under each lane, outside its height. */
 .lane {
   display: grid;
   grid-template-columns: var(--lane-grip) 1fr var(--lane-close);
   column-gap: var(--lane-gutter);
   align-items: stretch;
-}
-.lane + .lane {
-  border-top: 1px solid var(--plot-grid);
+  box-sizing: content-box;
+  border-bottom: 1px solid var(--plot-grid);
 }
 .grip,
 .close {
