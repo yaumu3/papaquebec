@@ -1,12 +1,12 @@
 import { createMemo, createSignal, For, Index, Show } from 'solid-js';
 
-import { cx } from '../../design/cx';
-import { turn } from '../../lib/geo';
-import { ndRangeAfter, ndRangeNm, setNdRangeNm } from '../../state/nd';
-import { settings } from '../../state/settings';
-import type { Track } from '../../state/track';
-import { trackStore } from '../../state/tracks';
-import { trackWidth } from '../../ui/size';
+import { cx } from '../../../design/cx';
+import { turn } from '../../../lib/geo';
+import { ndRangeAfter, ndRangeNm, setNdRangeNm } from '../../../state/nd';
+import { settings } from '../../../state/settings';
+import type { Track } from '../../../state/track';
+import { trackStore } from '../../../state/tracks';
+import { trackWidth } from '../../../ui/size';
 import {
   aircraftPath,
   arcPath,

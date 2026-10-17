@@ -1,5 +1,5 @@
-import { RAD } from '../../lib/units';
-import { fixed, offset, toward } from '../svg';
+import { RAD } from '../../../lib/units';
+import { fixed, offset, toward } from '../../svg';
 
 /** The compass arc spans this far either side of the top. */
 const SPAN_DEG = 55;

@@ -23,7 +23,7 @@ import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
 import { advisoryBelow } from './header';
 import { History } from './history/History';
-import { Nd } from './nd/Nd';
+import { Nd } from './instruments/nd/Nd';
 import { NONE, positionReading, type Reading, READINGS } from './readings';
 import { Value } from './Value';
 

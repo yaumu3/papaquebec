@@ -1,11 +1,11 @@
-import type { Heard, HeardKey } from '../../lib/aircraft';
-import { type Altimeter, crewAltitudeFt } from '../../lib/altitude';
-import { steeringHeading } from '../../lib/autopilot';
-import { padBearing } from '../../lib/format';
-import { holds, INSTRUMENT_SEC } from '../../lib/reports';
-import { magneticBearing, magneticTrack } from '../../state/magnetic';
-import type { Readout } from '../../state/track';
-import { NONE, type Reading, READINGS } from '../readings';
+import type { Heard, HeardKey } from '../../../lib/aircraft';
+import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
+import { steeringHeading } from '../../../lib/autopilot';
+import { padBearing } from '../../../lib/format';
+import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
+import { magneticBearing, magneticTrack } from '../../../state/magnetic';
+import type { Readout } from '../../../state/track';
+import { NONE, type Reading, READINGS } from '../../readings';
 import type { Trend } from './geometry';
 
 /** The state of the instrument: oriented on the heading, on the track, or blank for want of both. */

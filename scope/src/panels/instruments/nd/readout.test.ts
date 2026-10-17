@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { STANDARD_ALTIMETER } from '../../lib/altitude';
-import { INSTRUMENT_SEC } from '../../lib/reports';
-import { setDeclinationAt } from '../../state/magnetic';
-import { makeSample } from '../../state/sampleFixture';
+import { STANDARD_ALTIMETER } from '../../../lib/altitude';
+import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { setDeclinationAt } from '../../../state/magnetic';
+import { makeSample } from '../../../state/sampleFixture';
 import { ndFrame, type NdReadouts, ndReadouts, ndSymbols, oldestHeard } from './readout';
 
 const NOW = 1000;
