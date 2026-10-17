@@ -73,12 +73,21 @@ export function createLaneDrag(deps: {
     if (drag()) t.preventDefault();
     if (drag() || holding()) t.stopPropagation();
   };
+  /** Reads a dragged lane's slot again as the lanes scroll under a still pointer. */
+  const reread = () => {
+    const d = drag();
+    if (d) setDrag(at(d, d.x, d.y));
+  };
   // Listening before a finger lands, so that the page waits for it before it scrolls.
   createEffect(() => {
     const sc = deps.scroller();
     if (!sc) return;
     sc.addEventListener('touchmove', keep, { passive: false });
-    onCleanup(() => sc.removeEventListener('touchmove', keep));
+    sc.addEventListener('scroll', reread);
+    onCleanup(() => {
+      sc.removeEventListener('touchmove', keep);
+      sc.removeEventListener('scroll', reread);
+    });
   });
 
   /** The drag with the slot and the bin read again at the pointer `x`, `y`. */
