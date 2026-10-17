@@ -12,6 +12,7 @@ import {
   heardAt,
   nearestSample,
   restSample,
+  seesAll,
   type Point,
   rangeOf,
   runsOf,
@@ -386,5 +387,25 @@ describe('restSample', () => {
       [120, false],
       null,
     ]);
+  });
+});
+
+describe('seesAll', () => {
+  it('sees every sample when it reaches over the first and the last, and all of none', () => {
+    // Arrange
+    const contact = [sample(100), sample(150), sample(200)];
+    const rows = [
+      { i: { from: 90, to: 210 }, samples: contact },
+      { i: { from: 101, to: 210 }, samples: contact },
+      { i: { from: 90, to: 199 }, samples: contact },
+      { i: { from: 100, to: 200 }, samples: contact },
+      { i: { from: 90, to: 210 }, samples: [] },
+    ];
+
+    // Act
+    const seen = rows.map((r) => seesAll(r.i, r.samples));
+
+    // Assert
+    expect(seen).toEqual([true, false, false, true, true]);
   });
 });

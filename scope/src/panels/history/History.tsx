@@ -23,7 +23,7 @@ import { Lane } from './Lane';
 import { type ScrollView, scrollView } from './scroll';
 import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
-import { nearestSample, restSample } from './trace';
+import { nearestSample, restSample, seesAll } from './trace';
 
 import s from './History.module.css';
 
@@ -190,10 +190,12 @@ export function History(props: { track: Track }) {
       </div>
       <Show when={historyOpen()}>
         <div ref={setTop} class={s.span}>
-          <span class={s.contactSpan}>
-            {clockLabel(contact().from, MINUTE_SEC)} – {clockLabel(contact().to, MINUTE_SEC)}
-          </span>
-          <span>{spanLabel(visible())}</span>
+          <Show when={!seesAll(visible(), samples())}>
+            <span class={s.contactSpan}>
+              {clockLabel(contact().from, MINUTE_SEC)} – {clockLabel(contact().to, MINUTE_SEC)}
+            </span>
+          </Show>
+          <span class={s.visibleSpan}>{spanLabel(visible())}</span>
         </div>
         <Timeline
           samples={samples()}

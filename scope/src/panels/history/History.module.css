@@ -283,7 +283,10 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/* Over the minimap: when the contact starts and ends at the left, the visible span at the right. */
+/*
+ * Over the minimap: when the contact starts and ends at the left, while the window shows only part
+ * of it, and the visible span at the right.
+ */
 .span {
   display: flex;
   justify-content: space-between;
@@ -297,6 +300,9 @@
 }
 .contactSpan {
   color: var(--plot-label);
+}
+.visibleSpan {
+  margin-left: auto;
 }
 /* The clock over the lanes, a hairline under it. */
 .axis {
