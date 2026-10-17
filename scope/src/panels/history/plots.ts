@@ -3,6 +3,7 @@ import type { HeardKey } from '../../lib/aircraft';
 import { crewAltitudeFt } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { modeNames, sourceName } from '../../lib/format';
+import { HPA_PER_INHG } from '../../lib/units';
 import { magneticTrack } from '../../state/magnetic';
 import { laneOf, type ReadingKey } from '../../state/plotted';
 import { settings } from '../../state/settings';
@@ -54,6 +55,10 @@ const heading = (s: Sample): Heading | undefined => {
   return trk === undefined && hdg === undefined ? undefined : { trk, hdg };
 };
 
+/** A pressure in hPa in inHg, unrounded, as the plot is drawn to a fraction of a pixel. */
+const inHg = (hpa: number | undefined): number | undefined =>
+  hpa === undefined ? undefined : hpa / HPA_PER_INHG;
+
 /** A bound in metres on a log scale: its power of ten, so each factor of ten takes the same height. */
 const logOf = (m: number | undefined): number | undefined =>
   m === undefined ? undefined : Math.log10(m);
@@ -73,7 +78,7 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   trk: { kind: 'heading', heading },
   selHdg: { kind: 'intent', y: steeringHeading, dash: 'dashed' },
   gs: { kind: 'line', y: (s) => s.gs, minSpan: 20 },
-  qnh: { kind: 'line', y: (s) => s.navQnh, minSpan: 4 },
+  qnh: { kind: 'line', y: (s) => inHg(s.navQnh), minSpan: 4 / HPA_PER_INHG },
   modes: { kind: 'gantt', names: (s) => s.navModes && modeNames(s.navModes) },
   ias: { kind: 'line', y: (s) => s.ias, minSpan: 20 },
   tas: { kind: 'line', y: (s) => s.tas, minSpan: 20 },

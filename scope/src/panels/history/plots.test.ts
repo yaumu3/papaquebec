@@ -122,6 +122,18 @@ describe('PLOTS', () => {
     expect(out).toEqual([1.3, { dir: 300, speed: 12 }]);
   });
 
+  it('plots the crew QNH in the inHg it reads in, on a scale as tall as 4 hPa at the least', () => {
+    // Arrange
+    const s = makeSample(1, { navQnh: 1013.2 });
+    const qnh = PLOTS.qnh;
+
+    // Act
+    const plotted = qnh.kind === 'line' ? [qnh.y(s), qnh.minSpan] : null;
+
+    // Assert
+    expect(plotted).toEqual([1013.2 / HPA_PER_INHG, 4 / HPA_PER_INHG]);
+  });
+
   it('plots the NIC and NACp as the powers of ten of their bounds, none where they bound nothing', () => {
     // Arrange
     const samples = [
