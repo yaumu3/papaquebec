@@ -3,6 +3,7 @@
   --nd-ink: var(--text);
   --nd-label: var(--color-level);
   --nd-small: var(--text-dim);
+  --zoom-w: 28px;
   position: relative;
   margin-top: var(--space-4);
   background: var(--nd-bg);
@@ -112,7 +113,7 @@
 }
 .alerts {
   position: absolute;
-  right: var(--space-4);
+  right: calc(var(--space-4) + var(--zoom-w) + var(--space-4));
   bottom: var(--space-3);
   display: flex;
   align-items: center;
@@ -199,4 +200,57 @@
   stroke: var(--text);
   stroke-width: 1.6;
   stroke-linecap: round;
+}
+.zoom {
+  position: absolute;
+  right: var(--space-4);
+  bottom: var(--space-3);
+  display: flex;
+  flex-direction: column;
+}
+.zoomButton {
+  position: relative;
+  box-sizing: border-box;
+  width: var(--zoom-w);
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--panel-border);
+  background: var(--nd-bg);
+  color: var(--control-on-bg);
+  font: inherit;
+  font-size: var(--text-xl);
+  line-height: 1;
+  cursor: pointer;
+}
+.zoomButton + .zoomButton {
+  border-top: 0;
+}
+.zoomButton:hover:not(:disabled) {
+  color: var(--text);
+}
+.zoomButton:disabled {
+  color: var(--text-muted);
+  cursor: default;
+}
+.zoomButton:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: -2px;
+}
+/*
+ * Each button's tap area is 44 by 44 px, drawn past its border: the upper one reaches up and the
+ * lower one down, so that they do not overlap. The insets count from the padding edge, a pixel
+ * inside the border. The area is no wider than the display's edge to the 8 px gap before the
+ * alerts, so it never covers one. Only 6 px lie below the pair, so the lower area hangs 12 px
+ * below the display, over the gap above the table, where nothing takes a tap; that is why the
+ * display does not clip its overflow, and the SVG clips its own drawing.
+ */
+.zoomButton::before {
+  position: absolute;
+  content: '';
+}
+.zoomButton:first-child::before {
+  inset: -19px -9px -1px -9px;
+}
+.zoomButton:last-child::before {
+  inset: 0 -9px -19px -9px;
 }

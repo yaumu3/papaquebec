@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import { turn } from '../../lib/geo';
-import { ndRangeNm } from '../../state/nd';
+import { ndRangeAfter, ndRangeNm, setNdRangeNm } from '../../state/nd';
 import { settings } from '../../state/settings';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
@@ -36,6 +36,25 @@ function Label(props: { children: string }) {
 /** A value of a corner: dim for the blank of an unknown, else in its own tone. */
 function Value(props: { r: NdText; class?: string | undefined }) {
   return <span class={props.r.known ? props.class : s.unknown}>{props.r.text}</span>;
+}
+
+/** A button that steps the range of the ND a step of the scale, dimmed and inert at the end of it. */
+function ZoomButton(props: { label: string; step: 1 | -1; glyph: string }) {
+  const next = () => ndRangeAfter(ndRangeNm(), props.step);
+  return (
+    <button
+      type="button"
+      class={s.zoomButton}
+      aria-label={props.label}
+      disabled={next() === undefined}
+      onClick={() => {
+        const to = next();
+        if (to !== undefined) setNdRangeNm(to);
+      }}
+    >
+      {props.glyph}
+    </button>
+  );
 }
 
 /** The navigation display of a target: its compass, oriented on the heading or else the track. */
@@ -158,6 +177,10 @@ export function Nd(props: { t: Track }) {
         </Show>
         <div class={s.alerts}>
           <For each={frame().flags}>{(flag) => <span class={s.flag}>{flag}</span>}</For>
+        </div>
+        <div class={s.zoom}>
+          <ZoomButton label="Zoom in" step={-1} glyph="+" />
+          <ZoomButton label="Zoom out" step={1} glyph={'−'} />
         </div>
       </Show>
     </div>
