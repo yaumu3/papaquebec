@@ -27,3 +27,6 @@ const inside = (x: number, y: number, b: Box): boolean =>
 /** Whether a pointer at `x`, `y` is over the bin, counted only where `view`, the lanes' scroll, shows it. */
 export const overBin = (x: number, y: number, bin: Box, view: Box): boolean =>
   inside(x, y, bin) && inside(x, y, view);
+
+/** What a key pressed while a pointer has hold of a lane does: Esc lets go of it; any other is kept from the page. */
+export const dragKeyOf = (key: string): 'cancel' | 'keep' => (key === 'Escape' ? 'cancel' : 'keep');

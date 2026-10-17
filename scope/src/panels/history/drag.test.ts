@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { dropOf, liftLeft, overBin, slotShown } from './drag';
+import { dragKeyOf, dropOf, liftLeft, overBin, slotShown } from './drag';
 
 describe('slotShown', () => {
   it('shows the slot under the pointer, or the place the lane left while over the bin', () => {
@@ -64,5 +64,18 @@ describe('overBin', () => {
 
     // Assert
     expect(over).toEqual([true, false, false, false]);
+  });
+});
+
+describe('dragKeyOf', () => {
+  it('lets go on Esc, and keeps every other key from the page', () => {
+    // Arrange
+    const keys = ['Escape', 'Delete', 'Backspace', 'ArrowDown', 'a'];
+
+    // Act
+    const asks = keys.map(dragKeyOf);
+
+    // Assert
+    expect(asks).toEqual(['cancel', 'keep', 'keep', 'keep', 'keep']);
   });
 });

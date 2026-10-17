@@ -2,7 +2,7 @@ import { type Accessor, createEffect, createSignal, onCleanup } from 'solid-js';
 
 import type { LaneKey } from '../../state/plotted';
 import { edgeSpeed, slotAt } from '../../ui/reorder';
-import { dropOf, overBin } from './drag';
+import { dragKeyOf, dropOf, overBin } from './drag';
 import { HOLD_MS, plotGestureOf } from './hold';
 import { axisOf, gestureOf, swipeRemoves } from './swipe';
 
@@ -57,7 +57,14 @@ export function createLaneDrag(deps: {
   const [swipe, setSwipe] = createSignal<LaneSwipe | null>(null);
   const [holding, setHolding] = createSignal(false);
   let end: (() => void) | null = null;
+  /** The lane a pointer has taken hold of, until it lets go. */
+  let held: LaneKey | null = null;
   onCleanup(() => end?.());
+  // A lane removed some other way takes the gesture on it with it.
+  createEffect(() => {
+    const lanes = deps.lanes();
+    if (held !== null && !lanes.includes(held)) end?.();
+  });
   /**
    * Keeps a finger's moves over the lanes from the page: from scrolling them while it drags one,
    * and from the sheet while it drags or rests on a plot.
@@ -89,6 +96,7 @@ export function createLaneDrag(deps: {
     if (e.button !== 0 || !(el instanceof HTMLElement)) return;
     if (e.target instanceof Element && e.target.closest('button')) return;
     end?.();
+    held = lane;
     el.setPointerCapture(e.pointerId);
     const from = deps.lanes().indexOf(lane);
     const x0 = e.clientX;
@@ -114,7 +122,6 @@ export function createLaneDrag(deps: {
     const pickUp = (x: number, y: number) => {
       setHolding(false);
       setDrag(at({ lane, from, slot: from, overBin: false, x: x0, y: y0, grabX }, x, y));
-      window.addEventListener('keydown', onKey, { capture: true });
       frame = requestAnimationFrame(scroll);
     };
     const onMove = (m: PointerEvent) => {
@@ -149,10 +156,9 @@ export function createLaneDrag(deps: {
       else if (s && swipeRemoves(s.dx, s.width)) deps.onDrop(s.lane, 'remove');
     };
     const onKey = (k: KeyboardEvent) => {
-      if (k.key !== 'Escape') return;
       k.preventDefault();
       k.stopPropagation();
-      end?.();
+      if (dragKeyOf(k.key) === 'cancel') end?.();
     };
     const cancel = () => end?.();
     const touchPlot = part === 'plot' && e.pointerType === 'touch';
@@ -163,6 +169,7 @@ export function createLaneDrag(deps: {
           if (!drag() && g === 'drag') pickUp(last.x, last.y);
         }, HOLD_MS)
       : undefined;
+    window.addEventListener('keydown', onKey, { capture: true });
     el.addEventListener('contextmenu', noMenu);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
@@ -170,6 +177,7 @@ export function createLaneDrag(deps: {
     el.addEventListener('lostpointercapture', cancel);
     end = () => {
       end = null;
+      held = null;
       clearTimeout(hold);
       cancelAnimationFrame(frame);
       el.removeEventListener('contextmenu', noMenu);
