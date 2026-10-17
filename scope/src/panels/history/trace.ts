@@ -1,7 +1,7 @@
 import type { HeardKey } from '../../lib/aircraft';
 import { STALE_SECONDS } from '../../render/scene/rules';
 import type { Sample } from '../../state/track';
-import type { Interval } from './span';
+import { type Interval, timeAt } from './span';
 
 /** As long without a report as makes a target stale on the scope breaks a trace too. */
 export const GAP_SEC = STALE_SECONDS;
@@ -176,6 +176,16 @@ export function nearestSample(samples: readonly Sample[], t: number, i: Interval
   const after = k < end ? samples[k] : undefined;
   if (!before || !after) return before ?? after ?? null;
   return t - before.t <= after.t - t ? before : after;
+}
+
+/** The sample inside the interval nearest the time a point `px` across a plot `width` wide stands for; null without any. */
+export function sampleAt(
+  samples: readonly Sample[],
+  px: number,
+  i: Interval,
+  width: number,
+): Sample | null {
+  return nearestSample(samples, timeAt(px, i, width), i);
 }
 
 /** Where the cursor rests: a sample, and whether it is the contact's latest. */

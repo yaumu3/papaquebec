@@ -12,6 +12,7 @@ import {
   heardAt,
   nearestSample,
   restSample,
+  sampleAt,
   seesAll,
   type Point,
   rangeOf,
@@ -407,5 +408,26 @@ describe('seesAll', () => {
 
     // Assert
     expect(seen).toEqual([true, false, false, true, true]);
+  });
+});
+
+describe('sampleAt', () => {
+  it('takes the sample nearest the time a point across the plot stands for, inside the window', () => {
+    // Arrange
+    const samples = [sample(100), sample(110), sample(120), sample(130)];
+    const window = { from: 100, to: 130 };
+    const rows = [
+      { px: 0, i: window },
+      { px: 140, i: window },
+      { px: 300, i: window },
+      { px: 140, i: { from: 110, to: 140 } },
+      { px: 140, i: { from: 111, to: 119 } },
+    ];
+
+    // Act
+    const found = rows.map((r) => sampleAt(samples, r.px, r.i, 300));
+
+    // Assert
+    expect(found.map((s) => s?.t)).toEqual([100, 110, 130, 120, undefined]);
   });
 });

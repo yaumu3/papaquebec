@@ -14,16 +14,16 @@ import {
 } from '../../state/history';
 import { lanesOf, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
-import type { Sample, Track } from '../../state/track';
+import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { trackReorder } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
 import { Lane } from './Lane';
 import { type ScrollView, scrollView } from './scroll';
-import { type Interval, resolveSpan, type Span, timeAt, WHOLE, xOf } from './span';
+import { type Interval, resolveSpan, type Span, WHOLE, xOf } from './span';
 import { Timeline } from './Timeline';
-import { nearestSample, restSample, seesAll } from './trace';
+import { restSample, sampleAt, seesAll } from './trace';
 
 import s from './History.module.css';
 
@@ -47,6 +47,8 @@ const NOTCH_H_PX = 4;
 /** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the latest. */
 export function History(props: { track: Track }) {
   const [span, setSpan] = createSignal<Span>(WHOLE);
+  /** How far across the plots the pointer is, if it is over them. */
+  const [hoverPx, setHoverPx] = createSignal<number | null>(null);
   // A memo, so that only another target resets the span, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
   createEffect(
@@ -54,14 +56,14 @@ export function History(props: { track: Track }) {
       hex,
       () => {
         setSpan(WHOLE);
-        setHoverInstant(null);
+        setHoverPx(null);
       },
       { defer: true },
     ),
   );
   // The lanes leave without a pointer-leave when the group folds or goes, so the hover is cleared here.
   createEffect(() => {
-    if (!historyOpen()) setHoverInstant(null);
+    if (!historyOpen()) setHoverPx(null);
   });
   onCleanup(() => setHoverInstant(null));
 
@@ -91,31 +93,26 @@ export function History(props: { track: Track }) {
   const plotWidth = trackWidth(labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
 
-  /** The sample under the pointer, kept beside the instant the scope rings, which others may clear. */
-  const [hovered, setHovered] = createSignal<Sample | null>(null);
+  /** The sample under the pointer, as the span moves under it too. */
   const hover = createMemo(() => {
-    const h = hovered();
-    return h && hoverInstant() === h.t ? h : null;
+    const px = hoverPx();
+    return px === null ? null : sampleAt(samples(), px, visible(), plotWidth());
   });
+  // The scope rings the hovered sample on the trail.
+  createEffect(on(hover, (h) => setHoverInstant(h?.t ?? null)));
   /** Where the cursor rests: the last sample in view. */
   const rest = createMemo(() => restSample(samples(), visible()));
   /** The sample the lanes are read at: the hovered one, else the one the cursor rests at. */
   const at = createMemo(() => hover() ?? rest()?.sample ?? null);
   /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
   const past = () => hover() !== null || rest()?.current === false;
-  const hoverAt = (px: number | null) => {
-    const near =
-      px === null ? null : nearestSample(samples(), timeAt(px, visible(), plotWidth()), visible());
-    setHovered(near);
-    setHoverInstant(near?.t ?? null);
-  };
   /** Hovers the instant under the pointer, none over the gutter or while a lane's grip has it. */
   const pointerAt = (e: PointerEvent) => {
     // A finger holds whatever it lands on, so only a button's hold is a grip's.
     const button = e.target instanceof Element ? e.target.closest('button') : null;
     if (button?.hasPointerCapture(e.pointerId)) return;
     const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
-    hoverAt(px < 0 ? null : px);
+    setHoverPx(px < 0 ? null : px);
   };
 
   const [chipText, setChipText] = createSignal<HTMLSpanElement>();
@@ -260,7 +257,7 @@ export function History(props: { track: Track }) {
               class={s.scroller}
               onScroll={measure}
               onPointerMove={pointerAt}
-              onPointerLeave={() => hoverAt(null)}
+              onPointerLeave={() => setHoverPx(null)}
             >
               <Show
                 when={lanes().length > 0}
