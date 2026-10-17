@@ -16,6 +16,7 @@ import {
   trackPath,
   trendPath,
   trendPoints,
+  windArrowPath,
 } from './geometry';
 
 const segments = (path: string): number => (path.match(/M/g) ?? []).length;
@@ -344,5 +345,29 @@ describe('levelOffPath', () => {
 
     // Assert
     expect(paths).toEqual(['', '', '']);
+  });
+});
+
+describe('windArrowPath', () => {
+  it('points downwind from a fixed place, with an open head', () => {
+    // Arrange
+    const from = 270;
+
+    // Act
+    const path = windArrowPath(from);
+
+    // Assert
+    expect(path).toBe('M6.0 60.0L26.0 60.0M21.0 63.5L26.0 60.0L21.0 56.5');
+  });
+
+  it('points down the display for a wind from the top', () => {
+    // Arrange
+    const from = 0;
+
+    // Act
+    const path = windArrowPath(from);
+
+    // Assert
+    expect(path.startsWith('M16.0 50.0L16.0 70.0')).toBe(true);
   });
 });

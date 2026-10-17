@@ -22,6 +22,7 @@ import {
   trackPath,
   trendPath,
   trendPoints,
+  windArrowPath,
 } from './geometry';
 import { ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
 
@@ -66,6 +67,10 @@ export function Nd(props: { t: Track }) {
     const turning = symbols().trend;
     return at && turning ? trendPath(trendPoints(g(), at.rel, turning, ndRangeNm())) : undefined;
   });
+  const wind = createMemo(() => {
+    const rel = relative(symbols().windFrom);
+    return rel === undefined ? undefined : windArrowPath(rel);
+  });
   const bug = createMemo(() => {
     const rel = relative(symbols().sel);
     return rel === undefined ? undefined : bugPath(g(), rel);
@@ -85,6 +90,7 @@ export function Nd(props: { t: Track }) {
           <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
           <Show when={track()}>{(p) => <path class={s.diamond} d={p().diamond} />}</Show>
           <path class={s.aircraft} d={aircraftPath(g())} />
+          <Show when={wind()}>{(d) => <path class={s.wind} d={d()} />}</Show>
         </svg>
         <Index each={marks().labels}>
           {(l) => (

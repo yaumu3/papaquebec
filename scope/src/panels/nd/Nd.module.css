@@ -195,3 +195,8 @@
   stroke-width: 2.2;
   stroke-linecap: round;
 }
+.wind {
+  stroke: var(--text);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}

@@ -109,10 +109,12 @@ export function ndReadouts(t: Readout, now: number): NdReadouts {
     if (value !== undefined) return { text: value, known: true };
     return { text: degree ? '---°' : '---', known: false };
   };
-  const wind = () =>
-    t.windDir === undefined || t.windSpeed === undefined
+  const wind = () => {
+    const from = windFromOf(t);
+    return from === undefined || t.windSpeed === undefined
       ? undefined
-      : `${padBearing(magneticBearing(t.windDir, t.at))}°/${Math.round(t.windSpeed)}`;
+      : `${padBearing(from)}°/${Math.round(t.windSpeed)}`;
+  };
   return {
     gs: read(['gs'], () => shown(READINGS.gs.format(t))),
     tas: read(['tas'], () => shown(READINGS.tas.format(t))),
@@ -131,6 +133,8 @@ export interface NdSymbols {
   trend?: Trend | undefined;
   /** The distance, in nautical miles, at which the aircraft levels off at its selected altitude. */
   levelOffNm?: number | undefined;
+  /** Where the wind blows from, degrees magnetic. */
+  windFrom?: number | undefined;
 }
 
 /** A turn slower than this, in degrees per second, is flight in a straight line: no trend is drawn. */
@@ -147,6 +151,7 @@ export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymb
     sel: live(['selHeading', 'navModes'], steeringHeading(t)),
     trend: trendOf(t, now),
     levelOffNm: levelOffOf(t, now, altimeter),
+    windFrom: live(['windDir', 'windSpeed'], windFromOf(t)),
   };
 }
 
@@ -173,3 +178,9 @@ function levelOffOf(t: Readout, now: number, altimeter: Altimeter): number | und
     return undefined;
   return (gs * Math.abs(selAlt - crew)) / Math.abs(vs) / 60;
 }
+
+/** The direction the wind blows from, magnetic, when both its direction and its speed are known. */
+const windFromOf = (t: Readout): number | undefined =>
+  t.windDir === undefined || t.windSpeed === undefined
+    ? undefined
+    : magneticBearing(t.windDir, t.at);

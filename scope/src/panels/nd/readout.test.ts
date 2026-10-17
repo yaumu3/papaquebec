@@ -422,3 +422,38 @@ describe('ndSymbols level-off', () => {
     expect(out).toEqual(Array(6).fill(undefined));
   });
 });
+
+const windy = (heard: object) =>
+  makeSample(NOW, {
+    seen: 1,
+    heading: 284,
+    windDir: 276,
+    windSpeed: 40,
+    at: AT,
+    heard: { heading: FRESH, windDir: FRESH, windSpeed: FRESH, ...heard },
+  });
+
+describe('ndSymbols wind', () => {
+  it('gives the direction the wind blows from, magnetic, while both its inputs hold', () => {
+    // Arrange
+    setDeclinationAt(() => () => 7);
+    const t = windy({});
+
+    // Act
+    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+
+    // Assert
+    expect(symbols.windFrom).toBe(269);
+  });
+
+  it('gives none once the speed has lapsed', () => {
+    // Arrange
+    const t = windy({ windSpeed: STALE });
+
+    // Act
+    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+
+    // Assert
+    expect(symbols.windFrom).toBeUndefined();
+  });
+});

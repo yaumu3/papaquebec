@@ -251,3 +251,21 @@ export function levelOffPath(g: NdGeometry, at: number, nm: number, rangeNm: num
   const to = toward(g.cx, g.cy, at + LEVEL_OFF_HALF_SPAN_DEG)(rpx);
   return `M${from}A${fixed(rpx)} ${fixed(rpx)} 0 0 1 ${to}`;
 }
+
+/** Where the wind arrow stands, from the top left of the display; it does not scale with it. */
+const WIND_ARROW_CENTRE: readonly [number, number] = [16, 60];
+const WIND_ARROW_HALF_LENGTH_PX = 10;
+const WIND_HEAD_BACK_PX = 5;
+const WIND_HEAD_HALF_WIDTH_PX = 3.5;
+
+/** The arrow of the wind, for a wind from `relFromDeg` off the top of the display: it points downwind. */
+export function windArrowPath(relFromDeg: number): string {
+  const [x, y] = WIND_ARROW_CENTRE;
+  const at = toward(x, y, relFromDeg + 180);
+  const tip = at(WIND_ARROW_HALF_LENGTH_PX);
+  const back = WIND_ARROW_HALF_LENGTH_PX - WIND_HEAD_BACK_PX;
+  return (
+    `M${at(-WIND_ARROW_HALF_LENGTH_PX)}L${tip}` +
+    `M${at(back, WIND_HEAD_HALF_WIDTH_PX)}L${tip}L${at(back, -WIND_HEAD_HALF_WIDTH_PX)}`
+  );
+}
