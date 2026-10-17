@@ -75,8 +75,8 @@ export function App() {
         <MapsPanel />
       </div>
       <div class={cx(s.column, s.right)}>
-        <ListPanel />
         <DetailPanel />
+        <ListPanel />
       </div>
       <TabBar />
       <ContextMenu />

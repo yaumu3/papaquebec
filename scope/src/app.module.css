@@ -30,7 +30,6 @@
 .right {
   right: calc(var(--edge) + env(safe-area-inset-right));
   width: 370px;
-  justify-content: space-between;
 }
 @media (max-width: 720px) {
   /* The room a sheet may fill. */
