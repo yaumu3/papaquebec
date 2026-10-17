@@ -5,7 +5,7 @@ import { nearestInTime } from '../../lib/nearest';
 import { RAD } from '../../lib/units';
 import { laneOf, type ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { READINGS } from '../readings';
+import { type Reading, READINGS } from '../readings';
 import { type Dash, HEARD, type Heading, PLOTS } from './plots';
 import type { Interval } from './span';
 import {
@@ -122,6 +122,16 @@ export interface ScaleLabel {
 /** The metres a power of ten stands for, to six figures, as a bound reads them. */
 const metresOf = (v: number): number => Number((10 ** v).toPrecision(6));
 
+/** Whether a reading is drawn on a log scale, as a bound. */
+const isLog = (key: ReadingKey): boolean => {
+  const spec = PLOTS[key];
+  return spec.kind === 'line' && spec.log === true;
+};
+
+/** A reading's value as a lane prints it: with its unit only on a log lane, where the unit changes along it. */
+export const plotText = (key: ReadingKey, r: Reading): string =>
+  isLog(key) && r.unit ? `${r.v} ${r.unit}` : r.v;
+
 /**
  * The top and bottom of a lane's scale as its reading reads them, bounds on a log scale with
  * their unit, which changes along it; none for a lane without a scale.
@@ -130,11 +140,10 @@ export function scaleLabels(lane: ReadingKey, r: Range): ScaleLabel[] {
   const spec = PLOTS[lane];
   const value = READINGS[lane].value;
   if (!value || (spec.kind !== 'line' && spec.kind !== 'pair')) return [];
-  const log = spec.kind === 'line' && spec.log;
-  return [r.hi, r.lo].map((v) => {
-    const reading = value(log ? metresOf(v) : v);
-    return { v, text: log && reading.unit ? `${reading.v} ${reading.unit}` : reading.v };
-  });
+  return [r.hi, r.lo].map((v) => ({
+    v,
+    text: plotText(lane, value(isLog(lane) ? metresOf(v) : v)),
+  }));
 }
 
 /** The path of the runs across a lane, each run its own subpath. */

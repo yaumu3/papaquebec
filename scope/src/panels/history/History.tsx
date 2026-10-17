@@ -1,7 +1,6 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
-import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
 import {
   closePlotLane,
@@ -14,12 +13,10 @@ import {
 } from '../../state/history';
 import { lanesOf, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
-import type { Sample, Track } from '../../state/track';
+import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { trackReorder } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
-import { READINGS } from '../readings';
-import { Value } from '../Value';
 import { axisStep, clockLabel, spanLabel, ticks } from './axis';
 import { Lane } from './Lane';
 import { type ScrollView, scrollView } from './scroll';
@@ -33,10 +30,8 @@ import s from './History.module.css';
 const LANE_PX = 84;
 /** A step of a minute, at which a clock label reads to the minute. */
 const MINUTE_SEC = 60;
-/** How far the hover box stands from the cursor. */
-const BOX_GAP_PX = 12;
 
-/** What the lanes plot of the selected target over the visible span, and the box at the hovered sample. */
+/** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the latest. */
 export function History(props: { track: Track }) {
   const [span, setSpan] = createSignal<Span>(WHOLE);
   // A memo, so that only another target resets the span, not every snapshot of this one.
@@ -87,17 +82,12 @@ export function History(props: { track: Track }) {
     const t = hoverInstant();
     return t === null ? null : (samples().find((sample) => sample.t === t) ?? null);
   });
+  /** The sample the lanes are read at: the hovered one, else the latest in view. */
+  const at = createMemo(() => hover() ?? nearestSample(samples(), visible().to, visible()));
   const hoverAt = (px: number | null) => {
-    const at =
+    const near =
       px === null ? null : nearestSample(samples(), timeAt(px, visible(), plotWidth()), visible());
-    setHoverInstant(at?.t ?? null);
-  };
-  /** The box stands beside the cursor on whichever side has more room. */
-  const boxStyle = (h: Sample) => {
-    const hx = x(h.t);
-    return hx < plotWidth() / 2
-      ? { left: `${hx + BOX_GAP_PX}px` }
-      : { right: `${plotWidth() - hx + BOX_GAP_PX}px` };
+    setHoverInstant(near?.t ?? null);
   };
 
   const reorder = trackReorder(movePlotLane);
@@ -178,6 +168,7 @@ export function History(props: { track: Track }) {
                       width={plotWidth()}
                       height={LANE_PX}
                       hover={hover()}
+                      at={at()}
                       onHover={hoverAt}
                       onClose={() => closePlotLane(lane)}
                       onGripDown={(y) => reorder.down(i(), y, LANE_PX + 1, lanes().length)}
@@ -186,23 +177,6 @@ export function History(props: { track: Track }) {
                     />
                   )}
                 </For>
-              </Show>
-            </div>
-            <div class={s.overlay}>
-              <Show when={hover()}>
-                {(h) => (
-                  <div class={s.box} style={boxStyle(h())}>
-                    <div class={s.time}>{clockTime(h().t)}Z</div>
-                    <For each={lanes().flatMap((lane) => readingsIn(plotted(), lane))}>
-                      {(key) => (
-                        <div class={s.row}>
-                          <span class={s.rowLabel}>{READINGS[key].label}</span>
-                          <Value r={READINGS[key].format(h())} />
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                )}
               </Show>
             </div>
           </div>

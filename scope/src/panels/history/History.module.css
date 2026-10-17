@@ -157,6 +157,36 @@
 .top > * {
   pointer-events: auto;
 }
+/*
+ * What the lane reads at the cursor's instant, at the right on the panel's ground, a little short of
+ * the edge; each intent in a slot of its own width, so that none moves another.
+ */
+.readout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 100%;
+  margin: 0 var(--space-2) 0 auto;
+  padding-left: var(--space-2);
+  background: var(--panel-bg);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hovered {
+  color: var(--color-selbox);
+}
+.slot {
+  display: inline-block;
+}
+.intentText {
+  color: var(--plot-intent);
+}
+.sample {
+  display: block;
+}
 .gap {
   fill: var(--plot-gap);
 }
@@ -275,38 +305,9 @@
   margin: 0 var(--plot-right) 0 var(--plot-left);
   line-height: 10px;
 }
-/* Over the plots, for the box; the pointer goes through to the lanes. */
-.overlay {
-  position: absolute;
-  inset: 0 var(--plot-right) 0 calc(var(--lane-overhang) + var(--plot-left));
-  pointer-events: none;
-}
 .label {
   position: absolute;
   transform: translateX(-50%);
-}
-.box {
-  position: absolute;
-  top: var(--space-3);
-  z-index: 1;
-  min-width: 150px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--panel-bg);
-  border: 1px solid var(--color-selbox);
-}
-.time {
-  color: var(--color-selbox);
-  font-size: var(--text-sm);
-}
-.row {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-5);
-}
-.rowLabel {
-  color: var(--text-dim);
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking);
 }
 /* Sized by the panel; its own width is read back for the coordinates. */
 .timeline {
@@ -341,6 +342,11 @@
 /* What the aircraft is set to do, in the lanes and the minimap alike. */
 .intent {
   stroke: var(--plot-intent);
+}
+/* The target the aircraft levels at second, and the sample of its line. */
+.intentDim {
+  color: var(--plot-intent-dim);
+  stroke: var(--plot-intent-dim);
 }
 .dim {
   fill: var(--panel-bg);

@@ -21,6 +21,7 @@ import {
   valueAt,
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
+import { readoutOf } from './readout';
 import { type Interval, xOf } from './span';
 import { barsOf, gapsIn, type Read, yOf } from './trace';
 
@@ -42,8 +43,20 @@ const BARB_PITCH_PX = 32;
 /** The same for heading glyphs, which are wider: about 30 px across at the most. */
 const GLYPH_PITCH_PX = 36;
 
+/** The widest each intent reads, in characters, so that its slot in the readout keeps one width. */
+const INTENT_CH: Partial<Record<ReadingKey, number>> = { selAlt: 5, fmsAlt: 5, selHdg: 4 };
+/** The sample of the other target's line in the readout. */
+const SAMPLE_PX = 12;
+const SAMPLE_H_PX = 8;
+
 /** The class that dashes a trace, if any. */
 export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
+
+/** The dash an intent is drawn with, if any. */
+const dashOf = (key: ReadingKey): Dash | undefined => {
+  const p = PLOTS[key];
+  return p.kind === 'intent' ? p.dash : undefined;
+};
 
 /** One lane of the bay: a top row with its grip, name and close button, then its scale and its plot over the visible span. */
 export function Lane(props: {
@@ -59,6 +72,8 @@ export function Lane(props: {
   width: number;
   height: number;
   hover: Sample | null;
+  /** The sample the lane is read at. */
+  at: Sample | null;
   /** The pointer is this far across the plot, or has left it. */
   onHover: (x: number | null) => void;
   onClose: () => void;
@@ -139,6 +154,9 @@ export function Lane(props: {
       HEARD[props.lane],
     ).map((h) => headingGlyph(x(h.t), mid(), h));
   });
+  const readout = createMemo(() => (props.at ? readoutOf(props.keys, props.at) : null));
+  /** How wide the intents' slots are: as wide as the widest intent plotted in the lane. */
+  const slotCh = () => Math.max(0, ...props.keys.slice(1).map((key) => INTENT_CH[key] ?? 0));
   const dots = () => {
     const h = props.hover;
     if (!h) return [];
@@ -299,6 +317,36 @@ export function Lane(props: {
         >
           ×
         </button>
+        <Show when={readout()}>
+          {(r) => (
+            <div class={s.readout}>
+              <span class={cx(props.hover && s.hovered)}>{r().value}</span>
+              <Show when={slotCh() > 0}>
+                <span class={cx(s.slot, s.intentText)} style={{ width: `${slotCh()}ch` }}>
+                  {r().first?.text}
+                </span>
+              </Show>
+              <Show when={props.keys.length > 2}>
+                <svg class={s.sample} width={SAMPLE_PX} height={SAMPLE_H_PX}>
+                  <Show when={r().other}>
+                    {(o) => (
+                      <line
+                        class={cx(s.trace, dashClass(dashOf(o().key)), s.intentDim)}
+                        x1="0"
+                        x2={SAMPLE_PX}
+                        y1={SAMPLE_H_PX / 2}
+                        y2={SAMPLE_H_PX / 2}
+                      />
+                    )}
+                  </Show>
+                </svg>
+                <span class={cx(s.slot, s.intentDim)} style={{ width: `${slotCh()}ch` }}>
+                  {r().other?.text}
+                </span>
+              </Show>
+            </div>
+          )}
+        </Show>
       </div>
     </div>
   );

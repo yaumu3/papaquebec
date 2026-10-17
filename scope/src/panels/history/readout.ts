@@ -1,4 +1,9 @@
 import { climbState } from '../../lib/format';
+import type { ReadingKey } from '../../state/plotted';
+import type { Sample } from '../../state/track';
+import { NONE, READINGS } from '../readings';
+import { plotText } from './plot';
+import { PLOTS } from './plots';
 
 /**
  * Within this, the two targets agree: the coarser step a selected altitude comes in, 32 ft in the
@@ -56,4 +61,51 @@ function fmsFirst(
     default:
       return altFt !== undefined && Math.abs(fms - altFt) < Math.abs(sel - altFt);
   }
+}
+
+/** An intent as a lane's readout prints it. */
+export interface IntentText {
+  key: ReadingKey;
+  text: string;
+}
+
+/**
+ * What a lane reads at a sample: its own reading, then the intent plotted in it that the aircraft
+ * goes for first, and the other one, if two are.
+ */
+export interface LaneReadout {
+  value: string;
+  first?: IntentText;
+  other?: IntentText;
+}
+
+/** A reading of the sample as a lane prints it; undefined when unknown. */
+function textOf(key: ReadingKey, s: Sample): string | undefined {
+  const r = READINGS[key].format(s);
+  return r === NONE ? undefined : plotText(key, r);
+}
+
+/** The intents plotted in a lane, the one the aircraft goes for first leading: by altitude in the altitude lane. */
+function intentsOf(keys: readonly ReadingKey[], s: Sample): ReadingKey[] {
+  const [lane, ...intents] = keys;
+  if (lane !== 'alt') return intents;
+  const alt = PLOTS.alt;
+  const targets = altTargets(
+    alt.kind === 'line' ? alt.y(s) : undefined,
+    s.verticalRate,
+    intents.includes('selAlt') ? s.selAlt : undefined,
+    intents.includes('fmsAlt') ? s.fmsAlt : undefined,
+  );
+  return targets ? [targets.first.key, ...(targets.other ? [targets.other.key] : [])] : [];
+}
+
+/** What the lane of `keys`, its own reading then the intents drawn in it, reads at `s`. */
+export function readoutOf(keys: readonly ReadingKey[], s: Sample): LaneReadout {
+  const [lane] = keys;
+  const value = (lane && textOf(lane, s)) ?? NONE.v;
+  const [first, other] = intentsOf(keys, s).flatMap((key) => {
+    const text = textOf(key, s);
+    return text === undefined ? [] : [{ key, text }];
+  });
+  return { value, ...(first && { first }), ...(other && { other }) };
 }
