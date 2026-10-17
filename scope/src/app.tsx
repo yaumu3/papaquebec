@@ -14,7 +14,7 @@ import { MapsPanel } from './panels/MapsPanel';
 import { Overlays } from './panels/Overlays';
 import { TabBar } from './panels/TabBar';
 import { TopBar } from './panels/TopBar';
-import { historyOpen, plotted } from './state/history';
+import { detailTab, plotted } from './state/history';
 import { keepUnscrolled } from './state/layout';
 import { setDeclinationAt } from './state/magnetic';
 import { setBuiltinAero } from './state/mapsets';
@@ -56,7 +56,7 @@ export function App() {
       panels: panels(),
       listSort: listSort(),
       plotted: plotted(),
-      historyOpen: historyOpen(),
+      detailTab: detailTab(),
     }),
   );
 
@@ -75,8 +75,8 @@ export function App() {
         <MapsPanel />
       </div>
       <div class={cx(s.column, s.right)}>
-        <ListPanel />
         <DetailPanel />
+        <ListPanel />
       </div>
       <TabBar />
       <ContextMenu />

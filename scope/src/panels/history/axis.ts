@@ -1,6 +1,6 @@
 import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
-import type { Interval } from './span';
+import type { Interval } from '../../state/span';
 
 /** Steps along the clock, seconds: each a round part of it, up to the hour. */
 const STEPS_SEC = [10, 15, 30, 60, 120, 300, 600, 900, 1800];

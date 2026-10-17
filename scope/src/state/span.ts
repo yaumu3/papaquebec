@@ -1,4 +1,4 @@
-import { clamp } from '../../lib/math';
+import { clamp } from '../lib/math';
 
 /** A stretch of time, seconds since epoch. */
 export interface Interval {

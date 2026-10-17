@@ -1,7 +1,7 @@
 import type { HeardKey } from '../../lib/aircraft';
 import { STALE_SECONDS } from '../../render/scene/rules';
+import { type Interval, timeAt } from '../../state/span';
 import type { Sample } from '../../state/track';
-import { type Interval, timeAt } from './span';
 
 /** As long without a report as makes a target stale on the scope breaks a trace too. */
 export const GAP_SEC = STALE_SECONDS;

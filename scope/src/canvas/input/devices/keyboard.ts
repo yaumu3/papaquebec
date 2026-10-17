@@ -25,14 +25,19 @@ function bindings(a: ScopeActions): Record<string, (e: KeyEvent) => void> {
 /** The history's root, which handles its own keys. */
 export const HISTORY_SELECTOR = '[data-history]';
 
-/** Whether a key pressed at `t` is another's to handle: typed into an input, or pressed in the history. */
+/** A tab list, which handles its own keys. */
+export const TABLIST_SELECTOR = '[role="tablist"]';
+
+/** Whether a key pressed at `t` is another's to handle: typed into an input, or pressed in the history or on a tab list. */
 export function ownsKeys(t: EventTarget | null): boolean {
   if (!t) return false;
   if ('tagName' in t && t.tagName === 'INPUT') return true;
-  return 'closest' in t && typeof t.closest === 'function' && t.closest(HISTORY_SELECTOR) !== null;
+  if (!('closest' in t) || typeof t.closest !== 'function') return false;
+  const closest = t.closest.bind(t);
+  return [HISTORY_SELECTOR, TABLIST_SELECTOR].some((sel) => closest(sel) !== null);
 }
 
-/** The keyboard's shortcuts; keys typed into an input or pressed in the history are left alone. */
+/** The keyboard's shortcuts; keys typed into an input or pressed in the history or on a tab list are left alone. */
 export function keyHandler(a: ScopeActions): (e: KeyEvent) => void {
   const b = bindings(a);
   return (e) => {

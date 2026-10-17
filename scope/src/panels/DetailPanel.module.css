@@ -1,5 +1,7 @@
 /* Wider at the sides than the other panels, as the design has it, and as a phone sheet is. */
 .body {
+  display: flex;
+  flex-direction: column;
   padding-inline: var(--space-6);
 }
 .empty {
@@ -15,6 +17,7 @@
   row-gap: var(--space-3);
   align-items: center;
   padding-top: var(--space-3);
+  flex: none;
 }
 /* On a phone the grabber already stands above it. */
 @media (max-width: 720px) {
@@ -149,4 +152,56 @@
 }
 .dim {
   --value: var(--text-dim);
+}
+/* The tabs stand on a rule across the panel; the open one is a box with its foot open into the content. */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  flex: none;
+  margin-top: var(--space-5);
+}
+.tabs::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid var(--panel-border);
+}
+.tab {
+  display: flex;
+  gap: var(--space-5);
+  padding: calc(var(--space-3) + 1px) calc(var(--space-6) + 1px) var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--panel-border);
+  color: var(--text-dim);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking);
+}
+.tab:hover,
+.on {
+  color: var(--text);
+}
+.tab:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: calc(-1 * var(--space-2));
+}
+.on {
+  padding: var(--space-3) var(--space-6) calc(var(--space-3) + 1px);
+  border: 1px solid var(--panel-border);
+  border-bottom-width: 0;
+}
+.count {
+  color: var(--text-muted);
+}
+/* What the open tab holds; it scrolls under the tab bar, not the whole panel. */
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.readings {
+  min-height: 0;
+  overflow-y: auto;
+}
+/* The tab bar's rule stands for the first group's. */
+.readings > .group:first-child {
+  border-top: 0;
 }

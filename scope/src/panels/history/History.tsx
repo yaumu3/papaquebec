@@ -5,17 +5,19 @@ import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
 import {
   addPlotLane,
-  historyOpen,
+  historyView,
   hoverInstant,
   movePlotLane,
   plotted,
   removePlotLane,
+  setHistorySpan,
   setHoverInstant,
+  setLaneScroll,
   switchPlotLane,
-  toggleHistory,
 } from '../../state/history';
 import { laneAfter, type LaneKey, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
+import { type Interval, resolveSpan, type Span, xOf } from '../../state/span';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { placeOf } from '../../ui/reorder';
@@ -30,7 +32,6 @@ import type { LaneMoves } from './moves';
 import { Palette } from './Palette';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
-import { type Interval, resolveSpan, type Span, WHOLE, xOf } from './span';
 import { swipeOffset } from './swipe';
 import { Timeline } from './Timeline';
 import { restSample, sampleAt, seesAll } from './trace';
@@ -60,25 +61,14 @@ const LIFT_GAP_PX = 4;
 
 /** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
 export function History(props: { track: Track }) {
-  const [span, setSpan] = createSignal<Span>(WHOLE);
   /** How far across the plots the pointer is, if it is over them. */
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
-  // A memo, so that only another target resets the span, not every snapshot of this one.
+  // A memo, so that only another target resets the hover, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
-  createEffect(
-    on(
-      hex,
-      () => {
-        setSpan(WHOLE);
-        setHoverPx(null);
-      },
-      { defer: true },
-    ),
-  );
-  // The lanes leave without a pointer-leave when the group folds or goes, so the hover is cleared here.
-  createEffect(() => {
-    if (!historyOpen()) setHoverPx(null);
-  });
+  // A memo, so that scrolling the lanes, which keeps the span, redraws none of them.
+  const span = createMemo(() => historyView(hex()).span);
+  const setSpan = (next: Span) => setHistorySpan(hex(), next);
+  createEffect(on(hex, () => setHoverPx(null), { defer: true }));
   onCleanup(() => setHoverInstant(null));
 
   /** The samples, told apart from the last snapshot's though the store appends to one array. */
@@ -98,7 +88,6 @@ export function History(props: { track: Track }) {
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
-  // Signals, as the elements come and go with the group folding and unfolding.
   const [top, setTop] = createSignal<HTMLDivElement>();
   const [labels, setLabels] = createSignal<HTMLDivElement>();
   const width = trackWidth(top);
@@ -248,16 +237,30 @@ export function History(props: { track: Track }) {
       reveal(lane);
     },
   });
+  const restoreScroll = () => {
+    const el = scroller();
+    if (!el) return;
+    el.scrollTop = historyView(hex()).scrollTop;
+    measure();
+  };
+  createEffect(on(hex, restoreScroll, { defer: true }));
   // Lanes come and go, which changes how far they scroll.
   createEffect(() => {
     plotted();
     measure();
   });
-  // So does the scroller's own size: on a phone it is none until the sheet first shows.
+  // So does the scroller's own size, which is none while the panel is hidden; a hidden scroller drops
+  // the scroll it is given, so it gets the kept one back once it has a size again.
   createEffect(() => {
     const el = scroller();
     if (!el) return;
-    const observer = new ResizeObserver(measure);
+    let sized = false;
+    const observer = new ResizeObserver(() => {
+      const shown = el.clientHeight > 0;
+      if (shown && !sized) restoreScroll();
+      else measure();
+      sized = shown;
+    });
     observer.observe(el);
     onCleanup(() => observer.disconnect());
   });
@@ -265,220 +268,205 @@ export function History(props: { track: Track }) {
   return (
     <div
       data-history
-      class={cx(s.history, !historyOpen() && s.folded, drag() && s.grabbing)}
+      class={cx(s.history, drag() && s.grabbing)}
       style={{ '--lane-height': `${LANE_PX}px`, '--notch-height': `${NOTCH_H_PX}px` }}
     >
-      <div class={s.title}>
-        <button
-          type="button"
-          class={s.toggle}
-          aria-expanded={historyOpen()}
-          onClick={toggleHistory}
-        >
-          <span class={s.chevron}>{historyOpen() ? '▾' : '▸'}</span>
-          HISTORY
-        </button>
+      <div ref={setTop} class={s.span}>
+        <Show when={!seesAll(visible(), samples())}>
+          <span class={s.contactSpan}>
+            {clockLabel(contact().from, MINUTE_SEC)} – {clockLabel(contact().to, MINUTE_SEC)}
+          </span>
+        </Show>
+        <span class={s.visibleSpan}>{spanLabel(visible())}</span>
       </div>
-      <Show when={historyOpen()}>
-        <div ref={setTop} class={s.span}>
-          <Show when={!seesAll(visible(), samples())}>
-            <span class={s.contactSpan}>
-              {clockLabel(contact().from, MINUTE_SEC)} – {clockLabel(contact().to, MINUTE_SEC)}
-            </span>
-          </Show>
-          <span class={s.visibleSpan}>{spanLabel(visible())}</span>
-        </div>
-        <Timeline
-          samples={samples()}
-          lanes={plotted().map(readingsIn)}
-          contact={contact()}
-          visible={visible()}
-          width={width()}
-          hover={hoverInstant()}
-          onSpan={setSpan}
-        />
-        <div class={s.axis}>
-          <div ref={setLabels} class={s.labels}>
-            <For each={labelTimes()}>
-              {(t, i) => (
-                <Show when={clockClear()[i()]}>
-                  <span class={s.label} style={{ left: `${x(t)}px` }}>
-                    {clockLabel(t, step())}
-                  </span>
-                </Show>
-              )}
-            </For>
-            <span ref={setRuler} class={cx(s.label, s.ruler)} aria-hidden="true">
-              {RULER}
-            </span>
-            <Show when={cursorX() !== null && at()}>
-              {(a) => (
-                <>
-                  <span
-                    class={cx(s.chip, past() && s.live)}
-                    style={{
-                      left: `${chipLeft(cursorX() ?? 0)}px`,
-                      padding: `0 ${CHIP_PAD_PX}px`,
-                    }}
-                  >
-                    <span ref={setChipText} class={s.chipTime}>
-                      {clockTime(a().t)}
-                    </span>
-                  </span>
-                  <svg
-                    class={cx(s.notch, past() && s.live)}
-                    style={{ left: `${(cursorX() ?? 0) - NOTCH_W_PX / 2}px` }}
-                    width={NOTCH_W_PX}
-                    height={NOTCH_H_PX}
-                  >
-                    <path d={`M0 0 H${NOTCH_W_PX} L${NOTCH_W_PX / 2} ${NOTCH_H_PX} Z`} />
-                  </svg>
-                </>
-              )}
-            </Show>
-          </div>
-        </div>
-        <div ref={setBay} class={s.bay}>
-          <div
-            class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}
-            style={(() => {
-              const px = cursorX();
-              return px === null ? {} : { '--cursor-left': cursorLeft(px) };
-            })()}
-          >
-            <div
-              ref={setScroller}
-              class={s.scroller}
-              onScroll={() => {
-                measure();
-                closeMenu();
-              }}
-              onPointerMove={pointerAt}
-              onPointerLeave={() => setHoverPx(null)}
-            >
-              <For each={plotted()}>
-                {(lane, i) => {
-                  onCleanup(() => lanes.delete(lane));
-                  return (
-                    <Lane
-                      lane={lane}
-                      index={i()}
-                      count={plotted().length}
-                      keys={readingsIn(lane)}
-                      samples={samples()}
-                      visible={visible()}
-                      ticks={tickTimes()}
-                      width={plotWidth()}
-                      height={LANE_PX}
-                      at={at()}
-                      past={past()}
-                      menuOpen={menu()?.own === lane}
-                      laneRef={(el) => lanes.set(lane, el)}
-                      moves={movesOf(lane)}
-                      onMenu={(anchor) => toggleMenu(lane, anchor)}
-                      onGrab={(e, part) => grab(e, lane, part)}
-                      place={(() => {
-                        const d = drag();
-                        return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
-                      })()}
-                      slot={drag()?.lane === lane}
-                      swipeX={(() => {
-                        const sw = swipe();
-                        return sw?.lane === lane ? swipeOffset(sw.dx) : null;
-                      })()}
-                    />
-                  );
-                }}
-              </For>
-              <div class={s.addRow} style={{ order: plotted().length }}>
-                <button
-                  ref={(el) => {
-                    add = el;
-                  }}
-                  type="button"
-                  class={cx(s.add, menu()?.anchor === add && s.open, drag() && s.bin)}
-                  aria-haspopup="dialog"
-                  aria-expanded={menu()?.anchor === add}
-                  onClick={(e) => toggleMenu(null, e.currentTarget)}
-                >
-                  <Show when={drag()} fallback="+ LANE">
-                    {(d) => (
-                      <>
-                        <svg class={s.binIcon} viewBox="0 0 10 12" aria-hidden="true">
-                          <path d="M0.5 2.5 H9.5 M3.5 2.5 V0.5 H6.5 V2.5 M1.5 2.5 L2 11.5 H8 L8.5 2.5" />
-                        </svg>
-                        RELEASE TO REMOVE {READINGS[d().lane].label}
-                      </>
-                    )}
-                  </Show>
-                </button>
-              </div>
-            </div>
-            <Show when={cursorX()}>
-              {(px) => (
-                <div
-                  class={cx(s.timeCursor, past() && s.live)}
-                  style={{ left: cursorLeft(px()) }}
-                />
-              )}
-            </Show>
-          </div>
-          <Show when={view().thumb}>
-            {(thumb) => (
-              <div
-                class={s.thumb}
-                style={{ top: `${thumb().top}px`, height: `${thumb().height}px` }}
-              />
+      <Timeline
+        samples={samples()}
+        lanes={plotted().map(readingsIn)}
+        contact={contact()}
+        visible={visible()}
+        width={width()}
+        hover={hoverInstant()}
+        onSpan={setSpan}
+      />
+      <div class={s.axis}>
+        <div ref={setLabels} class={s.labels}>
+          <For each={labelTimes()}>
+            {(t, i) => (
+              <Show when={clockClear()[i()]}>
+                <span class={s.label} style={{ left: `${x(t)}px` }}>
+                  {clockLabel(t, step())}
+                </span>
+              </Show>
             )}
-          </Show>
-          <Show when={drag()}>
-            {(d) => {
-              let lift: HTMLDivElement | undefined;
-              const left = () =>
-                liftLeft(
-                  d().x - (bayBox()?.left ?? 0),
-                  Math.min(d().grabX, lift?.offsetWidth ?? 0),
-                  bayBox()?.width ?? 0,
-                  lift?.offsetWidth ?? 0,
-                );
-              return (
-                <div
-                  ref={(el) => {
-                    lift = el;
-                  }}
-                  class={s.lift}
+          </For>
+          <span ref={setRuler} class={cx(s.label, s.ruler)} aria-hidden="true">
+            {RULER}
+          </span>
+          <Show when={cursorX() !== null && at()}>
+            {(a) => (
+              <>
+                <span
+                  class={cx(s.chip, past() && s.live)}
                   style={{
-                    left: `${left()}px`,
-                    top: `${d().y - (bayBox()?.top ?? 0) - LIFT_GAP_PX}px`,
+                    left: `${chipLeft(cursorX() ?? 0)}px`,
+                    padding: `0 ${CHIP_PAD_PX}px`,
                   }}
                 >
-                  <span class={s.liftName}>
-                    {READINGS[d().lane].label}
-                    <span class={s.caret}>▼</span>
+                  <span ref={setChipText} class={s.chipTime}>
+                    {clockTime(a().t)}
                   </span>
-                  <span class={s.liftValue}>{liftValue(d().lane)}</span>
-                </div>
-              );
-            }}
-          </Show>
-          <Show when={menu()}>
-            {(m) => (
-              <Palette
-                own={m().own}
-                plotted={plotted()}
-                top={m().top}
-                anchor={m().anchor}
-                moves={(() => {
-                  const own = m().own;
-                  return own === null ? undefined : movesOf(own);
-                })()}
-                onPick={pick}
-                onClose={closeMenu}
-              />
+                </span>
+                <svg
+                  class={cx(s.notch, past() && s.live)}
+                  style={{ left: `${(cursorX() ?? 0) - NOTCH_W_PX / 2}px` }}
+                  width={NOTCH_W_PX}
+                  height={NOTCH_H_PX}
+                >
+                  <path d={`M0 0 H${NOTCH_W_PX} L${NOTCH_W_PX / 2} ${NOTCH_H_PX} Z`} />
+                </svg>
+              </>
             )}
           </Show>
         </div>
-      </Show>
+      </div>
+      <div ref={setBay} class={s.bay}>
+        <div
+          class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}
+          style={(() => {
+            const px = cursorX();
+            return px === null ? {} : { '--cursor-left': cursorLeft(px) };
+          })()}
+        >
+          <div
+            ref={setScroller}
+            class={s.scroller}
+            onScroll={(e) => {
+              setLaneScroll(hex(), e.currentTarget.scrollTop);
+              measure();
+              closeMenu();
+            }}
+            onPointerMove={pointerAt}
+            onPointerLeave={() => setHoverPx(null)}
+          >
+            <For each={plotted()}>
+              {(lane, i) => {
+                onCleanup(() => lanes.delete(lane));
+                return (
+                  <Lane
+                    lane={lane}
+                    index={i()}
+                    count={plotted().length}
+                    keys={readingsIn(lane)}
+                    samples={samples()}
+                    visible={visible()}
+                    ticks={tickTimes()}
+                    width={plotWidth()}
+                    height={LANE_PX}
+                    at={at()}
+                    past={past()}
+                    menuOpen={menu()?.own === lane}
+                    laneRef={(el) => lanes.set(lane, el)}
+                    moves={movesOf(lane)}
+                    onMenu={(anchor) => toggleMenu(lane, anchor)}
+                    onGrab={(e, part) => grab(e, lane, part)}
+                    place={(() => {
+                      const d = drag();
+                      return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
+                    })()}
+                    slot={drag()?.lane === lane}
+                    swipeX={(() => {
+                      const sw = swipe();
+                      return sw?.lane === lane ? swipeOffset(sw.dx) : null;
+                    })()}
+                  />
+                );
+              }}
+            </For>
+            <div class={s.addRow} style={{ order: plotted().length }}>
+              <button
+                ref={(el) => {
+                  add = el;
+                }}
+                type="button"
+                class={cx(s.add, menu()?.anchor === add && s.open, drag() && s.bin)}
+                aria-haspopup="dialog"
+                aria-expanded={menu()?.anchor === add}
+                onClick={(e) => toggleMenu(null, e.currentTarget)}
+              >
+                <Show when={drag()} fallback="+ LANE">
+                  {(d) => (
+                    <>
+                      <svg class={s.binIcon} viewBox="0 0 10 12" aria-hidden="true">
+                        <path d="M0.5 2.5 H9.5 M3.5 2.5 V0.5 H6.5 V2.5 M1.5 2.5 L2 11.5 H8 L8.5 2.5" />
+                      </svg>
+                      RELEASE TO REMOVE {READINGS[d().lane].label}
+                    </>
+                  )}
+                </Show>
+              </button>
+            </div>
+          </div>
+          <Show when={cursorX()}>
+            {(px) => (
+              <div class={cx(s.timeCursor, past() && s.live)} style={{ left: cursorLeft(px()) }} />
+            )}
+          </Show>
+        </div>
+        <Show when={view().thumb}>
+          {(thumb) => (
+            <div
+              class={s.thumb}
+              style={{ top: `${thumb().top}px`, height: `${thumb().height}px` }}
+            />
+          )}
+        </Show>
+        <Show when={drag()}>
+          {(d) => {
+            let lift: HTMLDivElement | undefined;
+            const left = () =>
+              liftLeft(
+                d().x - (bayBox()?.left ?? 0),
+                Math.min(d().grabX, lift?.offsetWidth ?? 0),
+                bayBox()?.width ?? 0,
+                lift?.offsetWidth ?? 0,
+              );
+            return (
+              <div
+                ref={(el) => {
+                  lift = el;
+                }}
+                class={s.lift}
+                style={{
+                  left: `${left()}px`,
+                  top: `${d().y - (bayBox()?.top ?? 0) - LIFT_GAP_PX}px`,
+                }}
+              >
+                <span class={s.liftName}>
+                  {READINGS[d().lane].label}
+                  <span class={s.caret}>▼</span>
+                </span>
+                <span class={s.liftValue}>{liftValue(d().lane)}</span>
+              </div>
+            );
+          }}
+        </Show>
+        <Show when={menu()}>
+          {(m) => (
+            <Palette
+              own={m().own}
+              plotted={plotted()}
+              top={m().top}
+              anchor={m().anchor}
+              moves={(() => {
+                const own = m().own;
+                return own === null ? undefined : movesOf(own);
+              })()}
+              onPick={pick}
+              onClose={closeMenu}
+            />
+          )}
+        </Show>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { createMemo, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import type { ReadingKey } from '../../state/plotted';
+import { type Interval, xOf } from '../../state/span';
 import type { Sample } from '../../state/track';
 import { NONE, READINGS } from '../readings';
 import { clearOfEnds, clockStep, ticks } from './axis';
@@ -23,7 +24,6 @@ import {
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
 import { heldIntents, readoutOf, readoutSlots, type Slot } from './readout';
-import { type Interval, xOf } from './span';
 import { barsOf, gapsIn, yOf } from './trace';
 
 import s from './History.module.css';

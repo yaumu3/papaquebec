@@ -2,18 +2,22 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   addPlotLane,
-  historyOpen,
+  detailTab,
+  historyView,
   hoverInstant,
+  keepViewOf,
   movePlotLane,
   plotted,
   removePlotLane,
+  setHistorySpan,
   setHoverInstant,
+  setLaneScroll,
   setPlotted,
   switchPlotLane,
-  toggleHistory,
 } from './history';
 import { DEFAULT_PLOTTED } from './plotted';
 import { persisted } from './settings';
+import { type Span, WHOLE } from './span';
 
 describe('history state', () => {
   it('starts from the persisted plot, the default readings with nothing stored', () => {
@@ -71,15 +75,15 @@ describe('history state', () => {
     expect(plotted()).toEqual(['alt', 'gs', 'roll']);
   });
 
-  it('starts with the history group open and folds it on a toggle', () => {
+  it('starts on the persisted tab, NOW with nothing stored', () => {
     // Arrange
-    const before = historyOpen();
+    const stored = persisted.detailTab;
 
     // Act
-    toggleHistory();
+    const tab = detailTab();
 
     // Assert
-    expect([before, historyOpen()]).toEqual([true, false]);
+    expect([stored, tab]).toEqual(['now', 'now']);
   });
 
   it('starts with no instant under the pointer and takes one', () => {
@@ -91,5 +95,66 @@ describe('history state', () => {
 
     // Assert
     expect([before, hoverInstant()]).toEqual([null, 1234]);
+  });
+
+  it('keeps the span set for a target', () => {
+    // Arrange
+    const tail: Span = { kind: 'tail', sec: 120 };
+    setHistorySpan('a', tail);
+
+    // Act
+    const view = historyView('a');
+
+    // Assert
+    expect(view.span).toEqual(tail);
+  });
+
+  it('keeps the lane scroll set for a target', () => {
+    // Arrange
+    setLaneScroll('a', 140);
+
+    // Act
+    const view = historyView('a');
+
+    // Assert
+    expect(view.scrollTop).toBe(140);
+  });
+
+  it('keeps the span by reference when the lanes scroll', () => {
+    // Arrange
+    const tail: Span = { kind: 'tail', sec: 120 };
+    setHistorySpan('a', tail);
+    setLaneScroll('a', 90);
+
+    // Act
+    const { span } = historyView('a');
+
+    // Assert
+    expect(span).toBe(tail);
+  });
+
+  it('starts another target whole and at the top', () => {
+    // Arrange
+    setHistorySpan('a', { kind: 'tail', sec: 120 });
+    setLaneScroll('a', 140);
+
+    // Act
+    const view = historyView('b');
+
+    // Assert
+    expect(view).toEqual({ hex: 'b', span: WHOLE, scrollTop: 0 });
+  });
+
+  it('forgets the view once another target is selected, back at the first too', () => {
+    // Arrange
+    setHistorySpan('a', { kind: 'tail', sec: 120 });
+    keepViewOf('b');
+    keepViewOf('a');
+
+    // Act
+    const view = historyView('a');
+
+    // Assert
+    expect(view).toEqual({ hex: 'a', span: WHOLE, scrollTop: 0 });
   });
 });
