@@ -33,6 +33,9 @@
   /* The ND's half-range ring and its track line. */
   --nd-ring: #3a3a38;
   --nd-track: #6a6a66;
+  /* The PFD's tape and VSI strips, and its flight mode band. */
+  --pfd-strip: #3a3a39;
+  --pfd-fma: #333332;
   /* Hairlines inside a plot, and the shade of a stretch with no report. */
   --plot-grid: #2c2c2a;
   --plot-gap: #262624;

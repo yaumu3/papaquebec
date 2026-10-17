@@ -24,6 +24,7 @@ import { Window } from '../ui/Window';
 import { advisoryBelow } from './header';
 import { History } from './history/History';
 import { Nd } from './instruments/nd/Nd';
+import { Pfd } from './instruments/pfd/Pfd';
 import { NONE, positionReading, type Reading, READINGS } from './readings';
 import { Value } from './Value';
 
@@ -241,6 +242,7 @@ function Tabs() {
 function Readings(props: { t: Track }) {
   return (
     <div class={s.readings}>
+      <Pfd t={props.t} />
       <Nd t={props.t} />
       <Group name="POS">
         <PositionCell t={props.t} />
