@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { HeardKey } from '../../lib/aircraft';
 import { makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
 import type { Interval } from './span';
@@ -8,6 +9,7 @@ import {
   barsOf,
   GAP_SEC,
   gapsIn,
+  heardAt,
   nearestSample,
   type Point,
   rangeOf,
@@ -70,6 +72,69 @@ describe('runsOf', () => {
 
     // Assert
     expect(runs.flat().map((p) => p.t)).toEqual([2, 3, 4, 5]);
+  });
+});
+
+describe('heardAt', () => {
+  it('is the oldest instant of the keys heard, undefined with none', () => {
+    // Arrange
+    const keys: readonly HeardKey[] = ['windSpeed', 'windDir'];
+    const rows = [
+      sample(20, { heard: { windSpeed: 10, windDir: 8 } }),
+      sample(20, { heard: { windDir: 8 } }),
+      sample(20, { heard: { gs: 8 } }),
+    ];
+
+    // Act
+    const instants = rows.map((s) => heardAt(s, keys));
+
+    // Assert
+    expect(instants).toEqual([8, 8, undefined]);
+  });
+});
+
+describe('runsOf with the instants a reading is heard at', () => {
+  it('takes a value repeated without a new report as no new point', () => {
+    // Arrange
+    const samples = [1, 1, 3, 3].map((heard, k) =>
+      sample(k + 1, { gs: 250 + heard, heard: { gs: heard } }),
+    );
+
+    // Act
+    const runs = runsOf(samples, gs, ALL, ['gs']);
+
+    // Assert
+    expect(runs).toEqual([
+      [
+        { t: 1, v: 251 },
+        { t: 3, v: 253 },
+      ],
+    ]);
+  });
+
+  it('breaks where the reading went unheard longer than the gap, though the samples kept coming', () => {
+    // Arrange
+    const again = 2 + GAP_SEC;
+    const samples = Array.from({ length: 40 }, (_, k) =>
+      sample(k + 1, { gs: 250, heard: { gs: k + 1 < again ? 1 : again } }),
+    );
+
+    // Act
+    const runs = runsOf(samples, gs, ALL, ['gs']);
+
+    // Assert
+    expect(runs).toEqual([[{ t: 1, v: 250 }], [{ t: again, v: 250 }]]);
+  });
+
+  it('skips a sample whose reading was never heard', () => {
+    // Arrange
+    const samples = [sample(1, { gs: 250, heard: { gs: 1 } }), sample(2, { gs: 251 })];
+
+    // Act
+    const runs = runsOf(samples, gs, ALL, ['gs']);
+
+    // Assert
+    expect(runs).toEqual([[{ t: 1, v: 250 }]]);
   });
 });
 

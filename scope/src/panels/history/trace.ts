@@ -1,3 +1,4 @@
+import type { HeardKey } from '../../lib/aircraft';
 import { nearestInTime } from '../../lib/nearest';
 import { STALE_SECONDS } from '../../render/scene/rules';
 import type { Sample } from '../../state/track';
@@ -44,21 +45,44 @@ function around(samples: readonly Sample[], i: Interval): Sample[] {
   return samples.slice(Math.max(0, first - 1), Math.min(samples.length, last + 1));
 }
 
-/** The runs of points a trace joins: consecutive samples of a stretch that carry the reading. */
-export function runsOf(samples: readonly Sample[], read: Read, i: Interval): Point[][] {
+/** When a reading made of the values `keys` was heard: when the oldest of them was; undefined unless one was. */
+export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefined {
+  const instants = keys.flatMap((key) => s.heard[key] ?? []);
+  return instants.length > 0 ? Math.min(...instants) : undefined;
+}
+
+/**
+ * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
+ * the `heard` instants of the reading, only a sample with a new report of it is a point, and a run
+ * breaks where the reading went unheard longer than the gap.
+ */
+export function runsOf(
+  samples: readonly Sample[],
+  read: Read,
+  i: Interval,
+  heard: readonly HeardKey[] = [],
+): Point[][] {
   const runs: Point[][] = [];
   for (const stretch of stretches(around(samples, i))) {
     let run: Point[] = [];
+    let last: number | undefined;
+    const end = () => {
+      if (run.length > 0) runs.push(run);
+      run = [];
+    };
     for (const s of stretch) {
       const v = read(s);
+      const at = heard.length > 0 ? heardAt(s, heard) : s.t;
       if (v === undefined) {
-        if (run.length > 0) runs.push(run);
-        run = [];
-      } else {
-        run.push({ t: s.t, v });
+        end();
+        continue;
       }
+      if (at === undefined || at === last) continue;
+      if (last !== undefined && at - last > GAP_SEC) end();
+      run.push({ t: s.t, v });
+      last = at;
     }
-    if (run.length > 0) runs.push(run);
+    end();
   }
   return runs;
 }
