@@ -164,6 +164,10 @@ function Header(props: { t: Track }) {
             ref={(el) => {
               advisory = el;
               resized.observe(el);
+              onCleanup(() => {
+                resized.unobserve(el);
+                advisory = undefined;
+              });
             }}
             class={cx(s.emergency, s.ra)}
           >
