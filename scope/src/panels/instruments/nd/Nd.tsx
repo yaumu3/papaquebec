@@ -14,7 +14,7 @@ import {
   arcPath,
   bugPath,
   compass,
-  diamondPath,
+  headingPointerPath,
   lastHeardY,
   levelOffPath,
   lubberPath,
@@ -63,7 +63,7 @@ function ZoomButton(props: { label: string; step: 1 | -1; glyph: string }) {
   );
 }
 
-/** The navigation display of a target: its compass, oriented on the heading or else the track. */
+/** The navigation display of a target: its compass, track-up, with the heading as a pointer. */
 export function Nd(props: { t: Track }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
   const width = trackWidth(root);
@@ -72,18 +72,18 @@ export function Nd(props: { t: Track }) {
   const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
   /**
    * The glides stand at once on another target, and when the frame changes mode: a target heard
-   * again, or steered by its track instead of its heading, is shown where it is, not on its way
+   * again, or whose track lapses or comes back, is shown where it is, not on its way
    * from where the last frame left it.
    */
   const key = () => `${props.t.hex}/${frame().mode}`;
   const orient = glided(() => frame().orient, { wrap: 360, key });
   const marks = createMemo(() => compass(g(), orient()));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
-  const anchors = createMemo(() => rangeAnchors(g()));
   const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
   const bearing = (of: (own: NdSymbols) => number | undefined) =>
     glided(() => of(symbols()), { wrap: 360, key });
   const trackDeg = bearing((own) => own.track);
+  const headingDeg = bearing((own) => own.heading);
   const selDeg = bearing((own) => own.sel);
   const windFromDeg = bearing((own) => own.windFrom);
   const levelOffNm = glided(() => symbols().levelOffNm, { key });
@@ -93,10 +93,9 @@ export function Nd(props: { t: Track }) {
     deg === undefined ? undefined : turn(orient(), deg);
   const track = createMemo(() => {
     const rel = relative(trackDeg());
-    return rel === undefined
-      ? undefined
-      : { rel, line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
+    return rel === undefined ? undefined : { rel, line: trackPath(g()) };
   });
+  const anchors = createMemo(() => rangeAnchors(g(), track() !== undefined));
   const levelOff = createMemo(() => {
     const at = track();
     const nm = levelOffNm();
@@ -113,6 +112,10 @@ export function Nd(props: { t: Track }) {
   const wind = createMemo(() => {
     const rel = relative(windFromDeg());
     return rel === undefined ? undefined : windArrowPath(rel);
+  });
+  const pointer = createMemo(() => {
+    const rel = relative(headingDeg());
+    return rel === undefined ? undefined : headingPointerPath(g(), rel);
   });
   const bug = createMemo(() => {
     const rel = relative(selDeg());
@@ -165,10 +168,10 @@ export function Nd(props: { t: Track }) {
           <path class={s.major} d={marks().major} />
           <path class={s.lubber} d={lubberPath(g())} />
           <Show when={track()}>{(p) => <path class={s.trackLine} d={p().line} />}</Show>
+          <Show when={pointer()}>{(d) => <path class={s.headingPointer} d={d()} />}</Show>
           <Show when={levelOff()}>{(d) => <path class={s.levelOff} d={d()} />}</Show>
           <Show when={trend()}>{(d) => <path class={s.trend} d={d()} />}</Show>
           <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
-          <Show when={track()}>{(p) => <path class={s.diamond} d={p().diamond} />}</Show>
           <path class={s.trafficOther} d={shapes('other')} />
           <path class={s.trafficProximate} d={shapes('proximate')} />
           <path class={s.threat} d={shapes('threat')} />
@@ -218,7 +221,7 @@ export function Nd(props: { t: Track }) {
           {ndRangeNm()}
         </div>
         <div
-          class={s.range}
+          class={cx(s.range, track() && s.besideTrack)}
           style={{ left: `${anchors().half.x}px`, top: `${anchors().half.y}px` }}
         >
           {ndRangeNm() / 2}
@@ -238,8 +241,8 @@ export function Nd(props: { t: Track }) {
             <Value r={readouts().sel} class={s.sel} />
           </div>
           <div>
-            <Label>TRK </Label>
-            <Value r={readouts().trk} class={s.trk} />
+            <Label>HDG </Label>
+            <Value r={readouts().hdg} />
           </div>
         </div>
         <div class={cx(s.corner, s.temps)}>
@@ -249,7 +252,7 @@ export function Nd(props: { t: Track }) {
           <Value r={readouts().sat} />
         </div>
         <div class={s.top}>
-          <span class={cx(s.label, s.modeLabel)}>{frame().label}</span>
+          <span class={cx(s.label, s.modeLabel)}>TRK</span>
           <span class={s.box}>{boxOf(frame().mode, orient())}</span>
           <span class={s.label}>MAG</span>
         </div>

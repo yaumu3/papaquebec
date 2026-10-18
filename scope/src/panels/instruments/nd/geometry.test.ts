@@ -5,7 +5,7 @@ import {
   arcPath,
   bugPath,
   compass,
-  diamondPath,
+  headingPointerPath,
   lastHeardY,
   levelOffPath,
   lubberPath,
@@ -150,17 +150,42 @@ describe('compass', () => {
   });
 });
 
+describe('heading pointer', () => {
+  it('draws an open triangle outside the arc at the bearing, none off it', () => {
+    // Arrange
+    const g = ndGeometry(346);
+    const rels = [0, 75, -75, 76];
+
+    // Act
+    const paths = rels.map((rel) => headingPointerPath(g, rel));
+
+    // Assert
+    expect(paths).toEqual([
+      'M173.0 39.0L178.0 28.0L168.0 28.0Z',
+      'M317.9 150.2L329.8 152.2L327.2 142.5Z',
+      'M28.1 150.2L18.8 142.5L16.2 152.2Z',
+      '',
+    ]);
+  });
+});
+
 describe('anchors', () => {
-  it('puts the range labels 4 px left of the arc ends, and LAST HEARD over the ring', () => {
+  it('puts the range labels by the arc and ring ends, the half range beside the track line while drawn, and LAST HEARD over the ring', () => {
     // Arrange
     const g = ndGeometry(346);
 
     // Act
-    const out = { ranges: rangeAnchors(g), lastHeard: lastHeardY(g) };
+    const out = {
+      ranges: [false, true].map((line) => rangeAnchors(g, line)),
+      lastHeard: lastHeardY(g),
+    };
 
     // Assert
     expect(out).toEqual({
-      ranges: { outer: { x: 25.1, y: 150.4 }, half: { x: 97, y: 169.7 } },
+      ranges: [
+        { outer: { x: 25.1, y: 150.4 }, half: { x: 97, y: 169.7 } },
+        { outer: { x: 25.1, y: 150.4 }, half: { x: 181, y: 114.5 } },
+      ],
       lastHeard: 106.5,
     });
   });
@@ -182,40 +207,16 @@ describe('fixed symbols', () => {
   });
 });
 
-describe('track line and diamond', () => {
-  const g = ndGeometry(346);
-
-  it('draws the line from near the aircraft out to the arc, crossed at the ring', () => {
+describe('track line', () => {
+  it("runs straight up from the aircraft's nose to the arc, a 10 px tick at half range", () => {
     // Arrange
-    const at = 0;
+    const g = ndGeometry(346);
 
     // Act
-    const path = trackPath(g, at);
+    const path = trackPath(g);
 
     // Assert
-    expect(path).toBe('M173.0 175.0L173.0 52.0M169.0 114.5L177.0 114.5');
-  });
-
-  it('draws the diamond on the arc, closed', () => {
-    // Arrange
-    const at = 0;
-
-    // Act
-    const path = diamondPath(g, at);
-
-    // Assert
-    expect(path).toBe('M173.0 34.0L177.0 40.0L173.0 46.0L169.0 40.0Z');
-  });
-
-  it('draws neither where the track is off the arc', () => {
-    // Arrange
-    const at = 80;
-
-    // Act
-    const paths = [trackPath(g, at), diamondPath(g, at)];
-
-    // Assert
-    expect(paths).toEqual(['', '']);
+    expect(path).toBe('M173.0 179.0L173.0 40.0M168.0 114.5L178.0 114.5');
   });
 });
 

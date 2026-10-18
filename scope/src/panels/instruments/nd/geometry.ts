@@ -20,12 +20,10 @@ const LAST_HEARD_RISE_PX = 8;
 const AIRCRAFT_HALF_WIDTH_PX = 6;
 const AIRCRAFT_NOSE_PX = 10;
 const AIRCRAFT_TAIL_PX = 8;
-const TRACK_FROM_PX = 14;
-const TRACK_SHORT_PX = 12;
-/** Half the length of the tick that crosses the track line at the ring. */
-const CROSS_PX = 4;
-const DIAMOND_HALF_HEIGHT_PX = 6;
-const DIAMOND_HALF_WIDTH_PX = 4;
+/** How far right of the track line the half range's left edge stands. */
+const HALF_RANGE_BESIDE_PX = 8;
+/** Half the length of the tick across the track line at half range. */
+const CROSS_PX = 5;
 
 /** Where the display stands in its box: the centre of the compass and the radii of its arc and ring. */
 export interface NdGeometry {
@@ -118,8 +116,14 @@ export function aircraftPath(g: NdGeometry): string {
   return `M${nose}L${right}L${left}Z`;
 }
 
-/** Where the right edges of the outer range's label and of half of it stand: left of the arc and ring ends. */
-export function rangeAnchors(g: NdGeometry): {
+/**
+ * Where the outer range's label stands, by its right edge left of the arc end, and half of it:
+ * left of the ring end, or by its left edge beside the track line's tick while the line is drawn.
+ */
+export function rangeAnchors(
+  g: NdGeometry,
+  trackLine: boolean,
+): {
   outer: { x: number; y: number };
   half: { x: number; y: number };
 } {
@@ -127,7 +131,10 @@ export function rangeAnchors(g: NdGeometry): {
     const [x, y] = ndPoint(g, -SPAN_DEG, r);
     return { x: tenth(x - RANGE_LABEL_GAP_PX), y: tenth(y) };
   };
-  return { outer: at(g.r), half: at(g.r2) };
+  return {
+    outer: at(g.r),
+    half: trackLine ? { x: tenth(g.cx + HALF_RANGE_BESIDE_PX), y: tenth(g.cy - g.r2) } : at(g.r2),
+  };
 }
 
 /** The line LAST HEARD is centred on, just above the half-range ring. */
@@ -136,18 +143,10 @@ export const lastHeardY = (g: NdGeometry): number => g.cy - g.r2 - LAST_HEARD_RI
 /** Whether a bearing, relative to the top, falls on the compass's arc. */
 export const onArc = (rel: number): boolean => Math.abs(rel) <= SPAN_DEG;
 
-/** The track line, from near the aircraft to short of the arc, crossed at the half-range ring; empty off the arc. */
-export function trackPath(g: NdGeometry, at: number): string {
-  if (!onArc(at)) return '';
-  const p = toward(g.cx, g.cy, at);
-  return `M${p(TRACK_FROM_PX)}L${p(g.r - TRACK_SHORT_PX)}M${p(g.r2, -CROSS_PX)}L${p(g.r2, CROSS_PX)}`;
-}
-
-/** The diamond on the arc at the track, open; empty off the arc. */
-export function diamondPath(g: NdGeometry, at: number): string {
-  if (!onArc(at)) return '';
-  const p = toward(g.cx, g.cy, at);
-  return `M${p(g.r + DIAMOND_HALF_HEIGHT_PX)}L${p(g.r, DIAMOND_HALF_WIDTH_PX)}L${p(g.r - DIAMOND_HALF_HEIGHT_PX)}L${p(g.r, -DIAMOND_HALF_WIDTH_PX)}Z`;
+/** The track line, straight up from the aircraft's nose to the arc, ticked at half range. */
+export function trackPath(g: NdGeometry): string {
+  const p = toward(g.cx, g.cy, 0);
+  return `M${p(AIRCRAFT_NOSE_PX)}L${p(g.r)}M${p(g.r2, -CROSS_PX)}L${p(g.r2, CROSS_PX)}`;
 }
 
 /** The bug outline as (outward from the arc's radius, across): a notch in the foot, towards the arc. */
@@ -197,6 +196,17 @@ export function bugPath(g: NdGeometry, rel: number): string {
   const side = Math.sign(rel);
   return bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side);
 }
+
+/** The heading pointer as (outward from the arc's radius, across): tip on the arc, base outside it. */
+const POINTER_OUTLINE: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [12, 5],
+  [12, -5],
+];
+
+/** The heading pointer, an open triangle pointing in at the arc; empty off the arc. */
+export const headingPointerPath = (g: NdGeometry, rel: number): string =>
+  onArc(rel) ? `${bugOutline(g, rel, POINTER_OUTLINE)}Z` : '';
 
 /** How the track turns and how fast the aircraft goes: what the trend vector extends. */
 export interface Trend {

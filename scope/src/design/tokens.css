@@ -30,9 +30,8 @@
   --accent: #fff;
   /* The instruments' ground. */
   --instrument-bg: #0b0b0b;
-  /* The ND's half-range ring and its track line. */
+  /* The ND's half-range ring. */
   --nd-ring: #3a3a38;
-  --nd-track: #6a6a66;
   /* The PFD's tape and VSI strips, flight mode band, readout boxes, sky and ground. */
   --pfd-strip: #3a3a39;
   --pfd-fma: #333332;

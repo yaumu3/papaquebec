@@ -70,6 +70,10 @@
   color: var(--text-muted);
   font-size: var(--text-xs);
 }
+.besideTrack {
+  transform: translateY(-50%);
+  color: var(--text-dim);
+}
 .top {
   position: absolute;
   inset: var(--space-2) 0 auto;
@@ -160,23 +164,20 @@
 .sel {
   color: var(--plot-intent);
 }
-.trk {
-  color: var(--color-level);
-}
 .unknown {
   color: var(--text-muted);
 }
 .trackLine {
-  stroke: var(--nd-track);
+  stroke: var(--text);
   stroke-width: 1;
 }
 .bug {
   stroke: var(--plot-intent);
   stroke-width: 1.6;
 }
-.diamond {
-  stroke: var(--color-level);
-  stroke-width: 1.6;
+.headingPointer {
+  stroke: var(--text);
+  stroke-width: 1.5;
 }
 .trend {
   stroke: var(--text);

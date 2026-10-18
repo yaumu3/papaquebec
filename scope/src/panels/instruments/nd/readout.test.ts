@@ -16,7 +16,14 @@ afterEach(() => {
 });
 
 describe('ndFrame', () => {
-  it('sets the mode, its label, the box and the flags by what holds', () => {
+  const lapsedTrack = makeSample(NOW, {
+    seen: 1,
+    heading: 201,
+    track: 198,
+    heard: { heading: FRESH, track: STALE },
+  });
+
+  it('sets the mode, the box and the flags by what holds, a track heard INSTRUMENT_SEC ago lapsed', () => {
     // Arrange
     const rows = [
       makeSample(NOW, {
@@ -27,12 +34,7 @@ describe('ndFrame', () => {
       }),
       makeSample(NOW, { seen: 1, track: 47, heard: { track: FRESH } }),
       makeSample(NOW, { seen: 34, heading: 201, track: 198, heard: { heading: 966, track: 966 } }),
-      makeSample(NOW, {
-        seen: 1,
-        heading: 201,
-        track: 198,
-        heard: { heading: STALE, track: STALE },
-      }),
+      lapsedTrack,
       makeSample(NOW, { seen: 1 }),
     ];
 
@@ -40,22 +42,22 @@ describe('ndFrame', () => {
     const frames = rows.map((t) => ndFrame(t, NOW));
 
     // Assert
-    expect(frames.map((f) => [f.mode, f.label, f.box, f.flags])).toEqual([
-      ['heading', 'HDG', '284', []],
-      ['track', 'TRK', '047', ['HDG']],
-      ['lost', 'HDG', '---', ['TRK', 'HDG']],
-      ['blank', 'HDG', '---', ['TRK', 'HDG']],
-      ['blank', 'TRK', '---', ['TRK', 'HDG']],
+    expect(frames.map((f) => [f.mode, f.box, f.flags])).toEqual([
+      ['track', '289', []],
+      ['track', '047', []],
+      ['lost', '---', ['TRK']],
+      ['blank', '---', ['TRK']],
+      ['blank', '---', ['TRK']],
     ]);
   });
 
-  it('orients on the heading, else the track, as heard', () => {
+  it('orients on the track, else the last track, else the last heading', () => {
     // Arrange
     const rows = [
       makeSample(NOW, { heading: 284, track: 289, heard: { heading: FRESH, track: FRESH } }),
       makeSample(NOW, { track: 47, heard: { track: FRESH } }),
-      makeSample(NOW, { seen: 40, heading: 201, track: 198, heard: { heading: 900, track: 900 } }),
-      makeSample(NOW, { seen: 40, track: 198, heard: { track: 900 } }),
+      lapsedTrack,
+      makeSample(NOW, { seen: 40, heading: 201, heard: { heading: 900 } }),
       makeSample(NOW, { seen: 40 }),
     ];
 
@@ -63,7 +65,7 @@ describe('ndFrame', () => {
     const orients = rows.map((t) => ndFrame(t, NOW).orient);
 
     // Assert
-    expect(orients).toEqual([284, 47, 201, 198, 0]);
+    expect(orients).toEqual([289, 47, 198, 201, 0]);
   });
 
   it('orients the last frame on the magnetic track', () => {
@@ -76,22 +78,6 @@ describe('ndFrame', () => {
 
     // Assert
     expect(frame.orient).toBe(198);
-  });
-
-  it('lets a heading heard exactly INSTRUMENT_SEC ago lapse, the track holding', () => {
-    // Arrange
-    const t = makeSample(NOW, {
-      seen: 1,
-      heading: 284,
-      track: 289,
-      heard: { heading: STALE, track: FRESH },
-    });
-
-    // Act
-    const frame = ndFrame(t, NOW);
-
-    // Assert
-    expect([frame.mode, frame.orient]).toEqual(['track', 289]);
   });
 
   it('says how long ago the target was last heard, only when lost', () => {
@@ -107,14 +93,14 @@ describe('ndFrame', () => {
 });
 
 const texts = (r: NdReadouts) =>
-  [r.gs, r.tas, r.wind, r.sel, r.trk, r.tat, r.sat].map((x) => x.text);
+  [r.gs, r.tas, r.wind, r.sel, r.hdg, r.tat, r.sat].map((x) => x.text);
 
 describe('ndReadouts', () => {
-  it('reads every value of the corners, the wind and the track magnetic', () => {
+  it('reads every value of the corners, the wind magnetic and the heading as reported', () => {
     // Arrange
     setDeclinationAt(() => () => 7);
     const heard = Object.fromEntries(
-      ['gs', 'tas', 'windDir', 'windSpeed', 'selHeading', 'navModes', 'track', 'tat', 'oat'].map(
+      ['gs', 'tas', 'windDir', 'windSpeed', 'selHeading', 'navModes', 'heading', 'tat', 'oat'].map(
         (k) => [k, FRESH],
       ),
     );
@@ -126,7 +112,7 @@ describe('ndReadouts', () => {
       windSpeed: 63.6,
       selHeading: 310,
       navModes: ['autopilot'],
-      track: 289,
+      heading: 284,
       tat: -4,
       oat: -56,
       at: AT,
@@ -137,7 +123,7 @@ describe('ndReadouts', () => {
     const readouts = ndReadouts(t, NOW);
 
     // Assert
-    expect(texts(readouts)).toEqual(['462', '438', '269°/64', '310°', '282°', '-4°C', '-56°C']);
+    expect(texts(readouts)).toEqual(['462', '438', '269°/64', '310°', '284°', '-4°C', '-56°C']);
   });
 
   it('prints no sign on a temperature of zero and a plus on a positive one', () => {
@@ -219,8 +205,8 @@ describe('ndReadouts', () => {
       seen: 34,
       gs: 462,
       oat: -56,
-      track: 289,
-      heard: { gs: FRESH, oat: FRESH, track: FRESH },
+      heading: 284,
+      heard: { gs: FRESH, oat: FRESH, heading: FRESH },
     });
 
     // Act
@@ -230,14 +216,14 @@ describe('ndReadouts', () => {
     expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
   });
 
-  it('keeps the values that still hold when neither heading nor track does', () => {
+  it('keeps the values that still hold, blanking those that lapse', () => {
     // Arrange
     const t = makeSample(NOW, {
       seen: 1,
       gs: 462,
       oat: -56,
-      track: 289,
-      heard: { gs: FRESH, oat: FRESH, track: STALE },
+      heading: 284,
+      heard: { gs: FRESH, oat: FRESH, heading: STALE },
     });
 
     // Act
@@ -254,7 +240,7 @@ describe('ndSymbols', () => {
   const KEYS = ['heading', 'track', 'selHeading', 'navModes'];
   const fields = { heading: 284, track: 289, selHeading: 310, navModes: ['autopilot'] };
 
-  it('gives the track and the selected heading, magnetic, while the frame is live', () => {
+  it('gives the track, the heading and the selected heading, magnetic, while the frame is live', () => {
     // Arrange
     setDeclinationAt(() => () => 7);
     const t = makeSample(NOW, { seen: 1, ...fields, at: AT, heard: heardAll(KEYS, FRESH) });
@@ -263,24 +249,28 @@ describe('ndSymbols', () => {
     const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
-    expect(symbols).toEqual({ track: 282, sel: 310 });
+    expect(symbols).toEqual({ track: 282, heading: 284, sel: 310 });
   });
 
   it('leaves out what no longer holds', () => {
     // Arrange
-    const heard = { ...heardAll(KEYS, FRESH), track: STALE };
+    const heard = { ...heardAll(KEYS, FRESH), heading: STALE };
     const t = makeSample(NOW, { seen: 1, ...fields, heard });
 
     // Act
     const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
-    expect(symbols).toEqual({ sel: 310 });
+    expect(symbols).toEqual({ track: 289, sel: 310 });
   });
 
   it('gives nothing in a blank frame or a lost one', () => {
     // Arrange
-    const blank = makeSample(NOW, { seen: 1, ...fields, heard: heardAll(KEYS, STALE) });
+    const blank = makeSample(NOW, {
+      seen: 1,
+      ...fields,
+      heard: { ...heardAll(KEYS, FRESH), track: STALE },
+    });
     const lost = makeSample(NOW, { seen: 34, ...fields, heard: heardAll(KEYS, FRESH) });
 
     // Act
@@ -409,11 +399,11 @@ describe('ndSymbols level-off', () => {
 const windy = (heard: object) =>
   makeSample(NOW, {
     seen: 1,
-    heading: 284,
+    track: 289,
     windDir: 276,
     windSpeed: 40,
     at: AT,
-    heard: { heading: FRESH, windDir: FRESH, windSpeed: FRESH, ...heard },
+    heard: { track: FRESH, windDir: FRESH, windSpeed: FRESH, ...heard },
   });
 
 describe('ndSymbols wind', () => {
