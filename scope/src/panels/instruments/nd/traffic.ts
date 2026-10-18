@@ -99,6 +99,19 @@ function pointOnDisplay(
   return onArc(rel) && radius <= g.r - EDGE_PX ? ndPoint(g, rel, radius) : undefined;
 }
 
+/** Where `at` lies from own ship `from`: its distance, and its bearing off the top of the display; at the same point, straight ahead. */
+function polarOf(
+  from: LivePosition,
+  fromAt: GeoPoint | undefined,
+  at: LivePosition,
+  view: NdView,
+): { rel: number; distanceNm: number } {
+  const { distanceNm, bearingTrue } = inverse(from, at);
+  const coincident = distanceNm === 0 || Number.isNaN(bearingTrue);
+  const rel = coincident ? 0 : turn(view.frame.orient, magneticBearing(bearingTrue, fromAt));
+  return { rel, distanceNm };
+}
+
 /** The track's place on the display, or nothing when it lies outside the arc or beyond the range. */
 function placeOnDisplay(
   own: Origin,
@@ -107,9 +120,7 @@ function placeOnDisplay(
   at: LivePosition,
   view: NdView,
 ): Placed | undefined {
-  const { distanceNm, bearingTrue } = inverse(own.position, at);
-  const coincident = distanceNm === 0 || Number.isNaN(bearingTrue);
-  const rel = coincident ? 0 : turn(view.frame.orient, magneticBearing(bearingTrue, own.at));
+  const { rel, distanceNm } = polarOf(own.position, own.at, at, view);
   const point = pointOnDisplay(view, rel, distanceNm);
   return point && { track: t, x: point[0], y: point[1], distanceNm, deltaFt: alt - own.alt };
 }
