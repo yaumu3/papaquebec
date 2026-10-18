@@ -1,3 +1,5 @@
+import { type Accessor, createMemo, createSignal } from 'solid-js';
+
 import { clamp } from '../../lib/math';
 
 /**
@@ -71,4 +73,97 @@ export function retargetPoints(
     next.set(key, was && glides[0] === was[0] && glides[1] === was[1] ? was : glides);
   }
   return next;
+}
+
+/** The clock the glides are drawn by: `performance.now()` at the last frame, ticking while one moves. */
+const [clock, setClock] = createSignal(0);
+let framesUntil = 0;
+let framing = false;
+
+const frame = (): void => {
+  const now = performance.now();
+  setClock(now);
+  framing = now < framesUntil;
+  if (framing) requestAnimationFrame(frame);
+};
+
+/** Keeps the frames coming until the glides begun at `now` have arrived. */
+function frameUntil(now: number): void {
+  framesUntil = Math.max(framesUntil, now + GLIDE_MS);
+  if (framing) return;
+  framing = true;
+  requestAnimationFrame(frame);
+}
+
+/** Whether a glide begun at `now` has somewhere to go: one standing on its value draws no frame. */
+const setOff = (g: Glide, now: number): boolean => g.startedAt === now && g.from !== g.to;
+
+export interface GlideOptions {
+  /** The circle an angle is on, 360 for degrees. */
+  wrap?: number | undefined;
+  /**
+   * Whose reading it is, and on what scale: a change of key stands at once on the new value, as
+   * another target's would.
+   */
+  key?: Accessor<unknown> | undefined;
+}
+
+/**
+ * The reading as the instrument shows it: on its way to each new value of `target` over
+ * `GLIDE_MS`, standing at once on a value from none or of a new key, none while there is none.
+ */
+export function glided(target: Accessor<number>, o?: GlideOptions): Accessor<number>;
+export function glided(
+  target: Accessor<number | undefined>,
+  o?: GlideOptions,
+): Accessor<number | undefined>;
+export function glided(
+  target: Accessor<number | undefined>,
+  o: GlideOptions = {},
+): Accessor<number | undefined> {
+  let lastKey: unknown;
+  const glide = createMemo<Glide | undefined>((current) => {
+    const to = target();
+    const key = o.key?.();
+    const kept = key === lastKey ? current : undefined;
+    lastKey = key;
+    const now = performance.now();
+    const next = retargetGlide(kept, to, now, o.wrap);
+    if (next !== undefined && setOff(next, now)) frameUntil(now);
+    return next;
+  });
+  return createMemo(() => {
+    const g = glide();
+    return g === undefined ? undefined : glideAt(g, clock(), o.wrap);
+  });
+}
+
+/**
+ * The points of `items` as the instrument shows them, by `keyOf` the item: each on its way to
+ * the item's `pointOf` over `GLIDE_MS`, a new item standing at once where it is, every item on a
+ * new `key`.
+ */
+export function glidedPoints<T>(
+  items: Accessor<readonly T[]>,
+  keyOf: (item: T) => string,
+  pointOf: (item: T) => Point,
+  key?: Accessor<unknown>,
+): Accessor<ReadonlyMap<string, Point>> {
+  let lastKey: unknown;
+  const glides = createMemo<Map<string, PointGlides>>((current) => {
+    const targets = new Map(items().map((item) => [keyOf(item), pointOf(item)] as const));
+    const k = key?.();
+    const kept = k === lastKey ? current : new Map<string, PointGlides>();
+    lastKey = k;
+    const now = performance.now();
+    const next = retargetPoints(kept, targets, now);
+    if ([...next.values()].some((pair) => pair.some((g) => setOff(g, now)))) frameUntil(now);
+    return next;
+  }, new Map());
+  return createMemo(() => {
+    const now = clock();
+    return new Map(
+      [...glides()].map(([k, [x, y]]) => [k, [glideAt(x, now), glideAt(y, now)] as const]),
+    );
+  });
 }
