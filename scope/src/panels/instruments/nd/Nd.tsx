@@ -28,7 +28,7 @@ import {
   trendPoints,
   windArrowPath,
 } from './geometry';
-import { boxOf, ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
+import { boxOf, ndFrame, type NdSymbols, type NdText, ndReadouts, ndSymbols } from './readout';
 import { ndTraffic, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
@@ -76,30 +76,41 @@ export function Nd(props: { t: Track }) {
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
   const anchors = createMemo(() => rangeAnchors(g()));
   const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
+  const bearing = (of: (own: NdSymbols) => number | undefined) =>
+    glided(() => of(symbols()), { wrap: 360, key });
+  const trackDeg = bearing((own) => own.track);
+  const selDeg = bearing((own) => own.sel);
+  const windFromDeg = bearing((own) => own.windFrom);
+  const levelOffNm = glided(() => symbols().levelOffNm, { key });
+  const turnRate = glided(() => symbols().trend?.rateDegS, { key });
+  const trendGs = glided(() => symbols().trend?.gsKt, { key });
   const relative = (deg: number | undefined) =>
     deg === undefined ? undefined : turn(orient(), deg);
   const track = createMemo(() => {
-    const rel = relative(symbols().track);
+    const rel = relative(trackDeg());
     return rel === undefined
       ? undefined
       : { rel, line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
   });
   const levelOff = createMemo(() => {
     const at = track();
-    const nm = symbols().levelOffNm;
+    const nm = levelOffNm();
     return at && nm !== undefined ? levelOffPath(g(), at.rel, nm, ndRangeNm()) : undefined;
   });
   const trend = createMemo(() => {
     const at = track();
-    const turning = symbols().trend;
-    return at && turning ? trendPath(trendPoints(g(), at.rel, turning, ndRangeNm())) : undefined;
+    const rateDegS = turnRate();
+    const gsKt = trendGs();
+    return at && rateDegS !== undefined && gsKt !== undefined
+      ? trendPath(trendPoints(g(), at.rel, { rateDegS, gsKt }, ndRangeNm()))
+      : undefined;
   });
   const wind = createMemo(() => {
-    const rel = relative(symbols().windFrom);
+    const rel = relative(windFromDeg());
     return rel === undefined ? undefined : windArrowPath(rel);
   });
   const bug = createMemo(() => {
-    const rel = relative(symbols().sel);
+    const rel = relative(selDeg());
     return rel === undefined ? undefined : bugPath(g(), rel);
   });
   const traffic = createMemo(() => {
