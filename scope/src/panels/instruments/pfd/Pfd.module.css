@@ -170,14 +170,20 @@
   line-height: 7px;
   text-align: center;
 }
+/* 0.36em is JetBrains Mono's baseline below the middle of a line, as MONO_MID_TO_BASELINE_EM in geometry.ts. */
 .hatch {
-  display: inline-block;
+  position: absolute;
+  left: 0;
+  top: calc(50% + 0.36em - 1cap);
   width: 1ch;
   height: 1cap;
 }
 .hatchLine {
   stroke: var(--color-level);
   stroke-width: 1;
+}
+.wheelRows > div {
+  position: relative;
 }
 .wheelRows {
   position: absolute;

@@ -182,13 +182,6 @@ export interface Wheel<T = string> {
 const carried = (a: number, place: number, step: number): number =>
   Math.max(0, (a % place) - (place - step)) / step;
 
-/**
- * The top of a wheel's column in its window: the row `above` rows down in place, moved down by
- * `turned` of a row.
- */
-export const wheelTop = (windowH: number, lineH: number, above: number, turned: number): number =>
-  windowH / 2 - lineH / 2 - above * lineH + turned * lineH;
-
 /** Where a wheel's window stands, and how its column is laid out in it. */
 export interface WheelCell {
   x: number;
@@ -198,9 +191,29 @@ export interface WheelCell {
   /** The height of a row, and the number of rows above the one at rest. */
   lineH: number;
   above: number;
+  /** The font size of the rows, and the top of the resting row inside the window. */
+  px: number;
+  restTop: number;
 }
 
-/** A digit wheel of `place`, rolling from this digit to the next through the last `step` before it. */
+/**
+ * The top of a wheel's column in its window: the resting row in place, moved down by `turned` of a
+ * row.
+ */
+export const columnTop = (cell: WheelCell, turned: number): number =>
+  cell.restTop - cell.above * cell.lineH + turned * cell.lineH;
+
+/** Where the baseline of row `row` of a wheel stands, `turned` of a row along. */
+export const rowBaseline = (cell: WheelCell, row: number, turned: number): number =>
+  cell.y +
+  columnTop(cell, turned) +
+  row * cell.lineH +
+  cell.lineH / 2 +
+  MONO_MID_TO_BASELINE_EM * cell.px;
+
+/**
+ * A digit wheel of `place`, rolling from this digit to the next through the last `step` before it.
+ */
 const carryWheel = <T>(a: number, place: number, step: number, rows: [T, T]): Wheel<T> => ({
   rows,
   turned: carried(a, place, step),
@@ -209,27 +222,52 @@ const carryWheel = <T>(a: number, place: number, step: number, rows: [T, T]): Wh
 /** JetBrains Mono: advance 600, ascender 1020, descender 300 of 1000 units per em. */
 const MONO_ADVANCE_EM = 0.6;
 /**
- * The baseline's depth in a box whose line height is its font size:
- * (1 − (1020 + 300) / 1000) / 2 + 1020 / 1000.
+ * How far the baseline sits below the middle of a line box, whatever its line height:
+ * (1020 − 300) / 2 / 1000. The baseline's depth in a box as tall as its font is 0.5 plus this.
  */
-const MONO_BASELINE_EM = 0.86;
+const MONO_MID_TO_BASELINE_EM = 0.36;
 /** JetBrains Mono's cap height, 730 of 1000 units per em. */
-const MONO_CAP_EM = 0.73;
+export const MONO_CAP_EM = 0.73;
+
+/** The readout box's inner half height: the box's half height less its 1 px stroke. */
+const INNER_HALF_PX = READOUT_HALF_HEIGHT_PX - 1;
+/** The window of a drum, and of a carry wheel: the box's inner height. */
+const DRUM_WINDOW_H_PX = 2 * INNER_HALF_PX;
+/** A pitch is rounded up to this, so that rows land on the browser's layout grid. */
+const LAYOUT_STEP_PX = 0.25;
+
+/** The baseline's depth below `yc` for a readout line of `linePx`. */
+const baselineDepth = (linePx: number): number => MONO_MID_TO_BASELINE_EM * linePx;
 
 /**
- * The window of a digit of `px` ending at `edge`, standing on the baseline of a line of `linePx`
- * centred on `yc`.
+ * The row pitch of a readout's carry wheels, whose windows are the box's inner height. At rest the
+ * next row's baseline waits at or above the inner top edge, and when a carry ends the old row's
+ * cap top has cleared the inner bottom edge.
  */
-const digitCell = (yc: number, linePx: number, edge: number, px: number): WheelCell => ({
-  x: edge - MONO_ADVANCE_EM * px,
-  y: yc - linePx / 2 + MONO_BASELINE_EM * (linePx - px),
-  w: MONO_ADVANCE_EM * px,
-  h: px,
-  lineH: px,
-  above: 1,
-});
+export const carryPitch = (linePx: number): number => {
+  const depth = baselineDepth(linePx);
+  const clear = Math.max(INNER_HALF_PX + depth, INNER_HALF_PX + MONO_CAP_EM * linePx - depth);
+  return Math.ceil(clear / LAYOUT_STEP_PX) * LAYOUT_STEP_PX;
+};
 
-const DRUM_WINDOW_H_PX = 2 * READOUT_HALF_HEIGHT_PX - 2;
+/**
+ * The window of a carry wheel's digit of `px` ending at `edge`, on the baseline of a readout line
+ * of `linePx` centred on `yc`: the box's inner height, the resting row put by its baseline.
+ */
+const carryCell = (yc: number, linePx: number, edge: number, px: number): WheelCell => {
+  const pitch = carryPitch(linePx);
+  return {
+    x: edge - MONO_ADVANCE_EM * px,
+    y: yc - INNER_HALF_PX,
+    w: MONO_ADVANCE_EM * px,
+    h: DRUM_WINDOW_H_PX,
+    lineH: pitch,
+    above: 1,
+    px,
+    restTop: INNER_HALF_PX + baselineDepth(linePx) - pitch / 2 - MONO_MID_TO_BASELINE_EM * px,
+  };
+};
+
 const SPIKE_PX = 5;
 
 /** The speed readout: a box inset from the tape's edge, with a spike to the right at the centre line. */
@@ -293,18 +331,21 @@ export interface SpeedReadout {
 export function speedReadout(g: PfdGeometry): SpeedReadout {
   const right = g.sR - SPEED_BOX_IN_PX;
   const hiX = right - SPEED_DRUM_GAP_PX;
-  const tens = digitCell(g.yc, SPEED_DIGIT_PX, hiX, SPEED_DIGIT_PX);
+  const carry = (edge: number) => carryCell(g.yc, SPEED_DIGIT_PX, edge, SPEED_DIGIT_PX);
+  const tens = carry(hiX);
   return {
     midX: (g.sL + g.sR) / 2,
-    hundreds: digitCell(g.yc, SPEED_DIGIT_PX, tens.x, SPEED_DIGIT_PX),
+    hundreds: carry(tens.x),
     tens,
     ones: {
       x: hiX + 1,
-      y: g.yc - READOUT_HALF_HEIGHT_PX + 1,
+      y: g.yc - INNER_HALF_PX,
       w: right - hiX - 2,
       h: DRUM_WINDOW_H_PX,
       lineH: SPEED_DRUM_LINE_PX,
       above: 2,
+      px: SPEED_DIGIT_PX,
+      restTop: INNER_HALF_PX - SPEED_DRUM_LINE_PX / 2,
     },
   };
 }
@@ -661,7 +702,7 @@ export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
   const left = g.aL + ALTITUDE_BOX_IN_PX;
   const right = g.aR + ALTITUDE_BOX_OUT_PX;
   const drumX = right - ALTITUDE_DRUM_GAP_PX;
-  const digit = (edge: number, px: number) => digitCell(g.yc, ALTITUDE_THOUSANDS_PX, edge, px);
+  const digit = (edge: number, px: number) => carryCell(g.yc, ALTITUDE_THOUSANDS_PX, edge, px);
   const hundreds = digit(right - ALTITUDE_DIGITS_GAP_PX, ALTITUDE_HUNDREDS_PX);
   const thousands = digit(hundreds.x, ALTITUDE_THOUSANDS_PX);
   const slot = digit(thousands.x, ALTITUDE_THOUSANDS_PX);
@@ -673,15 +714,17 @@ export function altitudeReadout(g: PfdGeometry): AltitudeReadout {
     hundreds,
     drum: {
       x: drumX,
-      y: g.yc - READOUT_HALF_HEIGHT_PX + 1,
+      y: g.yc - INNER_HALF_PX,
       w: right - drumX - 1,
       h: DRUM_WINDOW_H_PX,
       lineH: ALTITUDE_DRUM_LINE_PX,
       above: 2,
+      px: ALTITUDE_HUNDREDS_PX,
+      restTop: INNER_HALF_PX - ALTITUDE_DRUM_LINE_PX / 2,
     },
     neg: {
       x: slot.x + slot.w / 2,
-      y: slot.y + (MONO_BASELINE_EM - MONO_CAP_EM / 2) * slot.h,
+      y: g.yc + baselineDepth(ALTITUDE_THOUSANDS_PX) - (MONO_CAP_EM * ALTITUDE_THOUSANDS_PX) / 2,
     },
   };
 }

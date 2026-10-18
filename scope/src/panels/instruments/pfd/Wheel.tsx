@@ -1,7 +1,7 @@
 import { Index, type JSX } from 'solid-js';
 
 import { cx } from '../../../design/cx';
-import { type Wheel as WheelData, type WheelCell, wheelTop } from './geometry';
+import { type Wheel as WheelData, type WheelCell, columnTop } from './geometry';
 
 import s from './Pfd.module.css';
 
@@ -16,7 +16,7 @@ interface WheelProps<T> {
 
 /** A digit wheel: its rows in a clipped window, the column turned by the wheel's fraction of a row. */
 export function Wheel<T = string>(props: WheelProps<T>) {
-  const top = () => wheelTop(props.cell.h, props.cell.lineH, props.cell.above, props.wheel.turned);
+  const top = () => columnTop(props.cell, props.wheel.turned);
   return (
     <div
       class={s.wheel}
