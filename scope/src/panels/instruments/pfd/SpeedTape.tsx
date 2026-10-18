@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js';
+import { Index, Show } from 'solid-js';
 
 import { Flag } from './Flag';
 import {
@@ -49,13 +49,13 @@ export function SpeedText(props: { g: PfdGeometry; view: SpeedView | undefined; 
       <Show when={props.view} fallback={<Flag text="SPD" x={at().midX} y={props.g.yc} />}>
         {(v) => (
           <>
-            <For each={v().tape.labels}>
+            <Index each={v().tape.labels}>
               {(l) => (
-                <div class={s.speedLabel} style={{ left: `${l.x}px`, top: `${l.y}px` }}>
-                  {l.text}
+                <div class={s.speedLabel} style={{ left: `${l().x}px`, top: `${l().y}px` }}>
+                  {l().text}
                 </div>
               )}
-            </For>
+            </Index>
             <Wheel cell={at().hundreds} wheel={v().digits.hundreds} class={s.speedDigits} />
             <Wheel cell={at().tens} wheel={v().digits.tens} class={s.speedDigits} />
             <Wheel cell={at().ones} wheel={v().digits.ones} class={s.speedDigits} />

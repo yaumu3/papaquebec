@@ -1,4 +1,4 @@
-import { createUniqueId, For, type JSX, Show } from 'solid-js';
+import { createUniqueId, Index, type JSX, Show } from 'solid-js';
 
 import { Flag } from './Flag';
 import {
@@ -133,14 +133,14 @@ export function AltitudeText(props: AltitudeProps & { baro: string }) {
       <Show when={props.view}>
         {(v) => (
           <>
-            <For each={v().tape.labels}>
+            <Index each={v().tape.labels}>
               {(l) => (
-                <div class={s.altitudeLabel} style={{ left: `${l.x}px`, top: `${l.y}px` }}>
-                  <span class={s.thousandsLabel}>{l.hi}</span>
-                  <span class={s.hundredsLabel}>{l.lo}</span>
+                <div class={s.altitudeLabel} style={{ left: `${l().x}px`, top: `${l().y}px` }}>
+                  <span class={s.thousandsLabel}>{l().hi}</span>
+                  <span class={s.hundredsLabel}>{l().lo}</span>
                 </div>
               )}
-            </For>
+            </Index>
             <Wheel
               cell={at().tenThousands}
               wheel={v().digits.tenThousands}
