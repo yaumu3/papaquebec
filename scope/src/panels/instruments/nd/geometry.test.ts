@@ -150,16 +150,22 @@ describe('compass', () => {
 });
 
 describe('anchors', () => {
-  it('puts the range labels 4 px left of the arc ends, and LAST HEARD over the ring', () => {
+  it('puts the range labels by the arc and ring ends, the half range beside the track line while drawn, and LAST HEARD over the ring', () => {
     // Arrange
     const g = ndGeometry(346);
 
     // Act
-    const out = { ranges: rangeAnchors(g), lastHeard: lastHeardY(g) };
+    const out = {
+      ranges: [false, true].map((line) => rangeAnchors(g, line)),
+      lastHeard: lastHeardY(g),
+    };
 
     // Assert
     expect(out).toEqual({
-      ranges: { outer: { x: 25.1, y: 150.4 }, half: { x: 97, y: 169.7 } },
+      ranges: [
+        { outer: { x: 25.1, y: 150.4 }, half: { x: 97, y: 169.7 } },
+        { outer: { x: 25.1, y: 150.4 }, half: { x: 181, y: 114.5 } },
+      ],
       lastHeard: 106.5,
     });
   });

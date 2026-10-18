@@ -70,6 +70,10 @@
   color: var(--text-muted);
   font-size: var(--text-xs);
 }
+.besideTrack {
+  transform: translateY(-50%);
+  color: var(--text-dim);
+}
 .top {
   position: absolute;
   inset: var(--space-2) 0 auto;

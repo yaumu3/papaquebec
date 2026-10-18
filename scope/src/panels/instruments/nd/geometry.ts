@@ -20,6 +20,8 @@ const LAST_HEARD_RISE_PX = 8;
 const AIRCRAFT_HALF_WIDTH_PX = 6;
 const AIRCRAFT_NOSE_PX = 10;
 const AIRCRAFT_TAIL_PX = 8;
+/** How far right of the track line the half range's left edge stands. */
+const HALF_RANGE_BESIDE_PX = 8;
 /** Half the length of the tick across the track line at half range. */
 const CROSS_PX = 5;
 
@@ -114,8 +116,14 @@ export function aircraftPath(g: NdGeometry): string {
   return `M${nose}L${right}L${left}Z`;
 }
 
-/** Where the right edges of the outer range's label and of half of it stand: left of the arc and ring ends. */
-export function rangeAnchors(g: NdGeometry): {
+/**
+ * Where the outer range's label stands, by its right edge left of the arc end, and half of it:
+ * left of the ring end, or by its left edge beside the track line's tick while the line is drawn.
+ */
+export function rangeAnchors(
+  g: NdGeometry,
+  trackLine: boolean,
+): {
   outer: { x: number; y: number };
   half: { x: number; y: number };
 } {
@@ -123,7 +131,10 @@ export function rangeAnchors(g: NdGeometry): {
     const [x, y] = ndPoint(g, -SPAN_DEG, r);
     return { x: tenth(x - RANGE_LABEL_GAP_PX), y: tenth(y) };
   };
-  return { outer: at(g.r), half: at(g.r2) };
+  return {
+    outer: at(g.r),
+    half: trackLine ? { x: tenth(g.cx + HALF_RANGE_BESIDE_PX), y: tenth(g.cy - g.r2) } : at(g.r2),
+  };
 }
 
 /** The line LAST HEARD is centred on, just above the half-range ring. */

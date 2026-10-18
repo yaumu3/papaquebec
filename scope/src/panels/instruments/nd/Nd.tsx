@@ -78,7 +78,6 @@ export function Nd(props: { t: Track }) {
   const orient = glided(() => frame().orient, { wrap: 360, key });
   const marks = createMemo(() => compass(g(), orient()));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
-  const anchors = createMemo(() => rangeAnchors(g()));
   const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
   const bearing = (of: (own: NdSymbols) => number | undefined) =>
     glided(() => of(symbols()), { wrap: 360, key });
@@ -94,6 +93,7 @@ export function Nd(props: { t: Track }) {
     const rel = relative(trackDeg());
     return rel === undefined ? undefined : { rel, line: trackPath(g()) };
   });
+  const anchors = createMemo(() => rangeAnchors(g(), track() !== undefined));
   const levelOff = createMemo(() => {
     const at = track();
     const nm = levelOffNm();
@@ -214,7 +214,7 @@ export function Nd(props: { t: Track }) {
           {ndRangeNm()}
         </div>
         <div
-          class={s.range}
+          class={cx(s.range, track() && s.besideTrack)}
           style={{ left: `${anchors().half.x}px`, top: `${anchors().half.y}px` }}
         >
           {ndRangeNm() / 2}
