@@ -3,6 +3,7 @@ import { createMemo, createSignal, For, Index, Show } from 'solid-js';
 import { cx } from '../../../design/cx';
 import { turn } from '../../../lib/geo';
 import { ndRangeAfter, ndRangeNm, setNdRangeNm } from '../../../state/nd';
+import { snapshotVersion } from '../../../state/scope';
 import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
@@ -19,12 +20,15 @@ import {
   ndGeometry,
   rangeAnchors,
   ringPath,
+  threatSquarePath,
   trackPath,
+  trafficDiamondPath,
   trendPath,
   trendPoints,
   windArrowPath,
 } from './geometry';
 import { ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
+import { ndTraffic, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
 import s from './Nd.module.css';
@@ -95,6 +99,23 @@ export function Nd(props: { t: Track }) {
     const rel = relative(symbols().sel);
     return rel === undefined ? undefined : bugPath(g(), rel);
   });
+  const traffic = createMemo(() => {
+    snapshotVersion();
+    return ndTraffic(props.t, trackStore.tracks.values(), trackStore.stats.now, {
+      frame: frame(),
+      rangeNm: ndRangeNm(),
+      g: g(),
+    });
+  });
+  const shapes = (kind: TrafficKind) =>
+    traffic()
+      .symbols.filter((symbol) => symbol.kind === kind)
+      .map((symbol) =>
+        kind === 'threat'
+          ? threatSquarePath(symbol.x, symbol.y)
+          : trafficDiamondPath(symbol.x, symbol.y),
+      )
+      .join('');
   return (
     <div
       data-nd
@@ -114,6 +135,9 @@ export function Nd(props: { t: Track }) {
           <Show when={trend()}>{(d) => <path class={s.trend} d={d()} />}</Show>
           <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
           <Show when={track()}>{(p) => <path class={s.diamond} d={p().diamond} />}</Show>
+          <path class={s.trafficOther} d={shapes('other')} />
+          <path class={s.trafficProximate} d={shapes('proximate')} />
+          <path class={s.threat} d={shapes('threat')} />
           <path class={s.aircraft} d={aircraftPath(g())} />
           <Show when={wind()}>{(d) => <path class={s.wind} d={d()} />}</Show>
         </svg>
@@ -125,6 +149,32 @@ export function Nd(props: { t: Track }) {
             >
               {l().text}
             </div>
+          )}
+        </Index>
+        <Index each={traffic().symbols}>
+          {(symbol) => (
+            <>
+              <Show when={symbol().label}>
+                {(label) => (
+                  <div
+                    class={cx(s.trafficLabel, symbol().kind === 'threat' && s.threatInk)}
+                    style={{ left: `${label().x}px`, top: `${label().y}px` }}
+                  >
+                    {label().text}
+                  </div>
+                )}
+              </Show>
+              <Show when={symbol().arrow}>
+                {(arrow) => (
+                  <div
+                    class={cx(s.trafficArrow, symbol().kind === 'threat' && s.threatInk)}
+                    style={{ left: `${arrow().x}px`, top: `${arrow().y}px` }}
+                  >
+                    {arrow().glyph}
+                  </div>
+                )}
+              </Show>
+            </>
           )}
         </Index>
         <div
@@ -177,6 +227,12 @@ export function Nd(props: { t: Track }) {
           )}
         </Show>
         <div class={s.alerts}>
+          <Show when={traffic().offscale}>
+            <span class={s.alert}>OFFSCALE</span>
+          </Show>
+          <Show when={traffic().traffic}>
+            <span class={s.alert}>TRAFFIC</span>
+          </Show>
           <For each={frame().flags}>{(flag) => <span class={flags.flag}>{flag}</span>}</For>
         </div>
         <div class={s.zoom}>
