@@ -34,7 +34,7 @@ export function Pfd(props: { t: Track }) {
   const altitude = createMemo(() => altitudeView(g(), feet()));
   const sel = createMemo(() => targetOf(r().selAlt));
   const fms = createMemo(() => targetOf(r().fmsAlt));
-  const needle = createMemo(() => needleView(g(), vs()));
+  const needle = createMemo(() => needleView(g(), vs(), r().vs));
   const scale = createMemo(() => vsiScale(g()));
   return (
     <div

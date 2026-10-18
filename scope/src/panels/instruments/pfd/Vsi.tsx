@@ -17,8 +17,15 @@ export interface NeedleView {
   digits: VsiDigits | undefined;
 }
 
-export const needleView = (g: PfdGeometry, vs: number | undefined): NeedleView | undefined =>
-  vs === undefined ? undefined : { path: vsiNeedlePath(g, vs), digits: vsiDigits(g, vs) };
+/** The needle on the rate as shown, the digits on the rate as reported, while it holds. */
+export const needleView = (
+  g: PfdGeometry,
+  shown: number | undefined,
+  reported: number | undefined,
+): NeedleView | undefined =>
+  shown === undefined || reported === undefined
+    ? undefined
+    : { path: vsiNeedlePath(g, shown), digits: vsiDigits(g, reported) };
 
 /** The strip and its scale, and the needle while the rate holds. */
 export function VsiMarks(props: {
