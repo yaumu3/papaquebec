@@ -70,7 +70,12 @@ export function Nd(props: { t: Track }) {
   const g = createMemo(() => ndGeometry(width()));
   const frame = createMemo(() => ndFrame(props.t, trackStore.stats.now));
   const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
-  const key = () => props.t.hex;
+  /**
+   * The glides stand at once on another target, and when the frame changes mode: a target heard
+   * again, or steered by its track instead of its heading, is shown where it is, not on its way
+   * from where the last frame left it.
+   */
+  const key = () => `${props.t.hex}/${frame().mode}`;
   const orient = glided(() => frame().orient, { wrap: 360, key });
   const marks = createMemo(() => compass(g(), orient()));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
