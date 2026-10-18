@@ -9,16 +9,15 @@ import { NONE, type Reading, READINGS } from '../../readings';
 import { holdsAll, isLost } from '../freshness';
 import type { Trend } from './geometry';
 
-/** The state of the instrument: oriented on the heading, on the track, or blank for want of both. */
-export type NdMode = 'heading' | 'track' | 'lost' | 'blank';
+/** The state of the instrument: track-up, lost, or blank for want of a track that holds. */
+export type NdMode = 'track' | 'lost' | 'blank';
 
-export type NdFlag = 'TRK' | 'HDG';
+export type NdFlag = 'TRK';
 
 export interface NdFrame {
   mode: NdMode;
   /** The bearing at the top of the display, magnetic. */
   orient: number;
-  label: NdFlag;
   box: string;
   flags: readonly NdFlag[];
   lastHeard: string | undefined;
@@ -26,42 +25,33 @@ export interface NdFrame {
 
 const BLANK_BOX = '---';
 
-/** The mode the instrument is in: the heading while it holds, else the magnetic track while it holds. */
+/** The mode the instrument is in: track-up while the magnetic track holds. */
 function modeOf(t: Readout, now: number): NdMode {
   if (isLost(t)) return 'lost';
-  if (holds(t.heard.heading, now, INSTRUMENT_SEC) && t.heading !== undefined) return 'heading';
   if (holds(t.heard.track, now, INSTRUMENT_SEC) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
 }
 
-/** The bearing the display is oriented on: the last heading, else the last track, whatever their age. */
-function orientOf(t: Readout, mode: NdMode): number {
-  if (mode === 'track') return magneticTrack(t) ?? 0;
-  return t.heading ?? magneticTrack(t) ?? 0;
-}
+/** The bearing the display is oriented on: the track, else the last heading, whatever their age. */
+const orientOf = (t: Readout): number => magneticTrack(t) ?? t.heading ?? 0;
 
 const FLAGS: Record<NdMode, readonly NdFlag[]> = {
-  heading: [],
-  track: ['HDG'],
-  lost: ['TRK', 'HDG'],
-  blank: ['TRK', 'HDG'],
+  track: [],
+  lost: ['TRK'],
+  blank: ['TRK'],
 };
-
-/** Whether the display is oriented on a reading that holds. */
-const isLive = (mode: NdMode): boolean => mode === 'heading' || mode === 'track';
 
 /** What the box at the top reads: the bearing at the top of a live display, else the blank. */
 export const boxOf = (mode: NdMode, orient: number): string =>
-  isLive(mode) ? padBearing(orient) : BLANK_BOX;
+  mode === 'track' ? padBearing(orient) : BLANK_BOX;
 
 /** What the top of the ND reads, and the flags beside it, from the freshness of the target's readings. */
 export function ndFrame(t: Readout, now: number): NdFrame {
   const mode = modeOf(t, now);
-  const orient = orientOf(t, mode);
+  const orient = orientOf(t);
   return {
     mode,
     orient,
-    label: mode !== 'track' && t.heading !== undefined ? 'HDG' : 'TRK',
     box: boxOf(mode, orient),
     flags: FLAGS[mode],
     lastHeard: mode === 'lost' ? `LAST HEARD ${Math.round(t.seen)} s` : undefined,
@@ -133,7 +123,7 @@ const TREND_MIN_RATE_DEG_S = 0.3;
 
 /** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
 export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymbols {
-  if (!isLive(modeOf(t, now))) return {};
+  if (modeOf(t, now) !== 'track') return {};
   const live = (keys: readonly HeardKey[], v: number | undefined) =>
     holdsAll(t, keys, now) ? v : undefined;
   return {

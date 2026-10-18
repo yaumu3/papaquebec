@@ -62,7 +62,7 @@ function ZoomButton(props: { label: string; step: 1 | -1; glyph: string }) {
   );
 }
 
-/** The navigation display of a target: its compass, oriented on the heading or else the track. */
+/** The navigation display of a target: its compass, oriented on the track. */
 export function Nd(props: { t: Track }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
   const width = trackWidth(root);
@@ -71,7 +71,7 @@ export function Nd(props: { t: Track }) {
   const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
   /**
    * The glides stand at once on another target, and when the frame changes mode: a target heard
-   * again, or steered by its track instead of its heading, is shown where it is, not on its way
+   * again, or whose track lapses or comes back, is shown where it is, not on its way
    * from where the last frame left it.
    */
   const key = () => `${props.t.hex}/${frame().mode}`;
@@ -245,7 +245,7 @@ export function Nd(props: { t: Track }) {
           <Value r={readouts().sat} />
         </div>
         <div class={s.top}>
-          <span class={cx(s.label, s.modeLabel)}>{frame().label}</span>
+          <span class={cx(s.label, s.modeLabel)}>TRK</span>
           <span class={s.box}>{boxOf(frame().mode, orient())}</span>
           <span class={s.label}>MAG</span>
         </div>
