@@ -174,10 +174,6 @@
   stroke: var(--plot-intent);
   stroke-width: 1.6;
 }
-.diamond {
-  stroke: var(--color-level);
-  stroke-width: 1.6;
-}
 .trend {
   stroke: var(--text);
   stroke-width: 1.6;

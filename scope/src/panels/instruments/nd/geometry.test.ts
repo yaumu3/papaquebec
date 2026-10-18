@@ -5,7 +5,6 @@ import {
   arcPath,
   bugPath,
   compass,
-  diamondPath,
   lastHeardY,
   levelOffPath,
   lubberPath,
@@ -182,7 +181,7 @@ describe('fixed symbols', () => {
   });
 });
 
-describe('track line and diamond', () => {
+describe('track line', () => {
   const g = ndGeometry(346);
 
   it('draws the line from near the aircraft out to the arc, crossed at the ring', () => {
@@ -196,26 +195,15 @@ describe('track line and diamond', () => {
     expect(path).toBe('M173.0 175.0L173.0 52.0M169.0 114.5L177.0 114.5');
   });
 
-  it('draws the diamond on the arc, closed', () => {
-    // Arrange
-    const at = 0;
-
-    // Act
-    const path = diamondPath(g, at);
-
-    // Assert
-    expect(path).toBe('M173.0 34.0L177.0 40.0L173.0 46.0L169.0 40.0Z');
-  });
-
-  it('draws neither where the track is off the arc', () => {
+  it('draws no track line where the track is off the arc', () => {
     // Arrange
     const at = 80;
 
     // Act
-    const paths = [trackPath(g, at), diamondPath(g, at)];
+    const path = trackPath(g, at);
 
     // Assert
-    expect(paths).toEqual(['', '']);
+    expect(path).toBe('');
   });
 });
 

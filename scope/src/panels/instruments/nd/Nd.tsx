@@ -14,7 +14,6 @@ import {
   arcPath,
   bugPath,
   compass,
-  diamondPath,
   lastHeardY,
   levelOffPath,
   lubberPath,
@@ -93,9 +92,7 @@ export function Nd(props: { t: Track }) {
     deg === undefined ? undefined : turn(orient(), deg);
   const track = createMemo(() => {
     const rel = relative(trackDeg());
-    return rel === undefined
-      ? undefined
-      : { rel, line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
+    return rel === undefined ? undefined : { rel, line: trackPath(g(), rel) };
   });
   const levelOff = createMemo(() => {
     const at = track();
@@ -168,7 +165,6 @@ export function Nd(props: { t: Track }) {
           <Show when={levelOff()}>{(d) => <path class={s.levelOff} d={d()} />}</Show>
           <Show when={trend()}>{(d) => <path class={s.trend} d={d()} />}</Show>
           <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
-          <Show when={track()}>{(p) => <path class={s.diamond} d={p().diamond} />}</Show>
           <path class={s.trafficOther} d={shapes('other')} />
           <path class={s.trafficProximate} d={shapes('proximate')} />
           <path class={s.threat} d={shapes('threat')} />

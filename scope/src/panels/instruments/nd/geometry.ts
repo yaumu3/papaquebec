@@ -24,8 +24,6 @@ const TRACK_FROM_PX = 14;
 const TRACK_SHORT_PX = 12;
 /** Half the length of the tick that crosses the track line at the ring. */
 const CROSS_PX = 4;
-const DIAMOND_HALF_HEIGHT_PX = 6;
-const DIAMOND_HALF_WIDTH_PX = 4;
 
 /** Where the display stands in its box: the centre of the compass and the radii of its arc and ring. */
 export interface NdGeometry {
@@ -141,13 +139,6 @@ export function trackPath(g: NdGeometry, at: number): string {
   if (!onArc(at)) return '';
   const p = toward(g.cx, g.cy, at);
   return `M${p(TRACK_FROM_PX)}L${p(g.r - TRACK_SHORT_PX)}M${p(g.r2, -CROSS_PX)}L${p(g.r2, CROSS_PX)}`;
-}
-
-/** The diamond on the arc at the track, open; empty off the arc. */
-export function diamondPath(g: NdGeometry, at: number): string {
-  if (!onArc(at)) return '';
-  const p = toward(g.cx, g.cy, at);
-  return `M${p(g.r + DIAMOND_HALF_HEIGHT_PX)}L${p(g.r, DIAMOND_HALF_WIDTH_PX)}L${p(g.r - DIAMOND_HALF_HEIGHT_PX)}L${p(g.r, -DIAMOND_HALF_WIDTH_PX)}Z`;
 }
 
 /** The bug outline as (outward from the arc's radius, across): a notch in the foot, towards the arc. */
