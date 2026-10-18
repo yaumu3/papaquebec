@@ -22,3 +22,12 @@ export function verticalArrow(t: Track, now: number): '↑' | '↓' | undefined 
   }
   return rate > 0 ? '↑' : '↓';
 }
+
+/** Traffic within this range (NM) and relative altitude (ft) is proximate (RTCA DO-185B). */
+const PROXIMATE_NM = 6;
+const PROXIMATE_FT = 1200;
+
+/** Whether traffic is proximate or other, the edges included. */
+export function trafficKind(distanceNm: number, deltaFt: number): 'other' | 'proximate' {
+  return distanceNm <= PROXIMATE_NM && Math.abs(deltaFt) <= PROXIMATE_FT ? 'proximate' : 'other';
+}

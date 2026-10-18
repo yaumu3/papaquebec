@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { INSTRUMENT_SEC } from '../../../lib/reports';
 import { makeTrack } from '../../../render/scene/trackFixture';
-import { relativeAltitudeLabel, verticalArrow } from './traffic';
+import { relativeAltitudeLabel, trafficKind, verticalArrow } from './traffic';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
@@ -51,5 +51,25 @@ describe('verticalArrow', () => {
 
     // Assert
     expect(arrows).toEqual([undefined, '↑', undefined, '↓', undefined, undefined]);
+  });
+});
+
+describe('trafficKind', () => {
+  it('is proximate within 6 NM and 1,200 ft, the edges included', () => {
+    // Arrange
+    const rows: [number, number][] = [
+      [6, 0],
+      [6.01, 0],
+      [1, 1200],
+      [1, -1200],
+      [1, 1201],
+      [1, -1201],
+    ];
+
+    // Act
+    const kinds = rows.map(([nm, ft]) => trafficKind(nm, ft));
+
+    // Assert
+    expect(kinds).toEqual(['proximate', 'other', 'proximate', 'proximate', 'other', 'other']);
   });
 });
