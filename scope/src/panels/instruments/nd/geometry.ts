@@ -47,8 +47,12 @@ export function ndGeometry(w: number): NdGeometry {
 /** A number to a tenth of a pixel, as the drawing is. */
 const tenth = (n: number): number => Number(fixed(n));
 
+/** The radius in pixels that `nm` nautical miles reach at a range of `rangeNm`. */
+export const pxOf = (g: NdGeometry, nm: number, rangeNm: number): number => (nm * g.r) / rangeNm;
+
 /** The point `a` degrees clockwise of the top at radius `r`. */
-const point = (g: NdGeometry, a: number, r: number): [number, number] => offset(g.cx, g.cy, a)(r);
+export const ndPoint = (g: NdGeometry, a: number, r: number): [number, number] =>
+  offset(g.cx, g.cy, a)(r);
 
 /** An arc across the compass's span at radius `r`. */
 export function arcPath(g: NdGeometry, r: number): string {
@@ -94,7 +98,7 @@ export function compass(g: NdGeometry, orient: number): Compass {
     if (Math.abs(a) > LABEL_SPAN_DEG) continue;
     const tens = norm(b) / 10;
     const big = tens % 3 === 0;
-    const [x, y] = point(g, a, g.r - (big ? BIG_LABEL_INSET_PX : SMALL_LABEL_INSET_PX));
+    const [x, y] = ndPoint(g, a, g.r - (big ? BIG_LABEL_INSET_PX : SMALL_LABEL_INSET_PX));
     out.labels.push({ text: String(tens), x: tenth(x), y: tenth(y), big });
   }
   return out;
@@ -120,7 +124,7 @@ export function rangeAnchors(g: NdGeometry): {
   half: { x: number; y: number };
 } {
   const at = (r: number) => {
-    const [x, y] = point(g, -SPAN_DEG, r);
+    const [x, y] = ndPoint(g, -SPAN_DEG, r);
     return { x: tenth(x - RANGE_LABEL_GAP_PX), y: tenth(y) };
   };
   return { outer: at(g.r), half: at(g.r2) };
@@ -130,7 +134,7 @@ export function rangeAnchors(g: NdGeometry): {
 export const lastHeardY = (g: NdGeometry): number => g.cy - g.r2 - LAST_HEARD_RISE_PX;
 
 /** Whether a bearing, relative to the top, falls on the compass's arc. */
-const onArc = (rel: number): boolean => Math.abs(rel) <= SPAN_DEG;
+export const onArc = (rel: number): boolean => Math.abs(rel) <= SPAN_DEG;
 
 /** The track line, from near the aircraft to short of the arc, crossed at the half-range ring; empty off the arc. */
 export function trackPath(g: NdGeometry, at: number): string {
@@ -216,7 +220,7 @@ export function trendPoints(
   trend: Trend,
   rangeNm: number,
 ): [number, number][] {
-  const pxPerSec = ((trend.gsKt / 3600) * g.r) / rangeNm;
+  const pxPerSec = pxOf(g, trend.gsKt / 3600, rangeNm);
   let x = g.cx;
   let y = g.cy - TREND_FROM_PX;
   const points: [number, number][] = [];
@@ -246,7 +250,7 @@ const LEVEL_OFF_HALF_SPAN_DEG = 11;
 
 /** The arc across the track at the distance a climb or descent will level off at; empty when it falls outside the compass. */
 export function levelOffPath(g: NdGeometry, at: number, nm: number, rangeNm: number): string {
-  const rpx = (nm * g.r) / rangeNm;
+  const rpx = pxOf(g, nm, rangeNm);
   if (rpx <= LEVEL_OFF_MIN_PX || rpx >= g.r) return '';
   const from = toward(g.cx, g.cy, at - LEVEL_OFF_HALF_SPAN_DEG)(rpx);
   const to = toward(g.cx, g.cy, at + LEVEL_OFF_HALF_SPAN_DEG)(rpx);
