@@ -40,7 +40,7 @@ describe('ndGeometry', () => {
 });
 
 describe('arcPath', () => {
-  it('runs from 55° left of the top to 55° right of it', () => {
+  it('runs from 75° left of the top to 75° right of it', () => {
     // Arrange
     const g = ndGeometry(346);
 
@@ -48,7 +48,7 @@ describe('arcPath', () => {
     const path = arcPath(g, g.r);
 
     // Assert
-    expect(path).toBe('M50.9 103.5A149.0 149.0 0 0 1 295.1 103.5');
+    expect(path).toBe('M29.1 150.4A149.0 149.0 0 0 1 316.9 150.4');
   });
 
   it('draws the half-range ring on the same span at half the radius', () => {
@@ -74,7 +74,7 @@ describe('compass', () => {
     const marks = compass(g, orient);
 
     // Assert
-    expect([segments(marks.major), segments(marks.minor)]).toEqual([11, 12]);
+    expect([segments(marks.major), segments(marks.minor)]).toEqual([15, 16]);
   });
 
   it('labels the tens in tens of degrees, the multiples of three large', () => {
@@ -86,6 +86,8 @@ describe('compass', () => {
 
     // Assert
     expect(marks.labels.map((l) => l.text)).toEqual([
+      '28',
+      '29',
       '30',
       '31',
       '32',
@@ -97,8 +99,16 @@ describe('compass', () => {
       '2',
       '3',
       '4',
+      '5',
+      '6',
     ]);
-    expect(marks.labels.filter((l) => l.big).map((l) => l.text)).toEqual(['30', '33', '0', '3']);
+    expect(marks.labels.filter((l) => l.big).map((l) => l.text)).toEqual([
+      '30',
+      '33',
+      '0',
+      '3',
+      '6',
+    ]);
   });
 
   it('places a label inside the arc, further in for a large one', () => {
@@ -109,10 +119,10 @@ describe('compass', () => {
     const [first] = compass(g, orient).labels;
 
     // Assert
-    expect([first?.x, first?.y]).toEqual([75.7, 107.4]);
+    expect([first?.x, first?.y]).toEqual([50.8, 144.5]);
   });
 
-  it('leaves out the labels past 50° and keeps their ticks', () => {
+  it('leaves out the labels past 70° and keeps their ticks', () => {
     // Arrange
     const orient = 345;
 
@@ -121,6 +131,8 @@ describe('compass', () => {
 
     // Assert
     expect(marks.labels.map((l) => l.text)).toEqual([
+      '28',
+      '29',
       '30',
       '31',
       '32',
@@ -131,8 +143,10 @@ describe('compass', () => {
       '1',
       '2',
       '3',
+      '4',
+      '5',
     ]);
-    expect(segments(marks.major)).toBe(12);
+    expect(segments(marks.major)).toBe(16);
   });
 });
 
@@ -146,7 +160,7 @@ describe('anchors', () => {
 
     // Assert
     expect(out).toEqual({
-      ranges: { outer: { x: 46.9, y: 103.5 }, half: { x: 108, y: 146.3 } },
+      ranges: { outer: { x: 25.1, y: 150.4 }, half: { x: 97, y: 169.7 } },
       lastHeard: 106.5,
     });
   });
@@ -195,7 +209,7 @@ describe('track line and diamond', () => {
 
   it('draws neither where the track is off the arc', () => {
     // Arrange
-    const at = 70;
+    const at = 80;
 
     // Act
     const paths = [trackPath(g, at), diamondPath(g, at)];
@@ -220,7 +234,7 @@ describe('bugPath', () => {
 
   it('draws the whole bug, closed, at its bearing while that is on the arc', () => {
     // Arrange
-    const rels = [0, 30, -55, 55];
+    const rels = [0, 30, -75, 75];
 
     // Act
     const paths = rels.map((rel) => bugPath(g, rel));
@@ -247,10 +261,10 @@ describe('bugPath', () => {
       [false, 5],
     ]);
     const [right, left] = paths.map((p) => vertices(p).map((v) => bearingOf(g, v)));
-    expect(Math.max(...(right ?? []))).toBeCloseTo(55, 1);
-    expect(Math.max(...(right ?? []).map(Math.abs))).toBeLessThan(55.1);
-    expect(Math.min(...(left ?? []))).toBeCloseTo(-55, 1);
-    expect(Math.max(...(left ?? []).map(Math.abs))).toBeLessThan(55.1);
+    expect(Math.max(...(right ?? []))).toBeCloseTo(75, 1);
+    expect(Math.max(...(right ?? []).map(Math.abs))).toBeLessThan(75.1);
+    expect(Math.min(...(left ?? []))).toBeCloseTo(-75, 1);
+    expect(Math.max(...(left ?? []).map(Math.abs))).toBeLessThan(75.1);
   });
 
   it('parks the same however far off the arc the bearing is', () => {
