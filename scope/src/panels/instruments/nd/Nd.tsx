@@ -8,6 +8,7 @@ import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
 import { trackWidth } from '../../../ui/size';
+import { glided } from '../glide';
 import {
   aircraftPath,
   arcPath,
@@ -27,7 +28,7 @@ import {
   trendPoints,
   windArrowPath,
 } from './geometry';
-import { ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
+import { boxOf, ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
 import { ndTraffic, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
@@ -69,12 +70,14 @@ export function Nd(props: { t: Track }) {
   const g = createMemo(() => ndGeometry(width()));
   const frame = createMemo(() => ndFrame(props.t, trackStore.stats.now));
   const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
-  const marks = createMemo(() => compass(g(), frame().orient));
+  const key = () => props.t.hex;
+  const orient = glided(() => frame().orient, { wrap: 360, key });
+  const marks = createMemo(() => compass(g(), orient()));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
   const anchors = createMemo(() => rangeAnchors(g()));
   const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
   const relative = (deg: number | undefined) =>
-    deg === undefined ? undefined : turn(frame().orient, deg);
+    deg === undefined ? undefined : turn(orient(), deg);
   const track = createMemo(() => {
     const rel = relative(symbols().track);
     return rel === undefined
@@ -216,7 +219,7 @@ export function Nd(props: { t: Track }) {
         </div>
         <div class={s.top}>
           <span class={cx(s.label, s.modeLabel)}>{frame().label}</span>
-          <span class={s.box}>{frame().box}</span>
+          <span class={s.box}>{boxOf(frame().mode, orient())}</span>
           <span class={s.label}>MAG</span>
         </div>
         <Show when={frame().lastHeard}>
