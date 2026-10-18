@@ -132,3 +132,62 @@ export function trafficAround(
   }
   return placed;
 }
+
+/** How far the label stands above or below the symbol's centre, and the arrow right of it, in pixels. */
+const LABEL_OFFSET_PX = 12;
+const ARROW_GAP_PX = 9;
+
+export type TrafficKind = 'other' | 'proximate' | 'threat';
+
+/** A symbol to draw: its kind and centre, the label centred on its own point and the arrow from its left edge. */
+export interface TrafficSymbol {
+  kind: TrafficKind;
+  x: number;
+  y: number;
+  label?: { text: string; x: number; y: number } | undefined;
+  arrow?: { glyph: '↑' | '↓'; x: number; y: number } | undefined;
+}
+
+/** What the ND draws of the traffic: the symbols in paint order, and the annunciations. */
+export interface NdTraffic {
+  symbols: TrafficSymbol[];
+  traffic: boolean;
+  offscale: boolean;
+}
+
+const NONE: NdTraffic = { symbols: [], traffic: false, offscale: false };
+
+/** The symbol of placed traffic of a kind, with the label of its altitude and the arrow of its rate. */
+function symbolOf(kind: TrafficKind, p: Placed, now: number): TrafficSymbol {
+  const below = hundredsOf(p.deltaFt) < 0;
+  const arrow = verticalArrow(p.track, now);
+  return {
+    kind,
+    x: p.x,
+    y: p.y,
+    label: {
+      text: relativeAltitudeLabel(p.deltaFt),
+      x: p.x,
+      y: p.y + (below ? LABEL_OFFSET_PX : -LABEL_OFFSET_PX),
+    },
+    arrow: arrow && { glyph: arrow, x: p.x + ARROW_GAP_PX, y: p.y },
+  };
+}
+
+/** The traffic the display draws around own ship, none on a lost or blank display. */
+export function ndTraffic(
+  own: Track,
+  others: Iterable<Track>,
+  now: number,
+  view: NdView,
+): NdTraffic {
+  if (view.frame.mode === 'lost' || view.frame.mode === 'blank') return NONE;
+  const placed = trafficAround(own, others, now, view).map((p) => ({
+    kind: trafficKind(p.distanceNm, p.deltaFt),
+    p,
+  }));
+  const symbols = (['other', 'proximate'] as const).flatMap((kind) =>
+    placed.filter((t) => t.kind === kind).map((t) => symbolOf(kind, t.p, now)),
+  );
+  return { symbols, traffic: false, offscale: false };
+}

@@ -7,8 +7,10 @@ import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
 import type { Track } from '../../../state/track';
 import { ndGeometry, pxOf } from './geometry';
+import type { NdFrame } from './readout';
 import {
   nearOnPlane,
+  ndTraffic,
   relativeAltitudeLabel,
   trafficAround,
   trafficKind,
@@ -127,8 +129,8 @@ const traffic = (
   });
 };
 
-const view = (orient = 0, rangeNm = 20) => ({
-  frame: { mode: 'heading' as const, orient },
+const view = (orient = 0, rangeNm = 20, mode: NdFrame['mode'] = 'heading') => ({
+  frame: { mode, orient },
   rangeNm,
   g: G,
 });
@@ -270,5 +272,71 @@ describe('nearOnPlane', () => {
 
     // Assert
     expect(near).toEqual([true, false, true]);
+  });
+});
+
+describe('ndTraffic', () => {
+  it('lists the other traffic before the proximate, whatever the order it came in', () => {
+    // Arrange
+    const others = [traffic('near', 10, 3), traffic('far', 20, 10)];
+
+    // Act
+    const result = ndTraffic(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(result.symbols.map((s) => s.kind)).toEqual(['other', 'proximate']);
+  });
+
+  it('puts the label 12 px above traffic above or level, 12 px below traffic below', () => {
+    // Arrange
+    const others = [
+      traffic('above', 0, 10, { alt: 31100 }),
+      traffic('level', 20, 10, { alt: 29960 }),
+      traffic('below', 40, 10, { alt: 29100 }),
+    ];
+
+    // Act
+    const result = ndTraffic(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(result.symbols.map((s) => [s.label?.text, (s.label?.y ?? 0) - s.y])).toEqual([
+      ['+11', -12],
+      ['+00', -12],
+      ['-09', 12],
+    ]);
+    expect(result.symbols.map((s) => (s.label?.x ?? 0) - s.x)).toEqual([0, 0, 0]);
+  });
+
+  it('puts the arrow 9 px right of the symbol at its height, when the rate calls for one', () => {
+    // Arrange
+    const held = { position: FRESH, alt: FRESH, verticalRate: FRESH };
+    const others = [
+      traffic('climbing', 0, 10, { verticalRate: 1500, heard: held }),
+      traffic('level', 20, 10),
+    ];
+
+    // Act
+    const result = ndTraffic(ownShip(), others, NOW, view());
+
+    // Assert
+    const arrows = result.symbols.map(
+      (s) => s.arrow && [s.arrow.glyph, s.arrow.x - s.x, s.arrow.y - s.y],
+    );
+    expect(arrows).toEqual([['↑', 9, 0], undefined]);
+  });
+
+  it('draws nothing on a display that is lost or blank', () => {
+    // Arrange
+    const others = [traffic('a', 0, 5)];
+    const frames = (['lost', 'blank'] as const).map((mode) => view(0, 20, mode));
+
+    // Act
+    const results = frames.map((v) => ndTraffic(ownShip(), others, NOW, v));
+
+    // Assert
+    expect(results).toEqual([
+      { symbols: [], traffic: false, offscale: false },
+      { symbols: [], traffic: false, offscale: false },
+    ]);
   });
 });
