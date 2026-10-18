@@ -134,7 +134,7 @@ const traffic = (
   });
 };
 
-const view = (orient = 0, rangeNm = 20, mode: NdFrame['mode'] = 'heading') => ({
+const view = (orient = 0, rangeNm = 20, mode: NdFrame['mode'] = 'track') => ({
   frame: { mode, orient },
   rangeNm,
   g: G,
