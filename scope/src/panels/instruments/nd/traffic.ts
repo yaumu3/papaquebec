@@ -190,19 +190,24 @@ function placeThreat(own: Track, threat: Track | undefined, now: number, view: N
 
 const NONE: NdTraffic = { symbols: [], traffic: false, offscale: false };
 
+/** The label of a relative altitude for a symbol centred at (x, y): above it, or below it for traffic below. */
+function labelOf(x: number, y: number, deltaFt: number): TrafficSymbol['label'] {
+  const below = hundredsOf(deltaFt) < 0;
+  return {
+    text: relativeAltitudeLabel(deltaFt),
+    x,
+    y: y + (below ? LABEL_OFFSET_PX : -LABEL_OFFSET_PX),
+  };
+}
+
 /** The symbol of placed traffic of a kind, with the label of its altitude and the arrow of its rate. */
 function symbolOf(kind: TrafficKind, p: Placed, now: number): TrafficSymbol {
-  const below = hundredsOf(p.deltaFt) < 0;
   const arrow = verticalArrow(p.track, now);
   return {
     kind,
     x: p.x,
     y: p.y,
-    label: {
-      text: relativeAltitudeLabel(p.deltaFt),
-      x: p.x,
-      y: p.y + (below ? LABEL_OFFSET_PX : -LABEL_OFFSET_PX),
-    },
+    label: labelOf(p.x, p.y, p.deltaFt),
     arrow: arrow && { glyph: arrow, x: p.x + ARROW_GAP_PX, y: p.y },
   };
 }
