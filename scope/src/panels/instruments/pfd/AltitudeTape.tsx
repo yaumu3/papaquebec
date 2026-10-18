@@ -30,10 +30,8 @@ export interface AltitudeView {
   digits: AltitudeDigits;
 }
 
-export function altitudeView(g: PfdGeometry, read: PfdAltitude): AltitudeView | undefined {
-  if (read.kind !== 'feet') return undefined;
-  return { ft: read.ft, tape: altitudeTape(g, read.ft), digits: altitudeDigits(read.ft) };
-}
+export const altitudeView = (g: PfdGeometry, ft: number | undefined): AltitudeView | undefined =>
+  ft === undefined ? undefined : { ft, tape: altitudeTape(g, ft), digits: altitudeDigits(ft) };
 
 /** The hatch: stripes falling to the right, in a block centred in a digit cell, as tall as a capital. */
 function Hatch() {

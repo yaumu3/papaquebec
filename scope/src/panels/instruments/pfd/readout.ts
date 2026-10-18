@@ -87,6 +87,10 @@ export function pfdFma(t: Readout & Pick<Track, 'samples'>, now: number): PfdFma
 /** What the altitude tape reads: feet as the crew reads them, the ground, or the ALT flag. */
 export type PfdAltitude = { kind: 'feet'; ft: number } | { kind: 'ground' } | { kind: 'flag' };
 
+/** The feet of an altitude read in feet; none of the ground or a flag. */
+export const feetOf = (read: PfdAltitude): number | undefined =>
+  read.kind === 'feet' ? read.ft : undefined;
+
 export interface PfdReadouts {
   /** The speed in knots; undefined for the SPD flag. */
   ias: number | undefined;

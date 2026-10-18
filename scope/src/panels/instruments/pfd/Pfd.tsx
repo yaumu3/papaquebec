@@ -6,11 +6,12 @@ import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
 import { trackWidth } from '../../../ui/size';
 import { isLost } from '../freshness';
+import { glided } from '../glide';
 import { AltitudeMarks, AltitudeText, altitudeView, targetOf } from './AltitudeTape';
 import { AttitudeMarks, AttitudeText, attitudeView } from './Attitude';
 import { FmaMarks, FmaText } from './Fma';
 import { pfdGeometry, vsiScale } from './geometry';
-import { pfdFma, pfdReadouts } from './readout';
+import { feetOf, pfdFma, pfdReadouts } from './readout';
 import { SpeedMarks, SpeedText, speedView } from './SpeedTape';
 import { needleView, VsiMarks, VsiText } from './Vsi';
 
@@ -24,12 +25,16 @@ export function Pfd(props: { t: Track }) {
   const lost = createMemo(() => isLost(props.t));
   const r = createMemo(() => pfdReadouts(props.t, trackStore.stats.now, settings.altimeter));
   const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
-  const speed = createMemo(() => speedView(g(), r().ias));
+  const key = () => props.t.hex;
+  const ias = glided(() => r().ias, { key });
+  const feet = glided(() => feetOf(r().altitude), { key });
+  const vs = glided(() => r().vs, { key });
+  const speed = createMemo(() => speedView(g(), ias()));
   const attitude = createMemo(() => attitudeView(g(), r()));
-  const altitude = createMemo(() => altitudeView(g(), r().altitude));
+  const altitude = createMemo(() => altitudeView(g(), feet()));
   const sel = createMemo(() => targetOf(r().selAlt));
   const fms = createMemo(() => targetOf(r().fmsAlt));
-  const needle = createMemo(() => needleView(g(), r().vs));
+  const needle = createMemo(() => needleView(g(), vs()));
   const scale = createMemo(() => vsiScale(g()));
   return (
     <div
