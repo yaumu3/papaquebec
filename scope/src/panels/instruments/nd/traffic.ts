@@ -88,6 +88,17 @@ export function nearOnPlane(
   return Math.hypot(b.x - a.x, b.y - a.y) <= limitNm * PLANE_MARGIN;
 }
 
+/** The pixel at `rel` degrees off the top and `distanceNm` out, or nothing outside the arc or beyond the range. */
+function pointOnDisplay(
+  view: NdView,
+  rel: number,
+  distanceNm: number,
+): [number, number] | undefined {
+  const { g, rangeNm } = view;
+  const radius = pxOf(g, distanceNm, rangeNm);
+  return onArc(rel) && radius <= g.r - EDGE_PX ? ndPoint(g, rel, radius) : undefined;
+}
+
 /** The track's place on the display, or nothing when it lies outside the arc or beyond the range. */
 function placeOnDisplay(
   own: Origin,
@@ -96,14 +107,11 @@ function placeOnDisplay(
   at: LivePosition,
   view: NdView,
 ): Placed | undefined {
-  const { g, rangeNm, frame } = view;
   const { distanceNm, bearingTrue } = inverse(own.position, at);
   const coincident = distanceNm === 0 || Number.isNaN(bearingTrue);
-  const rel = coincident ? 0 : turn(frame.orient, magneticBearing(bearingTrue, own.at));
-  const radius = pxOf(g, distanceNm, rangeNm);
-  if (!onArc(rel) || radius > g.r - EDGE_PX) return undefined;
-  const [x, y] = ndPoint(g, rel, radius);
-  return { track: t, x, y, distanceNm, deltaFt: alt - own.alt };
+  const rel = coincident ? 0 : turn(view.frame.orient, magneticBearing(bearingTrue, own.at));
+  const point = pointOnDisplay(view, rel, distanceNm);
+  return point && { track: t, x: point[0], y: point[1], distanceNm, deltaFt: alt - own.alt };
 }
 
 /** Own ship as the traffic is measured from, when it holds a position and an altitude. */
