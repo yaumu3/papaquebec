@@ -231,6 +231,23 @@ interface Estimate {
 }
 
 /**
+ * Whether the threat named by its address lies where the display does not reach. Only a held
+ * position of its own and of own ship says so; its altitude does not matter.
+ */
+function addressOffscale(
+  own: Track,
+  threat: Track | undefined,
+  now: number,
+  view: NdView,
+): boolean {
+  const from = heldPosition(own, now);
+  const at = threat && heldPosition(threat, now);
+  if (!from || !at) return false;
+  const { rel, distanceNm } = polarOf(from, own.at, at, view);
+  return !pointOnDisplay(view, rel, distanceNm);
+}
+
+/**
  * The threat given by range and bearing from own ship's heading, as the aircraft estimates it.
  * It needs a held heading to turn the bearing to the display, not own ship's position.
  */
@@ -242,6 +259,12 @@ function estimateOf(own: Track, now: number, view: NdView): Estimate | undefined
   if (own.heading === undefined || !holdsAll(own, ['heading'], now)) return undefined;
   const rel = turn(view.frame.orient, own.heading + bearing);
   return { rel, rangeNm: range, altitude };
+}
+
+/** Whether the threat given by range and bearing, with a held heading, lies where the display does not reach. */
+function estimateOffscale(own: Track, now: number, view: NdView): boolean {
+  const estimate = estimateOf(own, now, view);
+  return !!estimate && !pointOnDisplay(view, estimate.rel, estimate.rangeNm);
 }
 
 /** The symbol of the threat given by position, labelled when both its altitude and own ship's are known. */
@@ -276,14 +299,11 @@ export function ndTraffic(
   const symbols = (['other', 'proximate'] as const).flatMap((kind) =>
     placed.filter((t) => t.kind === kind).map((t) => symbolOf(kind, t.p, now)),
   );
-  const threat = placeThreat(
-    own,
-    all.find((t) => t.hex === address),
-    now,
-    view,
-  );
+  const threatTrack = all.find((t) => t.hex === address);
+  const threat = placeThreat(own, threatTrack, now, view);
   if (threat) symbols.push(symbolOf('threat', threat, now));
   const byPosition = threatByPosition(own, now, view);
   if (byPosition) symbols.push(byPosition);
-  return { symbols, traffic: advisoryActive(own.ra), offscale: false };
+  const offscale = addressOffscale(own, threatTrack, now, view) || estimateOffscale(own, now, view);
+  return { symbols, traffic: advisoryActive(own.ra), offscale };
 }

@@ -330,7 +330,10 @@ describe('ndTraffic', () => {
   it('draws nothing, and annunciates nothing, on a display that is lost or blank', () => {
     // Arrange
     const own = ownShip({ ra: advisory({ address: 'thr' }) });
-    const rows = [[traffic('thr', 10, 4), traffic('a', 0, 5)]];
+    const rows = [
+      [traffic('thr', 10, 4), traffic('a', 0, 5)],
+      [traffic('thr', 0, 30), traffic('a', 0, 5)],
+    ];
     const frames = (['lost', 'blank'] as const).map((mode) => view(0, 20, mode));
     const none = { symbols: [], traffic: false, offscale: false };
 
@@ -338,7 +341,7 @@ describe('ndTraffic', () => {
     const results = frames.flatMap((v) => rows.map((others) => ndTraffic(own, others, NOW, v)));
 
     // Assert
-    expect(results).toEqual(Array.from({ length: 2 }, () => none));
+    expect(results).toEqual(Array.from({ length: 4 }, () => none));
   });
 });
 
@@ -488,5 +491,53 @@ describe('ndTraffic threat by position', () => {
 
     // Assert
     expect(results.map((r) => r.symbols.map((s) => s.label))).toEqual([[undefined], [undefined]]);
+  });
+});
+
+describe('ndTraffic offscale', () => {
+  const HELD = { position: FRESH, alt: FRESH, heading: FRESH };
+  const own = (threat: Threat | undefined, over: Partial<Track> = {}, terminated = false): Track =>
+    ownShip({ heading: 0, heard: HELD, ra: threat && advisory(threat, terminated), ...over });
+
+  it('is annunciated for a threat with a known position that falls outside what is drawn', () => {
+    // Arrange
+    const rows: [Track, Track[], ReturnType<typeof view>][] = [
+      [own({ address: 't' }), [traffic('t', 0, 12.5)], view(0, 10)],
+      [own({ address: 't' }), [traffic('t', 0, 60)], view(0, 10)],
+      [own({ address: 't' }), [traffic('t', 60, 5)], view(0, 10)],
+      [own({ range: 15, bearing: 20 }), [], view(0, 10)],
+      [own({ address: 't' }, { heading: undefined }), [traffic('t', 0, 12.5)], view(0, 10)],
+    ];
+
+    // Act
+    const results = rows.map(([o, others, v]) => ndTraffic(o, others, NOW, v).offscale);
+
+    // Assert
+    expect(results).toEqual([true, true, true, true, true]);
+  });
+
+  it('is not annunciated for a threat that is drawn, cannot be placed or is not active', () => {
+    // Arrange
+    const rows: [Track, Track[], ReturnType<typeof view>][] = [
+      [own({ address: 't' }), [traffic('t', 0, 12.5)], view(0, 20)],
+      [own({ address: 't' }), [traffic('t', 0, 5, { alt: 33100 })], view(0, 10)],
+      [own({ address: 'ghost' }), [traffic('t', 0, 12.5)], view(0, 10)],
+      [own({ range: 15, bearing: 20 }, { heading: undefined }), [], view(0, 10)],
+      [
+        own({ range: 15, bearing: 20 }, { heard: { ...HELD, heading: NOW - INSTRUMENT_SEC } }),
+        [],
+        view(0, 10),
+      ],
+      [own({ address: 't' }, {}, true), [traffic('t', 0, 12.5)], view(0, 10)],
+      [own(undefined), [traffic('t', 0, 12.5)], view(0, 10)],
+      [own({ address: 't' }, { position: { kind: 'none' } }), [traffic('t', 0, 12.5)], view(0, 10)],
+      [own({ address: 't' }), [traffic('t', 0, 12.5, { position: { kind: 'none' } })], view(0, 10)],
+    ];
+
+    // Act
+    const results = rows.map(([o, others, v]) => ndTraffic(o, others, NOW, v).offscale);
+
+    // Assert
+    expect(results).toEqual(rows.map(() => false));
   });
 });
