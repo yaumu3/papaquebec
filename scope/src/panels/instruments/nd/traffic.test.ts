@@ -1,8 +1,19 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
+import { direct } from '../../../lib/geodesic';
 import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
-import { relativeAltitudeLabel, trafficKind, verticalArrow } from './traffic';
+import { setDeclinationAt } from '../../../state/magnetic';
+import type { Track } from '../../../state/track';
+import { ndGeometry, pxOf } from './geometry';
+import {
+  nearOnPlane,
+  relativeAltitudeLabel,
+  trafficAround,
+  trafficKind,
+  verticalArrow,
+} from './traffic';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
@@ -71,5 +82,193 @@ describe('trafficKind', () => {
 
     // Assert
     expect(kinds).toEqual(['proximate', 'other', 'proximate', 'proximate', 'other', 'other']);
+  });
+});
+
+const OWN_AT = { lat: 35.55, lon: 139.78 };
+const G = ndGeometry(346);
+const EDGE_NM = (20 * (G.r - 4)) / G.r;
+
+afterEach(() => {
+  setDeclinationAt(() => () => 0);
+});
+
+const ownShip = (over: Partial<Track> = {}): Track =>
+  makeTrack({
+    hex: 'own',
+    alt: 30000,
+    at: OWN_AT,
+    position: { kind: 'live', ...OWN_AT, x: 0, y: 0 },
+    heard: { position: FRESH, alt: FRESH },
+    ...over,
+  });
+
+/** Traffic `nm` from own ship on the true bearing, with the plane's x/y set to match, stretched by `stretch`. */
+const traffic = (
+  hex: string,
+  bearing: number,
+  nm: number,
+  over: Partial<Track> = {},
+  stretch = 1,
+): Track => {
+  const p = direct(OWN_AT, bearing, nm);
+  return makeTrack({
+    hex,
+    alt: 30000,
+    at: p,
+    position: {
+      kind: 'live',
+      ...p,
+      x: nm * stretch * Math.sin(bearing * RAD),
+      y: nm * stretch * Math.cos(bearing * RAD),
+    },
+    heard: { position: FRESH, alt: FRESH },
+    ...over,
+  });
+};
+
+const view = (orient = 0, rangeNm = 20) => ({
+  frame: { mode: 'heading' as const, orient },
+  rangeNm,
+  g: G,
+});
+const hexes = (placed: { track: Track }[]): string[] => placed.map((p) => p.track.hex);
+
+describe('trafficAround', () => {
+  it('keeps traffic within 2,700 ft of own ship and drops what is further', () => {
+    // Arrange
+    const others = [
+      traffic('up', 0, 5, { alt: 32700 }),
+      traffic('down', 0, 5, { alt: 27300 }),
+      traffic('high', 0, 5, { alt: 32701 }),
+      traffic('low', 0, 5, { alt: 27299 }),
+    ];
+
+    // Act
+    const placed = trafficAround(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(hexes(placed)).toEqual(['up', 'down']);
+  });
+
+  it('drops ground traffic, an altitude not held, a stale or absent position, and own ship', () => {
+    // Arrange
+    const others = [
+      traffic('ground', 0, 5, { alt: 'ground' }),
+      traffic('noalt', 0, 5, { heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
+      traffic('stale', 0, 5, { heard: { position: NOW - INSTRUMENT_SEC, alt: FRESH } }),
+      traffic('nowhere', 0, 5, { position: { kind: 'none' } }),
+      traffic('own', 0, 5),
+      traffic('kept', 0, 5),
+    ];
+
+    // Act
+    const placed = trafficAround(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(hexes(placed)).toEqual(['kept']);
+  });
+
+  it('keeps what lies inside the arc and the range and drops what lies outside', () => {
+    // Arrange
+    const others = [
+      traffic('arc-in', 54.9, 5),
+      traffic('arc-out', 55.1, 5),
+      traffic('arc-out-left', 304.9, 5),
+      traffic('range-in', 0, EDGE_NM - 0.01),
+      traffic('range-out', 0, EDGE_NM + 0.01),
+    ];
+
+    // Act
+    const placed = trafficAround(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(hexes(placed)).toEqual(['arc-in', 'range-in']);
+  });
+
+  it('draws nothing from an own ship without a position, an altitude held or the air', () => {
+    // Arrange
+    const owns = [
+      ownShip({ position: { kind: 'none' } }),
+      ownShip({ heard: { position: NOW - INSTRUMENT_SEC, alt: FRESH } }),
+      ownShip({ alt: 'ground' }),
+      ownShip({ heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
+    ];
+    const others = [traffic('a', 0, 5)];
+
+    // Act
+    const placed = owns.map((own) => trafficAround(own, others, NOW, view()));
+
+    // Assert
+    expect(placed.map(hexes)).toEqual([[], [], [], []]);
+  });
+
+  it('places traffic by the magnetic bearing relative to the top, at the scale of the range', () => {
+    // Arrange
+    setDeclinationAt(() => () => 7);
+    const others = [traffic('ahead', 97, 5)];
+
+    // Act
+    const [first] = trafficAround(ownShip(), others, NOW, view(90));
+
+    // Assert
+    expect(first?.x).toBeCloseTo(G.cx, 3);
+    expect(first?.y).toBeCloseTo(G.cy - pxOf(G, 5, 20), 3);
+  });
+
+  it('puts traffic at own ship exactly at the centre, not at NaN', () => {
+    // Arrange
+    const others = [
+      traffic('same', 0, 5, { at: OWN_AT, position: { kind: 'live', ...OWN_AT, x: 0, y: 0 } }),
+    ];
+
+    // Act
+    const [first] = trafficAround(ownShip(), others, NOW, view(123));
+
+    // Assert
+    expect([first?.x, first?.y]).toEqual([G.cx, G.cy]);
+  });
+
+  it('keeps traffic the geodesic holds although the plane puts it past the range', () => {
+    // Arrange
+    const edge = EDGE_NM - 0.01;
+    const stretched = traffic('far', 0, edge, {}, 1.05);
+
+    // Act
+    const [first] = trafficAround(ownShip(), [stretched], NOW, view());
+
+    // Assert
+    expect(first?.x).toBeCloseTo(G.cx, 3);
+    expect(first?.y).toBeCloseTo(G.cy - pxOf(G, edge, 20), 3);
+  });
+
+  it('reports the distance and the relative altitude of what it places', () => {
+    // Arrange
+    const others = [traffic('a', 0, 5, { alt: 29600 })];
+
+    // Act
+    const [first] = trafficAround(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(first?.distanceNm).toBeCloseTo(5, 3);
+    expect(first?.deltaFt).toBe(-400);
+  });
+});
+
+describe('nearOnPlane', () => {
+  it('keeps a target a little past the limit and drops one far past it', () => {
+    // Arrange
+    const own = { x: 0, y: 0 };
+    const rows = [
+      { x: 0, y: 21 },
+      { x: 0, y: 40 },
+      { x: -21, y: 0 },
+    ];
+
+    // Act
+    const near = rows.map((b) => nearOnPlane(own, b, 20));
+
+    // Assert
+    expect(near).toEqual([true, false, true]);
   });
 });
