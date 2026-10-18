@@ -212,6 +212,25 @@ function symbolOf(kind: TrafficKind, p: Placed, now: number): TrafficSymbol {
   };
 }
 
+/**
+ * The threat given by range and bearing from own ship's heading, as the aircraft estimates it.
+ * It needs a held heading to turn the bearing to the display, not own ship's position; its
+ * label needs both its altitude and own ship's held altitude.
+ */
+function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol | undefined {
+  const threat = advisoryActive(own.ra) ? own.ra.threat : undefined;
+  if (!threat || !('range' in threat) || !('bearing' in threat)) return undefined;
+  const { range, bearing, altitude } = threat;
+  if (range === undefined || bearing === undefined) return undefined;
+  if (own.heading === undefined || !holdsAll(own, ['heading'], now)) return undefined;
+  const point = pointOnDisplay(view, turn(view.frame.orient, own.heading + bearing), range);
+  if (!point) return undefined;
+  const [x, y] = point;
+  const ownAlt = heldAltitude(own, now);
+  const known = altitude !== undefined && ownAlt !== undefined;
+  return { kind: 'threat', x, y, label: known ? labelOf(x, y, altitude - ownAlt) : undefined };
+}
+
 /** The traffic the display draws around own ship, none on a lost or blank display. */
 export function ndTraffic(
   own: Track,
@@ -238,5 +257,7 @@ export function ndTraffic(
     view,
   );
   if (threat) symbols.push(symbolOf('threat', threat, now));
+  const byPosition = threatByPosition(own, now, view);
+  if (byPosition) symbols.push(byPosition);
   return { symbols, traffic: advisoryActive(own.ra), offscale: false };
 }

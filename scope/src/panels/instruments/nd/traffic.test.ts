@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import type { ResolutionAdvisory, Threat } from '../../../lib/acas';
+import { turn } from '../../../lib/geo';
 import { direct } from '../../../lib/geodesic';
 import { INSTRUMENT_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
 import type { Track } from '../../../state/track';
-import { ndGeometry, pxOf } from './geometry';
+import { ndGeometry, ndPoint, pxOf } from './geometry';
 import type { NdFrame } from './readout';
 import {
   nearOnPlane,
@@ -414,5 +415,78 @@ describe('ndTraffic threat by address', () => {
     // Assert
     expect(result.symbols).toEqual([]);
     expect(result.traffic).toBe(true);
+  });
+});
+
+describe('ndTraffic threat by position', () => {
+  const HELD = { position: FRESH, alt: FRESH, heading: FRESH };
+  const byPosition = (threat: Threat, over: Partial<Track> = {}): Track =>
+    ownShip({ heading: 152, heard: HELD, ra: advisory(threat), ...over });
+
+  it('places it at its range, on its bearing from the heading, with the label of its altitude', () => {
+    // Arrange
+    const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
+    const [x, y] = ndPoint(G, turn(150, 152 + 20), pxOf(G, 3, 20));
+
+    // Act
+    const result = ndTraffic(own, [], NOW, view(150));
+
+    // Assert
+    expect(result.symbols.map((s) => [s.kind, s.x, s.y, s.label?.text])).toEqual([
+      ['threat', x, y, '-04'],
+    ]);
+    expect(result.traffic).toBe(true);
+  });
+
+  it('places nothing without a held heading, nor without a range or a bearing, but still TRAFFIC', () => {
+    // Arrange
+    const owns = [
+      byPosition({ range: 3, bearing: 20 }, { heard: { ...HELD, heading: NOW - INSTRUMENT_SEC } }),
+      byPosition(
+        { range: 3, bearing: 20 },
+        { heading: undefined, heard: { position: FRESH, alt: FRESH } },
+      ),
+      byPosition({ bearing: 20 }),
+      byPosition({ range: 3 }),
+    ];
+
+    // Act
+    const results = owns.map((own) => ndTraffic(own, [], NOW, view(150)));
+
+    // Assert
+    expect(results.map((r) => [r.symbols, r.traffic])).toEqual([
+      [[], true],
+      [[], true],
+      [[], true],
+      [[], true],
+    ]);
+  });
+
+  it('places it without own ship held position', () => {
+    // Arrange
+    const own = byPosition({ range: 3, bearing: 20 }, { position: { kind: 'none' } });
+
+    // Act
+    const result = ndTraffic(own, [], NOW, view(150));
+
+    // Assert
+    expect(result.symbols.map((s) => s.kind)).toEqual(['threat']);
+  });
+
+  it('gives no label without the threat altitude or without own altitude held', () => {
+    // Arrange
+    const owns = [
+      byPosition({ range: 3, bearing: 20 }),
+      byPosition(
+        { range: 3, bearing: 20, altitude: 29600 },
+        { heard: { ...HELD, alt: NOW - INSTRUMENT_SEC } },
+      ),
+    ];
+
+    // Act
+    const results = owns.map((own) => ndTraffic(own, [], NOW, view(150)));
+
+    // Assert
+    expect(results.map((r) => r.symbols.map((s) => s.label))).toEqual([[undefined], [undefined]]);
   });
 });
