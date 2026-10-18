@@ -259,7 +259,7 @@ describe('ndSymbols', () => {
   const KEYS = ['heading', 'track', 'selHeading', 'navModes'];
   const fields = { heading: 284, track: 289, selHeading: 310, navModes: ['autopilot'] };
 
-  it('gives the track and the selected heading, magnetic, while the frame is live', () => {
+  it('gives the track, the heading and the selected heading, magnetic, while the frame is live', () => {
     // Arrange
     setDeclinationAt(() => () => 7);
     const t = makeSample(NOW, { seen: 1, ...fields, at: AT, heard: heardAll(KEYS, FRESH) });
@@ -268,19 +268,19 @@ describe('ndSymbols', () => {
     const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
-    expect(symbols).toEqual({ track: 282, sel: 310 });
+    expect(symbols).toEqual({ track: 282, heading: 284, sel: 310 });
   });
 
   it('leaves out what no longer holds', () => {
     // Arrange
-    const heard = { ...heardAll(KEYS, FRESH), selHeading: STALE };
+    const heard = { ...heardAll(KEYS, FRESH), heading: STALE };
     const t = makeSample(NOW, { seen: 1, ...fields, heard });
 
     // Act
     const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
 
     // Assert
-    expect(symbols).toEqual({ track: 289 });
+    expect(symbols).toEqual({ track: 289, sel: 310 });
   });
 
   it('gives nothing in a blank frame or a lost one', () => {

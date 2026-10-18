@@ -110,6 +110,8 @@ export function ndReadouts(t: Readout, now: number): NdReadouts {
 /** What the ND draws of the target's own state, in degrees magnetic, each while it holds. */
 export interface NdSymbols {
   track?: number | undefined;
+  /** The heading, magnetic as reported. */
+  heading?: number | undefined;
   sel?: number | undefined;
   trend?: Trend | undefined;
   /** The distance, in nautical miles, at which the aircraft levels off at its selected altitude. */
@@ -128,6 +130,7 @@ export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymb
     holdsAll(t, keys, now) ? v : undefined;
   return {
     track: live(['track'], magneticTrack(t)),
+    heading: live(['heading'], t.heading),
     sel: live(['selHeading', 'navModes'], steeringHeading(t)),
     trend: trendOf(t, now),
     levelOffNm: levelOffOf(t, now, altimeter),

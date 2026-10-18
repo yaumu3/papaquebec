@@ -5,6 +5,7 @@ import {
   arcPath,
   bugPath,
   compass,
+  headingPointerPath,
   lastHeardY,
   levelOffPath,
   lubberPath,
@@ -146,6 +147,25 @@ describe('compass', () => {
       '5',
     ]);
     expect(segments(marks.major)).toBe(16);
+  });
+});
+
+describe('heading pointer', () => {
+  it('draws an open triangle outside the arc at the bearing, none off it', () => {
+    // Arrange
+    const g = ndGeometry(346);
+    const rels = [0, 75, -75, 76];
+
+    // Act
+    const paths = rels.map((rel) => headingPointerPath(g, rel));
+
+    // Assert
+    expect(paths).toEqual([
+      'M173.0 39.0L178.0 28.0L168.0 28.0Z',
+      'M317.9 150.2L329.8 152.2L327.2 142.5Z',
+      'M28.1 150.2L18.8 142.5L16.2 152.2Z',
+      '',
+    ]);
   });
 });
 

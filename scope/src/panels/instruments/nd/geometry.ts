@@ -197,6 +197,17 @@ export function bugPath(g: NdGeometry, rel: number): string {
   return bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side);
 }
 
+/** The heading pointer as (outward from the arc's radius, across): tip on the arc, base outside it. */
+const POINTER_OUTLINE: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [12, 5],
+  [12, -5],
+];
+
+/** The heading pointer, an open triangle pointing in at the arc; empty off the arc. */
+export const headingPointerPath = (g: NdGeometry, rel: number): string =>
+  onArc(rel) ? `${bugOutline(g, rel, POINTER_OUTLINE)}Z` : '';
+
 /** How the track turns and how fast the aircraft goes: what the trend vector extends. */
 export interface Trend {
   rateDegS: number;

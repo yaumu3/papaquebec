@@ -175,6 +175,10 @@
   stroke: var(--plot-intent);
   stroke-width: 1.6;
 }
+.headingPointer {
+  stroke: var(--text);
+  stroke-width: 1.5;
+}
 .trend {
   stroke: var(--text);
   stroke-width: 1.6;

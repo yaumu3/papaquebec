@@ -14,6 +14,7 @@ import {
   arcPath,
   bugPath,
   compass,
+  headingPointerPath,
   lastHeardY,
   levelOffPath,
   lubberPath,
@@ -62,7 +63,7 @@ function ZoomButton(props: { label: string; step: 1 | -1; glyph: string }) {
   );
 }
 
-/** The navigation display of a target: its compass, oriented on the track. */
+/** The navigation display of a target: its compass, track-up, with the heading as a pointer. */
 export function Nd(props: { t: Track }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
   const width = trackWidth(root);
@@ -82,6 +83,7 @@ export function Nd(props: { t: Track }) {
   const bearing = (of: (own: NdSymbols) => number | undefined) =>
     glided(() => of(symbols()), { wrap: 360, key });
   const trackDeg = bearing((own) => own.track);
+  const headingDeg = bearing((own) => own.heading);
   const selDeg = bearing((own) => own.sel);
   const windFromDeg = bearing((own) => own.windFrom);
   const levelOffNm = glided(() => symbols().levelOffNm, { key });
@@ -110,6 +112,10 @@ export function Nd(props: { t: Track }) {
   const wind = createMemo(() => {
     const rel = relative(windFromDeg());
     return rel === undefined ? undefined : windArrowPath(rel);
+  });
+  const pointer = createMemo(() => {
+    const rel = relative(headingDeg());
+    return rel === undefined ? undefined : headingPointerPath(g(), rel);
   });
   const bug = createMemo(() => {
     const rel = relative(selDeg());
@@ -162,6 +168,7 @@ export function Nd(props: { t: Track }) {
           <path class={s.major} d={marks().major} />
           <path class={s.lubber} d={lubberPath(g())} />
           <Show when={track()}>{(p) => <path class={s.trackLine} d={p().line} />}</Show>
+          <Show when={pointer()}>{(d) => <path class={s.headingPointer} d={d()} />}</Show>
           <Show when={levelOff()}>{(d) => <path class={s.levelOff} d={d()} />}</Show>
           <Show when={trend()}>{(d) => <path class={s.trend} d={d()} />}</Show>
           <Show when={bug()}>{(d) => <path class={s.bug} d={d()} />}</Show>
