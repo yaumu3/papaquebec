@@ -12,9 +12,7 @@ use tokio::sync::watch;
 use tracker::beast::Reader;
 use tracker::position::Position;
 use tracker::proto::{
-    Aircraft, EmergencyPriorityStatus, Frame, Snapshot, Source,
-    advisory::{Threat, ThreatPosition},
-    frame::Body,
+    Aircraft, EmergencyPriorityStatus, Frame, Snapshot, Source, advisory::Threat, frame::Body,
     reported,
 };
 use tracker::registry::Registry;
@@ -110,7 +108,7 @@ fn every_aircraft_is_heard_and_placed_near_the_site() {
         a.reception.is_some_and(|r| r.heard_ms == snapshot.now_ms)
             && a.position.is_some_and(|p| p.heard_ms == snapshot.now_ms)
     };
-    assert_eq!(snapshot.aircraft.len(), 13);
+    assert_eq!(snapshot.aircraft.len(), 14);
     assert!(snapshot.aircraft.iter().all(near));
     assert!(snapshot.aircraft.iter().all(timed));
 }
@@ -159,7 +157,7 @@ fn fleet_exercises_every_glyph_and_color() {
     assert_eq!(count(&|a| a.selected_altitude_mcp_ft.is_some()), 5);
     let qualified =
         |a: &Aircraft| a.position.is_some_and(|p| p.nic == 8) && reported(a.nac_p) == Some(9);
-    assert_eq!(count(&qualified), 13);
+    assert_eq!(count(&qualified), 14);
 }
 
 #[test]
@@ -241,7 +239,7 @@ fn air_data_are_heard_of_every_aircraft_in_the_air() {
     // standard temperature at the level to what the steps of the Mach
     // number and the airspeed allow
     let airborne: Vec<_> = snapshot.aircraft.iter().filter(|a| !on_ground(a)).collect();
-    assert_eq!(airborne.len(), 11);
+    assert_eq!(airborne.len(), 12);
     let speeds = |a: &&Aircraft| {
         a.true_airspeed_kt.is_some() && a.indicated_airspeed_kt.is_some() && a.mach.is_some()
     };
@@ -293,12 +291,7 @@ fn one_aircraft_idents_and_one_flies_an_advisory() {
     let advisory = advised[0].advisory.as_ref().expect("advised");
     let resolution = advisory.resolution.expect("of one threat");
     assert!(resolution.corrective && resolution.positive && !resolution.downward);
-    let placed = ThreatPosition {
-        altitude_ft: Some(16_500),
-        range_nm: Some(2.5),
-        bearing_deg: Some(33.0),
-    };
-    assert_eq!(advisory.threat, Some(Threat::ThreatPosition(placed)));
+    assert_eq!(advisory.threat, Some(Threat::ThreatAddress(0x00d0_000e)));
 }
 
 #[test]
@@ -386,8 +379,8 @@ fn extra_traffic_is_added_within_the_bounds() {
         a.place()
             .is_some_and(|place| SITE.distance_nm(place) < 60.0)
     };
-    assert_eq!(snapshot.aircraft.len(), 13 + 500);
-    assert_eq!(addresses.len(), 13 + 500);
+    assert_eq!(snapshot.aircraft.len(), 14 + 500);
+    assert_eq!(addresses.len(), 14 + 500);
     assert!(snapshot.aircraft.iter().all(near));
 }
 
@@ -411,7 +404,7 @@ fn every_identity_is_fictional_and_registered() {
         let designator = registry.and_then(|r| r.type_designator.as_deref());
         registration.is_some_and(|r| r.starts_with("TEST-")) && designator.is_some()
     };
-    assert_eq!(callsigns.len(), 11 + 50);
+    assert_eq!(callsigns.len(), 12 + 50);
     assert!(
         callsigns
             .iter()
@@ -449,7 +442,7 @@ async fn fleet_served_to_a_connection_is_followed_into_the_feed() {
                     .iter()
                     .filter(|a| a.place().is_some())
                     .count()
-                    == 13
+                    == 14
             {
                 break snapshot;
             }

@@ -21,7 +21,7 @@ use tracker::message::{comm_b_reply, squitter};
 use tracker::position::{Position, bearing_of, signed_bearing, toward};
 use tracker::proto::{
     Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
-    advisory::{Resolution, Threat, ThreatPosition},
+    advisory::{Resolution, Threat},
 };
 use tracker::register::{HeadingAndSpeed, TrackAndTurn};
 
@@ -154,6 +154,19 @@ struct Plan {
     bounds: f64,
     /// The pattern it flies for good, in place of any route or straight flight.
     hold: Option<Hold>,
+    /// The aircraft it keeps its place off, in place of any flight of its own.
+    station: Option<Station>,
+}
+
+/// Where an aircraft keeps off another, on the same track at the same speed.
+#[derive(Clone, Copy)]
+struct Station {
+    /// The address of the aircraft it keeps its place off.
+    leader: u32,
+    range_nm: f64,
+    /// Degrees right of the leader's track.
+    bearing_deg: f64,
+    below_ft: f64,
 }
 
 const AUTOPILOT: Modes = Modes {
@@ -175,33 +188,31 @@ const HOLDING: Modes = Modes {
     ..AUTOPILOT
 };
 /// What an aircraft of the fleet keeps showing: it presses IDENT, or it flies
-/// a resolution advisory.
+/// a resolution advisory against the aircraft at an address.
 #[derive(Clone, Copy, PartialEq)]
 enum Shown {
     Ident,
-    Advisory,
+    Advisory(u32),
 }
 
-/// A corrective climb against one threat, placed a little below, ahead to the right.
-const CLIMB: Advisory = Advisory {
-    multiple_threats: false,
-    resolution: Some(Resolution {
-        corrective: true,
-        downward: false,
-        increased_rate: false,
-        sense_reversal: false,
-        altitude_crossing: false,
-        positive: true,
-    }),
-    corrections: None,
-    terminated: false,
-    threat: Some(Threat::ThreatPosition(ThreatPosition {
-        altitude_ft: Some(16_500),
-        range_nm: Some(2.5),
-        bearing_deg: Some(33.0),
-    })),
-    heard_ms: 0,
-};
+/// A corrective climb against the threat at `address`.
+fn climbing(address: u32) -> Advisory {
+    Advisory {
+        multiple_threats: false,
+        resolution: Some(Resolution {
+            corrective: true,
+            downward: false,
+            increased_rate: false,
+            sense_reversal: false,
+            altitude_crossing: false,
+            positive: true,
+        }),
+        corrections: None,
+        terminated: false,
+        threat: Some(Threat::ThreatAddress(address)),
+        heard_ms: 0,
+    }
+}
 
 /// A small fleet that exercises every color, glyph and prefix the scope draws.
 #[rustfmt::skip]
@@ -225,7 +236,7 @@ fn fleet() -> Vec<Plan> {
         Plan { sel_alt: Some(14_000.0), modes: Some(Modes { lnav: true, ..HOLDING }),
             hold: Some(Hold { x: 12.0, y: 14.0, inbound_deg: 225.0, leg_s: 60.0 }),
             ..plan(6, true, large, 0o3452, (14.71, 16.71), 14_000.0, 230.0, 225.0, 0.0, "A320") },
-        Plan { sel_alt: Some(21_000.0), sel_heading: Some(260.0), modes: Some(HOLDING), shown: Some(Shown::Advisory),
+        Plan { sel_alt: Some(21_000.0), sel_heading: Some(260.0), modes: Some(HOLDING), shown: Some(Shown::Advisory(0x00d0_000e)),
             ..plan(7, true, heavy, 0o5512, (-8.0, 31.0), 17_000.0, 380.0, 260.0, 0.0, "B74F") },
         plan(8, true, large, 0o7012, (32.0, 7.0), 7500.0, 240.0, 250.0, -600.0, "CRJ7"),
         plan(9, false, small, 0o7700, (-28.0, 10.0), 9000.0, 250.0, 95.0, -1200.0, "C68A"),
@@ -237,6 +248,8 @@ fn fleet() -> Vec<Plan> {
             ..plan(12, true, large, 0o2253, (-22.0, -18.0), 12_000.0, 280.0, 300.0, 1500.0, "A320") },
         Plan { status: Some(EmergencyPriorityStatus::GeneralEmergency),
             ..plan(13, true, large, 0o3305, (24.0, -12.0), 6000.0, 230.0, 320.0, -900.0, "B738") },
+        Plan { station: Some(Station { leader: 0x00d0_0007, range_nm: 2.5, bearing_deg: 33.0, below_ft: 500.0 }),
+            ..plan(14, true, large, 0o2214, (0.0, 0.0), 16_500.0, 380.0, 260.0, 0.0, "A320") },
     ]
 }
 
@@ -520,6 +533,9 @@ impl Flying {
     }
 
     fn advance(&mut self, now: f64, elapsed: f64) {
+        if self.plan.station.is_some() {
+            return;
+        }
         if let Some(route) = self.route.clone() {
             self.follow(&route, elapsed);
             return;
@@ -574,8 +590,13 @@ impl Flying {
         let odd = !second.is_multiple_of(2);
         let mut fields = self.moving(site, odd);
         fields.extend(self.selected().map(|selected| selected.write()));
-        if plan.shown == Some(Shown::Advisory) {
-            fields.push(RaBroadcast { advisory: CLIMB }.write());
+        if let Some(Shown::Advisory(threat)) = plan.shown {
+            fields.push(
+                RaBroadcast {
+                    advisory: climbing(threat),
+                }
+                .write(),
+            );
         }
         if second.is_multiple_of(3) {
             let status = OperationalStatus {
@@ -745,13 +766,43 @@ impl Fleet {
         now: f64,
         flying: Vec<Flying>,
     ) -> Self {
-        Self {
+        let mut fleet = Self {
             site,
             clock: Box::new(clock),
             started: now,
             last: now,
             flown: 0,
             flying,
+        };
+        fleet.keep_stations();
+        fleet
+    }
+
+    /// Puts each aircraft that keeps a station where it is off its leader, flying as it flies.
+    fn keep_stations(&mut self) {
+        for i in 0..self.flying.len() {
+            let Some(station) = self.flying[i].plan.station else {
+                continue;
+            };
+            let Some(leader) = self
+                .flying
+                .iter()
+                .find(|other| other.plan.address == station.leader)
+            else {
+                continue;
+            };
+            let (east, north) = toward(leader.plan.track + station.bearing_deg, station.range_nm);
+            let (x, y) = (leader.x + east, leader.y + north);
+            let (alt, track, gs) = (
+                leader.alt - station.below_ft,
+                leader.plan.track,
+                leader.plan.gs,
+            );
+            let (baro_rate, turning) = (leader.baro_rate, leader.turning);
+            let follower = &mut self.flying[i];
+            (follower.x, follower.y, follower.alt) = (x, y, alt);
+            (follower.plan.track, follower.plan.gs) = (track, gs);
+            (follower.baro_rate, follower.turning) = (baro_rate, turning);
         }
     }
 
@@ -815,6 +866,9 @@ impl Fleet {
         let mut frames = Vec::new();
         for flying in &mut self.flying {
             flying.advance(now, elapsed);
+        }
+        self.keep_stations();
+        for flying in &self.flying {
             // readsb marks a position found by multilateration so, and measures no signal.
             let (timestamp, signal) = if flying.plan.mlat {
                 (Frame::MULTILATERATED, 0)
@@ -876,8 +930,9 @@ fn ticks(seconds: f64) -> u64 {
 mod tests {
     use super::{Fleet, Flying, MANAGED, Phase, Plan, fleet as planned, turn_rate_deg_per_s};
     use crate::testing::{SITE, hand_clock};
-    use tracker::field::{Field, ModesReported, Status};
-    use tracker::proto::EmergencyPriorityStatus;
+    use tracker::field::{Field, ModesReported, RaBroadcast, Status};
+    use tracker::position::{bearing_of, signed_bearing};
+    use tracker::proto::{EmergencyPriorityStatus, advisory::Threat};
     use tracker::register::TrackAndTurn;
 
     /// A fleet at second 1000 and the hand that moves its clock.
@@ -1206,7 +1261,7 @@ mod tests {
 
         // Assert
         let reserved = 0x00d0_0000..=0x00df_ffff;
-        assert_eq!(registered.len(), 13 + 50);
+        assert_eq!(registered.len(), 14 + 50);
         assert!(
             registered
                 .iter()
@@ -1217,5 +1272,81 @@ mod tests {
                 .iter()
                 .all(|(_, registration, _)| registration.starts_with("TEST-"))
         );
+    }
+
+    /// The address of the aircraft numbered `number` in the fleet.
+    fn address_of(number: u32) -> u32 {
+        planned()
+            .into_iter()
+            .find(|plan| plan.number == number)
+            .map(|plan| plan.address)
+            .expect("the aircraft is in the fleet")
+    }
+
+    #[test]
+    fn advisory_names_a_simulated_target_by_its_address() {
+        // Arrange
+        let plan = planned()
+            .into_iter()
+            .find(|plan| plan.number == 7)
+            .expect("TEST07 is in the fleet");
+        let flying = Flying::new(plan, 0.0);
+
+        // Act
+        let advisory = flying
+            .broadcasts(SITE, 0)
+            .into_iter()
+            .find_map(RaBroadcast::read)
+            .map(|broadcast| broadcast.advisory);
+
+        // Assert
+        let threat = advisory.and_then(|advisory| advisory.threat);
+        let addresses: Vec<_> = planned().iter().map(|plan| plan.address).collect();
+        assert!(
+            matches!(threat, Some(Threat::ThreatAddress(address)) if addresses.contains(&address)),
+            "{threat:?}"
+        );
+    }
+
+    #[test]
+    fn threat_keeps_its_station_off_the_advisory_aircraft() {
+        // Arrange: twenty minutes, long enough for TEST07 to be put back across the site
+        let (leader, threat) = (address_of(7), address_of(14));
+        let (mut fleet, advance) = fleet(0);
+        let mut seconds = Vec::new();
+
+        // Act
+        for _ in 0..1200 {
+            fleet.fly();
+            let at = |address| fleet.states().find(|state| state.address == address);
+            seconds.push((at(leader), at(threat)));
+            advance(1.0);
+        }
+
+        // Assert: every second the threat is 2.5 NM off, 33° right of the track, 500 ft below,
+        // on the same track at the same speed, and TEST07 was indeed put back across the site
+        let pairs: Vec<_> = seconds
+            .into_iter()
+            .map(|(l, t)| (l.unwrap(), t.unwrap()))
+            .collect();
+        let jumped = pairs
+            .windows(2)
+            .any(|w| (w[1].0.x - w[0].0.x).hypot(w[1].0.y - w[0].0.y) > 10.0);
+        assert!(jumped, "TEST07 never left the bounds");
+        for (l, t) in &pairs {
+            let (bearing, range) = bearing_of(t.x - l.x, t.y - l.y);
+            assert!((range - 2.5).abs() < 0.05, "{range}");
+            assert!(
+                (signed_bearing(bearing - l.track_deg) - 33.0).abs() < 1.0,
+                "{bearing}"
+            );
+            assert!(
+                (l.alt_ft - t.alt_ft - 500.0).abs() < 1.0,
+                "{} {}",
+                l.alt_ft,
+                t.alt_ft
+            );
+            assert!((t.track_deg - l.track_deg).abs() < 1e-9 && (t.gs_kt - l.gs_kt).abs() < 1e-9);
+        }
     }
 }
