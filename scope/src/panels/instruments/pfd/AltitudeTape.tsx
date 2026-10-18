@@ -1,4 +1,4 @@
-import { createUniqueId, For, type JSX, Show } from 'solid-js';
+import { createUniqueId, Index, type JSX, Show } from 'solid-js';
 
 import { Flag } from './Flag';
 import {
@@ -30,10 +30,8 @@ export interface AltitudeView {
   digits: AltitudeDigits;
 }
 
-export function altitudeView(g: PfdGeometry, read: PfdAltitude): AltitudeView | undefined {
-  if (read.kind !== 'feet') return undefined;
-  return { ft: read.ft, tape: altitudeTape(g, read.ft), digits: altitudeDigits(read.ft) };
-}
+export const altitudeView = (g: PfdGeometry, ft: number | undefined): AltitudeView | undefined =>
+  ft === undefined ? undefined : { ft, tape: altitudeTape(g, ft), digits: altitudeDigits(ft) };
 
 /** The hatch: stripes falling to the right, in a block centred in a digit cell, as tall as a capital. */
 function Hatch() {
@@ -133,14 +131,14 @@ export function AltitudeText(props: AltitudeProps & { baro: string }) {
       <Show when={props.view}>
         {(v) => (
           <>
-            <For each={v().tape.labels}>
+            <Index each={v().tape.labels}>
               {(l) => (
-                <div class={s.altitudeLabel} style={{ left: `${l.x}px`, top: `${l.y}px` }}>
-                  <span class={s.thousandsLabel}>{l.hi}</span>
-                  <span class={s.hundredsLabel}>{l.lo}</span>
+                <div class={s.altitudeLabel} style={{ left: `${l().x}px`, top: `${l().y}px` }}>
+                  <span class={s.thousandsLabel}>{l().hi}</span>
+                  <span class={s.hundredsLabel}>{l().lo}</span>
                 </div>
               )}
-            </For>
+            </Index>
             <Wheel
               cell={at().tenThousands}
               wheel={v().digits.tenThousands}

@@ -8,6 +8,7 @@ import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
 import { trackWidth } from '../../../ui/size';
+import { glided, glidedPoints } from '../glide';
 import {
   aircraftPath,
   arcPath,
@@ -27,8 +28,8 @@ import {
   trendPoints,
   windArrowPath,
 } from './geometry';
-import { ndFrame, type NdText, ndReadouts, ndSymbols } from './readout';
-import { ndTraffic, type TrafficKind } from './traffic';
+import { boxOf, ndFrame, type NdSymbols, type NdText, ndReadouts, ndSymbols } from './readout';
+import { ndTraffic, symbolDrawn, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
 import s from './Nd.module.css';
@@ -69,34 +70,52 @@ export function Nd(props: { t: Track }) {
   const g = createMemo(() => ndGeometry(width()));
   const frame = createMemo(() => ndFrame(props.t, trackStore.stats.now));
   const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
-  const marks = createMemo(() => compass(g(), frame().orient));
+  /**
+   * The glides stand at once on another target, and when the frame changes mode: a target heard
+   * again, or steered by its track instead of its heading, is shown where it is, not on its way
+   * from where the last frame left it.
+   */
+  const key = () => `${props.t.hex}/${frame().mode}`;
+  const orient = glided(() => frame().orient, { wrap: 360, key });
+  const marks = createMemo(() => compass(g(), orient()));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
   const anchors = createMemo(() => rangeAnchors(g()));
   const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
+  const bearing = (of: (own: NdSymbols) => number | undefined) =>
+    glided(() => of(symbols()), { wrap: 360, key });
+  const trackDeg = bearing((own) => own.track);
+  const selDeg = bearing((own) => own.sel);
+  const windFromDeg = bearing((own) => own.windFrom);
+  const levelOffNm = glided(() => symbols().levelOffNm, { key });
+  const turnRate = glided(() => symbols().trend?.rateDegS, { key });
+  const trendGs = glided(() => symbols().trend?.gsKt, { key });
   const relative = (deg: number | undefined) =>
-    deg === undefined ? undefined : turn(frame().orient, deg);
+    deg === undefined ? undefined : turn(orient(), deg);
   const track = createMemo(() => {
-    const rel = relative(symbols().track);
+    const rel = relative(trackDeg());
     return rel === undefined
       ? undefined
       : { rel, line: trackPath(g(), rel), diamond: diamondPath(g(), rel) };
   });
   const levelOff = createMemo(() => {
     const at = track();
-    const nm = symbols().levelOffNm;
+    const nm = levelOffNm();
     return at && nm !== undefined ? levelOffPath(g(), at.rel, nm, ndRangeNm()) : undefined;
   });
   const trend = createMemo(() => {
     const at = track();
-    const turning = symbols().trend;
-    return at && turning ? trendPath(trendPoints(g(), at.rel, turning, ndRangeNm())) : undefined;
+    const rateDegS = turnRate();
+    const gsKt = trendGs();
+    return at && rateDegS !== undefined && gsKt !== undefined
+      ? trendPath(trendPoints(g(), at.rel, { rateDegS, gsKt }, ndRangeNm()))
+      : undefined;
   });
   const wind = createMemo(() => {
-    const rel = relative(symbols().windFrom);
+    const rel = relative(windFromDeg());
     return rel === undefined ? undefined : windArrowPath(rel);
   });
   const bug = createMemo(() => {
-    const rel = relative(symbols().sel);
+    const rel = relative(selDeg());
     return rel === undefined ? undefined : bugPath(g(), rel);
   });
   const traffic = createMemo(() => {
@@ -107,9 +126,24 @@ export function Nd(props: { t: Track }) {
       g: g(),
     });
   });
+  /** Where each traffic lies from own ship as shown: on its way to where its latest report puts it. */
+  const lying = glidedPoints(
+    () => traffic().symbols,
+    (symbol) => symbol.key,
+    (symbol) => symbol.at,
+    key,
+  );
+  /** The symbols as drawn: each at where it lies, with the compass as it is turned now. */
+  const shown = createMemo(() =>
+    traffic().symbols.flatMap((symbol) => {
+      const at = lying().get(symbol.key) ?? symbol.at;
+      const drawn = symbolDrawn(symbol, at, orient(), { g: g(), rangeNm: ndRangeNm() });
+      return drawn ? [drawn] : [];
+    }),
+  );
   const shapes = (kind: TrafficKind) =>
-    traffic()
-      .symbols.filter((symbol) => symbol.kind === kind)
+    shown()
+      .filter((symbol) => symbol.kind === kind)
       .map((symbol) =>
         kind === 'threat'
           ? threatSquarePath(symbol.x, symbol.y)
@@ -151,7 +185,7 @@ export function Nd(props: { t: Track }) {
             </div>
           )}
         </Index>
-        <Index each={traffic().symbols}>
+        <Index each={shown()}>
           {(symbol) => (
             <>
               <Show when={symbol().label}>
@@ -216,7 +250,7 @@ export function Nd(props: { t: Track }) {
         </div>
         <div class={s.top}>
           <span class={cx(s.label, s.modeLabel)}>{frame().label}</span>
-          <span class={s.box}>{frame().box}</span>
+          <span class={s.box}>{boxOf(frame().mode, orient())}</span>
           <span class={s.label}>MAG</span>
         </div>
         <Show when={frame().lastHeard}>

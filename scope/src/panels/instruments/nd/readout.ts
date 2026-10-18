@@ -47,16 +47,22 @@ const FLAGS: Record<NdMode, readonly NdFlag[]> = {
   blank: ['TRK', 'HDG'],
 };
 
+/** Whether the display is oriented on a reading that holds. */
+const isLive = (mode: NdMode): boolean => mode === 'heading' || mode === 'track';
+
+/** What the box at the top reads: the bearing at the top of a live display, else the blank. */
+export const boxOf = (mode: NdMode, orient: number): string =>
+  isLive(mode) ? padBearing(orient) : BLANK_BOX;
+
 /** What the top of the ND reads, and the flags beside it, from the freshness of the target's readings. */
 export function ndFrame(t: Readout, now: number): NdFrame {
   const mode = modeOf(t, now);
   const orient = orientOf(t, mode);
-  const live = mode === 'heading' || mode === 'track';
   return {
     mode,
     orient,
     label: mode !== 'track' && t.heading !== undefined ? 'HDG' : 'TRK',
-    box: live ? padBearing(orient) : BLANK_BOX,
+    box: boxOf(mode, orient),
     flags: FLAGS[mode],
     lastHeard: mode === 'lost' ? `LAST HEARD ${Math.round(t.seen)} s` : undefined,
   };
@@ -127,8 +133,7 @@ const TREND_MIN_RATE_DEG_S = 0.3;
 
 /** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
 export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymbols {
-  const mode = modeOf(t, now);
-  if (mode !== 'heading' && mode !== 'track') return {};
+  if (!isLive(modeOf(t, now))) return {};
   const live = (keys: readonly HeardKey[], v: number | undefined) =>
     holdsAll(t, keys, now) ? v : undefined;
   return {

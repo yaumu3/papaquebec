@@ -6,7 +6,15 @@ import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
-import { fmaColumns, modeChangedAt, type PfdReadouts, pfdFma, pfdReadouts } from './readout';
+import {
+  feetOf,
+  fmaColumns,
+  modeChangedAt,
+  type PfdAltitude,
+  type PfdReadouts,
+  pfdFma,
+  pfdReadouts,
+} from './readout';
 
 const NOW = 1000;
 
@@ -373,6 +381,19 @@ describe('pfdReadouts altitude', () => {
       { kind: 'feet', ft: crew },
       { kind: 'feet', ft: 37000 },
     ]);
+  });
+});
+
+describe('feetOf', () => {
+  it('is the feet of an altitude read in feet, none of the ground or a flag', () => {
+    // Arrange
+    const reads: PfdAltitude[] = [{ kind: 'feet', ft: 4750 }, { kind: 'ground' }, { kind: 'flag' }];
+
+    // Act
+    const out = reads.map(feetOf);
+
+    // Assert
+    expect(out).toEqual([4750, undefined, undefined]);
   });
 });
 

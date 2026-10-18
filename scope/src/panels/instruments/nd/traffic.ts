@@ -1,9 +1,11 @@
 import type { ResolutionAdvisory } from '../../../lib/acas';
 import { type GeoPoint, turn } from '../../../lib/geo';
 import { inverse } from '../../../lib/geodesic';
+import { RAD } from '../../../lib/units';
 import { magneticBearing } from '../../../state/magnetic';
 import type { Position, Track } from '../../../state/track';
 import { holdsAll } from '../freshness';
+import type { Point } from '../glide';
 import { type NdGeometry, ndPoint, onArc, pxOf } from './geometry';
 import { type NdFrame } from './readout';
 
@@ -55,11 +57,18 @@ export interface NdView {
   g: NdGeometry;
 }
 
-/** Traffic placed on the display: its centre in pixels, and how far and how high it is from own ship. */
+/** Where traffic lies from own ship: east and north in NM, magnetic north up. */
+const offsetOf = (bearingMag: number, distanceNm: number): Point => [
+  distanceNm * Math.sin(bearingMag * RAD),
+  distanceNm * Math.cos(bearingMag * RAD),
+];
+
+/** Traffic placed on the display: its centre in pixels, where it lies, and how far and how high it is from own ship. */
 export interface Placed {
   track: Track;
   x: number;
   y: number;
+  at: Point;
   distanceNm: number;
   deltaFt: number;
 }
@@ -90,7 +99,7 @@ export function nearOnPlane(
 
 /** The pixel at `rel` degrees off the top and `distanceNm` out, or nothing outside the arc or beyond the range. */
 function pointOnDisplay(
-  view: NdView,
+  view: Pick<NdView, 'g' | 'rangeNm'>,
   rel: number,
   distanceNm: number,
 ): [number, number] | undefined {
@@ -99,17 +108,20 @@ function pointOnDisplay(
   return onArc(rel) && radius <= g.r - EDGE_PX ? ndPoint(g, rel, radius) : undefined;
 }
 
-/** Where `at` lies from own ship `from`: its distance, and its bearing off the top of the display; at the same point, straight ahead. */
+/**
+ * Where `at` lies from own ship `from`: its distance, its magnetic bearing, and that off the top
+ * of the display; at the same point, straight ahead.
+ */
 function polarOf(
   from: LivePosition,
   fromAt: GeoPoint | undefined,
   at: LivePosition,
   view: NdView,
-): { rel: number; distanceNm: number } {
+): { rel: number; bearing: number; distanceNm: number } {
   const { distanceNm, bearingTrue } = inverse(from, at);
   const coincident = distanceNm === 0 || Number.isNaN(bearingTrue);
-  const rel = coincident ? 0 : turn(view.frame.orient, magneticBearing(bearingTrue, fromAt));
-  return { rel, distanceNm };
+  const bearing = coincident ? view.frame.orient : magneticBearing(bearingTrue, fromAt);
+  return { rel: turn(view.frame.orient, bearing), bearing, distanceNm };
 }
 
 /** The track's place on the display, or nothing when it lies outside the arc or beyond the range. */
@@ -120,9 +132,11 @@ function placeOnDisplay(
   at: LivePosition,
   view: NdView,
 ): Placed | undefined {
-  const { rel, distanceNm } = polarOf(own.position, own.at, at, view);
+  const { rel, bearing, distanceNm } = polarOf(own.position, own.at, at, view);
   const point = pointOnDisplay(view, rel, distanceNm);
-  return point && { track: t, x: point[0], y: point[1], distanceNm, deltaFt: alt - own.alt };
+  if (!point) return undefined;
+  const [x, y] = point;
+  return { track: t, x, y, at: offsetOf(bearing, distanceNm), distanceNm, deltaFt: alt - own.alt };
 }
 
 /** Own ship as the traffic is measured from, when it holds a position and an altitude. */
@@ -165,13 +179,52 @@ const ARROW_GAP_PX = 9;
 
 export type TrafficKind = 'other' | 'proximate' | 'threat';
 
-/** A symbol to draw: its kind and centre, the label centred on its own point and the arrow from its left edge. */
+/** The key of the threat the aircraft places by range and bearing, which no track address is. */
+const ESTIMATE_KEY = 'estimate';
+
+/**
+ * A symbol to draw: its kind and centre, the label centred on its own point and the arrow from
+ * its left edge; keyed by the track's address, so that it is the same symbol from one report to
+ * the next.
+ */
 export interface TrafficSymbol {
   kind: TrafficKind;
+  key: string;
+  /** Where the traffic lies from own ship: east and north in NM, magnetic north up. */
+  at: Point;
   x: number;
   y: number;
   label?: { text: string; x: number; y: number } | undefined;
   arrow?: { glyph: '↑' | '↓'; x: number; y: number } | undefined;
+}
+
+/** The symbol drawn at (x, y) instead: its label and arrow move with it. */
+export function symbolAt(symbol: TrafficSymbol, x: number, y: number): TrafficSymbol {
+  const dx = x - symbol.x;
+  const dy = y - symbol.y;
+  const moved = { ...symbol, x, y };
+  if (symbol.label)
+    moved.label = { ...symbol.label, x: symbol.label.x + dx, y: symbol.label.y + dy };
+  if (symbol.arrow)
+    moved.arrow = { ...symbol.arrow, x: symbol.arrow.x + dx, y: symbol.arrow.y + dy };
+  return moved;
+}
+
+/**
+ * The symbol as drawn with the compass turned to `orient` and its traffic `at` (east, north) NM
+ * of own ship; none where the display does not reach.
+ */
+export function symbolDrawn(
+  symbol: TrafficSymbol,
+  at: Point,
+  orient: number,
+  view: Pick<NdView, 'g' | 'rangeNm'>,
+): TrafficSymbol | undefined {
+  const [east, north] = at;
+  const distanceNm = Math.hypot(east, north);
+  const rel = distanceNm === 0 ? 0 : turn(orient, Math.atan2(east, north) / RAD);
+  const point = pointOnDisplay(view, rel, distanceNm);
+  return point && symbolAt(symbol, point[0], point[1]);
 }
 
 /** What the ND draws of the traffic: the symbols in paint order, and the annunciations. */
@@ -216,6 +269,8 @@ function symbolOf(kind: TrafficKind, p: Placed, now: number): TrafficSymbol {
   const arrow = verticalArrow(p.track, now);
   return {
     kind,
+    key: p.track.hex,
+    at: p.at,
     x: p.x,
     y: p.y,
     label: labelOf(p.x, p.y, p.deltaFt),
@@ -226,6 +281,7 @@ function symbolOf(kind: TrafficKind, p: Placed, now: number): TrafficSymbol {
 /** A threat given by range and bearing: where the display puts it, and its altitude if the aircraft gave one. */
 interface Estimate {
   rel: number;
+  at: Point;
   rangeNm: number;
   altitude: number | undefined;
 }
@@ -257,8 +313,9 @@ function estimateOf(own: Track, now: number, view: NdView): Estimate | undefined
   const { range, bearing, altitude } = threat;
   if (range === undefined || bearing === undefined) return undefined;
   if (own.heading === undefined || !holdsAll(own, ['heading'], now)) return undefined;
-  const rel = turn(view.frame.orient, own.heading + bearing);
-  return { rel, rangeNm: range, altitude };
+  const bearingMag = own.heading + bearing;
+  const rel = turn(view.frame.orient, bearingMag);
+  return { rel, at: offsetOf(bearingMag, range), rangeNm: range, altitude };
 }
 
 /** Whether the threat given by range and bearing, with a held heading, lies where the display does not reach. */
@@ -277,7 +334,7 @@ function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol 
   const { altitude } = estimate;
   const label =
     altitude !== undefined && ownAlt !== undefined ? labelOf(x, y, altitude - ownAlt) : undefined;
-  return { kind: 'threat', x, y, label };
+  return { kind: 'threat', key: ESTIMATE_KEY, at: estimate.at, x, y, label };
 }
 
 /** The traffic the display draws around own ship, none on a lost or blank display. */
