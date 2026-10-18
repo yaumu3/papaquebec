@@ -678,11 +678,47 @@ export function altitudeDigits(ft: number): AltitudeDigits {
   };
 }
 
-const ALTITUDE_THOUSANDS_PX = 17;
+export const ALTITUDE_THOUSANDS_PX = 17;
 const ALTITUDE_HUNDREDS_PX = 13;
 const ALTITUDE_DIGITS_GAP_PX = 18;
 const ALTITUDE_DRUM_GAP_PX = 17;
 const ALTITUDE_DRUM_LINE_PX = 17;
+
+/**
+ * The stripes of the hatch, measured on a Boeing PFD: their horizontal pitch as a part of the cap
+ * height, how steeply they fall (down per across), and how much of each period is ink (4.5 of
+ * 5.75 px in the reference, a step lighter at the user's word, kept to at least 1 device px of gap
+ * at a pixel ratio of 2).
+ */
+const HATCH_PITCH_CAP = 0.185;
+const HATCH_SLOPE = 2;
+const HATCH_INK = 0.68;
+/** The hatch block's width as a part of the digit advance. */
+const HATCH_WIDTH_ADVANCE = 0.85;
+
+export interface HatchStyle {
+  /** Where the block starts in its cell, and how wide it is. */
+  left: number;
+  width: number;
+  /** The stripes: drawn `ink` of each `pitch` across them, turned `angle` degrees clockwise. */
+  pitch: number;
+  ink: number;
+  angle: number;
+}
+
+/** The hatch for a digit cell of `px`: centred, cap-high stripes falling to the right. */
+export function hatchStyle(px: number): HatchStyle {
+  const advance = MONO_ADVANCE_EM * px;
+  const width = HATCH_WIDTH_ADVANCE * advance;
+  const pitch = HATCH_PITCH_CAP * MONO_CAP_EM * px * Math.sin(Math.atan(HATCH_SLOPE));
+  return {
+    left: (advance - width) / 2,
+    width,
+    pitch,
+    ink: HATCH_INK * pitch,
+    angle: -Math.atan(1 / HATCH_SLOPE) / RAD,
+  };
+}
 
 export interface AltitudeReadout {
   /** The middle of the tape, where its flag stands. */

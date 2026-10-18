@@ -31,6 +31,7 @@ import {
   type WheelCell,
   columnTop,
   carryPitch,
+  hatchStyle,
   MONO_CAP_EM,
   rowBaseline,
   vsiDigits,
@@ -680,6 +681,23 @@ describe('columnTop', () => {
 
     // Assert
     expect(out).toEqual([-25.5, -12.75, -28]);
+  });
+});
+
+describe('hatchStyle', () => {
+  it('centres a block 0.85 of the advance wide, striped at the reference pitch and slope', () => {
+    // Arrange
+    const px = 17;
+
+    // Act
+    const out = hatchStyle(px);
+
+    // Assert
+    expect(out.width).toBeCloseTo(8.67, 3);
+    expect(out.left).toBeCloseTo(0.765, 3);
+    expect(out.pitch).toBeCloseTo(2.0535, 3);
+    expect(out.ink).toBeCloseTo(1.3964, 3);
+    expect(out.angle).toBeCloseTo(-26.565, 3);
   });
 });
 

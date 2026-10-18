@@ -8,8 +8,10 @@ import {
   altitudeDigits,
   altitudeReadout,
   altitudeStripPath,
+  ALTITUDE_THOUSANDS_PX,
   altitudeTape,
   fmsLinePath,
+  hatchStyle,
   type PfdGeometry,
   selBugPath,
   selClipRect,
@@ -33,20 +35,25 @@ export function altitudeView(g: PfdGeometry, read: PfdAltitude): AltitudeView | 
   return { ft: read.ft, tape: altitudeTape(g, read.ft), digits: altitudeDigits(read.ft) };
 }
 
-/** One digit cell of crosshatch: 1 px lines at 45 and 135 degrees, 4 px apart. */
+/** The hatch: stripes falling to the right, in a block centred in a digit cell, as tall as a capital. */
 function Hatch() {
   const id = createUniqueId();
+  const hatch = hatchStyle(ALTITUDE_THOUSANDS_PX);
   return (
-    <svg class={s.hatch} aria-hidden="true">
+    <svg
+      class={s.hatch}
+      style={{ left: `${hatch.left}px`, width: `${hatch.width}px` }}
+      aria-hidden="true"
+    >
       <defs>
         <pattern
           id={id}
-          width="4"
-          height="4"
+          width={hatch.pitch}
+          height="1"
           patternUnits="userSpaceOnUse"
-          patternTransform="rotate(45)"
+          patternTransform={`rotate(${hatch.angle})`}
         >
-          <path class={s.hatchLine} d="M0 0.5H4M0.5 0V4" />
+          <rect class={s.hatchInk} width={hatch.ink} height="1" />
         </pattern>
       </defs>
       <rect width="100%" height="100%" fill={`url(#${id})`} />
