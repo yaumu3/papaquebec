@@ -164,9 +164,6 @@
 .sel {
   color: var(--plot-intent);
 }
-.trk {
-  color: var(--color-level);
-}
 .unknown {
   color: var(--text-muted);
 }

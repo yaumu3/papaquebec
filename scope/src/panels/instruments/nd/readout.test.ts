@@ -112,14 +112,14 @@ describe('ndFrame', () => {
 });
 
 const texts = (r: NdReadouts) =>
-  [r.gs, r.tas, r.wind, r.sel, r.trk, r.tat, r.sat].map((x) => x.text);
+  [r.gs, r.tas, r.wind, r.sel, r.hdg, r.tat, r.sat].map((x) => x.text);
 
 describe('ndReadouts', () => {
-  it('reads every value of the corners, the wind and the track magnetic', () => {
+  it('reads every value of the corners, the wind magnetic and the heading as reported', () => {
     // Arrange
     setDeclinationAt(() => () => 7);
     const heard = Object.fromEntries(
-      ['gs', 'tas', 'windDir', 'windSpeed', 'selHeading', 'navModes', 'track', 'tat', 'oat'].map(
+      ['gs', 'tas', 'windDir', 'windSpeed', 'selHeading', 'navModes', 'heading', 'tat', 'oat'].map(
         (k) => [k, FRESH],
       ),
     );
@@ -131,7 +131,7 @@ describe('ndReadouts', () => {
       windSpeed: 63.6,
       selHeading: 310,
       navModes: ['autopilot'],
-      track: 289,
+      heading: 284,
       tat: -4,
       oat: -56,
       at: AT,
@@ -142,7 +142,7 @@ describe('ndReadouts', () => {
     const readouts = ndReadouts(t, NOW);
 
     // Assert
-    expect(texts(readouts)).toEqual(['462', '438', '269°/64', '310°', '282°', '-4°C', '-56°C']);
+    expect(texts(readouts)).toEqual(['462', '438', '269°/64', '310°', '284°', '-4°C', '-56°C']);
   });
 
   it('prints no sign on a temperature of zero and a plus on a positive one', () => {
@@ -224,8 +224,8 @@ describe('ndReadouts', () => {
       seen: 34,
       gs: 462,
       oat: -56,
-      track: 289,
-      heard: { gs: FRESH, oat: FRESH, track: FRESH },
+      heading: 284,
+      heard: { gs: FRESH, oat: FRESH, heading: FRESH },
     });
 
     // Act
@@ -235,14 +235,14 @@ describe('ndReadouts', () => {
     expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
   });
 
-  it('keeps the values that still hold when neither heading nor track does', () => {
+  it('keeps the values that still hold, blanking those that lapse', () => {
     // Arrange
     const t = makeSample(NOW, {
       seen: 1,
       gs: 462,
       oat: -56,
-      track: 289,
-      heard: { gs: FRESH, oat: FRESH, track: STALE },
+      heading: 284,
+      heard: { gs: FRESH, oat: FRESH, heading: STALE },
     });
 
     // Act

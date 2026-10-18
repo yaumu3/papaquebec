@@ -69,7 +69,7 @@ export interface NdReadouts {
   tas: NdText;
   wind: NdText;
   sel: NdText;
-  trk: NdText;
+  hdg: NdText;
   tat: NdText;
   sat: NdText;
 }
@@ -101,7 +101,7 @@ export function ndReadouts(t: Readout, now: number): NdReadouts {
     tas: read(['tas'], () => shown(READINGS.tas.format(t))),
     wind: read(['windDir', 'windSpeed'], wind),
     sel: read(['selHeading', 'navModes'], () => degrees(steeringHeading(t)), true),
-    trk: read(['track'], () => degrees(magneticTrack(t)), true),
+    hdg: read(['heading'], () => degrees(t.heading), true),
     tat: read(['tat'], () => shown(READINGS.tat.format(t), true)),
     sat: read(['oat'], () => shown(READINGS.oat.format(t), true)),
   };

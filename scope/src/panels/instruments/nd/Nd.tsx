@@ -234,8 +234,8 @@ export function Nd(props: { t: Track }) {
             <Value r={readouts().sel} class={s.sel} />
           </div>
           <div>
-            <Label>TRK </Label>
-            <Value r={readouts().trk} class={s.trk} />
+            <Label>HDG </Label>
+            <Value r={readouts().hdg} />
           </div>
         </div>
         <div class={cx(s.corner, s.temps)}>
