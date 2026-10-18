@@ -105,6 +105,13 @@ function placeOnDisplay(
   return { track: t, x, y, distanceNm, deltaFt: alt - own.alt };
 }
 
+/** Own ship as the traffic is measured from, when it holds a position and an altitude. */
+function originOf(own: Track, now: number): Origin | undefined {
+  const position = heldPosition(own, now);
+  const alt = heldAltitude(own, now);
+  return position && alt !== undefined ? { position, alt, at: own.at } : undefined;
+}
+
 /**
  * The traffic around own ship that the display draws: other tracks with a held position and
  * altitude within the band, inside the arc and the range. Nothing while own ship lacks a held
@@ -116,10 +123,9 @@ export function trafficAround(
   now: number,
   view: NdView,
 ): Placed[] {
-  const position = heldPosition(own, now);
-  const alt = heldAltitude(own, now);
-  if (!position || alt === undefined) return [];
-  const origin: Origin = { position, alt, at: own.at };
+  const origin = originOf(own, now);
+  if (!origin) return [];
+  const { position, alt } = origin;
   const limitNm = (view.rangeNm * (view.g.r - EDGE_PX)) / view.g.r;
   const placed: Placed[] = [];
   for (const t of others) {
