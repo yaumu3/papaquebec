@@ -158,7 +158,8 @@ struct Plan {
     station: Option<Station>,
 }
 
-/// Where an aircraft keeps off another, on the same track at the same speed.
+/// Where an aircraft keeps off another, at the same speed: it moves as the leader does but reports
+/// a track converging on the leader's path, so that each sees the other ahead.
 #[derive(Clone, Copy)]
 struct Station {
     /// The address of the aircraft it keeps its place off.
@@ -167,6 +168,8 @@ struct Station {
     /// Degrees right of the leader's track.
     bearing_deg: f64,
     below_ft: f64,
+    /// Degrees left of the leader's track that it reports as its own.
+    converging_deg: f64,
 }
 
 const AUTOPILOT: Modes = Modes {
@@ -264,7 +267,7 @@ fn fleet() -> Vec<Plan> {
             ..plan(12, true, large, 0o2253, (-22.0, -18.0), 12_000.0, 280.0, 300.0, 1500.0, "A320") },
         Plan { status: Some(EmergencyPriorityStatus::GeneralEmergency),
             ..plan(13, true, large, 0o3305, (24.0, -12.0), 6000.0, 230.0, 320.0, -900.0, "B738") },
-        Plan { station: Some(Station { leader: 0x00d0_0007, range_nm: 2.5, bearing_deg: 33.0, below_ft: 500.0 }),
+        Plan { station: Some(Station { leader: 0x00d0_0007, range_nm: 2.5, bearing_deg: 33.0, below_ft: 500.0, converging_deg: 125.0 }),
             ..plan(14, true, large, 0o2214, (0.0, 0.0), 16_500.0, 380.0, 260.0, 0.0, "A320") },
     ]
 }
@@ -822,7 +825,8 @@ impl Fleet {
                 .and_then(|shown| shown.answered(leader.plan.address, self.flying[i].plan.address));
             let follower = &mut self.flying[i];
             (follower.x, follower.y, follower.alt) = (x, y, alt);
-            (follower.plan.track, follower.plan.gs) = (track, gs);
+            (follower.plan.track, follower.plan.gs) =
+                ((track - station.converging_deg).rem_euclid(360.0), gs);
             (follower.baro_rate, follower.turning) = (baro_rate, turning);
             follower.plan.shown = answer;
         }
@@ -950,7 +954,9 @@ fn ticks(seconds: f64) -> u64 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Fleet, Flying, MANAGED, Phase, Plan, fleet as planned, turn_rate_deg_per_s};
+    use super::{
+        Fleet, Flying, MANAGED, Phase, Plan, bearing, fleet as planned, turn_rate_deg_per_s,
+    };
     use crate::testing::{SITE, hand_clock};
     use tracker::field::{Field, ModesReported, RaBroadcast, Status};
     use tracker::position::{bearing_of, signed_bearing};
@@ -958,7 +964,7 @@ mod tests {
         Advisory, EmergencyPriorityStatus,
         advisory::{Resolution, Threat},
     };
-    use tracker::register::TrackAndTurn;
+    use tracker::register::{HeadingAndSpeed, TrackAndTurn};
 
     /// A fleet at second 1000 and the hand that moves its clock.
     fn fleet(extra: u32) -> (Fleet, impl Fn(f64)) {
@@ -1397,6 +1403,38 @@ mod tests {
     }
 
     #[test]
+    fn each_aircraft_of_the_pair_sees_the_other_ahead() {
+        // Arrange: twenty minutes, long enough for TEST07 to be put back across the site
+        let (leader, follower) = (address_of(7), address_of(14));
+        let (mut fleet, advance) = fleet(0);
+        let mut sightings = Vec::new();
+
+        // Act
+        for _ in 0..1200 {
+            fleet.fly();
+            let aircraft = |address| {
+                let flying = fleet.flying.iter().find(|f| f.plan.address == address);
+                let flying = flying.expect("the aircraft is in the fleet");
+                let heading = HeadingAndSpeed::read(flying.answers(0.0)[1])
+                    .and_then(|report| report.magnetic_heading_deg);
+                (flying.x, flying.y, heading.expect("it reports a heading"))
+            };
+            let ((lx, ly, lh), (fx, fy, fh)) = (aircraft(leader), aircraft(follower));
+            let seen = |from_x, from_y, heading, to_x, to_y| {
+                signed_bearing(bearing(from_x, from_y, to_x, to_y) - heading)
+            };
+            sightings.push((seen(lx, ly, lh, fx, fy), seen(fx, fy, fh, lx, ly)));
+            advance(1.0);
+        }
+
+        // Assert: each is on the right side of the other's nose, well inside the ND's arc
+        let outside = sightings.iter().find(|&&(by_leader, by_follower)| {
+            !((0.0..=45.0).contains(&by_leader) && (-45.0..=0.0).contains(&by_follower))
+        });
+        assert!(outside.is_none(), "{outside:?}");
+    }
+
+    #[test]
     fn threat_keeps_its_station_off_the_advisory_aircraft() {
         // Arrange: twenty minutes, long enough for TEST07 to be put back across the site
         let (leader, threat) = (address_of(7), address_of(14));
@@ -1412,7 +1450,8 @@ mod tests {
         }
 
         // Assert: every second the threat is 2.5 NM off, 33° right of the track, 500 ft below,
-        // on the same track at the same speed, and TEST07 was indeed put back across the site
+        // reporting a track 125° left of the leader's at the same speed, and TEST07 was indeed
+        // put back across the site
         let pairs: Vec<_> = seconds
             .into_iter()
             .map(|(l, t)| (l.unwrap(), t.unwrap()))
@@ -1434,7 +1473,8 @@ mod tests {
                 l.alt_ft,
                 t.alt_ft
             );
-            assert!((t.track_deg - l.track_deg).abs() < 1e-9 && (t.gs_kt - l.gs_kt).abs() < 1e-9);
+            assert!((signed_bearing(t.track_deg - l.track_deg) + 125.0).abs() < 1e-9);
+            assert!((t.gs_kt - l.gs_kt).abs() < 1e-9);
         }
     }
 }
