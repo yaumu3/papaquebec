@@ -176,9 +176,9 @@ describe('trafficAround', () => {
   it('keeps what lies inside the arc and the range and drops what lies outside', () => {
     // Arrange
     const others = [
-      traffic('arc-in', 54.9, 5),
-      traffic('arc-out', 55.1, 5),
-      traffic('arc-out-left', 304.9, 5),
+      traffic('arc-in', 74.9, 5),
+      traffic('arc-out', 75.1, 5),
+      traffic('arc-out-left', 284.9, 5),
       traffic('range-in', 0, EDGE_NM - 0.01),
       traffic('range-out', 0, EDGE_NM + 0.01),
     ];
@@ -504,7 +504,7 @@ describe('ndTraffic offscale', () => {
     const rows: [Track, Track[], ReturnType<typeof view>][] = [
       [own({ address: 't' }), [traffic('t', 0, 12.5)], view(0, 10)],
       [own({ address: 't' }), [traffic('t', 0, 60)], view(0, 10)],
-      [own({ address: 't' }), [traffic('t', 60, 5)], view(0, 10)],
+      [own({ address: 't' }), [traffic('t', 80, 5)], view(0, 10)],
       [own({ range: 15, bearing: 20 }), [], view(0, 10)],
       [own({ address: 't' }, { heading: undefined }), [traffic('t', 0, 12.5)], view(0, 10)],
     ];

@@ -3,9 +3,9 @@ import { fixed, offset, toward } from '../../svg';
 import { instrumentHeight } from '../height';
 
 /** The compass arc spans this far either side of the top. */
-const SPAN_DEG = 55;
+const SPAN_DEG = 75;
 /** The labels of the compass run this far either side of the top. */
-const LABEL_SPAN_DEG = 50;
+const LABEL_SPAN_DEG = 70;
 const TICK_STEP_DEG = 5;
 const MINOR_TICK_PX = 5;
 const MAJOR_TICK_PX = 9;
