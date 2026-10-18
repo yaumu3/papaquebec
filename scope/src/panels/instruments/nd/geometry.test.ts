@@ -13,6 +13,8 @@ import {
   ndGeometry,
   rangeAnchors,
   ringPath,
+  threatSquarePath,
+  trafficDiamondPath,
   trackPath,
   trendPath,
   trendPoints,
@@ -369,5 +371,29 @@ describe('windArrowPath', () => {
 
     // Assert
     expect(path.startsWith('M16.0 50.0L16.0 70.0')).toBe(true);
+  });
+});
+
+describe('traffic symbols', () => {
+  it('draws the diamond with a 5.5 px half-diagonal about its centre', () => {
+    // Arrange
+    const at: [number, number] = [100, 50];
+
+    // Act
+    const path = trafficDiamondPath(...at);
+
+    // Assert
+    expect(path).toBe('M100.0 44.5L105.5 50.0L100.0 55.5L94.5 50.0Z');
+  });
+
+  it('draws the threat as a 9 px square about its centre', () => {
+    // Arrange
+    const at: [number, number] = [100, 50];
+
+    // Act
+    const path = threatSquarePath(...at);
+
+    // Assert
+    expect(path).toBe('M95.5 45.5L104.5 45.5L104.5 54.5L95.5 54.5Z');
   });
 });

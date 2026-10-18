@@ -274,3 +274,33 @@ export function windArrowPath(relFromDeg: number): string {
     `M${at(back, WIND_HEAD_HALF_WIDTH_PX)}L${tip}L${at(back, -WIND_HEAD_HALF_WIDTH_PX)}`
   );
 }
+
+/** Half the diagonal of a traffic diamond (RTCA DO-185B symbols as the ND draws them). */
+const TRAFFIC_HALF_DIAGONAL_PX = 5.5;
+const THREAT_SIDE_PX = 9;
+
+/** The closed outline through `corners`, as a subpath. */
+const outline = (corners: readonly (readonly [number, number])[]): string =>
+  `${corners.map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`).join('')}Z`;
+
+/** The diamond of other and proximate traffic, centred at (x, y). */
+export function trafficDiamondPath(x: number, y: number): string {
+  const d = TRAFFIC_HALF_DIAGONAL_PX;
+  return outline([
+    [x, y - d],
+    [x + d, y],
+    [x, y + d],
+    [x - d, y],
+  ]);
+}
+
+/** The square of the RA threat, centred at (x, y). */
+export function threatSquarePath(x: number, y: number): string {
+  const h = THREAT_SIDE_PX / 2;
+  return outline([
+    [x - h, y - h],
+    [x + h, y - h],
+    [x + h, y + h],
+    [x - h, y + h],
+  ]);
+}
