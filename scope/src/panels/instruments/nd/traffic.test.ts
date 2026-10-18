@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import type { ResolutionAdvisory, Threat } from '../../../lib/acas';
 import { direct } from '../../../lib/geodesic';
 import { INSTRUMENT_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
@@ -325,18 +326,93 @@ describe('ndTraffic', () => {
     expect(arrows).toEqual([['↑', 9, 0], undefined]);
   });
 
-  it('draws nothing on a display that is lost or blank', () => {
+  it('draws nothing, and annunciates nothing, on a display that is lost or blank', () => {
     // Arrange
-    const others = [traffic('a', 0, 5)];
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const rows = [[traffic('thr', 10, 4), traffic('a', 0, 5)]];
     const frames = (['lost', 'blank'] as const).map((mode) => view(0, 20, mode));
+    const none = { symbols: [], traffic: false, offscale: false };
 
     // Act
-    const results = frames.map((v) => ndTraffic(ownShip(), others, NOW, v));
+    const results = frames.flatMap((v) => rows.map((others) => ndTraffic(own, others, NOW, v)));
 
     // Assert
-    expect(results).toEqual([
-      { symbols: [], traffic: false, offscale: false },
-      { symbols: [], traffic: false, offscale: false },
+    expect(results).toEqual(Array.from({ length: 2 }, () => none));
+  });
+});
+
+const advisory = (threat: Threat | undefined, terminated = false): ResolutionAdvisory => ({
+  multipleThreats: false,
+  terminated,
+  ...(threat && { threat }),
+});
+
+describe('ndTraffic threat by address', () => {
+  it('draws the threat last, once, with the traffic around it', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const others = [traffic('thr', 10, 4), traffic('other', 20, 10)];
+
+    // Act
+    const result = ndTraffic(own, others, NOW, view());
+
+    // Assert
+    expect(result.symbols.map((s) => s.kind)).toEqual(['other', 'threat']);
+    expect(result.traffic).toBe(true);
+  });
+
+  it('draws a threat outside the band when it lies in the arc, with its three-digit label', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const others = [traffic('thr', 10, 4, { alt: 33100 })];
+
+    // Act
+    const result = ndTraffic(own, others, NOW, view());
+
+    // Assert
+    expect(result.symbols.map((s) => [s.kind, s.label?.text])).toEqual([['threat', '+31']]);
+  });
+
+  it('annunciates TRAFFIC without a symbol for a threat that no track matches', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'ghost' }) });
+    const others = [traffic('a', 10, 4)];
+
+    // Act
+    const result = ndTraffic(own, others, NOW, view());
+
+    // Assert
+    expect(result.symbols.map((s) => s.kind)).toEqual(['proximate']);
+    expect(result.traffic).toBe(true);
+  });
+
+  it('draws no threat for a terminated advisory, or for none, and no TRAFFIC', () => {
+    // Arrange
+    const rows = [advisory({ address: 'thr' }, true), undefined];
+    const others = [traffic('thr', 10, 4)];
+
+    // Act
+    const results = rows.map((ra) => ndTraffic(ownShip({ ra }), others, NOW, view()));
+
+    // Assert
+    expect(results.map((r) => [r.symbols.map((s) => s.kind), r.traffic])).toEqual([
+      [['proximate'], false],
+      [['proximate'], false],
     ]);
+  });
+
+  it('draws no symbol for a threat whose altitude is not held, but still TRAFFIC', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const others = [
+      traffic('thr', 10, 4, { heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
+    ];
+
+    // Act
+    const result = ndTraffic(own, others, NOW, view());
+
+    // Assert
+    expect(result.symbols).toEqual([]);
+    expect(result.traffic).toBe(true);
   });
 });

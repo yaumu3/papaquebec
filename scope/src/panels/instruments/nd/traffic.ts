@@ -1,3 +1,4 @@
+import type { ResolutionAdvisory } from '../../../lib/acas';
 import { type GeoPoint, turn } from '../../../lib/geo';
 import { inverse } from '../../../lib/geodesic';
 import { magneticBearing } from '../../../state/magnetic';
@@ -161,6 +162,24 @@ export interface NdTraffic {
   offscale: boolean;
 }
 
+/** The advisory is in force while it is present and not terminated. */
+const advisoryActive = (ra: ResolutionAdvisory | undefined): ra is ResolutionAdvisory =>
+  ra !== undefined && !ra.terminated;
+
+/** The address the active advisory names its threat by, if it does. */
+function threatAddress(ra: ResolutionAdvisory | undefined): string | undefined {
+  return advisoryActive(ra) && ra.threat && 'address' in ra.threat ? ra.threat.address : undefined;
+}
+
+/** The threat named by its address, placed wherever it is held, whatever its altitude; no band applies. */
+function placeThreat(own: Track, threat: Track | undefined, now: number, view: NdView) {
+  const origin = originOf(own, now);
+  const at = threat && heldPosition(threat, now);
+  const alt = threat && heldAltitude(threat, now);
+  if (!origin || !threat || !at || alt === undefined) return undefined;
+  return placeOnDisplay(origin, threat, alt, at, view);
+}
+
 const NONE: NdTraffic = { symbols: [], traffic: false, offscale: false };
 
 /** The symbol of placed traffic of a kind, with the label of its altitude and the arrow of its rate. */
@@ -188,12 +207,23 @@ export function ndTraffic(
   view: NdView,
 ): NdTraffic {
   if (view.frame.mode === 'lost' || view.frame.mode === 'blank') return NONE;
-  const placed = trafficAround(own, others, now, view).map((p) => ({
-    kind: trafficKind(p.distanceNm, p.deltaFt),
-    p,
-  }));
+  const address = threatAddress(own.ra);
+  const all = [...others];
+  const placed = trafficAround(
+    own,
+    all.filter((t) => t.hex !== address),
+    now,
+    view,
+  ).map((p) => ({ kind: trafficKind(p.distanceNm, p.deltaFt), p }));
   const symbols = (['other', 'proximate'] as const).flatMap((kind) =>
     placed.filter((t) => t.kind === kind).map((t) => symbolOf(kind, t.p, now)),
   );
-  return { symbols, traffic: false, offscale: false };
+  const threat = placeThreat(
+    own,
+    all.find((t) => t.hex === address),
+    now,
+    view,
+  );
+  if (threat) symbols.push(symbolOf('threat', threat, now));
+  return { symbols, traffic: advisoryActive(own.ra), offscale: false };
 }
