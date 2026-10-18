@@ -137,9 +137,6 @@
 .span2 {
   grid-column: span 2;
 }
-.span4 {
-  grid-column: 1 / -1;
-}
 .k {
   display: flex;
   justify-content: space-between;

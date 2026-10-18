@@ -6,7 +6,7 @@
   --zoom-w: 28px;
   position: relative;
   margin-top: var(--space-4);
-  background: var(--nd-bg);
+  background: var(--instrument-bg);
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
 }
@@ -119,22 +119,6 @@
   align-items: center;
   gap: var(--space-3);
 }
-/* The flag of a missing value, struck through from corner to corner: what it names is not known. */
-.flag {
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-caution);
-  background: linear-gradient(
-    to bottom right,
-    transparent calc(50% - 0.5px),
-    var(--color-caution) calc(50% - 0.5px),
-    var(--color-caution) calc(50% + 0.5px),
-    transparent calc(50% + 0.5px)
-  );
-  color: var(--color-caution);
-  font-size: var(--text-sm);
-  letter-spacing: var(--tracking-wide);
-  line-height: 15px;
-}
 .corner {
   position: absolute;
   font-size: var(--text-md);
@@ -223,7 +207,7 @@
   height: 26px;
   padding: 0;
   border: 1px solid var(--panel-border);
-  background: var(--nd-bg);
+  background: var(--instrument-bg);
   color: var(--control-on-bg);
   font: inherit;
   font-size: var(--text-xl);

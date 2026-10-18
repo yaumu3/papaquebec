@@ -8,6 +8,7 @@ import {
   formatAltitude,
   holdsSelected,
   qnhAltitudeFt,
+  selectedFt,
   type Selection,
   STANDARD_ALTIMETER,
 } from './altitude';
@@ -147,5 +148,18 @@ describe('holdsSelected', () => {
 
     // Assert
     expect(out).toEqual([true, false, true, false, true, false, false, false]);
+  });
+});
+
+describe('selectedFt', () => {
+  it('rounds a selected altitude to the 100 ft the crew selects in', () => {
+    // Arrange
+    const reported = [14016, 31984, 4500];
+
+    // Act
+    const out = reported.map(selectedFt);
+
+    // Assert
+    expect(out).toEqual([14000, 32000, 4500]);
   });
 });

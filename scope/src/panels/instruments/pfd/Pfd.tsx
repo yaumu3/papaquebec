@@ -1,0 +1,64 @@
+import { createMemo, createSignal, Show } from 'solid-js';
+
+import { cx } from '../../../design/cx';
+import { settings } from '../../../state/settings';
+import type { Track } from '../../../state/track';
+import { trackStore } from '../../../state/tracks';
+import { trackWidth } from '../../../ui/size';
+import { isLost } from '../freshness';
+import { AltitudeMarks, AltitudeText, altitudeView, targetOf } from './AltitudeTape';
+import { AttitudeMarks, AttitudeText, attitudeView } from './Attitude';
+import { FmaMarks, FmaText } from './Fma';
+import { pfdGeometry, vsiScale } from './geometry';
+import { pfdFma, pfdReadouts } from './readout';
+import { SpeedMarks, SpeedText, speedView } from './SpeedTape';
+import { needleView, VsiMarks, VsiText } from './Vsi';
+
+import s from './Pfd.module.css';
+
+/** The primary flight display of a target: its modes, speed, attitude, altitude and vertical speed. */
+export function Pfd(props: { t: Track }) {
+  const [root, setRoot] = createSignal<HTMLDivElement>();
+  const width = trackWidth(root);
+  const g = createMemo(() => pfdGeometry(width()));
+  const lost = createMemo(() => isLost(props.t));
+  const r = createMemo(() => pfdReadouts(props.t, trackStore.stats.now, settings.altimeter));
+  const fma = createMemo(() => pfdFma(props.t, trackStore.stats.now));
+  const speed = createMemo(() => speedView(g(), r().ias));
+  const attitude = createMemo(() => attitudeView(g(), r()));
+  const altitude = createMemo(() => altitudeView(g(), r().altitude));
+  const sel = createMemo(() => targetOf(r().selAlt));
+  const fms = createMemo(() => targetOf(r().fmsAlt));
+  const needle = createMemo(() => needleView(g(), r().vs));
+  const scale = createMemo(() => vsiScale(g()));
+  return (
+    <div
+      data-pfd
+      ref={setRoot}
+      class={cx(s.pfd, lost() && s.last)}
+      style={{ height: `${g().h}px` }}
+    >
+      <Show when={width() > 0}>
+        <svg class={s.svg} aria-hidden="true">
+          <AttitudeMarks g={g()} view={attitude()} />
+          <SpeedMarks g={g()} view={speed()} />
+          <AltitudeMarks g={g()} read={r().altitude} view={altitude()} sel={sel()} fms={fms()} />
+          <VsiMarks g={g()} scale={scale()} needle={needle()} />
+          <FmaMarks g={g()} />
+        </svg>
+        <AttitudeText g={g()} view={attitude()} />
+        <SpeedText g={g()} view={speed()} mach={r().mach} />
+        <AltitudeText
+          g={g()}
+          read={r().altitude}
+          view={altitude()}
+          sel={sel()}
+          fms={fms()}
+          baro={r().baro}
+        />
+        <VsiText scale={scale()} needle={needle()} />
+        <FmaText g={g()} fma={fma()} />
+      </Show>
+    </div>
+  );
+}

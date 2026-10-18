@@ -1,5 +1,6 @@
-import { RAD } from '../../lib/units';
-import { fixed, offset, toward } from '../svg';
+import { RAD } from '../../../lib/units';
+import { fixed, offset, toward } from '../../svg';
+import { instrumentHeight } from '../height';
 
 /** The compass arc spans this far either side of the top. */
 const SPAN_DEG = 55;
@@ -38,7 +39,7 @@ export interface NdGeometry {
 
 /** The whole geometry of a display `w` wide: two thirds as high, the arc as large as that and the width let it be. */
 export function ndGeometry(w: number): NdGeometry {
-  const h = Math.floor((w * 2) / 3);
+  const h = instrumentHeight(w);
   const r = Math.min(h - 60, w / 2 - 24);
   return { w, h, cx: w / 2, cy: Math.min(h - 20, 40 + r), r, r2: r / 2 };
 }

@@ -28,10 +28,17 @@
   --row-hover: #2a2a2a;
   --row-selected: #3a3a3a;
   --accent: #fff;
-  /* The ND's ground, its half-range ring and its track line. */
-  --nd-bg: #0b0b0b;
+  /* The instruments' ground. */
+  --instrument-bg: #0b0b0b;
+  /* The ND's half-range ring and its track line. */
   --nd-ring: #3a3a38;
   --nd-track: #6a6a66;
+  /* The PFD's tape and VSI strips, flight mode band, readout boxes, sky and ground. */
+  --pfd-strip: #3a3a39;
+  --pfd-fma: #333332;
+  --pfd-readout: #000;
+  --pfd-sky: #3c5fb8;
+  --pfd-ground: #744a22;
   /* Hairlines inside a plot, and the shade of a stretch with no report. */
   --plot-grid: #2c2c2a;
   --plot-gap: #262624;
@@ -56,6 +63,12 @@
   --text-xl: 14px;
   /* The large labels of the ND's compass. */
   --text-nd-label: 12px;
+  /* The PFD's speed digits, altitude digits and the labels of its tapes and VSI. */
+  --text-pfd-speed: 16px;
+  --text-pfd-xs: 8px;
+  --text-pfd-2xs: 7px;
+  --text-pfd-label: 12px;
+  --text-pfd-alt: 17px;
   --tracking: 0.5px;
   --tracking-wide: 1px;
 

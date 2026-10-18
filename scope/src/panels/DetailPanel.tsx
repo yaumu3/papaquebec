@@ -23,7 +23,8 @@ import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
 import { advisoryBelow } from './header';
 import { History } from './history/History';
-import { Nd } from './nd/Nd';
+import { Nd } from './instruments/nd/Nd';
+import { Pfd } from './instruments/pfd/Pfd';
 import { NONE, positionReading, type Reading, READINGS } from './readings';
 import { Value } from './Value';
 
@@ -37,16 +38,11 @@ function Cell(props: {
   glyph?: string;
   dim?: boolean | undefined;
   /** Columns taken, for a value too long for one. */
-  span?: 2 | 4 | undefined;
+  span?: 2 | undefined;
   onClick?: () => void;
 }) {
   const cls = () =>
-    cx(
-      s.cell,
-      props.span === 2 && s.span2,
-      props.span === 4 && s.span4,
-      (props.dim ?? props.r === NONE) && s.dim,
-    );
+    cx(s.cell, props.span === 2 && s.span2, (props.dim ?? props.r === NONE) && s.dim);
   const body = () => (
     <>
       <div class={s.k}>
@@ -68,9 +64,9 @@ function Cell(props: {
 }
 
 /** The cell of one reading of the catalog. */
-function ReadingCell(props: { of: ReadingKey; t: Track; dim?: boolean; span?: 4 }) {
+function ReadingCell(props: { of: ReadingKey; t: Track; dim?: boolean }) {
   const spec = READINGS[props.of];
-  return <Cell k={spec.label} r={spec.format(props.t)} dim={props.dim} span={props.span} />;
+  return <Cell k={spec.label} r={spec.format(props.t)} dim={props.dim} />;
 }
 
 /** The position, whose tap centres the scope on it. */
@@ -246,21 +242,8 @@ function Tabs() {
 function Readings(props: { t: Track }) {
   return (
     <div class={s.readings}>
+      <Pfd t={props.t} />
       <Nd t={props.t} />
-      <Group name="FLT">
-        <ReadingCell of="alt" t={props.t} />
-        <ReadingCell of="vs" t={props.t} />
-      </Group>
-      <Group name="NAV">
-        <ReadingCell of="selAlt" t={props.t} />
-        <ReadingCell of="fmsAlt" t={props.t} />
-        <ReadingCell of="qnh" t={props.t} />
-        <ReadingCell of="modes" t={props.t} span={4} />
-      </Group>
-      <Group name="AIR">
-        <ReadingCell of="ias" t={props.t} />
-        <ReadingCell of="mach" t={props.t} />
-      </Group>
       <Group name="POS">
         <PositionCell t={props.t} />
         <ReadingCell of="nic" t={props.t} />
