@@ -16,7 +16,14 @@ afterEach(() => {
 });
 
 describe('ndFrame', () => {
-  it('sets the mode, the box and the flags by what holds', () => {
+  const lapsedTrack = makeSample(NOW, {
+    seen: 1,
+    heading: 201,
+    track: 198,
+    heard: { heading: FRESH, track: STALE },
+  });
+
+  it('sets the mode, the box and the flags by what holds, a track heard INSTRUMENT_SEC ago lapsed', () => {
     // Arrange
     const rows = [
       makeSample(NOW, {
@@ -27,12 +34,7 @@ describe('ndFrame', () => {
       }),
       makeSample(NOW, { seen: 1, track: 47, heard: { track: FRESH } }),
       makeSample(NOW, { seen: 34, heading: 201, track: 198, heard: { heading: 966, track: 966 } }),
-      makeSample(NOW, {
-        seen: 1,
-        heading: 201,
-        track: 198,
-        heard: { heading: FRESH, track: STALE },
-      }),
+      lapsedTrack,
       makeSample(NOW, { seen: 1 }),
     ];
 
@@ -54,12 +56,7 @@ describe('ndFrame', () => {
     const rows = [
       makeSample(NOW, { heading: 284, track: 289, heard: { heading: FRESH, track: FRESH } }),
       makeSample(NOW, { track: 47, heard: { track: FRESH } }),
-      makeSample(NOW, {
-        seen: 1,
-        heading: 201,
-        track: 198,
-        heard: { heading: FRESH, track: STALE },
-      }),
+      lapsedTrack,
       makeSample(NOW, { seen: 40, heading: 201, heard: { heading: 900 } }),
       makeSample(NOW, { seen: 40 }),
     ];
@@ -81,22 +78,6 @@ describe('ndFrame', () => {
 
     // Assert
     expect(frame.orient).toBe(198);
-  });
-
-  it('lets a track heard exactly INSTRUMENT_SEC ago lapse', () => {
-    // Arrange
-    const t = makeSample(NOW, {
-      seen: 1,
-      heading: 284,
-      track: 289,
-      heard: { heading: FRESH, track: STALE },
-    });
-
-    // Act
-    const frame = ndFrame(t, NOW);
-
-    // Assert
-    expect([frame.mode, frame.orient]).toEqual(['blank', 289]);
   });
 
   it('says how long ago the target was last heard, only when lost', () => {
