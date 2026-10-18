@@ -29,7 +29,7 @@ import {
   windArrowPath,
 } from './geometry';
 import { boxOf, ndFrame, type NdSymbols, type NdText, ndReadouts, ndSymbols } from './readout';
-import { ndTraffic, symbolAt, type TrafficKind } from './traffic';
+import { ndTraffic, symbolDrawn, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
 import s from './Nd.module.css';
@@ -126,17 +126,19 @@ export function Nd(props: { t: Track }) {
       g: g(),
     });
   });
-  const placed = glidedPoints(
+  /** Where each traffic lies from own ship as shown: on its way to where its latest report puts it. */
+  const lying = glidedPoints(
     () => traffic().symbols,
     (symbol) => symbol.key,
-    (symbol) => [symbol.x, symbol.y],
-    () => `${props.t.hex}/${ndRangeNm()}/${g().w}`,
+    (symbol) => symbol.at,
+    key,
   );
-  /** The symbols where they are shown: each on its way to where its latest report places it. */
+  /** The symbols as drawn: each at where it lies, with the compass as it is turned now. */
   const shown = createMemo(() =>
-    traffic().symbols.map((symbol) => {
-      const at = placed().get(symbol.key);
-      return at ? symbolAt(symbol, at[0], at[1]) : symbol;
+    traffic().symbols.flatMap((symbol) => {
+      const at = lying().get(symbol.key) ?? symbol.at;
+      const drawn = symbolDrawn(symbol, at, orient(), { g: g(), rangeNm: ndRangeNm() });
+      return drawn ? [drawn] : [];
     }),
   );
   const shapes = (kind: TrafficKind) =>

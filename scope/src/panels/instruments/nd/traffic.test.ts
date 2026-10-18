@@ -15,6 +15,7 @@ import {
   ndTraffic,
   relativeAltitudeLabel,
   symbolAt,
+  symbolDrawn,
   type TrafficSymbol,
   trafficAround,
   trafficKind,
@@ -440,6 +441,22 @@ describe('ndTraffic threat by position', () => {
     expect(result.symbols.map((s) => s.key)).toEqual(['near', 'estimate']);
   });
 
+  it('carries where each symbol lies from own ship, east and north in NM, magnetic north up', () => {
+    // Arrange
+    const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
+    const others = [traffic('ahead', 150, 5)];
+    const [east, north] = [3 * Math.sin(172 * RAD), 3 * Math.cos(172 * RAD)];
+
+    // Act
+    const result = ndTraffic(own, others, NOW, view(150));
+
+    // Assert
+    expect(result.symbols[0]?.at[0]).toBeCloseTo(5 * Math.sin(150 * RAD), 2);
+    expect(result.symbols[0]?.at[1]).toBeCloseTo(5 * Math.cos(150 * RAD), 2);
+    expect(result.symbols[1]?.at[0]).toBeCloseTo(east, 6);
+    expect(result.symbols[1]?.at[1]).toBeCloseTo(north, 6);
+  });
+
   it('places it at its range, on its bearing from the heading, with the label of its altitude', () => {
     // Arrange
     const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
@@ -562,12 +579,13 @@ describe('symbolAt', () => {
     const full: TrafficSymbol = {
       kind: 'other',
       key: 'a',
+      at: [1, 2],
       x: 100,
       y: 50,
       label: { text: '+11', x: 100, y: 38 },
       arrow: { glyph: '↑', x: 109, y: 50 },
     };
-    const bare: TrafficSymbol = { kind: 'threat', key: 'estimate', x: 100, y: 50 };
+    const bare: TrafficSymbol = { kind: 'threat', key: 'estimate', at: [1, 2], x: 100, y: 50 };
 
     // Act
     const moved = [full, bare].map((symbol) => symbolAt(symbol, 103, 56));
@@ -577,12 +595,37 @@ describe('symbolAt', () => {
       {
         kind: 'other',
         key: 'a',
+        at: [1, 2],
         x: 103,
         y: 56,
         label: { text: '+11', x: 103, y: 44 },
         arrow: { glyph: '↑', x: 112, y: 56 },
       },
-      { kind: 'threat', key: 'estimate', x: 103, y: 56 },
+      { kind: 'threat', key: 'estimate', at: [1, 2], x: 103, y: 56 },
     ]);
+  });
+});
+
+describe('symbolDrawn', () => {
+  it('projects the traffic at its offset with the compass as shown, and drops it off the display', () => {
+    // Arrange
+    const symbol: TrafficSymbol = {
+      kind: 'other',
+      key: 'a',
+      at: [0, 5],
+      x: 0,
+      y: 0,
+      label: { text: '+11', x: 0, y: -12 },
+    };
+    const ahead = ndPoint(G, 0, pxOf(G, 5, 20));
+
+    // Act
+    const drawn = [0, 90].map((orient) => symbolDrawn(symbol, [0, 5], orient, view()));
+
+    // Assert
+    expect(drawn[0]?.x).toBeCloseTo(ahead[0], 6);
+    expect(drawn[0]?.y).toBeCloseTo(ahead[1], 6);
+    expect(drawn[0]?.label).toEqual({ text: '+11', x: ahead[0], y: ahead[1] - 12 });
+    expect(drawn[1]).toBeUndefined();
   });
 });
