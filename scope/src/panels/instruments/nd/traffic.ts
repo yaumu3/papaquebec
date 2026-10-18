@@ -165,13 +165,33 @@ const ARROW_GAP_PX = 9;
 
 export type TrafficKind = 'other' | 'proximate' | 'threat';
 
-/** A symbol to draw: its kind and centre, the label centred on its own point and the arrow from its left edge. */
+/** The key of the threat the aircraft places by range and bearing, which no track address is. */
+const ESTIMATE_KEY = 'estimate';
+
+/**
+ * A symbol to draw: its kind and centre, the label centred on its own point and the arrow from
+ * its left edge; keyed by the track's address, so that it is the same symbol from one report to
+ * the next.
+ */
 export interface TrafficSymbol {
   kind: TrafficKind;
+  key: string;
   x: number;
   y: number;
   label?: { text: string; x: number; y: number } | undefined;
   arrow?: { glyph: '↑' | '↓'; x: number; y: number } | undefined;
+}
+
+/** The symbol drawn at (x, y) instead: its label and arrow move with it. */
+export function symbolAt(symbol: TrafficSymbol, x: number, y: number): TrafficSymbol {
+  const dx = x - symbol.x;
+  const dy = y - symbol.y;
+  const moved = { ...symbol, x, y };
+  if (symbol.label)
+    moved.label = { ...symbol.label, x: symbol.label.x + dx, y: symbol.label.y + dy };
+  if (symbol.arrow)
+    moved.arrow = { ...symbol.arrow, x: symbol.arrow.x + dx, y: symbol.arrow.y + dy };
+  return moved;
 }
 
 /** What the ND draws of the traffic: the symbols in paint order, and the annunciations. */
@@ -216,6 +236,7 @@ function symbolOf(kind: TrafficKind, p: Placed, now: number): TrafficSymbol {
   const arrow = verticalArrow(p.track, now);
   return {
     kind,
+    key: p.track.hex,
     x: p.x,
     y: p.y,
     label: labelOf(p.x, p.y, p.deltaFt),
@@ -277,7 +298,7 @@ function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol 
   const { altitude } = estimate;
   const label =
     altitude !== undefined && ownAlt !== undefined ? labelOf(x, y, altitude - ownAlt) : undefined;
-  return { kind: 'threat', x, y, label };
+  return { kind: 'threat', key: ESTIMATE_KEY, x, y, label };
 }
 
 /** The traffic the display draws around own ship, none on a lost or blank display. */

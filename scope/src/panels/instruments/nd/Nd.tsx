@@ -8,7 +8,7 @@ import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
 import { trackWidth } from '../../../ui/size';
-import { glided } from '../glide';
+import { glided, glidedPoints } from '../glide';
 import {
   aircraftPath,
   arcPath,
@@ -29,7 +29,7 @@ import {
   windArrowPath,
 } from './geometry';
 import { boxOf, ndFrame, type NdSymbols, type NdText, ndReadouts, ndSymbols } from './readout';
-import { ndTraffic, type TrafficKind } from './traffic';
+import { ndTraffic, symbolAt, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
 import s from './Nd.module.css';
@@ -121,9 +121,22 @@ export function Nd(props: { t: Track }) {
       g: g(),
     });
   });
+  const placed = glidedPoints(
+    () => traffic().symbols,
+    (symbol) => symbol.key,
+    (symbol) => [symbol.x, symbol.y],
+    () => `${props.t.hex}/${ndRangeNm()}/${g().w}`,
+  );
+  /** The symbols where they are shown: each on its way to where its latest report places it. */
+  const shown = createMemo(() =>
+    traffic().symbols.map((symbol) => {
+      const at = placed().get(symbol.key);
+      return at ? symbolAt(symbol, at[0], at[1]) : symbol;
+    }),
+  );
   const shapes = (kind: TrafficKind) =>
-    traffic()
-      .symbols.filter((symbol) => symbol.kind === kind)
+    shown()
+      .filter((symbol) => symbol.kind === kind)
       .map((symbol) =>
         kind === 'threat'
           ? threatSquarePath(symbol.x, symbol.y)
@@ -165,7 +178,7 @@ export function Nd(props: { t: Track }) {
             </div>
           )}
         </Index>
-        <Index each={traffic().symbols}>
+        <Index each={shown()}>
           {(symbol) => (
             <>
               <Show when={symbol().label}>

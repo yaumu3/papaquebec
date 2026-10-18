@@ -14,6 +14,8 @@ import {
   nearOnPlane,
   ndTraffic,
   relativeAltitudeLabel,
+  symbolAt,
+  type TrafficSymbol,
   trafficAround,
   trafficKind,
   verticalArrow,
@@ -426,6 +428,18 @@ describe('ndTraffic threat by position', () => {
   const byPosition = (threat: Threat, over: Partial<Track> = {}): Track =>
     ownShip({ heading: 152, heard: HELD, ra: advisory(threat), ...over });
 
+  it('keys each symbol by its track, and the threat placed by range and bearing as the estimate', () => {
+    // Arrange
+    const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
+    const others = [traffic('near', 150, 3)];
+
+    // Act
+    const result = ndTraffic(own, others, NOW, view(150));
+
+    // Assert
+    expect(result.symbols.map((s) => s.key)).toEqual(['near', 'estimate']);
+  });
+
   it('places it at its range, on its bearing from the heading, with the label of its altitude', () => {
     // Arrange
     const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
@@ -539,5 +553,36 @@ describe('ndTraffic offscale', () => {
 
     // Assert
     expect(results).toEqual(rows.map(() => false));
+  });
+});
+
+describe('symbolAt', () => {
+  it('moves the label and the arrow with the symbol, and a bare symbol as it is', () => {
+    // Arrange
+    const full: TrafficSymbol = {
+      kind: 'other',
+      key: 'a',
+      x: 100,
+      y: 50,
+      label: { text: '+11', x: 100, y: 38 },
+      arrow: { glyph: '↑', x: 109, y: 50 },
+    };
+    const bare: TrafficSymbol = { kind: 'threat', key: 'estimate', x: 100, y: 50 };
+
+    // Act
+    const moved = [full, bare].map((symbol) => symbolAt(symbol, 103, 56));
+
+    // Assert
+    expect(moved).toEqual([
+      {
+        kind: 'other',
+        key: 'a',
+        x: 103,
+        y: 56,
+        label: { text: '+11', x: 103, y: 44 },
+        arrow: { glyph: '↑', x: 112, y: 56 },
+      },
+      { kind: 'threat', key: 'estimate', x: 103, y: 56 },
+    ]);
   });
 });
