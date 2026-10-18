@@ -266,14 +266,14 @@ fn air_data_are_heard_of_every_aircraft_in_the_air() {
 }
 
 #[test]
-fn one_aircraft_idents_and_one_flies_an_advisory() {
+fn one_aircraft_idents_and_a_pair_fly_advisories_against_each_other() {
     // Arrange
     let mut heard = Heard::new(0);
 
     // Act
     let snapshot = heard.placed();
 
-    // Assert: a climb, of one threat
+    // Assert: TEST07 climbs against TEST14, which descends against TEST07
     let identing: Vec<_> = snapshot
         .aircraft
         .iter()
@@ -286,12 +286,36 @@ fn one_aircraft_idents_and_one_flies_an_advisory() {
         .iter()
         .filter(|a| a.advisory.is_some())
         .collect();
-    assert_eq!(advised.len(), 1);
-    assert_eq!(advised[0].callsign(), Some("TEST07"));
-    let advisory = advised[0].advisory.as_ref().expect("advised");
-    let resolution = advisory.resolution.expect("of one threat");
-    assert!(resolution.corrective && resolution.positive && !resolution.downward);
-    assert_eq!(advisory.threat, Some(Threat::ThreatAddress(0x00d0_000e)));
+    let senses: Vec<_> = advised
+        .iter()
+        .map(|a| {
+            let advisory = a.advisory.as_ref().expect("advised");
+            let resolution = advisory.resolution.expect("of one threat");
+            (
+                a.callsign(),
+                resolution.corrective && resolution.positive,
+                resolution.downward,
+                advisory.threat,
+            )
+        })
+        .collect();
+    assert_eq!(
+        senses,
+        [
+            (
+                Some("TEST07"),
+                true,
+                false,
+                Some(Threat::ThreatAddress(0x00d0_000e))
+            ),
+            (
+                Some("TEST14"),
+                true,
+                true,
+                Some(Threat::ThreatAddress(0x00d0_0007))
+            ),
+        ]
+    );
 }
 
 #[test]

@@ -188,20 +188,36 @@ const HOLDING: Modes = Modes {
     ..AUTOPILOT
 };
 /// What an aircraft of the fleet keeps showing: it presses IDENT, or it flies
-/// a resolution advisory against the aircraft at an address.
+/// a resolution advisory against the aircraft at an address, which an aircraft keeping a station
+/// off that one answers in the complementary sense.
 #[derive(Clone, Copy, PartialEq)]
 enum Shown {
     Ident,
-    Advisory(u32),
+    Advisory { threat: u32, downward: bool },
 }
 
-/// A corrective climb against the threat at `address`.
-fn climbing(address: u32) -> Advisory {
+impl Shown {
+    /// The advisory the aircraft at `to` flies in answer to the one against it from `from`. TCAS II
+    /// coordinates an encounter between two equipped aircraft so that they resolve it in
+    /// complementary senses (RTCA DO-185B; ICAO Annex 10 Vol. IV), each naming the other.
+    fn answered(self, from: u32, to: u32) -> Option<Self> {
+        match self {
+            Self::Advisory { threat, downward } if threat == to => Some(Self::Advisory {
+                threat: from,
+                downward: !downward,
+            }),
+            _ => None,
+        }
+    }
+}
+
+/// A corrective climb or descent against the threat at `address`.
+fn resolving(address: u32, downward: bool) -> Advisory {
     Advisory {
         multiple_threats: false,
         resolution: Some(Resolution {
             corrective: true,
-            downward: false,
+            downward,
             increased_rate: false,
             sense_reversal: false,
             altitude_crossing: false,
@@ -236,7 +252,7 @@ fn fleet() -> Vec<Plan> {
         Plan { sel_alt: Some(14_000.0), modes: Some(Modes { lnav: true, ..HOLDING }),
             hold: Some(Hold { x: 12.0, y: 14.0, inbound_deg: 225.0, leg_s: 60.0 }),
             ..plan(6, true, large, 0o3452, (14.71, 16.71), 14_000.0, 230.0, 225.0, 0.0, "A320") },
-        Plan { sel_alt: Some(21_000.0), sel_heading: Some(260.0), modes: Some(HOLDING), shown: Some(Shown::Advisory(0x00d0_000e)),
+        Plan { sel_alt: Some(21_000.0), sel_heading: Some(260.0), modes: Some(HOLDING), shown: Some(Shown::Advisory { threat: 0x00d0_000e, downward: false }),
             ..plan(7, true, heavy, 0o5512, (-8.0, 31.0), 17_000.0, 380.0, 260.0, 0.0, "B74F") },
         plan(8, true, large, 0o7012, (32.0, 7.0), 7500.0, 240.0, 250.0, -600.0, "CRJ7"),
         plan(9, false, small, 0o7700, (-28.0, 10.0), 9000.0, 250.0, 95.0, -1200.0, "C68A"),
@@ -590,10 +606,10 @@ impl Flying {
         let odd = !second.is_multiple_of(2);
         let mut fields = self.moving(site, odd);
         fields.extend(self.selected().map(|selected| selected.write()));
-        if let Some(Shown::Advisory(threat)) = plan.shown {
+        if let Some(Shown::Advisory { threat, downward }) = plan.shown {
             fields.push(
                 RaBroadcast {
-                    advisory: climbing(threat),
+                    advisory: resolving(threat, downward),
                 }
                 .write(),
             );
@@ -779,6 +795,7 @@ impl Fleet {
     }
 
     /// Puts each aircraft that keeps a station where it is off its leader, flying as it flies.
+    /// It shows only what answers its leader's advisory.
     fn keep_stations(&mut self) {
         for i in 0..self.flying.len() {
             let Some(station) = self.flying[i].plan.station else {
@@ -799,10 +816,15 @@ impl Fleet {
                 leader.plan.gs,
             );
             let (baro_rate, turning) = (leader.baro_rate, leader.turning);
+            let answer = leader
+                .plan
+                .shown
+                .and_then(|shown| shown.answered(leader.plan.address, self.flying[i].plan.address));
             let follower = &mut self.flying[i];
             (follower.x, follower.y, follower.alt) = (x, y, alt);
             (follower.plan.track, follower.plan.gs) = (track, gs);
             (follower.baro_rate, follower.turning) = (baro_rate, turning);
+            follower.plan.shown = answer;
         }
     }
 
@@ -932,7 +954,10 @@ mod tests {
     use crate::testing::{SITE, hand_clock};
     use tracker::field::{Field, ModesReported, RaBroadcast, Status};
     use tracker::position::{bearing_of, signed_bearing};
-    use tracker::proto::{EmergencyPriorityStatus, advisory::Threat};
+    use tracker::proto::{
+        Advisory, EmergencyPriorityStatus,
+        advisory::{Resolution, Threat},
+    };
     use tracker::register::TrackAndTurn;
 
     /// A fleet at second 1000 and the hand that moves its clock.
@@ -1281,6 +1306,69 @@ mod tests {
             .find(|plan| plan.number == number)
             .map(|plan| plan.address)
             .expect("the aircraft is in the fleet")
+    }
+
+    /// The advisory the aircraft at `address` broadcasts in the fleet's next second.
+    fn advisory_of(fleet: &Fleet, address: u32) -> Option<Advisory> {
+        fleet
+            .flying
+            .iter()
+            .find(|flying| flying.plan.address == address)
+            .expect("the aircraft is in the fleet")
+            .broadcasts(SITE, 0)
+            .into_iter()
+            .find_map(RaBroadcast::read)
+            .map(|broadcast| broadcast.advisory)
+    }
+
+    #[test]
+    fn both_aircraft_of_the_encounter_name_each_other() {
+        // Arrange
+        let (climber, descender) = (address_of(7), address_of(14));
+        let (mut fleet, _advance) = fleet(0);
+        fleet.fly();
+
+        // Act
+        let threats = [climber, descender]
+            .map(|address| advisory_of(&fleet, address).and_then(|advisory| advisory.threat));
+
+        // Assert
+        assert_eq!(
+            threats,
+            [
+                Some(Threat::ThreatAddress(descender)),
+                Some(Threat::ThreatAddress(climber))
+            ]
+        );
+    }
+
+    #[test]
+    fn the_coordinated_advisories_are_in_complementary_senses() {
+        // Arrange
+        let (climber, descender) = (address_of(7), address_of(14));
+        let (mut fleet, _advance) = fleet(0);
+        fleet.fly();
+
+        // Act
+        let senses = [climber, descender].map(|address| {
+            advisory_of(&fleet, address).map(|advisory| (advisory.resolution, advisory.terminated))
+        });
+
+        // Assert
+        let sense = |downward| {
+            Some((
+                Some(Resolution {
+                    corrective: true,
+                    downward,
+                    increased_rate: false,
+                    sense_reversal: false,
+                    altitude_crossing: false,
+                    positive: true,
+                }),
+                false,
+            ))
+        };
+        assert_eq!(senses, [sense(false), sense(true)]);
     }
 
     #[test]
