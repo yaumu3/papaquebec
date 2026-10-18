@@ -9,14 +9,17 @@ import { type NdFrame } from './readout';
 /** The vertical speed in fpm from which TCAS shows a vertical arrow beside traffic (RTCA DO-185B). */
 const ARROW_FPM = 500;
 
+/** A relative altitude in whole hundreds of feet, halves rounded away from zero. */
+const hundredsOf = (deltaFt: number): number =>
+  Math.sign(deltaFt) * Math.round(Math.abs(deltaFt) / 100);
+
 /**
  * The altitude of traffic relative to own ship in hundreds of feet, signed by the rounded value
  * so that level reads `+00`, at least two digits and never clipped. Halves round away from zero.
  */
 export function relativeAltitudeLabel(deltaFt: number): string {
-  const hundreds = Math.round(Math.abs(deltaFt) / 100);
-  const sign = deltaFt < 0 && hundreds > 0 ? '-' : '+';
-  return `${sign}${String(hundreds).padStart(2, '0')}`;
+  const hundreds = hundredsOf(deltaFt);
+  return `${hundreds < 0 ? '-' : '+'}${String(Math.abs(hundreds)).padStart(2, '0')}`;
 }
 
 /** The arrow for traffic climbing or descending at 500 fpm or more by its own held rate. */
