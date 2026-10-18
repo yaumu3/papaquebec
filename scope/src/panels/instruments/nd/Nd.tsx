@@ -92,7 +92,7 @@ export function Nd(props: { t: Track }) {
     deg === undefined ? undefined : turn(orient(), deg);
   const track = createMemo(() => {
     const rel = relative(trackDeg());
-    return rel === undefined ? undefined : { rel, line: trackPath(g(), rel) };
+    return rel === undefined ? undefined : { rel, line: trackPath(g()) };
   });
   const levelOff = createMemo(() => {
     const at = track();

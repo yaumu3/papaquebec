@@ -167,7 +167,7 @@
   color: var(--text-muted);
 }
 .trackLine {
-  stroke: var(--nd-track);
+  stroke: var(--text);
   stroke-width: 1;
 }
 .bug {

@@ -182,28 +182,15 @@ describe('fixed symbols', () => {
 });
 
 describe('track line', () => {
-  const g = ndGeometry(346);
-
-  it('draws the line from near the aircraft out to the arc, crossed at the ring', () => {
+  it("runs straight up from the aircraft's nose to the arc, a 10 px tick at half range", () => {
     // Arrange
-    const at = 0;
+    const g = ndGeometry(346);
 
     // Act
-    const path = trackPath(g, at);
+    const path = trackPath(g);
 
     // Assert
-    expect(path).toBe('M173.0 175.0L173.0 52.0M169.0 114.5L177.0 114.5');
-  });
-
-  it('draws no track line where the track is off the arc', () => {
-    // Arrange
-    const at = 80;
-
-    // Act
-    const path = trackPath(g, at);
-
-    // Assert
-    expect(path).toBe('');
+    expect(path).toBe('M173.0 179.0L173.0 40.0M168.0 114.5L178.0 114.5');
   });
 });
 
