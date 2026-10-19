@@ -21,7 +21,8 @@ import {
   ndGeometry,
   rangeAnchors,
   ringPath,
-  threatSquarePath,
+  squarePath,
+  THREAT_SIDE_PX,
   trackPath,
   trafficDiamondPath,
   trendPath,
@@ -149,7 +150,7 @@ export function Nd(props: { t: Track }) {
       .filter((symbol) => symbol.kind === kind)
       .map((symbol) =>
         kind === 'threat'
-          ? threatSquarePath(symbol.x, symbol.y)
+          ? squarePath(symbol.x, symbol.y, THREAT_SIDE_PX)
           : trafficDiamondPath(symbol.x, symbol.y),
       )
       .join('');
