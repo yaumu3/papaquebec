@@ -69,7 +69,19 @@ export const isFiltered = (t: Filterable & { hex: string }): boolean =>
 /** Where each block was last drawn from its target, CSS px, mid-slide included: where the pointer finds it. */
 export const drawnBlocks = new Map<string, { dx: number; dy: number }>();
 
-export const [hovered, setHovered] = createSignal<string | null>(null);
+/** The surfaces a pointer can hover an aircraft on. */
+export type HoverSurface = 'scope' | 'list' | 'nd';
+
+const [hover, setHover] = createSignal<{ by: HoverSurface; hex: string } | null>(null, {
+  equals: (a, b) => a?.by === b?.by && a?.hex === b?.hex,
+});
+/** The aircraft hovered on any surface. */
+export const hovered = (): string | null => hover()?.hex ?? null;
+/** `by` hovers `hex`, replacing any hover; a null from `by` clears only a hover `by` set. */
+export function setHovered(by: HoverSurface, hex: string | null): void {
+  if (hex !== null) setHover({ by, hex });
+  else if (hover()?.by === by) setHover(null);
+}
 /** Pan offset from the site, in NM. */
 export const [pan, setPan] = createSignal<Vec2>({ x: 0, y: 0 });
 export const [canvasSize, setCanvasSize] = createSignal({ width: 1, height: 1, dpr: 1 });

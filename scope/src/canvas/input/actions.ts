@@ -171,7 +171,7 @@ export function createActions(host: DragHost): ScopeActions {
   const hover = (at: Point | null) => {
     setPointer(at && { cx: at.x, cy: at.y });
     const t = at && targetAt(view(), at.x, at.y);
-    setHovered(t ? t.hex : null);
+    setHovered('scope', t ? t.hex : null);
   };
 
   const zoomStart = () => {
