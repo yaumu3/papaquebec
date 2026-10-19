@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 
 import type { AircraftSnapshot } from '../lib/aircraft';
-import { forgetHovered, hovered, setHovered } from './scope';
+import { makeTrack } from '../render/scene/trackFixture';
+import { sortTracks } from './listSort';
+import { forgetHovered, hexAt, hovered, setHovered } from './scope';
 import { createTrackStore } from './trackStore';
 
 const project = () => ({ x: 0, y: 0 });
@@ -78,5 +80,36 @@ describe('the hover', () => {
 
     // Assert
     expect(seen).toEqual(cases.map((c) => c.expected));
+  });
+
+  it('follows the place under a resting pointer as the list re-sorts', () => {
+    // Arrange
+    const sort = { key: 'alt', dir: 'asc' } as const;
+    const before = [
+      makeTrack({ hex: 'd00001', alt: 1000 }),
+      makeTrack({ hex: 'd00002', alt: 2000 }),
+    ];
+    const after = [
+      makeTrack({ hex: 'd00001', alt: 3000 }),
+      makeTrack({ hex: 'd00002', alt: 2000 }),
+    ];
+    const hexes = (tracks: typeof before) => sortTracks(tracks, sort).map((t) => t.hex);
+
+    // Act
+    const seen = [before, after].map((tracks) => hexAt(hexes(tracks), 0));
+
+    // Assert
+    expect(seen).toEqual(['d00001', 'd00002']);
+  });
+
+  it('hovers nothing from no place or one past the last', () => {
+    // Arrange
+    const places = [null, 2];
+
+    // Act
+    const seen = places.map((place) => hexAt(['d00001', 'd00002'], place));
+
+    // Assert
+    expect(seen).toEqual([null, null]);
   });
 });

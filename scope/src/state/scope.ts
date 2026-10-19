@@ -82,6 +82,9 @@ export function setHovered(by: HoverSurface, hex: string | null): void {
   if (hex !== null) setHover({ by, hex });
   else if (hover()?.by === by) setHover(null);
 }
+/** What place `place` of a surface shows now, as a pointer resting there hovers it. */
+export const hexAt = (hexes: readonly string[], place: number | null): string | null =>
+  (place === null ? undefined : hexes[place]) ?? null;
 /** Forgets the hover once its aircraft has left the track store. */
 export function forgetHovered(tracks: ReadonlyMap<string, unknown>): void {
   const hex = hovered();
