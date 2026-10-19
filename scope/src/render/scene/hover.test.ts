@@ -45,20 +45,21 @@ describe('buildHover', () => {
     expect(rgba).toEqual(parseColor(trackColor(t, null)).map((c) => Math.fround(c)));
   });
 
-  it('draws nothing without a target, for the selected one, or for a filtered one', () => {
+  it('draws nothing without a target, for the selected one, a filtered one or one without a position', () => {
     // Arrange
     const t = makeTrack();
     const cases = [
       input({ track: null }),
       input({ track: t, selected: t.hex }),
       input({ track: t, filter: { ground: true, lowerFl: 200, upperFl: 500, squawk: 'all' } }),
+      input({ track: makeTrack({ position: { kind: 'none' } }) }),
     ];
 
     // Act
     const drawn = cases.map((c) => count(buildHover(c)));
 
     // Assert
-    expect(drawn).toEqual([0, 0, 0]);
+    expect(drawn).toEqual([0, 0, 0, 0]);
   });
 
   it('runs the leader to a block being dragged rather than to its direction', () => {
