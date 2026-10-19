@@ -82,6 +82,11 @@ export function setHovered(by: HoverSurface, hex: string | null): void {
   if (hex !== null) setHover({ by, hex });
   else if (hover()?.by === by) setHover(null);
 }
+/** Forgets the hover once its aircraft has left the track store. */
+export function forgetHovered(tracks: ReadonlyMap<string, unknown>): void {
+  const hex = hovered();
+  if (hex !== null && !tracks.has(hex)) setHover(null);
+}
 /** Pan offset from the site, in NM. */
 export const [pan, setPan] = createSignal<Vec2>({ x: 0, y: 0 });
 export const [canvasSize, setCanvasSize] = createSignal({ width: 1, height: 1, dpr: 1 });
