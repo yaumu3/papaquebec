@@ -15,6 +15,7 @@ import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rul
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import { magneticTrack } from '../state/magnetic';
 import {
+  hoverMark,
   isFiltered,
   listSort,
   selected,
@@ -123,7 +124,12 @@ export function ListPanel() {
             const handlers = mouse.at(i);
             return (
               <div
-                class={cx(s.row, rowTone(t()), selected() === t().hex && s.selected)}
+                class={cx(
+                  s.row,
+                  rowTone(t()),
+                  hoverMark() === t().hex && s.peek,
+                  selected() === t().hex && s.selected,
+                )}
                 onClick={() => setSelected(t().hex)}
                 onPointerEnter={handlers.enter}
                 onPointerLeave={handlers.leave}

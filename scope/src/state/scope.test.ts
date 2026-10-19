@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import type { AircraftSnapshot } from '../lib/aircraft';
 import { makeTrack } from '../render/scene/trackFixture';
 import { sortTracks } from './listSort';
-import { forgetHovered, hexAt, hovered, setHovered } from './scope';
+import { forgetHovered, hexAt, hovered, hoverMark, setHovered, setSelected } from './scope';
 import { createTrackStore } from './trackStore';
 
 const project = () => ({ x: 0, y: 0 });
@@ -23,6 +23,7 @@ describe('the hover', () => {
   beforeEach(() => {
     setHovered('scope', null);
     setHovered('list', null);
+    setSelected(null);
   });
 
   it('is replaced by a set from any surface', () => {
@@ -111,5 +112,20 @@ describe('the hover', () => {
 
     // Assert
     expect(seen).toEqual([null, null]);
+  });
+
+  it('marks the hovered aircraft unless it is the selected one', () => {
+    // Arrange
+    setHovered('list', 'd00001');
+    const selections = [null, 'd00002', 'd00001'];
+
+    // Act
+    const marks = selections.map((hex) => {
+      setSelected(hex);
+      return hoverMark();
+    });
+
+    // Assert
+    expect(marks).toEqual(['d00001', 'd00001', null]);
   });
 });

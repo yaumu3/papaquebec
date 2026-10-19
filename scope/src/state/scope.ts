@@ -82,6 +82,8 @@ export function setHovered(by: HoverSurface, hex: string | null): void {
   if (hex !== null) setHover({ by, hex });
   else if (hover()?.by === by) setHover(null);
 }
+/** The hovered aircraft unless it is selected, which a surface marks as selected instead. */
+export const hoverMark = (): string | null => (hovered() === selected() ? null : hovered());
 /** What place `place` of a surface shows now, as a pointer resting there hovers it. */
 export const hexAt = (hexes: readonly string[], place: number | null): string | null =>
   (place === null ? undefined : hexes[place]) ?? null;
