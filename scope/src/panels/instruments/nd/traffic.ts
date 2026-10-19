@@ -198,6 +198,16 @@ export interface TrafficSymbol {
   arrow?: { glyph: '↑' | '↓'; x: number; y: number } | undefined;
 }
 
+/** The symbols a pointer can hover: all but the threat placed by range and bearing, which no track backs. */
+export const peekable = (symbols: readonly TrafficSymbol[]): TrafficSymbol[] =>
+  symbols.filter((symbol) => symbol.key !== ESTIMATE_KEY);
+
+/** The hoverable symbol of aircraft `hex`, if it is drawn. */
+export const peekedSymbol = (
+  symbols: readonly TrafficSymbol[],
+  hex: string | null,
+): TrafficSymbol | undefined => peekable(symbols).find((symbol) => symbol.key === hex);
+
 /** The symbol drawn at (x, y) instead: its label and arrow move with it. */
 export function symbolAt(symbol: TrafficSymbol, x: number, y: number): TrafficSymbol {
   const dx = x - symbol.x;

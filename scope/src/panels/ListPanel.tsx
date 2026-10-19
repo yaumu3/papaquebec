@@ -15,6 +15,7 @@ import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rul
 import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
 import { magneticTrack } from '../state/magnetic';
 import {
+  hoverMark,
   isFiltered,
   listSort,
   selected,
@@ -26,6 +27,7 @@ import {
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
+import { hoverPlace } from '../ui/hoverPlace';
 import { Window } from '../ui/Window';
 
 import s from './ListPanel.module.css';
@@ -96,6 +98,7 @@ export function ListPanel() {
     snapshotVersion();
     return sortTracks([...trackStore.tracks.values()], listSort());
   });
+  const mouse = hoverPlace('list', () => rows().map((t) => t.hex));
   return (
     <Window id="list" class={s.panel} bodyClass={s.body}>
       <div class={s.header} style={GRID}>
@@ -117,25 +120,35 @@ export function ListPanel() {
       <div class={s.rows} style={GRID}>
         {/* By place, not by track: a snapshot brings new track objects, and a row is kept for its successor. */}
         <Index each={rows()}>
-          {(t) => (
-            <div
-              class={cx(s.row, rowTone(t()), selected() === t().hex && s.selected)}
-              onClick={() => setSelected(t().hex)}
-              onContextMenu={(e) => {
-                e.preventDefault();
-                setMenu({ x: e.clientX, y: e.clientY, items: targetMenu(t()) });
-              }}
-            >
-              <For each={COLUMNS}>
-                {(c) => (
-                  <span class={cx(c.figure && s.figure, c.faint?.(t()) && s.hex)}>
-                    {c.cell(t())}
-                    {c.hang && <span class={s.hang}>{c.hang(t())}</span>}
-                  </span>
+          {(t, i) => {
+            const handlers = mouse.at(i);
+            return (
+              <div
+                class={cx(
+                  s.row,
+                  rowTone(t()),
+                  hoverMark() === t().hex && s.peek,
+                  selected() === t().hex && s.selected,
                 )}
-              </For>
-            </div>
-          )}
+                onClick={() => setSelected(t().hex)}
+                onPointerEnter={handlers.enter}
+                onPointerLeave={handlers.leave}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setMenu({ x: e.clientX, y: e.clientY, items: targetMenu(t()) });
+                }}
+              >
+                <For each={COLUMNS}>
+                  {(c) => (
+                    <span class={cx(c.figure && s.figure, c.faint?.(t()) && s.hex)}>
+                      {c.cell(t())}
+                      {c.hang && <span class={s.hang}>{c.hang(t())}</span>}
+                    </span>
+                  )}
+                </For>
+              </div>
+            );
+          }}
         </Index>
       </div>
     </Window>

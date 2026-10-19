@@ -38,7 +38,7 @@ export const THEME = {
   cursorDim: '#9a6ab0',
   cursorFaint: '#d48cf04d',
   filtered: '#808080',
-  hover: '#a0a0a0',
+  hover: PALETTE.hover,
 } as const;
 
 /** Control zones and special-use areas: what the operator must not miss. Everything else is context. */

@@ -13,7 +13,8 @@ import {
   ndGeometry,
   rangeAnchors,
   ringPath,
-  threatSquarePath,
+  squarePath,
+  THREAT_SIDE_PX,
   trafficDiamondPath,
   trackPath,
   trendPath,
@@ -406,7 +407,7 @@ describe('traffic symbols', () => {
     const at: [number, number] = [100, 50];
 
     // Act
-    const path = threatSquarePath(...at);
+    const path = squarePath(...at, THREAT_SIDE_PX);
 
     // Assert
     expect(path).toBe('M95.5 45.5L104.5 45.5L104.5 54.5L95.5 54.5Z');

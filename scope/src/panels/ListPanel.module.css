@@ -73,7 +73,7 @@
   color: var(--color-level);
   cursor: pointer;
 }
-.row:hover {
+.peek {
   background: var(--row-hover);
 }
 .climbing {

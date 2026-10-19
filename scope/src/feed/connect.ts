@@ -1,6 +1,7 @@
 import { setQnhReports } from '../state/qnh';
 import {
   bumpSnapshot,
+  forgetHovered,
   setFeedStatus,
   setReceiverAnswered,
   setSite,
@@ -59,11 +60,13 @@ export function connectFeed(opts: FeedOptions): () => void {
       case 'backfill':
         if (!hasProjection()) return;
         for (const s of e.snapshots) trackStore.ingest(s);
+        forgetHovered(trackStore.tracks);
         bumpSnapshot();
         break;
       case 'snapshot':
         if (!hasProjection()) return;
         trackStore.ingest(e.snapshot);
+        forgetHovered(trackStore.tracks);
         setFeedStatus((s) => ({ ...s, lastAt: e.receivedAt, reason: null }));
         bumpSnapshot();
         break;

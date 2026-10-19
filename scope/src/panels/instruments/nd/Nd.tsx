@@ -3,10 +3,11 @@ import { createMemo, createSignal, For, Index, Show } from 'solid-js';
 import { cx } from '../../../design/cx';
 import { turn } from '../../../lib/geo';
 import { ndRangeAfter, ndRangeNm, setNdRangeNm } from '../../../state/nd';
-import { snapshotVersion } from '../../../state/scope';
+import { hovered, snapshotVersion } from '../../../state/scope';
 import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
+import { hoverPlace } from '../../../ui/hoverPlace';
 import { trackWidth } from '../../../ui/size';
 import { glided, glidedPoints } from '../glide';
 import {
@@ -19,9 +20,11 @@ import {
   levelOffPath,
   lubberPath,
   ndGeometry,
+  PEEK_SIDE_PX,
   rangeAnchors,
   ringPath,
-  threatSquarePath,
+  squarePath,
+  THREAT_SIDE_PX,
   trackPath,
   trafficDiamondPath,
   trendPath,
@@ -29,7 +32,7 @@ import {
   windArrowPath,
 } from './geometry';
 import { boxOf, ndFrame, type NdSymbols, type NdText, ndReadouts, ndSymbols } from './readout';
-import { ndTraffic, symbolDrawn, type TrafficKind } from './traffic';
+import { ndTraffic, peekable, peekedSymbol, symbolDrawn, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
 import s from './Nd.module.css';
@@ -144,12 +147,14 @@ export function Nd(props: { t: Track }) {
       return drawn ? [drawn] : [];
     }),
   );
+  const hits = createMemo(() => peekable(shown()));
+  const mouse = hoverPlace('nd', () => hits().map((symbol) => symbol.key));
   const shapes = (kind: TrafficKind) =>
     shown()
       .filter((symbol) => symbol.kind === kind)
       .map((symbol) =>
         kind === 'threat'
-          ? threatSquarePath(symbol.x, symbol.y)
+          ? squarePath(symbol.x, symbol.y, THREAT_SIDE_PX)
           : trafficDiamondPath(symbol.x, symbol.y),
       )
       .join('');
@@ -175,6 +180,11 @@ export function Nd(props: { t: Track }) {
           <path class={s.trafficOther} d={shapes('other')} />
           <path class={s.trafficProximate} d={shapes('proximate')} />
           <path class={s.threat} d={shapes('threat')} />
+          <Show when={peekedSymbol(shown(), hovered())}>
+            {(symbol) => (
+              <path class={s.peek} d={squarePath(symbol().x, symbol().y, PEEK_SIDE_PX)} />
+            )}
+          </Show>
           <path class={s.aircraft} d={aircraftPath(g())} />
           <Show when={wind()}>{(d) => <path class={s.wind} d={d()} />}</Show>
         </svg>
@@ -213,6 +223,19 @@ export function Nd(props: { t: Track }) {
               </Show>
             </>
           )}
+        </Index>
+        <Index each={hits()}>
+          {(symbol, i) => {
+            const handlers = mouse.at(i);
+            return (
+              <div
+                class={s.hit}
+                style={{ left: `${symbol().x}px`, top: `${symbol().y}px` }}
+                onPointerEnter={handlers.enter}
+                onPointerLeave={handlers.leave}
+              />
+            );
+          }}
         </Index>
         <div
           class={s.range}

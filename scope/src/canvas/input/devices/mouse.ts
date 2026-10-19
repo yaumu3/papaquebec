@@ -109,7 +109,7 @@ export function mouseBindings(a: ScopeActions): MouseHandlers<RangeCursorOrigin>
   };
 }
 
-const isMouse = (e: PointerEvent) => e.pointerType === 'mouse';
+export const isMouse = (e: Pick<PointerEvent, 'pointerType'>) => e.pointerType === 'mouse';
 
 /** Wheel sensitivity: one 100 px notch scales the range by about 1.2. */
 const ZOOM_PER_PX = 0.0018;

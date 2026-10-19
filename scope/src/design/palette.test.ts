@@ -38,6 +38,7 @@ describe('design tokens', () => {
       [THEME.selbox, PALETTE.selbox],
       [THEME.emergency, PALETTE.emergency],
       [THEME.caution, PALETTE.caution],
+      [THEME.hover, PALETTE.hover],
     ];
 
     // Act

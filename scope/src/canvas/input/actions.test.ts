@@ -77,7 +77,8 @@ describe('createActions', () => {
     setModeText(null);
     setMenu(null);
     setPointer(null);
-    setHovered(null);
+    setHovered('scope', null);
+    setHovered('list', null);
   });
 
   it('selects the target a tap lands within reach of, else clears the selection', () => {
@@ -174,6 +175,18 @@ describe('createActions', () => {
       [{ cx: 405, cy: 300 }, 'd00123'],
       [null, null],
     ]);
+  });
+
+  it('leaves a hover another surface set when the pointer is over no target', () => {
+    // Arrange
+    const a = subject();
+    setHovered('list', 'd00999');
+
+    // Act
+    a.hover({ x: 5, y: 5 });
+
+    // Assert
+    expect(hovered()).toBe('d00999');
   });
 
   it('zooms from the range the zoom started at, not from the last step', () => {
