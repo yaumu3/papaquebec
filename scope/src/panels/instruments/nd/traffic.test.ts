@@ -7,6 +7,7 @@ import { INSTRUMENT_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
+import { hexAt } from '../../../state/scope';
 import type { Track } from '../../../state/track';
 import { ndGeometry, ndPoint, pxOf } from './geometry';
 import type { NdFrame } from './readout';
@@ -673,5 +674,19 @@ describe('the symbols a pointer can hover', () => {
 
     // Assert
     expect(found).toBeUndefined();
+  });
+
+  it('hover the threat last, where it lies over the others, and nothing past the last place', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const others = [traffic('thr', 30, 4), traffic('near', 10, 3), traffic('far', 20, 10)];
+    const keys = peekable(ndTraffic(own, others, NOW, view()).symbols).map((s) => s.key);
+    const places = [0, 1, 2, 3];
+
+    // Act
+    const hovered = places.map((place) => hexAt(keys, place));
+
+    // Assert
+    expect(hovered).toEqual(['far', 'near', 'thr', null]);
   });
 });

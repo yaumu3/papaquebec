@@ -7,6 +7,7 @@ import { hovered, snapshotVersion } from '../../../state/scope';
 import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
 import { trackStore } from '../../../state/tracks';
+import { hoverPlace } from '../../../ui/hoverPlace';
 import { trackWidth } from '../../../ui/size';
 import { glided, glidedPoints } from '../glide';
 import {
@@ -31,7 +32,7 @@ import {
   windArrowPath,
 } from './geometry';
 import { boxOf, ndFrame, type NdSymbols, type NdText, ndReadouts, ndSymbols } from './readout';
-import { ndTraffic, peekedSymbol, symbolDrawn, type TrafficKind } from './traffic';
+import { ndTraffic, peekable, peekedSymbol, symbolDrawn, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
 import s from './Nd.module.css';
@@ -146,6 +147,8 @@ export function Nd(props: { t: Track }) {
       return drawn ? [drawn] : [];
     }),
   );
+  const hits = createMemo(() => peekable(shown()));
+  const mouse = hoverPlace('nd', () => hits().map((symbol) => symbol.key));
   const shapes = (kind: TrafficKind) =>
     shown()
       .filter((symbol) => symbol.kind === kind)
@@ -220,6 +223,19 @@ export function Nd(props: { t: Track }) {
               </Show>
             </>
           )}
+        </Index>
+        <Index each={hits()}>
+          {(symbol, i) => {
+            const handlers = mouse.at(i);
+            return (
+              <div
+                class={s.hit}
+                style={{ left: `${symbol().x}px`, top: `${symbol().y}px` }}
+                onPointerEnter={handlers.enter}
+                onPointerLeave={handlers.leave}
+              />
+            );
+          }}
         </Index>
         <div
           class={s.range}
