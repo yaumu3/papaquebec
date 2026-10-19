@@ -288,6 +288,8 @@ export function windArrowPath(relFromDeg: number): string {
 /** Half the diagonal of a traffic diamond (RTCA DO-185B symbols as the ND draws them). */
 const TRAFFIC_HALF_DIAGONAL_PX = 5.5;
 export const THREAT_SIDE_PX = 9;
+/** The square marking the hovered aircraft. */
+export const PEEK_SIDE_PX = 19;
 
 /** The closed outline through `corners`, as a subpath. */
 const outline = (corners: readonly (readonly [number, number])[]): string =>

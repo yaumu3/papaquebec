@@ -208,6 +208,11 @@
   fill: var(--color-emergency);
   stroke: none;
 }
+.peek {
+  fill: none;
+  stroke: var(--color-hover);
+  stroke-width: 1;
+}
 .trafficLabel,
 .trafficArrow {
   position: absolute;

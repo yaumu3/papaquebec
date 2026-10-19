@@ -13,6 +13,8 @@ import type { NdFrame } from './readout';
 import {
   nearOnPlane,
   ndTraffic,
+  peekable,
+  peekedSymbol,
   relativeAltitudeLabel,
   symbolAt,
   symbolDrawn,
@@ -627,5 +629,49 @@ describe('symbolDrawn', () => {
     expect(drawn[0]?.y).toBeCloseTo(ahead[1], 6);
     expect(drawn[0]?.label).toEqual({ text: '+11', x: ahead[0], y: ahead[1] - 12 });
     expect(drawn[1]).toBeUndefined();
+  });
+});
+
+const estimated = (over: Partial<Track> = {}) =>
+  ownShip({ heading: 152, heard: { position: FRESH, alt: FRESH, heading: FRESH }, ...over });
+
+describe('the symbols a pointer can hover', () => {
+  it('leave out the threat placed by range and bearing, and keep the paint order', () => {
+    // Arrange
+    const own = estimated({ ra: advisory({ range: 3, bearing: 20, altitude: 29600 }) });
+    const symbols = ndTraffic(own, [traffic('near', 150, 3)], NOW, view(150)).symbols;
+    // Precondition: the fixture draws the estimate
+    expect(symbols.map((s) => s.key)).toEqual(['near', 'estimate']);
+
+    // Act
+    const hoverable = peekable(symbols);
+
+    // Assert
+    expect(hoverable.map((s) => s.key)).toEqual(['near']);
+  });
+
+  it('find a threat named by its address, and nothing for an aircraft not drawn', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const symbols = ndTraffic(own, [traffic('thr', 10, 4)], NOW, view()).symbols;
+    const asked = ['thr', 'gone', null];
+
+    // Act
+    const found = asked.map((hex) => peekedSymbol(symbols, hex)?.kind);
+
+    // Assert
+    expect(found).toEqual(['threat', undefined, undefined]);
+  });
+
+  it('never find the estimate by its key', () => {
+    // Arrange
+    const own = estimated({ ra: advisory({ range: 3, bearing: 20, altitude: 29600 }) });
+    const symbols = ndTraffic(own, [], NOW, view(150)).symbols;
+
+    // Act
+    const found = peekedSymbol(symbols, 'estimate');
+
+    // Assert
+    expect(found).toBeUndefined();
   });
 });
