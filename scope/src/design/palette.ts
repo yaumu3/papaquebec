@@ -10,4 +10,5 @@ export const PALETTE = {
   selbox: '#ff9040',
   emergency: '#d04040',
   caution: '#e8b848',
+  hover: '#a0a0a0',
 } as const;
