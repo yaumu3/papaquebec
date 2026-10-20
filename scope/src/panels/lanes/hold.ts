@@ -52,3 +52,20 @@ export function touchHoldOf(
   if (axis === null) return ms >= HOLD_MS ? 'lift' : null;
   return part === 'row' && axis === 'x' ? 'swipe' : 'pass';
 }
+
+/**
+ * What a finger's move over the lanes is kept from: scrolling, once it drags, swipes or picks a
+ * lane; the sheet, from the press on a lane until the finger lifts.
+ */
+export function keepsTouch(g: {
+  drag: boolean;
+  swipe: boolean;
+  holding: boolean;
+  picking: boolean;
+}): {
+  prevent: boolean;
+  stop: boolean;
+} {
+  const prevent = g.drag || g.swipe || g.picking;
+  return { prevent, stop: prevent || g.holding };
+}

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { HOLD_MS, HOLD_SLOP_PX, laneGestureOf, MENU_HOLD_MS, touchHoldOf } from './hold';
+import {
+  HOLD_MS,
+  HOLD_SLOP_PX,
+  keepsTouch,
+  laneGestureOf,
+  MENU_HOLD_MS,
+  touchHoldOf,
+} from './hold';
 
 describe('laneGestureOf', () => {
   it('drags with a mouse or pen once past the slop, however soon, by the row or the plot', () => {
@@ -118,5 +125,31 @@ describe('touchHoldOf', () => {
 
     // Assert
     expect(gestures).toEqual(['swipe', 'pass', 'pass']);
+  });
+});
+
+describe('keepsTouch', () => {
+  it("keeps a finger's moves from the sheet at every stage of a gesture on a lane, and from scrolling once it drags, swipes or picks", () => {
+    // Arrange
+    const rest = { drag: false, swipe: false, holding: false, picking: false };
+    const stages = [
+      rest,
+      { ...rest, holding: true },
+      { ...rest, drag: true },
+      { ...rest, swipe: true },
+      { ...rest, picking: true },
+    ];
+
+    // Act
+    const kept = stages.map(keepsTouch);
+
+    // Assert
+    expect(kept).toEqual([
+      { prevent: false, stop: false },
+      { prevent: false, stop: true },
+      { prevent: true, stop: true },
+      { prevent: true, stop: true },
+      { prevent: true, stop: true },
+    ]);
   });
 });

@@ -3,7 +3,14 @@ import { type Accessor, createEffect, createSignal, onCleanup } from 'solid-js';
 import type { LaneKey } from '../../state/plotted';
 import { edgeSpeed, slotAt } from '../../ui/reorder';
 import { dragKeyOf, dropOf, overBin } from './drag';
-import { HOLD_MS, laneGestureOf, MENU_HOLD_MS, type TouchStage, touchHoldOf } from './hold';
+import {
+  HOLD_MS,
+  keepsTouch,
+  laneGestureOf,
+  MENU_HOLD_MS,
+  type TouchStage,
+  touchHoldOf,
+} from './hold';
 import { swipeRemoves } from './swipe';
 
 /** How far a pointer travels from where it took hold of a lane before it drags the lane. */
@@ -62,6 +69,8 @@ export function createLaneDrag(deps: {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
   const [swipe, setSwipe] = createSignal<LaneSwipe | null>(null);
   const [holding, setHolding] = createSignal(false);
+  /** Whether a finger's hold has opened the picker, which it still owns until it lifts. */
+  const [picking, setPicking] = createSignal(false);
   let end: (() => void) | null = null;
   /** The lane a pointer has taken hold of, until it lets go. */
   let held: LaneKey | null = null;
@@ -76,8 +85,14 @@ export function createLaneDrag(deps: {
    * swipes one, and from the sheet while it also rests on one.
    */
   const keep = (t: TouchEvent) => {
-    if (drag() || swipe()) t.preventDefault();
-    if (drag() || swipe() || holding()) t.stopPropagation();
+    const kept = keepsTouch({
+      drag: !!drag(),
+      swipe: !!swipe(),
+      holding: holding(),
+      picking: picking(),
+    });
+    if (kept.prevent) t.preventDefault();
+    if (kept.stop) t.stopPropagation();
   };
   /** Reads a dragged lane's slot again as the lanes scroll under a still pointer. */
   const reread = () => {
@@ -147,6 +162,7 @@ export function createLaneDrag(deps: {
     const openPicker = () => {
       if (!drag()?.still) return;
       stage = 'picker';
+      setPicking(true);
       cancelAnimationFrame(frame);
       setDrag(null);
       deps.picker.open(lane, el, last.x, last.y);
@@ -162,6 +178,7 @@ export function createLaneDrag(deps: {
       if (stage === 'picker') {
         if (touchHoldOf(stage, part, dx, dy, m.timeStamp - e.timeStamp) !== 'drag') return;
         deps.picker.close();
+        setPicking(false);
         stage = 'lifted';
         pickUp(m.clientX, m.clientY);
         return;
@@ -219,6 +236,7 @@ export function createLaneDrag(deps: {
     el.addEventListener('lostpointercapture', cancel);
     end = () => {
       end = null;
+      setPicking(false);
       held = null;
       clearTimeout(lift);
       clearTimeout(picker);
