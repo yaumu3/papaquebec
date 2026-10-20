@@ -21,6 +21,18 @@ export const liftLeft = (x: number, grabX: number, width: number, chipWidth: num
 /** An element's box in the viewport, CSS px. */
 export type Box = Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>;
 
+/** The part of `a` inside `b`; empty, never inverted, where they do not meet. */
+export function clipBox(a: Box, b: Box): Box {
+  const left = Math.max(a.left, b.left);
+  const top = Math.max(a.top, b.top);
+  return {
+    left,
+    top,
+    right: Math.max(left, Math.min(a.right, b.right)),
+    bottom: Math.max(top, Math.min(a.bottom, b.bottom)),
+  };
+}
+
 const inside = (x: number, y: number, b: Box): boolean =>
   x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
 

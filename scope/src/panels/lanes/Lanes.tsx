@@ -515,6 +515,7 @@ export function Lanes(props: { track: Track }) {
                 plotted={plotted()}
                 at={m().at}
                 anchor={m().anchor}
+                clip={scroller()?.getBoundingClientRect()}
                 moves={(() => {
                   const own = m().own;
                   return own === null ? undefined : movesOf(own);

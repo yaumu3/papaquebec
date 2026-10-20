@@ -5,6 +5,7 @@ import { LANE_GROUPS, type LaneKey } from '../../state/plotted';
 import { wrapIndex } from '../../ui/wrap';
 import { LANE_LABELS } from '../readings';
 import { chipName, chipOf, paletteName } from './chips';
+import { type Box, clipBox } from './drag';
 import { type PaletteAnchor, paletteBox } from './menu';
 import { type LaneMoves, onMoveKey } from './moves';
 
@@ -22,6 +23,8 @@ export function Palette(props: {
   at: PaletteAnchor;
   /** The control that opened it, which stands lit and gets the focus back. */
   anchor: HTMLElement;
+  /** Where the page shows the anchor, which only its part inside stands lit. */
+  clip?: Box | undefined;
   moves?: LaneMoves | undefined;
   onPick: (lane: LaneKey) => void;
   onClose: () => void;
@@ -55,7 +58,8 @@ export function Palette(props: {
   /** The mouse events that follow a touch would move the focus to the page. */
   const keepFocus = (e: MouseEvent) => e.preventDefault();
   /** What it is for, which stands lit. */
-  const lit = props.anchor.getBoundingClientRect();
+  const anchorBox = props.anchor.getBoundingClientRect();
+  const lit = props.clip ? clipBox(anchorBox, props.clip) : anchorBox;
   /** Stands it at its anchor, written straight to the element so that it takes the focus at once. */
   const place = () => {
     const box = paletteBox(
@@ -99,8 +103,8 @@ export function Palette(props: {
         style={{
           left: `${lit.left}px`,
           top: `${lit.top}px`,
-          width: `${lit.width}px`,
-          height: `${lit.height}px`,
+          width: `${lit.right - lit.left}px`,
+          height: `${lit.bottom - lit.top}px`,
         }}
       />
       <div
