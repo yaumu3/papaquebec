@@ -89,6 +89,7 @@ describe('clipBox', () => {
       { left: 10, top: 60, right: 290, bottom: 200 },
       { left: -20, top: 350, right: 320, bottom: 450 },
       { left: 10, top: 420, right: 290, bottom: 500 },
+      { left: 320, top: 150, right: 400, bottom: 250 },
     ];
 
     // Act
@@ -100,6 +101,7 @@ describe('clipBox', () => {
       { left: 10, top: 100, right: 290, bottom: 200 },
       { left: 0, top: 350, right: 300, bottom: 400 },
       { left: 10, top: 420, right: 290, bottom: 420 },
+      { left: 320, top: 150, right: 320, bottom: 250 },
     ]);
   });
 });
