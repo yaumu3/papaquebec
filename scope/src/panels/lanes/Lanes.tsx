@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js';
+import { Portal } from 'solid-js/web';
 
 import { cx } from '../../design/cx';
 import { clockTime } from '../../lib/format';
@@ -35,6 +36,7 @@ import { liftLeft, slotShown } from './drag';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
+import { addMenuAnchor, clickSourceOf, type PaletteAnchor } from './menu';
 import type { LaneMoves } from './moves';
 import { Palette } from './Palette';
 import { readoutOf } from './readout';
@@ -61,8 +63,6 @@ const CHIP_GAP_PX = 4;
 /** The notch under the chip, pointing down the cursor. */
 const NOTCH_W_PX = 7;
 const NOTCH_H_PX = 4;
-/** Between a palette and the control it hangs from. */
-const PALETTE_GAP_PX = 2;
 /** Between the chip lifted with a dragged lane and the pointer under it. */
 const LIFT_GAP_PX = 4;
 
@@ -175,18 +175,33 @@ export function Lanes(props: { track: Track }) {
   const [menu, setMenu] = createSignal<{
     own: LaneKey | null;
     anchor: HTMLElement;
-    top: number;
+    at: PaletteAnchor;
   } | null>(null);
   const closeMenu = () => setMenu(null);
   createEffect(on(hex, closeMenu, { defer: true }));
-  /** Opens the palette under `anchor`, or closes it when it is open there already. */
-  const toggleMenu = (own: LaneKey | null, anchor: HTMLElement) => {
+  /** Opens the palette at `place`, or closes it when it is open from `anchor` already. */
+  const toggleMenu = (own: LaneKey | null, anchor: HTMLElement, place: PaletteAnchor) => {
     if (menu()?.anchor === anchor) {
       closeMenu();
       return;
     }
-    const below = anchor.getBoundingClientRect().bottom - (bay()?.getBoundingClientRect().top ?? 0);
-    setMenu({ own, anchor, top: below + PALETTE_GAP_PX });
+    setMenu({ own, anchor, at: place });
+  };
+  /** Opens the palette of a lane under the button of its name. */
+  const openFromName = (own: LaneKey, button: HTMLElement) => {
+    const r = button.getBoundingClientRect();
+    toggleMenu(own, button, { x: r.left, y: r.bottom, up: false });
+  };
+  /** Opens the palette that adds a lane, upward from the click or from the button's corner. */
+  const openAdd = (e: MouseEvent) => {
+    const button = e.currentTarget;
+    if (!(button instanceof HTMLElement)) return;
+    const source = clickSourceOf(e.detail);
+    toggleMenu(
+      null,
+      button,
+      addMenuAnchor(source, e.clientX, e.clientY, button.getBoundingClientRect()),
+    );
   };
   /** Brings a lane into view and gives it the focus; with none, + LANE. */
   const reveal = (lane: LaneKey | null) => {
@@ -356,7 +371,6 @@ export function Lanes(props: { track: Track }) {
             onScroll={(e) => {
               setLaneScroll(hex(), e.currentTarget.scrollTop);
               measure();
-              closeMenu();
             }}
             onPointerMove={pointerAt}
             onPointerLeave={() => setHoverPx(null)}
@@ -397,7 +411,7 @@ export function Lanes(props: { track: Track }) {
                     menuOpen={menu()?.own === lane}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
-                    onMenu={(anchor) => toggleMenu(lane, anchor)}
+                    onMenu={(anchor) => openFromName(lane, anchor)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
                     slot={drag()?.lane === lane}
@@ -418,7 +432,7 @@ export function Lanes(props: { track: Track }) {
                 class={cx(s.add, menu()?.anchor === add && s.open, drag() && s.bin)}
                 aria-haspopup="dialog"
                 aria-expanded={menu()?.anchor === add}
-                onClick={(e) => toggleMenu(null, e.currentTarget)}
+                onClick={openAdd}
               >
                 <Show when={drag()} fallback="+ LANE">
                   {(d) => (
@@ -476,18 +490,20 @@ export function Lanes(props: { track: Track }) {
         </Show>
         <Show when={menu()}>
           {(m) => (
-            <Palette
-              own={m().own}
-              plotted={plotted()}
-              top={m().top}
-              anchor={m().anchor}
-              moves={(() => {
-                const own = m().own;
-                return own === null ? undefined : movesOf(own);
-              })()}
-              onPick={pick}
-              onClose={closeMenu}
-            />
+            <Portal>
+              <Palette
+                own={m().own}
+                plotted={plotted()}
+                at={m().at}
+                anchor={m().anchor}
+                moves={(() => {
+                  const own = m().own;
+                  return own === null ? undefined : movesOf(own);
+                })()}
+                onPick={pick}
+                onClose={closeMenu}
+              />
+            </Portal>
           )}
         </Show>
       </div>

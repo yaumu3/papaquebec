@@ -5,20 +5,22 @@ import { LANE_GROUPS, type LaneKey } from '../../state/plotted';
 import { wrapIndex } from '../../ui/wrap';
 import { LANE_LABELS } from '../readings';
 import { chipName, chipOf, paletteName } from './chips';
+import { type PaletteAnchor, paletteBox } from './menu';
 import { type LaneMoves, onMoveKey } from './moves';
 
 import s from './Palette.module.css';
 
 /**
  * The lanes by group as chips, to switch the lane `own` to another or, with none, to add one;
- * under a rule, a lane's own row of moves.
+ * under a rule, a lane's own row of moves. It floats over the page at a point, kept inside the
+ * window, with the rest of the page dimmed but what it is for.
  */
 export function Palette(props: {
   own: LaneKey | null;
   plotted: readonly LaneKey[];
-  /** Where it stands down the bay, under its anchor. */
-  top: number;
-  /** The control that opened it, which a click on leaves to itself. */
+  /** The point it stands at. */
+  at: PaletteAnchor;
+  /** The control that opened it, which stands lit and gets the focus back. */
   anchor: HTMLElement;
   moves?: LaneMoves | undefined;
   onPick: (lane: LaneKey) => void;
@@ -42,99 +44,135 @@ export function Palette(props: {
     const at = stops.findIndex((b) => b === document.activeElement);
     stops[wrapIndex(at, stops.length, e.shiftKey)]?.focus();
   };
-  const onPointerDown = (e: PointerEvent) => {
-    const t = e.target;
-    if (t instanceof Node && (el.contains(t) || props.anchor.contains(t))) return;
-    props.onClose();
+  /** Whatever scrolls closes it, which a point in the window would no longer fit. */
+  const onScroll = (e: Event) => {
+    if (!(e.target instanceof Node && el.contains(e.target))) props.onClose();
+  };
+  /** What it is for, which stands lit. */
+  const lit = props.anchor.getBoundingClientRect();
+  /** Stands it at its anchor, written straight to the element so that it takes the focus at once. */
+  const place = () => {
+    const box = paletteBox(
+      props.at,
+      { width: el.offsetWidth, height: el.offsetHeight },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    el.style.left = `${box.left}px`;
+    el.style.top = `${box.top}px`;
   };
   onMount(() => {
+    place();
     window.addEventListener('keydown', onKeyDown, { capture: true });
-    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    window.addEventListener('scroll', onScroll, { capture: true });
     const own = el.querySelector<HTMLButtonElement>('[aria-current="true"]');
     (own ?? el.querySelector<HTMLButtonElement>('button:not(:disabled)'))?.focus();
   });
   onCleanup(() => {
     window.removeEventListener('keydown', onKeyDown, { capture: true });
-    window.removeEventListener('pointerdown', onPointerDown, { capture: true });
+    window.removeEventListener('scroll', onScroll, { capture: true });
   });
 
   return (
-    <div
-      ref={(e) => {
-        el = e;
-      }}
-      class={s.palette}
-      style={{ top: `${props.top}px` }}
-      role="dialog"
-      aria-label={paletteName(props.own)}
-      onKeyDown={(e) => {
-        if (e.key === 'Tab') tabRound(e);
-        else if (props.moves) onMoveKey(props.moves, e);
-      }}
-    >
-      <For each={LANE_GROUPS}>
-        {(group) => (
-          <>
-            <span class={s.name}>{group.name}</span>
-            <div class={s.chips}>
-              <For each={group.lanes}>
-                {(lane) => {
-                  const chip = () => chipOf(props.plotted, props.own, lane);
-                  return (
-                    <button
-                      type="button"
-                      class={cx(
-                        s.chip,
-                        chip() === 'own' && s.own,
-                        chip() === 'open' && s.elsewhere,
-                      )}
-                      aria-current={chip() === 'own' ? 'true' : undefined}
-                      aria-label={chipName(lane, chip())}
-                      onClick={() => props.onPick(lane)}
-                    >
-                      <Show when={chip() === 'open'}>
-                        <span class={s.dot} aria-hidden="true" />
-                      </Show>
-                      {LANE_LABELS[lane]}
-                    </button>
-                  );
-                }}
-              </For>
-            </div>
-          </>
-        )}
-      </For>
-      <Show when={props.moves}>
-        {(m) => (
-          <>
-            <hr class={s.rule} />
-            <span class={s.name}>LANE</span>
-            <div class={s.chips}>
-              <span class={s.pair}>
-                <button
-                  type="button"
-                  class={s.chip}
-                  disabled={m().first}
-                  onClick={() => m().onUp()}
-                >
-                  ↑ UP <span class={s.key}>ALT+↑</span>
+    <>
+      <div
+        class={s.backdrop}
+        onPointerDown={props.onClose}
+        onWheel={props.onClose}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          props.onClose();
+        }}
+      />
+      <div
+        class={s.spotlight}
+        style={{
+          left: `${lit.left}px`,
+          top: `${lit.top}px`,
+          width: `${lit.width}px`,
+          height: `${lit.height}px`,
+        }}
+      />
+      <div
+        ref={(e) => {
+          el = e;
+        }}
+        data-lanes
+        class={s.palette}
+        role="dialog"
+        onMouseDown={(e) => {
+          // The mouse events that follow a touch would move the focus to the page.
+          e.preventDefault();
+        }}
+        aria-label={paletteName(props.own)}
+        onKeyDown={(e) => {
+          if (e.key === 'Tab') tabRound(e);
+          else if (props.moves) onMoveKey(props.moves, e);
+        }}
+      >
+        <For each={LANE_GROUPS}>
+          {(group) => (
+            <>
+              <span class={s.name}>{group.name}</span>
+              <div class={s.chips}>
+                <For each={group.lanes}>
+                  {(lane) => {
+                    const chip = () => chipOf(props.plotted, props.own, lane);
+                    return (
+                      <button
+                        type="button"
+                        class={cx(
+                          s.chip,
+                          chip() === 'own' && s.own,
+                          chip() === 'open' && s.elsewhere,
+                        )}
+                        aria-current={chip() === 'own' ? 'true' : undefined}
+                        aria-label={chipName(lane, chip())}
+                        onClick={() => props.onPick(lane)}
+                      >
+                        <Show when={chip() === 'open'}>
+                          <span class={s.dot} aria-hidden="true" />
+                        </Show>
+                        {LANE_LABELS[lane]}
+                      </button>
+                    );
+                  }}
+                </For>
+              </div>
+            </>
+          )}
+        </For>
+        <Show when={props.moves}>
+          {(m) => (
+            <>
+              <hr class={s.rule} />
+              <span class={s.name}>LANE</span>
+              <div class={s.chips}>
+                <span class={s.pair}>
+                  <button
+                    type="button"
+                    class={s.chip}
+                    disabled={m().first}
+                    onClick={() => m().onUp()}
+                  >
+                    ↑ UP <span class={s.key}>ALT+↑</span>
+                  </button>
+                  <button
+                    type="button"
+                    class={s.chip}
+                    disabled={m().last}
+                    onClick={() => m().onDown()}
+                  >
+                    ↓ DOWN <span class={s.key}>ALT+↓</span>
+                  </button>
+                </span>
+                <button type="button" class={cx(s.chip, s.remove)} onClick={() => m().onRemove()}>
+                  REMOVE <span class={s.key}>DEL</span>
                 </button>
-                <button
-                  type="button"
-                  class={s.chip}
-                  disabled={m().last}
-                  onClick={() => m().onDown()}
-                >
-                  ↓ DOWN <span class={s.key}>ALT+↓</span>
-                </button>
-              </span>
-              <button type="button" class={cx(s.chip, s.remove)} onClick={() => m().onRemove()}>
-                REMOVE <span class={s.key}>DEL</span>
-              </button>
-            </div>
-          </>
-        )}
-      </Show>
-    </div>
+              </div>
+            </>
+          )}
+        </Show>
+      </div>
+    </>
   );
 }

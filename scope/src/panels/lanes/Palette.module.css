@@ -1,20 +1,20 @@
 /*
- * The lanes by group, hung under the control that opened it as wide as the lanes, over them: a
- * column of group names, then each group's chips.
+ * The lanes by group, floating at a point over the page: a column of group names, then each
+ * group's chips.
  */
 .palette {
-  position: absolute;
-  left: 0;
-  right: 0;
-  z-index: 3;
+  position: fixed;
+  z-index: var(--z-menu);
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: 30px 1fr;
   align-items: center;
-  column-gap: var(--space-6);
   row-gap: var(--space-3);
-  padding: var(--space-5);
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  padding: var(--space-3) var(--space-4) 5px;
   border: 1px solid var(--panel-border);
   background: var(--panel-bg);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.7);
 }
 .name {
   color: var(--text-dim);
@@ -89,4 +89,20 @@
   margin-left: auto;
   border-color: var(--color-emergency);
   color: var(--color-emergency);
+}
+/* Dims the page but the palette and what it is for, and takes the touch or click that closes it. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-menu);
+}
+.spotlight {
+  position: fixed;
+  z-index: var(--z-menu);
+  outline: 1px solid var(--text);
+  outline-offset: -1px;
+  box-shadow:
+    0 0 0 100vmax rgba(0, 0, 0, 0.6),
+    0 14px 34px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
 }
