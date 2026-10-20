@@ -14,7 +14,7 @@ import { MapsPanel } from './panels/MapsPanel';
 import { Overlays } from './panels/Overlays';
 import { TabBar } from './panels/TabBar';
 import { TopBar } from './panels/TopBar';
-import { detailTab, plotted } from './state/lanes';
+import { plotted } from './state/lanes';
 import { keepUnscrolled } from './state/layout';
 import { setDeclinationAt } from './state/magnetic';
 import { setBuiltinAero } from './state/mapsets';
@@ -57,7 +57,6 @@ export function App() {
       panels: panels(),
       listSort: listSort(),
       plotted: plotted(),
-      detailTab: detailTab(),
       ndRangeNm: ndRangeNm(),
     }),
   );

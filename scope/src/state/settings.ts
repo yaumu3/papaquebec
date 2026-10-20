@@ -24,7 +24,6 @@ const DEFAULTS: Persisted = {
   listSort: DEFAULT_LIST_SORT,
   plotted: DEFAULT_PLOTTED,
   lanesVersion: LANES_VERSION,
-  detailTab: 'now',
   ndRangeNm: DEFAULT_ND_RANGE_NM,
 };
 

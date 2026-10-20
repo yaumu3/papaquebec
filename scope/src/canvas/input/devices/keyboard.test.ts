@@ -1,13 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { recordActions } from '../recordActions';
-import {
-  LANES_SELECTOR,
-  type KeyEvent,
-  keyHandler,
-  ND_SELECTOR,
-  TABLIST_SELECTOR,
-} from './keyboard';
+import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR } from './keyboard';
 
 const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): KeyEvent => ({
   key: k,
@@ -74,23 +68,6 @@ describe('keyHandler', () => {
       closest: (selector: string) => (selector === LANES_SELECTOR ? {} : null),
     });
     const presses = ['Delete', 'Backspace', 'Escape'].map((k) => key(k, false, inLanes));
-
-    // Act
-    for (const press of presses) onKey(press);
-
-    // Assert
-    expect(calls).toEqual([]);
-  });
-
-  it('leaves keys pressed on a tab list to it', () => {
-    // Arrange
-    const { calls, actions } = recordActions();
-    const onKey = keyHandler(actions);
-    const onTabs = Object.assign(new EventTarget(), {
-      tagName: 'BUTTON',
-      closest: (selector: string) => (selector === TABLIST_SELECTOR ? {} : null),
-    });
-    const presses = ['Home', 'ArrowLeft', 'Escape'].map((k) => key(k, false, onTabs));
 
     // Act
     for (const press of presses) onKey(press);

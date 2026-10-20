@@ -1,19 +1,14 @@
-import { createEffect, createMemo, For, on, Show } from 'solid-js';
+import { createEffect, createMemo, on, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { trackLabel } from '../render/scene/rules';
-import { detailTab, keepViewOf, plotted, setDetailTab } from '../state/lanes';
+import { keepViewOf } from '../state/lanes';
 import { selected, snapshotVersion } from '../state/scope';
-import { DETAIL_TABS, type DetailTab } from '../state/settings';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
-import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
-import { Nd } from './instruments/nd/Nd';
-import { Pfd } from './instruments/pfd/Pfd';
-import { Surv } from './instruments/surv/Surv';
 import { Lanes } from './lanes/Lanes';
 
 import s from './DetailPanel.module.css';
@@ -73,63 +68,6 @@ function Header(props: { t: Track }) {
   );
 }
 
-const PANEL_ID = 'detail-tabpanel';
-const tabId = (tab: DetailTab): string => `detail-tab-${tab}`;
-const TAB_LABELS: Record<DetailTab, string> = { now: 'NOW', history: 'HISTORY' };
-
-/** The tabs of the detail panel, on a rule that runs the panel's width; the open one is a box open at its foot. */
-function Tabs() {
-  const buttons: Partial<Record<DetailTab, HTMLButtonElement>> = {};
-  return (
-    <div
-      role="tablist"
-      class={s.tabs}
-      onKeyDown={(e) => {
-        if (e.ctrlKey || e.metaKey || e.altKey) return;
-        const next = tabFor(e.key, DETAIL_TABS, detailTab());
-        if (next === null) return;
-        e.preventDefault();
-        setDetailTab(next);
-        buttons[next]?.focus();
-      }}
-    >
-      <For each={DETAIL_TABS}>
-        {(tab) => (
-          <button
-            ref={(el) => {
-              buttons[tab] = el;
-            }}
-            type="button"
-            role="tab"
-            id={tabId(tab)}
-            class={cx(s.tab, detailTab() === tab && s.on)}
-            aria-selected={detailTab() === tab}
-            aria-controls={PANEL_ID}
-            tabIndex={detailTab() === tab ? 0 : -1}
-            onClick={() => setDetailTab(tab)}
-          >
-            {TAB_LABELS[tab]}
-            <Show when={tab === 'history'}>
-              <span class={s.count}>{plotted().length}</span>
-            </Show>
-          </button>
-        )}
-      </For>
-    </div>
-  );
-}
-
-/** The readings table. */
-function Readings(props: { t: Track }) {
-  return (
-    <div class={s.readings}>
-      <Pfd t={props.t} />
-      <Nd t={props.t} />
-      <Surv t={props.t} />
-    </div>
-  );
-}
-
 export function DetailPanel() {
   const track = createMemo(() => {
     snapshotVersion();
@@ -146,12 +84,7 @@ export function DetailPanel() {
         {(t) => (
           <>
             <Header t={t()} />
-            <Tabs />
-            <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(detailTab())} class={s.panel}>
-              <Show when={detailTab() === 'history'} fallback={<Readings t={t()} />}>
-                <Lanes track={t()} />
-              </Show>
-            </div>
+            <Lanes track={t()} />
           </>
         )}
       </Show>

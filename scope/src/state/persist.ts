@@ -4,8 +4,6 @@ import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
 import { isLaneKey, type LaneKey, withInstruments } from './plotted';
 import {
-  DETAIL_TABS,
-  type DetailTab,
   LABEL_DENSITIES,
   LAYER_KEYS,
   type Layers,
@@ -38,8 +36,6 @@ export interface Persisted {
   /** The lanes of the detail column, in order. */
   plotted: readonly LaneKey[];
   lanesVersion: typeof LANES_VERSION;
-  /** The tab the detail panel has open. */
-  detailTab: DetailTab;
   /** The range of the ND, one for all targets. */
   ndRangeNm: NdRangeNm;
 }
@@ -153,7 +149,6 @@ export function loadPersisted(storage: Storage, defaults: Persisted): Persisted 
     listSort: sortFrom(r.listSort, defaults.listSort),
     plotted: plottedFrom(r.plotted, r.lanesVersion, defaults.plotted),
     lanesVersion: LANES_VERSION,
-    detailTab: oneOf(DETAIL_TABS, r.detailTab, defaults.detailTab),
     ndRangeNm: oneOf(ND_RANGES_NM, r.ndRangeNm, defaults.ndRangeNm),
   };
 }

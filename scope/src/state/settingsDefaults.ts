@@ -85,11 +85,6 @@ export type Panels = Record<PanelId, boolean>;
 export const PANEL_IDS: readonly PanelId[] = ['display', 'maps', 'list', 'detail'];
 export const DEFAULT_PANELS: Panels = { display: true, maps: true, list: true, detail: true };
 
-/** A tab of the detail panel. */
-export type DetailTab = 'now' | 'history';
-/** Every detail tab, in the order its tab bar lists them. */
-export const DETAIL_TABS: readonly DetailTab[] = ['now', 'history'];
-
 /** The ranges of the ND, in nautical miles, from the closest in. */
 export const ND_RANGES_NM = [10, 20, 40, 80] as const;
 export type NdRangeNm = (typeof ND_RANGES_NM)[number];

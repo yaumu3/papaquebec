@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js';
 
 import { addLane, type LaneKey, moveLane, removeLane, switchLane } from './plotted';
-import { type DetailTab, persisted } from './settings';
+import { persisted } from './settings';
 import { type Span, WHOLE } from './span';
 
 /** The lanes of the detail column, in order. */
@@ -22,9 +22,6 @@ export function switchPlotLane(from: LaneKey, to: LaneKey): void {
 export function addPlotLane(lane: LaneKey): void {
   setPlotted((p) => addLane(p, lane));
 }
-
-/** The tab the detail panel has open. */
-export const [detailTab, setDetailTab] = createSignal<DetailTab>(persisted.detailTab);
 
 /** What the column shows of one target: its span, and how far down its lanes are scrolled. */
 export interface LanesView {

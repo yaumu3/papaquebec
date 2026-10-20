@@ -20,7 +20,6 @@ const DEFAULTS: Persisted = {
   listSort: DEFAULT_SORT,
   plotted: ['pfd', 'nd', 'alt'],
   lanesVersion: LANES_VERSION,
-  detailTab: 'now',
   ndRangeNm: 20,
 };
 
@@ -82,7 +81,6 @@ describe('savePersisted', () => {
       listSort: { key: 'alt', dir: 'desc' },
       plotted: ['trk', 'gs'],
       lanesVersion: LANES_VERSION,
-      detailTab: 'history',
       ndRangeNm: 80,
     };
     savePersisted(storage, state);
@@ -277,17 +275,15 @@ describe('loadPersisted history fold', () => {
 });
 
 describe('loadPersisted detailTab', () => {
-  it('keeps the open tab, and falls back when it is not one of the tabs', () => {
+  it('ignores a saved detail tab, which the panel no longer has', () => {
     // Arrange
-    const stores = ['history', 'graphs'].map((detailTab) =>
-      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ detailTab }) }),
-    );
+    const storage = memoryStorage({ [PERSIST_KEY]: JSON.stringify({ detailTab: 'history' }) });
 
     // Act
-    const tabs = stores.map((st) => loadPersisted(st, DEFAULTS).detailTab);
+    const loaded = loadPersisted(storage, DEFAULTS);
 
     // Assert
-    expect(tabs).toEqual(['history', 'now']);
+    expect('detailTab' in loaded).toBe(false);
   });
 });
 
