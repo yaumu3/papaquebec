@@ -352,6 +352,24 @@
   letter-spacing: var(--tracking-wide);
   white-space: nowrap;
 }
+/* A lane a finger has lifted and still holds: lit as the hold runs on to the picker. */
+.lifted {
+  z-index: 2;
+  outline: 1px solid var(--text);
+  outline-offset: -1px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.8);
+  animation: lift var(--lift-ms) linear;
+}
+@keyframes lift {
+  from {
+    outline-color: var(--panel-border);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lifted {
+    animation: none;
+  }
+}
 .tab {
   position: absolute;
   right: var(--space-2);

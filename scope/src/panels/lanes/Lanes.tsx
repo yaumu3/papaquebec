@@ -33,6 +33,7 @@ import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
 import { pickOf } from './chips';
 import { liftLeft, slotShown } from './drag';
+import { HOLD_MS, MENU_HOLD_MS } from './hold';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
@@ -195,7 +196,7 @@ export function Lanes(props: { track: Track }) {
   };
   /** What the last press on the column was made with: a finger's long press ends in a `contextmenu`. */
   let pressed: string | null = null;
-  /** Opens a lane's palette where it was asked for, or leaves it alone when a finger asked. */
+  /** Opens a lane's palette where it was asked for, or leaves it to the hold when a finger asked. */
   const openLaneMenu = (own: LaneKey, e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
     const lane = e.currentTarget;
@@ -266,6 +267,11 @@ export function Lanes(props: { track: Track }) {
   };
   const { drag, swipe, holding, grab } = createLaneDrag({
     scroller,
+    picker: {
+      open: (lane, el, fx, fy) =>
+        setMenu({ own: lane, anchor: el, at: { x: fx, y: fy, up: false } }),
+      close: closeMenu,
+    },
     bin: () => add,
     heights: () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0),
     lanes: plotted,
@@ -278,6 +284,11 @@ export function Lanes(props: { track: Track }) {
       reveal(lane);
     },
   });
+  /** The drag once the lane is off its place: not while a finger has only lifted it. */
+  const moving = () => {
+    const d = drag();
+    return d && !d.still ? d : null;
+  };
   const restoreScroll = () => {
     const el = scroller();
     if (!el) return;
@@ -310,7 +321,11 @@ export function Lanes(props: { track: Track }) {
     <div
       data-lanes
       class={cx(s.lanes, drag() && s.grabbing)}
-      style={{ '--lane-height': `${LANE_PX}px`, '--notch-height': `${NOTCH_H_PX}px` }}
+      style={{
+        '--lane-height': `${LANE_PX}px`,
+        '--notch-height': `${NOTCH_H_PX}px`,
+        '--lift-ms': `${MENU_HOLD_MS - HOLD_MS}ms`,
+      }}
     >
       <div ref={setTop} class={s.span}>
         <Show when={!seesAll(visible(), samples())}>
@@ -409,7 +424,8 @@ export function Lanes(props: { track: Track }) {
                     onMenu={(e) => openLaneMenu(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
-                    slot={drag()?.lane === lane}
+                    slot={moving()?.lane === lane}
+                    lifted={drag()?.lane === lane && drag()?.still === true}
                   />
                 ) : (
                   <Lane
@@ -430,7 +446,8 @@ export function Lanes(props: { track: Track }) {
                     onMenu={(e) => openLaneMenu(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
-                    slot={drag()?.lane === lane}
+                    slot={moving()?.lane === lane}
+                    lifted={drag()?.lane === lane && drag()?.still === true}
                     swipeX={(() => {
                       const sw = swipe();
                       return sw?.lane === lane ? swipeOffset(sw.dx) : null;
@@ -445,12 +462,12 @@ export function Lanes(props: { track: Track }) {
                   add = el;
                 }}
                 type="button"
-                class={cx(s.add, menu()?.anchor === add && s.open, drag() && s.bin)}
+                class={cx(s.add, menu()?.anchor === add && s.open, moving() && s.bin)}
                 aria-haspopup="dialog"
                 aria-expanded={menu()?.anchor === add}
                 onClick={openAdd}
               >
-                <Show when={drag()} fallback="+ LANE">
+                <Show when={moving()} fallback="+ LANE">
                   {(d) => (
                     <>
                       <svg class={s.binIcon} viewBox="0 0 10 12" aria-hidden="true">
@@ -472,7 +489,7 @@ export function Lanes(props: { track: Track }) {
             />
           )}
         </Show>
-        <Show when={drag()}>
+        <Show when={moving()}>
           {(d) => {
             let lift: HTMLDivElement | undefined;
             const left = () =>

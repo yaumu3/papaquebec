@@ -94,6 +94,8 @@ export function Lane(props: {
   /** How far a finger has swiped the top row left, while one does. */
   swipeX: number | null;
   slot: boolean;
+  /** Whether a finger has lifted it and not moved it yet: lit where it stands. */
+  lifted: boolean;
 }) {
   const spec = PLOTS[props.lane];
   const label = LANE_LABELS[props.lane];
@@ -166,7 +168,7 @@ export function Lane(props: {
     <div
       ref={props.laneRef}
       data-lane="history"
-      class={cx(s.lane, props.slot && s.hole)}
+      class={cx(s.lane, props.slot && s.hole, props.lifted && s.lifted)}
       style={{ height: `${props.height}px`, order: props.place }}
       tabindex="0"
       role="group"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { HOLD_MS, HOLD_SLOP_PX, laneGestureOf } from './hold';
+import { HOLD_MS, HOLD_SLOP_PX, laneGestureOf, MENU_HOLD_MS, touchHoldOf } from './hold';
 
 describe('laneGestureOf', () => {
   it('drags with a mouse or pen once past the slop, however soon, by the row or the plot', () => {
@@ -53,5 +53,70 @@ describe('laneGestureOf', () => {
 
     // Assert
     expect(gestures).toEqual(['swipe', 'pass', 'swipe', 'pass', 'pass']);
+  });
+});
+
+describe('touchHoldOf', () => {
+  it('lifts a lane held to HOLD_MS, not before', () => {
+    // Arrange
+    const holds = [HOLD_MS - 1, HOLD_MS];
+
+    // Act
+    const gestures = holds.map((ms) => touchHoldOf('pressed', 'plot', 0, 0, ms));
+
+    // Assert
+    expect(gestures).toEqual([null, 'lift']);
+  });
+
+  it('opens the picker of a lifted lane held within the slop to MENU_HOLD_MS, not before', () => {
+    // Arrange
+    const holds = [MENU_HOLD_MS - 1, MENU_HOLD_MS];
+
+    // Act
+    const gestures = holds.map((ms) => touchHoldOf('lifted', 'plot', 0, HOLD_SLOP_PX, ms));
+
+    // Assert
+    expect(gestures).toEqual([null, 'picker']);
+  });
+
+  it('drags a lane moved past the slop once lifted, and again once its picker is open', () => {
+    // Arrange
+    const stages = ['lifted', 'picker'] as const;
+
+    // Act
+    const gestures = stages.map((stage) =>
+      touchHoldOf(stage, 'plot', 0, HOLD_SLOP_PX + 1, MENU_HOLD_MS),
+    );
+
+    // Assert
+    expect(gestures).toEqual(['drag', 'drag']);
+  });
+
+  it('leaves a lane with its picker open alone while the finger stays within the slop', () => {
+    // Arrange
+    const holds = [HOLD_MS, MENU_HOLD_MS + 500];
+
+    // Act
+    const gestures = holds.map((ms) => touchHoldOf('picker', 'row', 3, 3, ms));
+
+    // Assert
+    expect(gestures).toEqual([null, null]);
+  });
+
+  it('swipes the row or passes to the page when moved first, before the lane is lifted', () => {
+    // Arrange
+    const moves = [
+      ['row', HOLD_SLOP_PX + 1, 0],
+      ['plot', HOLD_SLOP_PX + 1, 0],
+      ['row', 0, HOLD_SLOP_PX + 1],
+    ] as const;
+
+    // Act
+    const gestures = moves.map(([part, dx, dy]) =>
+      touchHoldOf('pressed', part, dx, dy, HOLD_MS - 1),
+    );
+
+    // Assert
+    expect(gestures).toEqual(['swipe', 'pass', 'pass']);
   });
 });

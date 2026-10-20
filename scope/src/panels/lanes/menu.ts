@@ -49,7 +49,7 @@ export function paletteBox(
 
 /**
  * What asked for a lane's menu. The menu key fires `contextmenu` with button -1; a press that
- * began with a finger is a touch, which is left alone; any other press is a mouse or pen.
+ * began with a finger is a touch, which the hold answers; any other press is a mouse or pen.
  */
 export function contextSourceOf(button: number, pressed: string | null): ContextSource {
   if (button === -1) return 'keyboard';

@@ -29,12 +29,14 @@ export function InstrumentLane(props: {
   /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
   place: number;
   slot: boolean;
+  /** Whether a finger has lifted it and not moved it yet: lit where it stands. */
+  lifted: boolean;
 }) {
   return (
     <div
       ref={props.laneRef}
       data-lane="instrument"
-      class={cx(s.lane, s.instrument, props.slot && s.hole)}
+      class={cx(s.lane, s.instrument, props.slot && s.hole, props.lifted && s.lifted)}
       style={{ order: props.place }}
       tabindex="0"
       role="group"
