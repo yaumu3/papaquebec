@@ -69,9 +69,9 @@ describe('laneName', () => {
 
     // Assert
     expect(names).toEqual([
-      'ALT lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
-      'GS lane, 3 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
-      'PFD lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
+      'ALT lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
+      'GS lane, 3 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
+      'PFD lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
     ]);
   });
 });
@@ -79,12 +79,12 @@ describe('laneName', () => {
 describe('pickOf', () => {
   it("switches the palette's lane to a free one, adds a free one to none, and goes to one that is open", () => {
     // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs'];
+    const plotted: LaneKey[] = ['alt', 'gs', 'pfd'];
     const rows: [LaneKey | null, LaneKey][] = [
       ['alt', 'vs'],
       [null, 'vs'],
       ['alt', 'gs'],
-      [null, 'gs'],
+      [null, 'pfd'],
       ['alt', 'alt'],
     ];
 

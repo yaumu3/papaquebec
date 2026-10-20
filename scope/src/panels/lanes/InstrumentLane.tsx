@@ -8,6 +8,7 @@ import { Pfd } from '../instruments/pfd/Pfd';
 import { Surv } from '../instruments/surv/Surv';
 import { laneName } from './chips';
 import type { LanePart } from './laneDrag';
+import { isMenuKey } from './menu';
 import { type LaneMoves, onMoveKey } from './moves';
 
 import s from './Lanes.module.css';
@@ -22,6 +23,8 @@ export function InstrumentLane(props: {
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
+  /** What asks for the lane's palette. */
+  onMenu: (e: MouseEvent | KeyboardEvent) => void;
   onGrab: (e: PointerEvent, part: LanePart) => void;
   /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
   place: number;
@@ -38,8 +41,11 @@ export function InstrumentLane(props: {
       aria-roledescription="lane"
       aria-label={laneName(props.lane, props.index, props.count)}
       onKeyDown={(e) => {
-        if (e.target === e.currentTarget) onMoveKey(props.moves, e);
+        if (e.target !== e.currentTarget) return;
+        if (isMenuKey(e)) props.onMenu(e);
+        else onMoveKey(props.moves, e);
       }}
+      onContextMenu={props.onMenu}
       onPointerDown={(e) => props.onGrab(e, 'plot')}
     >
       <Switch>

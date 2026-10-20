@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { addMenuAnchor, clickSourceOf, paletteBox } from './menu';
+import {
+  addMenuAnchor,
+  clickSourceOf,
+  contextSourceOf,
+  isMenuKey,
+  laneMenuAnchor,
+  paletteBox,
+} from './menu';
 
 describe('clickSourceOf', () => {
   it('tells a click made with the keyboard from one made with a pointer', () => {
@@ -32,6 +39,62 @@ describe('addMenuAnchor', () => {
       { x: 100, y: 310, up: true },
       { x: 40, y: 300, up: true },
     ]);
+  });
+});
+
+describe('contextSourceOf', () => {
+  it('tells a menu asked for with the keyboard, a finger held down, or a mouse or pen', () => {
+    // Arrange
+    const events: [number, string | null][] = [
+      [-1, null],
+      [-1, 'touch'],
+      [2, 'mouse'],
+      [2, 'pen'],
+      [0, 'touch'],
+      [2, 'touch'],
+      [2, null],
+    ];
+
+    // Act
+    const sources = events.map(([button, pressed]) => contextSourceOf(button, pressed));
+
+    // Assert
+    expect(sources).toEqual(['keyboard', 'keyboard', 'mouse', 'mouse', 'touch', 'touch', 'mouse']);
+  });
+});
+
+describe('laneMenuAnchor', () => {
+  it("opens at the pointer, at the lane's top-left from the keyboard, and not at all for a finger", () => {
+    // Arrange
+    const lane = { left: 40, top: 300, right: 380, bottom: 385 };
+    const rows: ['mouse' | 'touch' | 'keyboard', number, number][] = [
+      ['mouse', 100, 310],
+      ['keyboard', 0, 0],
+      ['touch', 100, 310],
+    ];
+
+    // Act
+    const anchors = rows.map(([source, x, y]) => laneMenuAnchor(source, x, y, lane));
+
+    // Assert
+    expect(anchors).toEqual([{ x: 100, y: 310, up: false }, { x: 40, y: 300, up: false }, null]);
+  });
+});
+
+describe('isMenuKey', () => {
+  it('is Shift+F10, which the keyboard asks for a menu with where no menu key stands', () => {
+    // Arrange
+    const keys = [
+      { key: 'F10', shiftKey: true },
+      { key: 'F10', shiftKey: false },
+      { key: 'F9', shiftKey: true },
+    ];
+
+    // Act
+    const flags = keys.map(isMenuKey);
+
+    // Assert
+    expect(flags).toEqual([true, false, false]);
   });
 });
 

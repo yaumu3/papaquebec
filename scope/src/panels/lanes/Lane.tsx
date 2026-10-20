@@ -9,6 +9,7 @@ import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
 import { laneName } from './chips';
 import type { LanePart } from './laneDrag';
+import { isMenuKey } from './menu';
 import { type LaneMoves, onMoveKey } from './moves';
 import {
   atTicks,
@@ -64,7 +65,7 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
   return p.kind === 'intent' ? p.dash : undefined;
 };
 
-/** One lane of the bay: a top row with the dropdown of its name, then its scale and its plot over the visible span. */
+/** One lane of the bay: a top row with its name and readout, then its scale and its plot over the visible span. */
 export function Lane(props: {
   lane: HistoryLane;
   /** Its place among the lanes, and how many there are. */
@@ -85,9 +86,8 @@ export function Lane(props: {
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
-  /** Whether the lane's palette is open, and the dropdown of its name that opens it. */
-  menuOpen: boolean;
-  onMenu: (anchor: HTMLElement) => void;
+  /** What asks for the lane's palette. */
+  onMenu: (e: MouseEvent | KeyboardEvent) => void;
   onGrab: (e: PointerEvent, part: LanePart) => void;
   /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
   place: number;
@@ -173,8 +173,11 @@ export function Lane(props: {
       aria-roledescription="lane"
       aria-label={laneName(props.lane, props.index, props.count)}
       onKeyDown={(e) => {
-        if (e.target === e.currentTarget) onMoveKey(props.moves, e);
+        if (e.target !== e.currentTarget) return;
+        if (isMenuKey(e)) props.onMenu(e);
+        else onMoveKey(props.moves, e);
       }}
+      onContextMenu={props.onMenu}
       onPointerDown={(e) =>
         props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
       }
@@ -288,16 +291,7 @@ export function Lane(props: {
         class={cx(s.top, props.swipeX !== null && s.swiping)}
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
       >
-        <button
-          type="button"
-          class={cx(s.menu, props.menuOpen && s.open)}
-          aria-haspopup="dialog"
-          aria-expanded={props.menuOpen}
-          onClick={(e) => props.onMenu(e.currentTarget)}
-        >
-          {label}
-          <span class={s.caret}>{props.menuOpen ? '▲' : '▼'}</span>
-        </button>
+        <span class={s.name}>{label}</span>
         <Show when={readout()}>
           {(r) => (
             <div class={s.readout}>

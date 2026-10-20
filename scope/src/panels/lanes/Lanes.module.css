@@ -150,18 +150,6 @@
   pointer-events: none;
   white-space: nowrap;
 }
-.liftName {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  box-sizing: border-box;
-  height: var(--lane-top);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--panel-border);
-  color: var(--text-dim);
-  font-size: var(--text-xs);
-  letter-spacing: var(--tracking-wide);
-}
 .liftValue {
   color: var(--text);
   font-size: var(--text-sm);
@@ -231,7 +219,7 @@
   white-space: nowrap;
 }
 /*
- * Over the plot: nothing marking it but the cursor, with the dropdown of the lane's name at the
+ * Over the plot: nothing marking it but the cursor, the lane's name at the
  * left and its readout at the right.
  */
 .top {
@@ -357,32 +345,12 @@
 .bar {
   fill: var(--text-dim);
 }
-/* The lane's name, a dropdown that opens its palette; lit while it is open. */
-.menu {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  box-sizing: border-box;
-  height: 100%;
-  padding: 0 var(--space-3);
-  border: 1px solid var(--panel-border);
+/* The lane's name. */
+.name {
   color: var(--text-dim);
   font-size: var(--text-xs);
   letter-spacing: var(--tracking-wide);
   white-space: nowrap;
-}
-.menu:hover,
-.open,
-.open:hover {
-  color: var(--text);
-}
-.open,
-.open:hover {
-  border-color: var(--text-dim);
-}
-.caret {
-  font-size: var(--text-xs);
-  letter-spacing: 0;
 }
 .tab {
   position: absolute;

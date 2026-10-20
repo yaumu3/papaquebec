@@ -36,7 +36,13 @@ import { liftLeft, slotShown } from './drag';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
-import { addMenuAnchor, clickSourceOf, type PaletteAnchor } from './menu';
+import {
+  addMenuAnchor,
+  clickSourceOf,
+  contextSourceOf,
+  laneMenuAnchor,
+  type PaletteAnchor,
+} from './menu';
 import type { LaneMoves } from './moves';
 import { Palette } from './Palette';
 import { readoutOf } from './readout';
@@ -187,10 +193,17 @@ export function Lanes(props: { track: Track }) {
     }
     setMenu({ own, anchor, at: place });
   };
-  /** Opens the palette of a lane under the button of its name. */
-  const openFromName = (own: LaneKey, button: HTMLElement) => {
-    const r = button.getBoundingClientRect();
-    toggleMenu(own, button, { x: r.left, y: r.bottom, up: false });
+  /** What the last press on the column was made with: a finger's long press ends in a `contextmenu`. */
+  let pressed: string | null = null;
+  /** Opens a lane's palette where it was asked for, or leaves it alone when a finger asked. */
+  const openLaneMenu = (own: LaneKey, e: MouseEvent | KeyboardEvent) => {
+    e.preventDefault();
+    const lane = e.currentTarget;
+    if (!(lane instanceof HTMLElement)) return;
+    const source = e instanceof MouseEvent ? contextSourceOf(e.button, pressed) : 'keyboard';
+    const point = e instanceof MouseEvent ? { x: e.clientX, y: e.clientY } : { x: 0, y: 0 };
+    const anchor = laneMenuAnchor(source, point.x, point.y, lane.getBoundingClientRect());
+    if (anchor) setMenu({ own, anchor: lane, at: anchor });
   };
   /** Opens the palette that adds a lane, upward from the click or from the button's corner. */
   const openAdd = (e: MouseEvent) => {
@@ -373,6 +386,9 @@ export function Lanes(props: { track: Track }) {
               measure();
             }}
             onPointerMove={pointerAt}
+            onPointerDown={(e) => {
+              pressed = e.pointerType;
+            }}
             onPointerLeave={() => setHoverPx(null)}
           >
             <For each={plotted()}>
@@ -390,6 +406,7 @@ export function Lanes(props: { track: Track }) {
                     count={plotted().length}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
+                    onMenu={(e) => openLaneMenu(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
                     slot={drag()?.lane === lane}
@@ -408,10 +425,9 @@ export function Lanes(props: { track: Track }) {
                     at={at()}
                     past={past()}
                     cursor={cursorX()}
-                    menuOpen={menu()?.own === lane}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
-                    onMenu={(anchor) => openFromName(lane, anchor)}
+                    onMenu={(e) => openLaneMenu(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
                     slot={drag()?.lane === lane}
@@ -477,10 +493,7 @@ export function Lanes(props: { track: Track }) {
                   top: `${d().y - (bayBox()?.top ?? 0) - LIFT_GAP_PX}px`,
                 }}
               >
-                <span class={s.liftName}>
-                  {LANE_LABELS[d().lane]}
-                  <span class={s.caret}>▼</span>
-                </span>
+                <span class={s.name}>{LANE_LABELS[d().lane]}</span>
                 <Show when={liftValue(d().lane)}>
                   {(value) => <span class={s.liftValue}>{value()}</span>}
                 </Show>

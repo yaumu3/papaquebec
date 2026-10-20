@@ -9,9 +9,6 @@ import { swipeRemoves } from './swipe';
 /** How far a pointer travels from where it took hold of a lane before it drags the lane. */
 const SLOP_PX = 4;
 
-/** Keeps a press from opening the page's menu, as a long one does. */
-const noMenu = (e: Event) => e.preventDefault();
-
 /** Where on a lane a pointer took hold of it: its top row, or the plot under it. */
 export type LanePart = 'row' | 'plot';
 
@@ -186,7 +183,6 @@ export function createLaneDrag(deps: {
         }, HOLD_MS)
       : undefined;
     window.addEventListener('keydown', onKey, { capture: true });
-    el.addEventListener('contextmenu', noMenu);
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);
     el.addEventListener('pointercancel', cancel);
@@ -196,7 +192,6 @@ export function createLaneDrag(deps: {
       held = null;
       clearTimeout(hold);
       cancelAnimationFrame(frame);
-      el.removeEventListener('contextmenu', noMenu);
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerup', onUp);
       el.removeEventListener('pointercancel', cancel);
