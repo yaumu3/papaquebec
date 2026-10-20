@@ -186,14 +186,6 @@ export function Lanes(props: { track: Track }) {
   } | null>(null);
   const closeMenu = () => setMenu(null);
   createEffect(on(hex, closeMenu, { defer: true }));
-  /** Opens the palette at `place`, or closes it when it is open from `anchor` already. */
-  const toggleMenu = (own: LaneKey | null, anchor: HTMLElement, place: PaletteAnchor) => {
-    if (menu()?.anchor === anchor) {
-      closeMenu();
-      return;
-    }
-    setMenu({ own, anchor, at: place });
-  };
   /** What the last press on the column was made with: a finger's long press ends in a `contextmenu`. */
   let pressed: string | null = null;
   /** Opens a lane's palette where it was asked for, or leaves it to the hold when a finger asked. */
@@ -211,11 +203,8 @@ export function Lanes(props: { track: Track }) {
     const button = e.currentTarget;
     if (!(button instanceof HTMLElement)) return;
     const source = clickSourceOf(e.detail);
-    toggleMenu(
-      null,
-      button,
-      addMenuAnchor(source, e.clientX, e.clientY, button.getBoundingClientRect()),
-    );
+    const at = addMenuAnchor(source, e.clientX, e.clientY, button.getBoundingClientRect());
+    setMenu({ own: null, anchor: button, at });
   };
   /** Brings a lane into view and gives it the focus; with none, + LANE. */
   const reveal = (lane: LaneKey | null) => {
@@ -462,7 +451,7 @@ export function Lanes(props: { track: Track }) {
                   add = el;
                 }}
                 type="button"
-                class={cx(s.add, menu()?.anchor === add && s.open, moving() && s.bin)}
+                class={cx(s.add, moving() && s.bin)}
                 aria-haspopup="dialog"
                 aria-expanded={menu()?.anchor === add}
                 onClick={openAdd}
