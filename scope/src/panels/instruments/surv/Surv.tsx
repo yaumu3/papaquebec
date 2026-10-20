@@ -80,7 +80,7 @@ function Group(props: { name: string; children: JSX.Element }) {
 /** The surveillance readings: where the position comes from and how well it is heard. */
 export function Surv(props: { t: Track }) {
   return (
-    <>
+    <div class={s.surv}>
       <Group name="POS">
         <PositionCell t={props.t} />
         <ReadingCell of="nic" t={props.t} />
@@ -92,6 +92,6 @@ export function Surv(props: { t: Track }) {
         <ReadingCell of="msgs" t={props.t} />
         <ReadingCell of="age" t={props.t} dim={isStale(props.t)} />
       </Group>
-    </>
+    </div>
   );
 }

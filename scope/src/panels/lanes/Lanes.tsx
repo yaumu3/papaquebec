@@ -15,7 +15,13 @@ import {
   setLaneScroll,
   switchPlotLane,
 } from '../../state/lanes';
-import { laneAfter, type LaneKey, readingsIn } from '../../state/plotted';
+import {
+  historyLanesOf,
+  isInstrumentLane,
+  laneAfter,
+  type LaneKey,
+  readingsIn,
+} from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
 import { type Interval, resolveSpan, type Span, xOf } from '../../state/span';
 import type { Track } from '../../state/track';
@@ -26,6 +32,7 @@ import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
 import { pickOf } from './chips';
 import { liftLeft, slotShown } from './drag';
+import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
 import type { LaneMoves } from './moves';
@@ -115,12 +122,14 @@ export function Lanes(props: { track: Track }) {
   const at = createMemo(() => hover() ?? rest()?.sample ?? null);
   /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
   const past = () => hover() !== null || rest()?.current === false;
-  /** Hovers the instant under the pointer, none off the lanes, over the gutter or while a lane is held, dragged or swiped. */
+  /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is held, dragged or swiped. */
   const pointerAt = (e: PointerEvent) => {
     const target = e.target instanceof Element ? e.target : null;
     const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
     setHoverPx(
-      px < 0 || drag() || swipe() || holding() || !target?.closest('[data-lane]') ? null : px,
+      px < 0 || drag() || swipe() || holding() || !target?.closest('[data-lane="history"]')
+        ? null
+        : px,
     );
   };
 
@@ -128,10 +137,10 @@ export function Lanes(props: { track: Track }) {
   const chipTextWidth = trackWidth(chipText);
   const [ruler, setRuler] = createSignal<HTMLSpanElement>();
   const rulerWidth = trackWidth(ruler);
-  /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere without a lane. */
+  /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere without a history lane. */
   const cursorX = () => {
     const a = at();
-    return a && plotted().length > 0
+    return a && historyLanesOf(plotted()).length > 0
       ? clamp(Math.floor(x(a.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5)
       : null;
   };
@@ -221,8 +230,9 @@ export function Lanes(props: { track: Track }) {
     const el = scroller();
     if (el) setView(scrollView(el.scrollTop, el.clientHeight, el.scrollHeight));
   };
-  /** What a lane reads at the cursor, as the chip lifted with it shows. */
-  const liftValue = (lane: LaneKey): string => {
+  /** What a lane reads at the cursor, as the chip lifted with it shows; nothing of an instrument. */
+  const liftValue = (lane: LaneKey): string | null => {
+    if (isInstrumentLane(lane)) return null;
     const a = at();
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
@@ -284,7 +294,7 @@ export function Lanes(props: { track: Track }) {
       </div>
       <Timeline
         samples={samples()}
-        lanes={plotted().map(readingsIn)}
+        lanes={historyLanesOf(plotted()).map(readingsIn)}
         contact={contact()}
         visible={visible()}
         width={width()}
@@ -354,7 +364,23 @@ export function Lanes(props: { track: Track }) {
             <For each={plotted()}>
               {(lane, i) => {
                 onCleanup(() => lanes.delete(lane));
-                return (
+                const placed = () => {
+                  const d = drag();
+                  return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
+                };
+                return isInstrumentLane(lane) ? (
+                  <InstrumentLane
+                    lane={lane}
+                    track={props.track}
+                    index={i()}
+                    count={plotted().length}
+                    laneRef={(el) => lanes.set(lane, el)}
+                    moves={movesOf(lane)}
+                    onGrab={(e, part) => grab(e, lane, part)}
+                    place={placed()}
+                    slot={drag()?.lane === lane}
+                  />
+                ) : (
                   <Lane
                     lane={lane}
                     index={i()}
@@ -373,10 +399,7 @@ export function Lanes(props: { track: Track }) {
                     moves={movesOf(lane)}
                     onMenu={(anchor) => toggleMenu(lane, anchor)}
                     onGrab={(e, part) => grab(e, lane, part)}
-                    place={(() => {
-                      const d = drag();
-                      return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
-                    })()}
+                    place={placed()}
                     slot={drag()?.lane === lane}
                     swipeX={(() => {
                       const sw = swipe();
@@ -444,7 +467,9 @@ export function Lanes(props: { track: Track }) {
                   {LANE_LABELS[d().lane]}
                   <span class={s.caret}>▼</span>
                 </span>
-                <span class={s.liftValue}>{liftValue(d().lane)}</span>
+                <Show when={liftValue(d().lane)}>
+                  {(value) => <span class={s.liftValue}>{value()}</span>}
+                </Show>
               </div>
             );
           }}

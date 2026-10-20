@@ -13,7 +13,13 @@ import {
 } from '../lib/format';
 import { hpaToInHg } from '../lib/metar';
 import { magneticTrack } from '../state/magnetic';
-import { LANE_KEYS, type LaneKey, type ReadingKey } from '../state/plotted';
+import {
+  type InstrumentLane,
+  isInstrumentLane,
+  LANE_KEYS,
+  type LaneKey,
+  type ReadingKey,
+} from '../state/plotted';
 import { settings } from '../state/settings';
 import type { Position, Readout } from '../state/track';
 
@@ -159,8 +165,14 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   age: { label: 'SEEN / POS', format: ageReading, value: (v) => ({ v: formatAge(v), unit: 's' }) },
 };
 
-/** What each lane is called: its reading's label. */
+/** What each lane of an instrument is called. */
+const INSTRUMENT_LABELS: Record<InstrumentLane, string> = { pfd: 'PFD', nd: 'ND', surv: 'SURV' };
+
+/** What each lane is called: its reading's label, or the instrument's name. */
 export const LANE_LABELS = Object.fromEntries(
-  LANE_KEYS.map((lane) => [lane, READINGS[lane].label]),
+  LANE_KEYS.map((lane) => [
+    lane,
+    isInstrumentLane(lane) ? INSTRUMENT_LABELS[lane] : READINGS[lane].label,
+  ]),
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the keys are the lanes
 ) as Readonly<Record<LaneKey, string>>;

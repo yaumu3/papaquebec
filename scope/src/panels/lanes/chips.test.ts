@@ -6,20 +6,22 @@ import { type Chip, chipName, chipOf, laneName, paletteName, pickOf } from './ch
 describe('chipOf', () => {
   it("tells the palette's own lane, a lane open elsewhere, and one free to pick", () => {
     // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs'];
+    const plotted: LaneKey[] = ['alt', 'gs', 'pfd', 'nd'];
     const rows: [LaneKey | null, LaneKey][] = [
       ['alt', 'alt'],
       ['alt', 'gs'],
       ['alt', 'vs'],
       [null, 'alt'],
       [null, 'vs'],
+      ['pfd', 'pfd'],
+      [null, 'nd'],
     ];
 
     // Act
     const chips = rows.map(([own, lane]) => chipOf(plotted, own, lane));
 
     // Assert
-    expect(chips).toEqual(['own', 'open', 'free', 'open', 'free']);
+    expect(chips).toEqual(['own', 'open', 'free', 'open', 'free', 'own', 'open']);
   });
 });
 
@@ -59,6 +61,7 @@ describe('laneName', () => {
     const rows: [LaneKey, number, number][] = [
       ['alt', 0, 3],
       ['gs', 2, 3],
+      ['pfd', 0, 3],
     ];
 
     // Act
@@ -68,6 +71,7 @@ describe('laneName', () => {
     expect(names).toEqual([
       'ALT lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
       'GS lane, 3 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
+      'PFD lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
     ]);
   });
 });

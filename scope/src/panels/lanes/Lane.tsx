@@ -1,7 +1,7 @@
 import { createMemo, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
-import type { LaneKey, ReadingKey } from '../../state/plotted';
+import type { HistoryLane, ReadingKey } from '../../state/plotted';
 import { type Interval, xOf } from '../../state/span';
 import type { Sample } from '../../state/track';
 import { LANE_LABELS, NONE } from '../readings';
@@ -66,7 +66,7 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
 
 /** One lane of the bay: a top row with the dropdown of its name, then its scale and its plot over the visible span. */
 export function Lane(props: {
-  lane: LaneKey;
+  lane: HistoryLane;
   /** Its place among the lanes, and how many there are. */
   index: number;
   count: number;
@@ -165,7 +165,7 @@ export function Lane(props: {
   return (
     <div
       ref={props.laneRef}
-      data-lane
+      data-lane="history"
       class={cx(s.lane, props.slot && s.hole)}
       style={{ height: `${props.height}px`, order: props.place }}
       tabindex="0"

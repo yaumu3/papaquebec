@@ -26,30 +26,46 @@ export const READING_KEYS = [
 
 export type ReadingKey = (typeof READING_KEYS)[number];
 
+/** The lanes that draw an instrument rather than a reading's history. */
+const INSTRUMENT_LANES = ['pfd', 'nd', 'surv'] as const;
+
+export type InstrumentLane = (typeof INSTRUMENT_LANES)[number];
+
 /** The lanes by group, in the order the palette offers them. */
 export const LANE_GROUPS = [
+  { name: 'INST', lanes: INSTRUMENT_LANES },
   { name: 'FLT', lanes: ['alt', 'vs', 'gs', 'trk', 'roll'] },
   { name: 'NAV', lanes: ['qnh', 'modes'] },
   { name: 'AIR', lanes: ['ias', 'tas', 'mach', 'wind', 'oat', 'tat'] },
   { name: 'POS', lanes: ['nic', 'nacp'] },
   { name: 'RX', lanes: ['src', 'rssi', 'msgs', 'age'] },
-] as const satisfies readonly { name: string; lanes: readonly ReadingKey[] }[];
+] as const satisfies readonly { name: string; lanes: readonly (ReadingKey | InstrumentLane)[] }[];
 
-/** A reading with a lane of its own. */
+/** What a lane can be: an instrument, or a reading with a lane of its own. */
 export type LaneKey = (typeof LANE_GROUPS)[number]['lanes'][number];
+
+/** A reading with a lane of its own, which draws its history. */
+export type HistoryLane = Exclude<LaneKey, InstrumentLane>;
 
 export const LANE_KEYS: readonly LaneKey[] = LANE_GROUPS.flatMap((g) => g.lanes);
 
 export const isLaneKey = (k: unknown): k is LaneKey => LANE_KEYS.some((lane) => lane === k);
 
+export const isInstrumentLane = (k: LaneKey): k is InstrumentLane =>
+  INSTRUMENT_LANES.some((lane) => lane === k);
+
+/** The lanes of `plotted` that draw a reading's history, in their order. */
+export const historyLanesOf = (plotted: readonly LaneKey[]): HistoryLane[] =>
+  plotted.filter((k) => !isInstrumentLane(k));
+
 /** The intents drawn in a lane, on its scale, whenever reported. */
-export const INTENTS: Partial<Record<LaneKey, readonly ReadingKey[]>> = {
+export const INTENTS: Partial<Record<HistoryLane, readonly ReadingKey[]>> = {
   alt: ['selAlt', 'fmsAlt'],
   trk: ['selHdg'],
 };
 
 /** The readings drawn in a lane: its own first, then its intents. */
-export const readingsIn = (lane: LaneKey): ReadingKey[] => [lane, ...(INTENTS[lane] ?? [])];
+export const readingsIn = (lane: HistoryLane): ReadingKey[] => [lane, ...(INTENTS[lane] ?? [])];
 
 /** Plotted on first use. */
 export const DEFAULT_PLOTTED: readonly LaneKey[] = ['alt', 'gs'];

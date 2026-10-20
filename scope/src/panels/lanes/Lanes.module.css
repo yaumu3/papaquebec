@@ -182,6 +182,11 @@
   /* A finger held on it picks it up, not the page's callout. */
   -webkit-touch-callout: none;
 }
+/* As tall as the instrument in it, which a finger held on it can pick up and a vertical move scrolls. */
+.instrument {
+  display: flow-root;
+  touch-action: pan-y;
+}
 .lane:focus-visible {
   outline: none;
 }

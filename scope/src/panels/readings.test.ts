@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { setDeclinationAt } from '../state/magnetic';
-import { LANE_KEYS } from '../state/plotted';
+import { isInstrumentLane, LANE_KEYS } from '../state/plotted';
 import { makeSample } from '../state/sampleFixture';
 import { LANE_LABELS, NONE, positionReading, READINGS } from './readings';
 
@@ -193,14 +193,19 @@ describe('positionReading', () => {
 });
 
 describe('LANE_LABELS', () => {
-  it('labels every lane as the reading of that name is labeled', () => {
+  it('labels a lane of a reading as the reading is labeled, and each instrument by its name', () => {
     // Arrange
-    const lanes = LANE_KEYS;
+    const lanes = LANE_KEYS.filter((lane) => !isInstrumentLane(lane));
 
     // Act
-    const labels = lanes.map((lane) => LANE_LABELS[lane]);
+    const labels = [
+      ...lanes.map((lane) => LANE_LABELS[lane]),
+      LANE_LABELS.pfd,
+      LANE_LABELS.nd,
+      LANE_LABELS.surv,
+    ];
 
     // Assert
-    expect(labels).toEqual(lanes.map((lane) => READINGS[lane].label));
+    expect(labels).toEqual([...lanes.map((lane) => READINGS[lane].label), 'PFD', 'ND', 'SURV']);
   });
 });
