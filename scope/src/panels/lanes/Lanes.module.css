@@ -1,5 +1,5 @@
 /* Left of each plot, the gutter its scale is labelled in; the plots run to the right edge. */
-.history {
+.lanes {
   --lane-gutter: 32px;
   --lane-top: 18px;
   --plot-left: var(--lane-gutter);

@@ -22,7 +22,7 @@ import { dashClass } from './Lane';
 import { laneRange, laneTraces, pathOf } from './plot';
 import { yOf } from './trace';
 
-import s from './History.module.css';
+import s from './Lanes.module.css';
 
 const HEIGHT_PX = 30;
 const PAD_PX = 3;

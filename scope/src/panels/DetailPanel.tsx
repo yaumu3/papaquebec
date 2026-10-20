@@ -4,17 +4,17 @@ import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { trackLabel } from '../render/scene/rules';
-import { detailTab, keepViewOf, plotted, setDetailTab } from '../state/history';
+import { detailTab, keepViewOf, plotted, setDetailTab } from '../state/lanes';
 import { selected, snapshotVersion } from '../state/scope';
 import { DETAIL_TABS, type DetailTab } from '../state/settings';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
 import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
-import { History } from './history/History';
 import { Nd } from './instruments/nd/Nd';
 import { Pfd } from './instruments/pfd/Pfd';
 import { Surv } from './instruments/surv/Surv';
+import { Lanes } from './lanes/Lanes';
 
 import s from './DetailPanel.module.css';
 
@@ -149,7 +149,7 @@ export function DetailPanel() {
             <Tabs />
             <div role="tabpanel" id={PANEL_ID} aria-labelledby={tabId(detailTab())} class={s.panel}>
               <Show when={detailTab() === 'history'} fallback={<Readings t={t()} />}>
-                <History track={t()} />
+                <Lanes track={t()} />
               </Show>
             </div>
           </>

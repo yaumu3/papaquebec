@@ -32,7 +32,7 @@ export interface Persisted {
   settings: Settings;
   panels: Panels;
   listSort: ListSort;
-  /** The lanes of the history, in order. */
+  /** The lanes of the detail column, in order. */
   plotted: readonly LaneKey[];
   /** The tab the detail panel has open. */
   detailTab: DetailTab;

@@ -5,16 +5,16 @@ import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
 import {
   addPlotLane,
-  historyView,
+  lanesView,
   hoverInstant,
   movePlotLane,
   plotted,
   removePlotLane,
-  setHistorySpan,
+  setLanesSpan,
   setHoverInstant,
   setLaneScroll,
   switchPlotLane,
-} from '../../state/history';
+} from '../../state/lanes';
 import { laneAfter, type LaneKey, readingsIn } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
 import { type Interval, resolveSpan, type Span, xOf } from '../../state/span';
@@ -36,7 +36,7 @@ import { swipeOffset } from './swipe';
 import { Timeline } from './Timeline';
 import { restSample, sampleAt, seesAll } from './trace';
 
-import s from './History.module.css';
+import s from './Lanes.module.css';
 
 /** Each lane's height, a hairline under it. */
 const LANE_PX = 84;
@@ -67,14 +67,14 @@ function take(own: LaneKey | null, lane: LaneKey): void {
 }
 
 /** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
-export function History(props: { track: Track }) {
+export function Lanes(props: { track: Track }) {
   /** How far across the plots the pointer is, if it is over them. */
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
   // A memo, so that only another target resets the hover, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
   // A memo, so that scrolling the lanes, which keeps the span, redraws none of them.
-  const span = createMemo(() => historyView(hex()).span);
-  const setSpan = (next: Span) => setHistorySpan(hex(), next);
+  const span = createMemo(() => lanesView(hex()).span);
+  const setSpan = (next: Span) => setLanesSpan(hex(), next);
   createEffect(on(hex, () => setHoverPx(null), { defer: true }));
   onCleanup(() => setHoverInstant(null));
 
@@ -243,7 +243,7 @@ export function History(props: { track: Track }) {
   const restoreScroll = () => {
     const el = scroller();
     if (!el) return;
-    el.scrollTop = historyView(hex()).scrollTop;
+    el.scrollTop = lanesView(hex()).scrollTop;
     measure();
   };
   createEffect(on(hex, restoreScroll, { defer: true }));
@@ -270,8 +270,8 @@ export function History(props: { track: Track }) {
 
   return (
     <div
-      data-history
-      class={cx(s.history, drag() && s.grabbing)}
+      data-lanes
+      class={cx(s.lanes, drag() && s.grabbing)}
       style={{ '--lane-height': `${LANE_PX}px`, '--notch-height': `${NOTCH_H_PX}px` }}
     >
       <div ref={setTop} class={s.span}>

@@ -27,7 +27,7 @@ import { type Dash, HEARD, PLOTS } from './plots';
 import { heldIntents, readoutOf, readoutSlots, type Slot } from './readout';
 import { barsOf, gapsIn, yOf } from './trace';
 
-import s from './History.module.css';
+import s from './Lanes.module.css';
 
 /** The data band: below the lane's top row, where its name sits, and clear of its foot. */
 const PAD_TOP_PX = 28;

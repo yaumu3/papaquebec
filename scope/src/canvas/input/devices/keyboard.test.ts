@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { recordActions } from '../recordActions';
 import {
-  HISTORY_SELECTOR,
+  LANES_SELECTOR,
   type KeyEvent,
   keyHandler,
   ND_SELECTOR,
@@ -65,15 +65,15 @@ describe('keyHandler', () => {
     expect(calls).toEqual([]);
   });
 
-  it('leaves keys pressed inside the history to it', () => {
+  it('leaves keys pressed inside the lanes to it', () => {
     // Arrange
     const { calls, actions } = recordActions();
     const onKey = keyHandler(actions);
-    const inHistory = Object.assign(new EventTarget(), {
+    const inLanes = Object.assign(new EventTarget(), {
       tagName: 'DIV',
-      closest: (selector: string) => (selector === HISTORY_SELECTOR ? {} : null),
+      closest: (selector: string) => (selector === LANES_SELECTOR ? {} : null),
     });
-    const presses = ['Delete', 'Backspace', 'Escape'].map((k) => key(k, false, inHistory));
+    const presses = ['Delete', 'Backspace', 'Escape'].map((k) => key(k, false, inLanes));
 
     // Act
     for (const press of presses) onKey(press);

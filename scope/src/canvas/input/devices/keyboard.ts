@@ -22,8 +22,8 @@ function bindings(a: ScopeActions): Record<string, (e: KeyEvent) => void> {
   };
 }
 
-/** The history's root, which handles its own keys. */
-export const HISTORY_SELECTOR = '[data-history]';
+/** The lanes' root, which handles its own keys. */
+export const LANES_SELECTOR = '[data-lanes]';
 
 /** The ND, whose zoom buttons handle their own keys. */
 export const ND_SELECTOR = '[data-nd]';
@@ -31,16 +31,16 @@ export const ND_SELECTOR = '[data-nd]';
 /** A tab list, which handles its own keys. */
 export const TABLIST_SELECTOR = '[role="tablist"]';
 
-/** Whether a key pressed at `t` is another's to handle: typed into an input, or pressed in the history, on a tab list or on the ND. */
+/** Whether a key pressed at `t` is another's to handle: typed into an input, or pressed in the lanes, on a tab list or on the ND. */
 export function ownsKeys(t: EventTarget | null): boolean {
   if (!t) return false;
   if ('tagName' in t && t.tagName === 'INPUT') return true;
   if (!('closest' in t) || typeof t.closest !== 'function') return false;
   const closest = t.closest.bind(t);
-  return [HISTORY_SELECTOR, TABLIST_SELECTOR, ND_SELECTOR].some((sel) => closest(sel) !== null);
+  return [LANES_SELECTOR, TABLIST_SELECTOR, ND_SELECTOR].some((sel) => closest(sel) !== null);
 }
 
-/** The keyboard's shortcuts; keys typed into an input or pressed in the history, on a tab list or on the ND are left alone. */
+/** The keyboard's shortcuts; keys typed into an input or pressed in the lanes, on a tab list or on the ND are left alone. */
 export function keyHandler(a: ScopeActions): (e: KeyEvent) => void {
   const b = bindings(a);
   return (e) => {

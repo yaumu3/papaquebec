@@ -13,7 +13,7 @@ import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
 import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
-import { hoverInstant } from '../state/history';
+import { hoverInstant } from '../state/lanes';
 import { declinationAt } from '../state/magnetic';
 import {
   aero,
