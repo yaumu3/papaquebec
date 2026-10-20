@@ -110,6 +110,7 @@ export function Palette(props: {
         data-lanes
         class={s.palette}
         role="dialog"
+        aria-modal="true"
         onMouseDown={keepFocus}
         aria-label={paletteName(props.own)}
         onKeyDown={(e) => {
