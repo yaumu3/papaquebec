@@ -27,14 +27,18 @@ export function Palette(props: {
   onClose: () => void;
 }) {
   let el!: HTMLDivElement;
+  /** Closes it and gives the focus back to what it is for. */
+  const close = () => {
+    // Read before closing, which unmounts the palette and its props with it.
+    const anchor = props.anchor;
+    props.onClose();
+    anchor.focus({ preventScroll: true });
+  };
   const onKeyDown = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     e.preventDefault();
     e.stopPropagation();
-    // Read before closing, which unmounts the palette and its props with it.
-    const anchor = props.anchor;
-    props.onClose();
-    anchor.focus();
+    close();
   };
   /** Tabs round the palette's buttons, as a dialog keeps the focus to itself. */
   const tabRound = (e: KeyboardEvent) => {
@@ -46,7 +50,7 @@ export function Palette(props: {
   };
   /** Whatever scrolls closes it, which a point in the window would no longer fit. */
   const onScroll = (e: Event) => {
-    if (!(e.target instanceof Node && el.contains(e.target))) props.onClose();
+    if (!(e.target instanceof Node && el.contains(e.target))) close();
   };
   /** The mouse events that follow a touch would move the focus to the page. */
   const keepFocus = (e: MouseEvent) => e.preventDefault();
@@ -79,11 +83,15 @@ export function Palette(props: {
       <div
         class={s.backdrop}
         onMouseDown={keepFocus}
-        onPointerDown={props.onClose}
-        onWheel={props.onClose}
+        onPointerDown={(e) => {
+          // Cancelled, so that the mouse events that follow do not take the focus from the lane.
+          e.preventDefault();
+          close();
+        }}
+        onWheel={close}
         onContextMenu={(e) => {
           e.preventDefault();
-          props.onClose();
+          close();
         }}
       />
       <div
