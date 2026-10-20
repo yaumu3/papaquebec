@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { LaneKey } from '../../state/plotted';
-import { type Chip, chipName, chipOf, laneName, paletteName } from './chips';
+import { type Chip, chipName, chipOf, laneName, paletteName, pickOf } from './chips';
 
 describe('chipOf', () => {
   it("tells the palette's own lane, a lane open elsewhere, and one free to pick", () => {
@@ -69,5 +69,25 @@ describe('laneName', () => {
       'ALT lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
       'GS lane, 3 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it.',
     ]);
+  });
+});
+
+describe('pickOf', () => {
+  it("switches the palette's lane to a free one, adds a free one to none, and goes to one that is open", () => {
+    // Arrange
+    const plotted: LaneKey[] = ['alt', 'gs'];
+    const rows: [LaneKey | null, LaneKey][] = [
+      ['alt', 'vs'],
+      [null, 'vs'],
+      ['alt', 'gs'],
+      [null, 'gs'],
+      ['alt', 'alt'],
+    ];
+
+    // Act
+    const picks = rows.map(([own, lane]) => pickOf(plotted, own, lane));
+
+    // Assert
+    expect(picks).toEqual(['switch', 'add', 'reveal', 'reveal', 'reveal']);
   });
 });

@@ -21,3 +21,13 @@ export const laneName = (lane: LaneKey, index: number, count: number): string =>
 /** What the chip of `lane` is called beyond its text: that it is open already, which only a dot shows. */
 export const chipName = (lane: LaneKey, chip: Chip): string | undefined =>
   chip === 'open' ? `${LANE_LABELS[lane]}, already open` : undefined;
+
+/** What picking `lane` in the palette of `own`, or of a lane to add when null, does: take its place, join the column, or go to the lane open already. */
+export function pickOf(
+  plotted: readonly LaneKey[],
+  own: LaneKey | null,
+  lane: LaneKey,
+): 'switch' | 'add' | 'reveal' {
+  if (chipOf(plotted, own, lane) !== 'free') return 'reveal';
+  return own === null ? 'add' : 'switch';
+}

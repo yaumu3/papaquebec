@@ -24,7 +24,7 @@ import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
-import { chipOf } from './chips';
+import { pickOf } from './chips';
 import { liftLeft, slotShown } from './drag';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
@@ -58,6 +58,13 @@ const NOTCH_H_PX = 4;
 const PALETTE_GAP_PX = 2;
 /** Between the chip lifted with a dragged lane and the pointer under it. */
 const LIFT_GAP_PX = 4;
+
+/** Applies a pick of `lane` in the palette of `own`: it takes the place of `own`, joins the column, or is open already. */
+function take(own: LaneKey | null, lane: LaneKey): void {
+  const what = pickOf(plotted(), own, lane);
+  if (what === 'switch' && own) switchPlotLane(own, lane);
+  else if (what === 'add') addPlotLane(lane);
+}
 
 /** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
 export function History(props: { track: Track }) {
@@ -183,11 +190,7 @@ export function History(props: { track: Track }) {
     const m = menu();
     if (!m) return;
     closeMenu();
-    const chip = chipOf(plotted(), m.own, lane);
-    if (chip === 'free') {
-      if (m.own) switchPlotLane(m.own, lane);
-      else addPlotLane(lane);
-    }
+    take(m.own, lane);
     reveal(lane);
   };
   /** The LANE row of the palette of `own`. */
