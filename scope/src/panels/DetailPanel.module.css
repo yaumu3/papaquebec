@@ -9,13 +9,11 @@
   font-size: var(--text-sm);
   letter-spacing: var(--tracking);
 }
-/* Who it is: the flight, then the airframe, an advisory at the right end of either. */
+/* Who it is: the flight, then the airframe; the advisory ends the flight's line or wraps alone. */
 .head {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  column-gap: var(--space-4);
-  row-gap: var(--space-3);
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
   padding-top: var(--space-3);
   flex: none;
 }
@@ -25,21 +23,21 @@
     padding-top: 0;
   }
 }
-/* As wide as its text, so that the callsign is never cut. */
 .flight {
-  grid-area: 1 / 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-4);
-  width: max-content;
+  column-gap: var(--space-4);
+  row-gap: var(--space-2);
   white-space: nowrap;
 }
+.flight > * {
+  flex: none;
+}
 .ra {
-  grid-area: 1 / 2;
-  justify-self: end;
+  margin-left: auto;
 }
 .airframe {
-  grid-area: 2 / 1;
   display: flex;
   gap: var(--space-5);
   color: var(--text-dim);
@@ -47,11 +45,9 @@
   letter-spacing: var(--tracking);
   white-space: nowrap;
 }
-.raBelow .flight {
-  grid-column: 1 / -1;
-}
-.raBelow .ra {
-  grid-row: 2;
+/* Where part 2's live control stands. */
+.slot {
+  margin-left: auto;
 }
 /* Copied by selecting it, which the page otherwise turns off. */
 .text {

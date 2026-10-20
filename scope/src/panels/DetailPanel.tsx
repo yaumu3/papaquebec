@@ -1,13 +1,4 @@
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  type JSX,
-  on,
-  onCleanup,
-  Show,
-} from 'solid-js';
+import { createEffect, createMemo, For, type JSX, on, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
@@ -21,7 +12,6 @@ import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
 import { tabFor } from '../ui/tabKeys';
 import { Window } from '../ui/Window';
-import { advisoryBelow } from './header';
 import { History } from './history/History';
 import { Nd } from './instruments/nd/Nd';
 import { Pfd } from './instruments/pfd/Pfd';
@@ -114,44 +104,17 @@ function Squawk(props: { squawk: string | undefined; code: EmergencyCode | null 
 }
 
 /**
- * Who it is: the flight on the first line, the airframe on the second. An active advisory stands
- * at the right end of the first, or of the second when the first has no room for it.
+ * Who it is: the flight on the first line, the airframe on the second. An active advisory ends the
+ * first line, or stands alone at the right of the next when the tags leave it no room.
  */
 function Header(props: { t: Track }) {
   const tags = createMemo(() => statusTags(props.t.squawk, props.t.emergency));
   const ra = () => (props.t.ra?.terminated ? undefined : props.t.ra);
-  const [raBelow, setRaBelow] = createSignal(false);
-  let head!: HTMLDivElement;
-  let flight!: HTMLDivElement;
-  let advisory: HTMLSpanElement | undefined;
-  const fit = () =>
-    setRaBelow(
-      advisoryBelow({
-        flight: flight.offsetWidth,
-        gap: Number.parseFloat(getComputedStyle(head).columnGap) || 0,
-        advisory: advisory?.offsetWidth ?? 0,
-        room: head.clientWidth,
-      }),
-    );
-  const resized = new ResizeObserver(fit);
-  onCleanup(() => resized.disconnect());
   const type = () => props.t.type && `${props.t.type}/${wakeLetter(props.t.category)}`;
   const about = () => [props.t.description, props.t.category].filter(Boolean).join(' · ');
   return (
-    <div
-      ref={(el) => {
-        head = el;
-        resized.observe(el);
-      }}
-      class={cx(s.head, raBelow() && s.raBelow)}
-    >
-      <div
-        ref={(el) => {
-          flight = el;
-          resized.observe(el);
-        }}
-        class={s.flight}
-      >
+    <div class={s.head}>
+      <div class={s.flight}>
         <span class={cx(s.text, s.callsign)}>{trackLabel(props.t)}</span>
         <Squawk squawk={props.t.squawk} code={tags().code} />
         <Show when={props.t.ident}>
@@ -161,24 +124,10 @@ function Header(props: { t: Track }) {
         <Show when={tags().priority}>
           {(priority) => <span class={s.priority}>{PRIORITY_WORDS[priority()]}</span>}
         </Show>
+        <Show when={ra()}>
+          {(r) => <span class={cx(s.emergency, s.ra)}>RA {advisoryWord(r())}</span>}
+        </Show>
       </div>
-      <Show when={ra()}>
-        {(r) => (
-          <span
-            ref={(el) => {
-              advisory = el;
-              resized.observe(el);
-              onCleanup(() => {
-                resized.unobserve(el);
-                advisory = undefined;
-              });
-            }}
-            class={cx(s.emergency, s.ra)}
-          >
-            RA {advisoryWord(r())}
-          </span>
-        )}
-      </Show>
       <div class={cx(s.text, s.airframe)}>
         <Show when={type()}>
           <span title={about() || undefined}>{type()}</span>
@@ -187,6 +136,7 @@ function Header(props: { t: Track }) {
           <span>{props.t.registration}</span>
         </Show>
         <span>{props.t.hex.toUpperCase()}</span>
+        <span class={s.slot} />
       </div>
     </div>
   );
