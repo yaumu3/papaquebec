@@ -48,6 +48,8 @@ export function Palette(props: {
   const onScroll = (e: Event) => {
     if (!(e.target instanceof Node && el.contains(e.target))) props.onClose();
   };
+  /** The mouse events that follow a touch would move the focus to the page. */
+  const keepFocus = (e: MouseEvent) => e.preventDefault();
   /** What it is for, which stands lit. */
   const lit = props.anchor.getBoundingClientRect();
   /** Stands it at its anchor, written straight to the element so that it takes the focus at once. */
@@ -76,6 +78,7 @@ export function Palette(props: {
     <>
       <div
         class={s.backdrop}
+        onMouseDown={keepFocus}
         onPointerDown={props.onClose}
         onWheel={props.onClose}
         onContextMenu={(e) => {
@@ -99,10 +102,7 @@ export function Palette(props: {
         data-lanes
         class={s.palette}
         role="dialog"
-        onMouseDown={(e) => {
-          // The mouse events that follow a touch would move the focus to the page.
-          e.preventDefault();
-        }}
+        onMouseDown={keepFocus}
         aria-label={paletteName(props.own)}
         onKeyDown={(e) => {
           if (e.key === 'Tab') tabRound(e);
