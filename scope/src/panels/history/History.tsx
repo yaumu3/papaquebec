@@ -226,7 +226,7 @@ export function History(props: { track: Track }) {
   const { drag, swipe, holding, grab } = createLaneDrag({
     scroller,
     bin: () => add,
-    pitch: LANE_PX + 1,
+    heights: () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0),
     lanes: plotted,
     onDrop: (lane, drop) => {
       if (drop === 'remove') {

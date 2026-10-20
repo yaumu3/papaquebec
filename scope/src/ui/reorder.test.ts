@@ -3,15 +3,27 @@ import { describe, expect, it } from 'bun:test';
 import { EDGE_PX, EDGE_SPEED_PX, edgeSpeed, placeOf, reorderKey, slotAt } from './reorder';
 
 describe('slotAt', () => {
-  it('reads the slot under the pointer by the pitch, kept among the places there are', () => {
+  it("reads the slot under the pointer by each item's height, kept among the places there are", () => {
     // Arrange
-    const ys = [-20, 0, 84, 85, 200, 400];
+    const heights = [85, 251, 61, 85];
+    const ys = [-1, 0, 84, 85, 335, 336, 396, 397, 481, 482, 9999];
 
     // Act
-    const slots = ys.map((y) => slotAt(y, 85, 3));
+    const slots = ys.map((y) => slotAt(y, heights));
 
     // Assert
-    expect(slots).toEqual([0, 0, 0, 1, 2, 2]);
+    expect(slots).toEqual([0, 0, 0, 1, 1, 2, 2, 3, 3, 3, 3]);
+  });
+
+  it('is the first slot with no items', () => {
+    // Arrange
+    const heights: number[] = [];
+
+    // Act
+    const slot = slotAt(50, heights);
+
+    // Assert
+    expect(slot).toBe(0);
   });
 });
 

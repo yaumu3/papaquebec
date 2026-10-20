@@ -35,15 +35,16 @@ export interface LaneSwipe {
 }
 
 /**
- * The drag of lanes, `pitch` apart down `scroller`: the slot under the pointer as it moves, the
- * view scrolling near its edges, and over `bin` the lane's removal. Esc, or the pointer lost,
- * cancels. A finger drags a lane once held on it; moving sideways first on the top row it swipes
- * the row instead, which removes the lane past a third of its width.
+ * The drag of lanes stacked down `scroller`, each as tall as `heights` has it: the slot under the
+ * pointer as it moves, the view scrolling near its edges, and over `bin` the lane's removal. Esc,
+ * or the pointer lost, cancels. A finger drags a lane once held on it; moving sideways first on the
+ * top row it swipes the row instead, which removes the lane past a third of its width.
  */
 export function createLaneDrag(deps: {
   scroller: () => HTMLElement | undefined;
   bin: () => HTMLElement | undefined;
-  pitch: number;
+  /** Each lane's height, in the order they stand. */
+  heights: () => readonly number[];
   lanes: () => readonly LaneKey[];
   onDrop: (lane: LaneKey, drop: ReturnType<typeof dropOf>) => void;
 }): {
@@ -96,7 +97,7 @@ export function createLaneDrag(deps: {
     const top = deps.scroller()?.scrollTop ?? 0;
     const bin = deps.bin()?.getBoundingClientRect();
     if (!sc) return { ...d, x, y };
-    const slot = slotAt(y - sc.top + top, deps.pitch, deps.lanes().length);
+    const slot = slotAt(y - sc.top + top, deps.heights());
     return { ...d, x, y, slot, overBin: !!bin && overBin(x, y, bin, sc) };
   };
 
