@@ -1,10 +1,10 @@
 import { createSignal } from 'solid-js';
 
 import { addLane, type LaneKey, moveLane, removeLane, switchLane } from './plotted';
-import { type DetailTab, persisted } from './settings';
+import { persisted } from './settings';
 import { type Span, WHOLE } from './span';
 
-/** The lanes of the history, in order. */
+/** The lanes of the detail column, in order. */
 export const [plotted, setPlotted] = createSignal<readonly LaneKey[]>(persisted.plotted);
 
 export function removePlotLane(lane: LaneKey): void {
@@ -23,25 +23,22 @@ export function addPlotLane(lane: LaneKey): void {
   setPlotted((p) => addLane(p, lane));
 }
 
-/** The tab the detail panel has open. */
-export const [detailTab, setDetailTab] = createSignal<DetailTab>(persisted.detailTab);
-
-/** What the history shows of one target: its span, and how far down its lanes are scrolled. */
-export interface HistoryView {
+/** What the column shows of one target: its span, and how far down its lanes are scrolled. */
+export interface LanesView {
   hex: string | null;
   span: Span;
   scrollTop: number;
 }
 
-const [view, setView] = createSignal<HistoryView>({ hex: null, span: WHOLE, scrollTop: 0 });
+const [view, setView] = createSignal<LanesView>({ hex: null, span: WHOLE, scrollTop: 0 });
 
-const viewOf = (v: HistoryView, hex: string | null): HistoryView =>
+const viewOf = (v: LanesView, hex: string | null): LanesView =>
   v.hex === hex ? v : { hex, span: WHOLE, scrollTop: 0 };
 
-/** The history's view of `hex`; any target but the one kept starts whole and at the top. */
-export const historyView = (hex: string | null): HistoryView => viewOf(view(), hex);
+/** The column's view of `hex`; any target but the one kept starts whole and at the top. */
+export const lanesView = (hex: string | null): LanesView => viewOf(view(), hex);
 
-export function setHistorySpan(hex: string | null, span: Span): void {
+export function setLanesSpan(hex: string | null, span: Span): void {
   setView((v) => ({ ...viewOf(v, hex), span }));
 }
 

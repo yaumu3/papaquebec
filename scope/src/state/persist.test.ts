@@ -3,7 +3,13 @@ import { describe, expect, it } from 'bun:test';
 import { FL_MAX } from './filter';
 import type { ListSort } from './listSort';
 import { memoryStorage } from './memoryStorage';
-import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
+import {
+  LANES_VERSION,
+  loadPersisted,
+  PERSIST_KEY,
+  savePersisted,
+  type Persisted,
+} from './persist';
 import { DEFAULT_SETTINGS } from './settings';
 
 const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
@@ -12,8 +18,8 @@ const DEFAULTS: Persisted = {
   settings: DEFAULT_SETTINGS,
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_SORT,
-  plotted: ['alt', 'gs'],
-  detailTab: 'now',
+  plotted: ['pfd', 'nd', 'alt'],
+  lanesVersion: LANES_VERSION,
   ndRangeNm: 20,
 };
 
@@ -74,7 +80,7 @@ describe('savePersisted', () => {
       panels: { ...DEFAULT_PANELS, maps: false },
       listSort: { key: 'alt', dir: 'desc' },
       plotted: ['trk', 'gs'],
-      detailTab: 'history',
+      lanesVersion: LANES_VERSION,
       ndRangeNm: 80,
     };
     savePersisted(storage, state);
@@ -155,14 +161,14 @@ describe('loadPersisted plotted', () => {
   it('keeps the lanes it knows, each once, and falls back when the entry is no list', () => {
     // Arrange
     const stores = [['gs', 'bogus', 'alt', 'gs'], [], 'alt'].map((plotted) =>
-      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted }) }),
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted, lanesVersion: LANES_VERSION }) }),
     );
 
     // Act
     const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
 
     // Assert
-    expect(plotted).toEqual([['gs', 'alt'], [], ['alt', 'gs']]);
+    expect(plotted).toEqual([['gs', 'alt'], [], ['pfd', 'nd', 'alt']]);
   });
 });
 
@@ -182,7 +188,11 @@ describe('loadPersisted plotted from before lanes stood alone', () => {
     const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
 
     // Assert
-    expect(plotted).toEqual([['alt', 'gs'], ['trk', 'gs'], ['gs']]);
+    expect(plotted).toEqual([
+      ['pfd', 'nd', 'alt', 'gs'],
+      ['pfd', 'nd', 'trk', 'gs'],
+      ['pfd', 'nd', 'gs'],
+    ]);
   });
 });
 
@@ -190,7 +200,10 @@ describe('loadPersisted plotted lanes', () => {
   it('keeps every lane of a stored plot, however many', () => {
     // Arrange
     const storage = memoryStorage({
-      [PERSIST_KEY]: JSON.stringify({ plotted: ['alt', 'gs', 'trk', 'ias', 'vs', 'roll'] }),
+      [PERSIST_KEY]: JSON.stringify({
+        plotted: ['alt', 'gs', 'trk', 'ias', 'vs', 'roll'],
+        lanesVersion: LANES_VERSION,
+      }),
     });
 
     // Act
@@ -198,6 +211,53 @@ describe('loadPersisted plotted lanes', () => {
 
     // Assert
     expect(plotted).toEqual(['alt', 'gs', 'trk', 'ias', 'vs', 'roll']);
+  });
+});
+
+describe('loadPersisted lanes version', () => {
+  it('puts the PFD and ND first in lanes saved before there were instruments, and leaves the rest', () => {
+    // Arrange
+    const saved = [
+      { plotted: ['alt', 'gs'] },
+      { plotted: ['alt', 'gs'], detailTab: 'history' },
+      { plotted: [] },
+      { plotted: ['alt', 'nd', 'gs'] },
+      { plotted: ['surv'] },
+      { plotted: ['alt', 'gs'], lanesVersion: 2 },
+      { plotted: [], lanesVersion: 2 },
+      { plotted: ['gs', 'pfd'], lanesVersion: 2 },
+      {},
+      { lanesVersion: 2 },
+    ];
+    const stores = saved.map((s) => memoryStorage({ [PERSIST_KEY]: JSON.stringify(s) }));
+
+    // Act
+    const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
+
+    // Assert
+    expect(plotted).toEqual([
+      ['pfd', 'nd', 'alt', 'gs'],
+      ['pfd', 'nd', 'alt', 'gs'],
+      ['pfd', 'nd'],
+      ['alt', 'nd', 'gs'],
+      ['surv'],
+      ['alt', 'gs'],
+      [],
+      ['gs', 'pfd'],
+      ['pfd', 'nd', 'alt'],
+      ['pfd', 'nd', 'alt'],
+    ]);
+  });
+
+  it('reads as the current lanes version, whatever was saved', () => {
+    // Arrange
+    const storage = memoryStorage();
+
+    // Act
+    const loaded = loadPersisted(storage, DEFAULTS);
+
+    // Assert
+    expect(loaded.lanesVersion).toBe(2);
   });
 });
 
@@ -215,17 +275,15 @@ describe('loadPersisted history fold', () => {
 });
 
 describe('loadPersisted detailTab', () => {
-  it('keeps the open tab, and falls back when it is not one of the tabs', () => {
+  it('ignores a saved detail tab, which the panel no longer has', () => {
     // Arrange
-    const stores = ['history', 'graphs'].map((detailTab) =>
-      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ detailTab }) }),
-    );
+    const storage = memoryStorage({ [PERSIST_KEY]: JSON.stringify({ detailTab: 'history' }) });
 
     // Act
-    const tabs = stores.map((st) => loadPersisted(st, DEFAULTS).detailTab);
+    const loaded = loadPersisted(storage, DEFAULTS);
 
     // Assert
-    expect(tabs).toEqual(['history', 'now']);
+    expect('detailTab' in loaded).toBe(false);
   });
 });
 

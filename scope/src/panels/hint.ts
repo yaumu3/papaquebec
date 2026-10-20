@@ -35,7 +35,7 @@ export const HINT: readonly HintBlock[] = [
     ],
   },
   {
-    title: 'HISTORY',
+    title: 'LANES',
     columns: [
       [
         { keys: ['ALT', '↑'], action: 'LANE UP' },

@@ -1,8 +1,11 @@
 import { clamp } from '../lib/math';
 
-/** The slot of `count` items `pitch` apart that a pointer `y` down their content is over. */
-export const slotAt = (y: number, pitch: number, count: number): number =>
-  clamp(Math.floor(y / pitch), 0, count - 1);
+/** The slot of items `heights` tall, one under another, that a pointer `y` down them is over. */
+export function slotAt(y: number, heights: readonly number[]): number {
+  let bottom = 0;
+  const slot = heights.findIndex((h) => y < (bottom += h));
+  return slot < 0 ? Math.max(heights.length - 1, 0) : slot;
+}
 
 /** Where item `i` stands while the item at `from` is held over `slot`, the others closed up round it. */
 export function placeOf(i: number, from: number, slot: number): number {

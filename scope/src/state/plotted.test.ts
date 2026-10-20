@@ -5,6 +5,9 @@ import {
   DEFAULT_PLOTTED,
   INTENTS,
   LANE_GROUPS,
+  type HistoryLane,
+  historyLanesOf,
+  isInstrumentLane,
   laneAfter,
   LANE_KEYS,
   type LaneKey,
@@ -13,12 +16,14 @@ import {
   readingsIn,
   removeLane,
   switchLane,
+  withInstruments,
 } from './plotted';
 
 describe('LANE_GROUPS', () => {
   it('lists the lanes by group, as the palette offers them', () => {
     // Arrange
     const expected = [
+      { name: 'INST', lanes: ['pfd', 'nd', 'surv'] },
       { name: 'FLT', lanes: ['alt', 'vs', 'gs', 'trk', 'roll'] },
       { name: 'NAV', lanes: ['qnh', 'modes'] },
       { name: 'AIR', lanes: ['ias', 'tas', 'mach', 'wind', 'oat', 'tat'] },
@@ -48,10 +53,47 @@ describe('LANE_GROUPS', () => {
   });
 });
 
+describe('isInstrumentLane', () => {
+  it('tells the lanes of an instrument from the lanes of a reading', () => {
+    // Arrange
+    const lanes: LaneKey[] = ['pfd', 'nd', 'surv', 'alt', 'age'];
+
+    // Act
+    const flags = lanes.map(isInstrumentLane);
+
+    // Assert
+    expect(flags).toEqual([true, true, true, false, false]);
+  });
+});
+
+describe('historyLanesOf', () => {
+  it('keeps the lanes of readings, in their order', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['pfd', 'alt', 'nd', 'gs', 'surv'];
+
+    // Act
+    const lanes = historyLanesOf(plotted);
+
+    // Assert
+    expect(lanes).toEqual(['alt', 'gs']);
+  });
+
+  it('is empty for a column of instruments alone', () => {
+    // Arrange
+    const plotted: LaneKey[] = ['pfd', 'nd'];
+
+    // Act
+    const lanes = historyLanesOf(plotted);
+
+    // Assert
+    expect(lanes).toEqual([]);
+  });
+});
+
 describe('readingsIn', () => {
   it("lists a lane's own reading first, then the intents always drawn in it", () => {
     // Arrange
-    const lanes: LaneKey[] = ['alt', 'trk', 'gs'];
+    const lanes: HistoryLane[] = ['alt', 'trk', 'gs'];
 
     // Act
     const keys = lanes.map(readingsIn);
@@ -64,26 +106,39 @@ describe('readingsIn', () => {
 describe('removeLane', () => {
   it('removes the lane, the rest keeping their order', () => {
     // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs', 'vs'];
+    const plotted: LaneKey[] = ['pfd', 'alt', 'gs', 'vs'];
+    const removed: LaneKey[] = ['gs', 'pfd'];
 
     // Act
-    const next = removeLane(plotted, 'gs');
+    const next = removed.map((lane) => removeLane(plotted, lane));
 
     // Assert
-    expect(next).toEqual(['alt', 'vs']);
+    expect(next).toEqual([
+      ['pfd', 'alt', 'vs'],
+      ['alt', 'gs', 'vs'],
+    ]);
   });
 });
 
 describe('moveLane', () => {
   it('moves a lane, the rest keeping their order', () => {
     // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs', 'trk'];
+    const plotted: LaneKey[] = ['alt', 'nd', 'gs', 'trk'];
+    const moves: [number, number][] = [
+      [0, 2],
+      [1, 3],
+      [3, 1],
+    ];
 
     // Act
-    const next = moveLane(plotted, 0, 2);
+    const next = moves.map(([from, to]) => moveLane(plotted, from, to));
 
     // Assert
-    expect(next).toEqual(['gs', 'trk', 'alt']);
+    expect(next).toEqual([
+      ['nd', 'gs', 'alt', 'trk'],
+      ['alt', 'gs', 'trk', 'nd'],
+      ['alt', 'trk', 'nd', 'gs'],
+    ]);
   });
 
   it('leaves the order alone when the lane goes where it is', () => {
@@ -99,9 +154,9 @@ describe('moveLane', () => {
 });
 
 describe('DEFAULT_PLOTTED', () => {
-  it('plots altitude and ground speed on first use', () => {
+  it('plots the PFD, the ND and altitude on first use', () => {
     // Arrange
-    const expected: LaneKey[] = ['alt', 'gs'];
+    const expected: LaneKey[] = ['pfd', 'nd', 'alt'];
 
     // Act
     const plotted = [...DEFAULT_PLOTTED];
@@ -111,14 +166,36 @@ describe('DEFAULT_PLOTTED', () => {
   });
 });
 
+describe('withInstruments', () => {
+  it('puts the PFD and the ND first, unless an instrument is plotted already', () => {
+    // Arrange
+    const saved: LaneKey[][] = [['alt', 'gs'], [], ['alt', 'surv'], ['nd'], ['pfd', 'alt']];
+
+    // Act
+    const lanes = saved.map(withInstruments);
+
+    // Assert
+    expect(lanes).toEqual([
+      ['pfd', 'nd', 'alt', 'gs'],
+      ['pfd', 'nd'],
+      ['alt', 'surv'],
+      ['nd'],
+      ['pfd', 'alt'],
+    ]);
+  });
+});
+
 describe('switchLane', () => {
   it('puts the lane picked in the place of the one switched, unless it is open or that is not', () => {
     // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs', 'vs'];
+    const plotted: LaneKey[] = ['alt', 'pfd', 'gs', 'vs'];
     const switches: [LaneKey, LaneKey][] = [
       ['gs', 'ias'],
       ['gs', 'vs'],
       ['trk', 'ias'],
+      ['gs', 'nd'],
+      ['gs', 'pfd'],
+      ['pfd', 'surv'],
     ];
 
     // Act
@@ -126,9 +203,12 @@ describe('switchLane', () => {
 
     // Assert
     expect(next).toEqual([
-      ['alt', 'ias', 'vs'],
-      ['alt', 'gs', 'vs'],
-      ['alt', 'gs', 'vs'],
+      ['alt', 'pfd', 'ias', 'vs'],
+      ['alt', 'pfd', 'gs', 'vs'],
+      ['alt', 'pfd', 'gs', 'vs'],
+      ['alt', 'pfd', 'nd', 'vs'],
+      ['alt', 'pfd', 'gs', 'vs'],
+      ['alt', 'surv', 'gs', 'vs'],
     ]);
   });
 });
@@ -136,16 +216,18 @@ describe('switchLane', () => {
 describe('addLane', () => {
   it('adds a lane at the end, unless it is open', () => {
     // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs'];
-    const added: LaneKey[] = ['roll', 'alt'];
+    const plotted: LaneKey[] = ['alt', 'pfd', 'gs'];
+    const added: LaneKey[] = ['roll', 'alt', 'nd', 'pfd'];
 
     // Act
     const next = added.map((lane) => addLane(plotted, lane));
 
     // Assert
     expect(next).toEqual([
-      ['alt', 'gs', 'roll'],
-      ['alt', 'gs'],
+      ['alt', 'pfd', 'gs', 'roll'],
+      ['alt', 'pfd', 'gs'],
+      ['alt', 'pfd', 'gs', 'nd'],
+      ['alt', 'pfd', 'gs'],
     ]);
   });
 });

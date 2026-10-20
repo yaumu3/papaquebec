@@ -2,24 +2,23 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   addPlotLane,
-  detailTab,
-  historyView,
+  lanesView,
   hoverInstant,
   keepViewOf,
   movePlotLane,
   plotted,
   removePlotLane,
-  setHistorySpan,
+  setLanesSpan,
   setHoverInstant,
   setLaneScroll,
   setPlotted,
   switchPlotLane,
-} from './history';
+} from './lanes';
 import { DEFAULT_PLOTTED } from './plotted';
 import { persisted } from './settings';
 import { type Span, WHOLE } from './span';
 
-describe('history state', () => {
+describe('lanes state', () => {
   it('starts from the persisted plot, the default readings with nothing stored', () => {
     // Arrange
     const defaults = [...DEFAULT_PLOTTED];
@@ -33,7 +32,7 @@ describe('history state', () => {
 
   it('removes a lane', () => {
     // Arrange
-    setPlotted([...DEFAULT_PLOTTED, 'vs']);
+    setPlotted(['alt', 'gs', 'vs']);
 
     // Act
     removePlotLane('alt');
@@ -75,17 +74,6 @@ describe('history state', () => {
     expect(plotted()).toEqual(['alt', 'gs', 'roll']);
   });
 
-  it('starts on the persisted tab, NOW with nothing stored', () => {
-    // Arrange
-    const stored = persisted.detailTab;
-
-    // Act
-    const tab = detailTab();
-
-    // Assert
-    expect([stored, tab]).toEqual(['now', 'now']);
-  });
-
   it('starts with no instant under the pointer and takes one', () => {
     // Arrange
     const before = hoverInstant();
@@ -100,10 +88,10 @@ describe('history state', () => {
   it('keeps the span set for a target', () => {
     // Arrange
     const tail: Span = { kind: 'tail', sec: 120 };
-    setHistorySpan('a', tail);
+    setLanesSpan('a', tail);
 
     // Act
-    const view = historyView('a');
+    const view = lanesView('a');
 
     // Assert
     expect(view.span).toEqual(tail);
@@ -114,7 +102,7 @@ describe('history state', () => {
     setLaneScroll('a', 140);
 
     // Act
-    const view = historyView('a');
+    const view = lanesView('a');
 
     // Assert
     expect(view.scrollTop).toBe(140);
@@ -123,11 +111,11 @@ describe('history state', () => {
   it('keeps the span by reference when the lanes scroll', () => {
     // Arrange
     const tail: Span = { kind: 'tail', sec: 120 };
-    setHistorySpan('a', tail);
+    setLanesSpan('a', tail);
     setLaneScroll('a', 90);
 
     // Act
-    const { span } = historyView('a');
+    const { span } = lanesView('a');
 
     // Assert
     expect(span).toBe(tail);
@@ -135,11 +123,11 @@ describe('history state', () => {
 
   it('starts another target whole and at the top', () => {
     // Arrange
-    setHistorySpan('a', { kind: 'tail', sec: 120 });
+    setLanesSpan('a', { kind: 'tail', sec: 120 });
     setLaneScroll('a', 140);
 
     // Act
-    const view = historyView('b');
+    const view = lanesView('b');
 
     // Assert
     expect(view).toEqual({ hex: 'b', span: WHOLE, scrollTop: 0 });
@@ -147,12 +135,12 @@ describe('history state', () => {
 
   it('forgets the view once another target is selected, back at the first too', () => {
     // Arrange
-    setHistorySpan('a', { kind: 'tail', sec: 120 });
+    setLanesSpan('a', { kind: 'tail', sec: 120 });
     keepViewOf('b');
     keepViewOf('a');
 
     // Act
-    const view = historyView('a');
+    const view = lanesView('a');
 
     // Assert
     expect(view).toEqual({ hex: 'a', span: WHOLE, scrollTop: 0 });

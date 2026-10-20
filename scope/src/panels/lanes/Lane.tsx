@@ -1,13 +1,15 @@
 import { createMemo, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
-import type { ReadingKey } from '../../state/plotted';
+import type { HistoryLane, ReadingKey } from '../../state/plotted';
 import { type Interval, xOf } from '../../state/span';
 import type { Sample } from '../../state/track';
-import { NONE, READINGS } from '../readings';
+import { LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
+import { laneName } from './chips';
 import type { LanePart } from './laneDrag';
+import { isMenuKey } from './menu';
 import { type LaneMoves, onMoveKey } from './moves';
 import {
   atTicks,
@@ -26,7 +28,7 @@ import { type Dash, HEARD, PLOTS } from './plots';
 import { heldIntents, readoutOf, readoutSlots, type Slot } from './readout';
 import { barsOf, gapsIn, yOf } from './trace';
 
-import s from './History.module.css';
+import s from './Lanes.module.css';
 
 /** The data band: below the lane's top row, where its name sits, and clear of its foot. */
 const PAD_TOP_PX = 28;
@@ -63,9 +65,9 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
   return p.kind === 'intent' ? p.dash : undefined;
 };
 
-/** One lane of the bay: a top row with the dropdown of its name, then its scale and its plot over the visible span. */
+/** One lane of the bay: a top row with its name and readout, then its scale and its plot over the visible span. */
 export function Lane(props: {
-  lane: ReadingKey;
+  lane: HistoryLane;
   /** Its place among the lanes, and how many there are. */
   index: number;
   count: number;
@@ -79,21 +81,24 @@ export function Lane(props: {
   /** The sample the lane is read at, and whether it is an earlier one than the latest. */
   at: Sample | null;
   past: boolean;
+  /** Where the time cursor stands across the plot, if it does. */
+  cursor: number | null;
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
-  /** Whether the lane's palette is open, and the dropdown of its name that opens it. */
-  menuOpen: boolean;
-  onMenu: (anchor: HTMLElement) => void;
+  /** What asks for the lane's palette. */
+  onMenu: (e: MouseEvent | KeyboardEvent) => void;
   onGrab: (e: PointerEvent, part: LanePart) => void;
   /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
   place: number;
   /** How far a finger has swiped the top row left, while one does. */
   swipeX: number | null;
   slot: boolean;
+  /** Whether a finger has lifted it and not moved it yet: lit where it stands. */
+  lifted: boolean;
 }) {
   const spec = PLOTS[props.lane];
-  const label = READINGS[props.lane].label;
+  const label = LANE_LABELS[props.lane];
   const x = (t: number) => xOf(t, props.visible, props.width);
 
   const traces = createMemo(() => laneTraces(props.samples, props.keys, props.visible));
@@ -162,16 +167,19 @@ export function Lane(props: {
   return (
     <div
       ref={props.laneRef}
-      data-lane
-      class={cx(s.lane, props.slot && s.hole)}
+      data-lane="history"
+      class={cx(s.lane, props.slot && s.hole, props.lifted && s.lifted)}
       style={{ height: `${props.height}px`, order: props.place }}
       tabindex="0"
       role="group"
       aria-roledescription="lane"
-      aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
+      aria-label={laneName(props.lane, props.index, props.count)}
       onKeyDown={(e) => {
-        if (e.target === e.currentTarget) onMoveKey(props.moves, e);
+        if (e.target !== e.currentTarget) return;
+        if (isMenuKey(e)) props.onMenu(e);
+        else onMoveKey(props.moves, e);
       }}
+      onContextMenu={props.onMenu}
       onPointerDown={(e) =>
         props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
       }
@@ -260,6 +268,14 @@ export function Lane(props: {
             )}
           </Index>
         </Show>
+        <Show when={props.cursor}>
+          {(px) => (
+            <div
+              class={cx(s.timeCursor, props.past && s.live)}
+              style={{ left: `${px() - 0.5}px` }}
+            />
+          )}
+        </Show>
       </div>
       <div class={s.gutter}>
         <Index each={scale()}>
@@ -277,16 +293,7 @@ export function Lane(props: {
         class={cx(s.top, props.swipeX !== null && s.swiping)}
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
       >
-        <button
-          type="button"
-          class={cx(s.menu, props.menuOpen && s.open)}
-          aria-haspopup="dialog"
-          aria-expanded={props.menuOpen}
-          onClick={(e) => props.onMenu(e.currentTarget)}
-        >
-          {label}
-          <span class={s.caret}>{props.menuOpen ? '▲' : '▼'}</span>
-        </button>
+        <span class={s.name}>{label}</span>
         <Show when={readout()}>
           {(r) => (
             <div class={s.readout}>
