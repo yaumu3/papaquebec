@@ -3,7 +3,7 @@ import { For, onCleanup, onMount, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import { LANE_GROUPS, type LaneKey } from '../../state/plotted';
 import { wrapIndex } from '../../ui/wrap';
-import { READINGS } from '../readings';
+import { LANE_LABELS } from '../readings';
 import { chipName, chipOf, paletteName } from './chips';
 import { type LaneMoves, onMoveKey } from './moves';
 
@@ -95,7 +95,7 @@ export function Palette(props: {
                       <Show when={chip() === 'open'}>
                         <span class={s.dot} aria-hidden="true" />
                       </Show>
-                      {READINGS[lane].label}
+                      {LANE_LABELS[lane]}
                     </button>
                   );
                 }}

@@ -22,7 +22,7 @@ import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
-import { NONE, READINGS } from '../readings';
+import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
 import { chipOf } from './chips';
 import { liftLeft, slotShown } from './drag';
@@ -400,7 +400,7 @@ export function History(props: { track: Track }) {
                       <svg class={s.binIcon} viewBox="0 0 10 12" aria-hidden="true">
                         <path d="M0.5 2.5 H9.5 M3.5 2.5 V0.5 H6.5 V2.5 M1.5 2.5 L2 11.5 H8 L8.5 2.5" />
                       </svg>
-                      RELEASE TO REMOVE {READINGS[d().lane].label}
+                      RELEASE TO REMOVE {LANE_LABELS[d().lane]}
                     </>
                   )}
                 </Show>
@@ -438,7 +438,7 @@ export function History(props: { track: Track }) {
                 }}
               >
                 <span class={s.liftName}>
-                  {READINGS[d().lane].label}
+                  {LANE_LABELS[d().lane]}
                   <span class={s.caret}>▼</span>
                 </span>
                 <span class={s.liftValue}>{liftValue(d().lane)}</span>

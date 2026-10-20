@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import { setDeclinationAt } from '../state/magnetic';
+import { LANE_KEYS } from '../state/plotted';
 import { makeSample } from '../state/sampleFixture';
-import { NONE, positionReading, READINGS } from './readings';
+import { LANE_LABELS, NONE, positionReading, READINGS } from './readings';
 
 describe('READINGS', () => {
   it('reads the message rate to a tenth per second', () => {
@@ -188,5 +189,18 @@ describe('positionReading', () => {
       { k: 'POSITION', r: { v: '35.73266 139.99644' } },
       { k: 'POSITION', r: NONE },
     ]);
+  });
+});
+
+describe('LANE_LABELS', () => {
+  it('labels every lane as the reading of that name is labeled', () => {
+    // Arrange
+    const lanes = LANE_KEYS;
+
+    // Act
+    const labels = lanes.map((lane) => LANE_LABELS[lane]);
+
+    // Assert
+    expect(labels).toEqual(lanes.map((lane) => READINGS[lane].label));
   });
 });

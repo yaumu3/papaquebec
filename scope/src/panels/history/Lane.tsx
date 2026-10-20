@@ -1,12 +1,13 @@
 import { createMemo, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
-import type { ReadingKey } from '../../state/plotted';
+import type { LaneKey, ReadingKey } from '../../state/plotted';
 import { type Interval, xOf } from '../../state/span';
 import type { Sample } from '../../state/track';
-import { NONE, READINGS } from '../readings';
+import { LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
+import { laneName } from './chips';
 import type { LanePart } from './laneDrag';
 import { type LaneMoves, onMoveKey } from './moves';
 import {
@@ -65,7 +66,7 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
 
 /** One lane of the bay: a top row with the dropdown of its name, then its scale and its plot over the visible span. */
 export function Lane(props: {
-  lane: ReadingKey;
+  lane: LaneKey;
   /** Its place among the lanes, and how many there are. */
   index: number;
   count: number;
@@ -95,7 +96,7 @@ export function Lane(props: {
   slot: boolean;
 }) {
   const spec = PLOTS[props.lane];
-  const label = READINGS[props.lane].label;
+  const label = LANE_LABELS[props.lane];
   const x = (t: number) => xOf(t, props.visible, props.width);
 
   const traces = createMemo(() => laneTraces(props.samples, props.keys, props.visible));
@@ -170,7 +171,7 @@ export function Lane(props: {
       tabindex="0"
       role="group"
       aria-roledescription="lane"
-      aria-label={`${label} lane, ${props.index + 1} of ${props.count}. Drag it, or press Alt and an arrow key, to move it; Delete removes it.`}
+      aria-label={laneName(props.lane, props.index, props.count)}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget) onMoveKey(props.moves, e);
       }}
