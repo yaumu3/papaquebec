@@ -364,6 +364,7 @@ export function History(props: { track: Track }) {
                     height={LANE_PX}
                     at={at()}
                     past={past()}
+                    cursor={cursorX()}
                     menuOpen={menu()?.own === lane}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
@@ -406,11 +407,6 @@ export function History(props: { track: Track }) {
               </button>
             </div>
           </div>
-          <Show when={cursorX()}>
-            {(px) => (
-              <div class={cx(s.timeCursor, past() && s.live)} style={{ left: cursorLeft(px()) }} />
-            )}
-          </Show>
         </div>
         <Show when={view().thumb}>
           {(thumb) => (

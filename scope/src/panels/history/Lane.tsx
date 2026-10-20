@@ -79,6 +79,8 @@ export function Lane(props: {
   /** The sample the lane is read at, and whether it is an earlier one than the latest. */
   at: Sample | null;
   past: boolean;
+  /** Where the time cursor stands across the plot, if it does. */
+  cursor: number | null;
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
@@ -259,6 +261,14 @@ export function Lane(props: {
               </span>
             )}
           </Index>
+        </Show>
+        <Show when={props.cursor}>
+          {(px) => (
+            <div
+              class={cx(s.timeCursor, props.past && s.live)}
+              style={{ left: `${px() - 0.5}px` }}
+            />
+          )}
         </Show>
       </div>
       <div class={s.gutter}>

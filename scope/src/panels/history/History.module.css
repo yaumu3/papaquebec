@@ -88,12 +88,10 @@
   pointer-events: none;
 }
 /*
- * Under the last lane, the last thing in the scroll: + LANE, which opens the palette to add a
- * lane. On the panel's ground, in front of the time cursor, which so stops at the lanes.
+ * Under the last lane, the last thing in the scroll: + LANE, which opens the palette to add a lane, on
+ * the panel's ground so that the map does not show through it.
  */
 .addRow {
-  position: relative;
-  z-index: 2;
   padding-top: var(--add-gap);
   background: var(--panel-bg);
 }
@@ -442,10 +440,10 @@
   visibility: hidden;
 }
 /*
- * The time cursor: a chip on the clock with a notch down to the lanes, and one line through them,
- * in front of the plots and behind the lanes' names and readouts. At rest it stands at the last
- * sample in view, dim at the latest; it lights up away from it, hovered or with the window in the
- * past.
+ * The time cursor: a chip on the clock with a notch down to the lanes, and a line through each,
+ * in front of its plot and behind its name and readout, over its hairline. At rest it stands at
+ * the last sample in view, dim at the latest; it lights up away from it, hovered or with the window
+ * in the past.
  */
 .chip {
   position: absolute;
@@ -474,7 +472,7 @@
 .timeCursor {
   position: absolute;
   top: 0;
-  bottom: 0;
+  bottom: -1px;
   z-index: 1;
   width: 1px;
   background: var(--text-dim);
