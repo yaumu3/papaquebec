@@ -33,7 +33,7 @@ describe('lanes state', () => {
 
   it('removes a lane', () => {
     // Arrange
-    setPlotted([...DEFAULT_PLOTTED, 'vs']);
+    setPlotted(['alt', 'gs', 'vs']);
 
     // Act
     removePlotLane('alt');

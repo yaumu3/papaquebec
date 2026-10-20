@@ -2,7 +2,7 @@ import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
-import { isLaneKey, type LaneKey } from './plotted';
+import { isLaneKey, type LaneKey, withInstruments } from './plotted';
 import {
   DETAIL_TABS,
   type DetailTab,
@@ -28,12 +28,16 @@ import { readJson, writeJson } from './storageJson';
 
 export const PERSIST_KEY = 'papaquebec.settings';
 
+/** The version of the lanes saved: 2 once instruments are lanes, which earlier saves lack. */
+export const LANES_VERSION = 2;
+
 export interface Persisted {
   settings: Settings;
   panels: Panels;
   listSort: ListSort;
   /** The lanes of the detail column, in order. */
   plotted: readonly LaneKey[];
+  lanesVersion: typeof LANES_VERSION;
   /** The tab the detail panel has open. */
   detailTab: DetailTab;
   /** The range of the ND, one for all targets. */
@@ -126,11 +130,17 @@ function sortFrom(raw: unknown, fallback: ListSort): ListSort {
 
 /**
  * The lanes known, each once; an empty list is a choice to plot nothing. A plot saved before
- * lanes stood alone lists intents too, which are dropped.
+ * lanes stood alone lists intents too, which are dropped; one saved before instruments were lanes
+ * gets them first.
  */
-function plottedFrom(raw: unknown, fallback: readonly LaneKey[]): readonly LaneKey[] {
+function plottedFrom(
+  raw: unknown,
+  version: unknown,
+  fallback: readonly LaneKey[],
+): readonly LaneKey[] {
   if (!Array.isArray(raw)) return fallback;
-  return [...new Set(raw.filter(isLaneKey))];
+  const lanes = [...new Set(raw.filter(isLaneKey))];
+  return version === LANES_VERSION ? lanes : withInstruments(lanes);
 }
 
 /** Field-by-field validation: anything unexpected falls back to the default for that field. */
@@ -141,7 +151,8 @@ export function loadPersisted(storage: Storage, defaults: Persisted): Persisted 
     settings: settingsFrom(r.settings, defaults.settings),
     panels: panelsFrom(r.panels, defaults.panels),
     listSort: sortFrom(r.listSort, defaults.listSort),
-    plotted: plottedFrom(r.plotted, defaults.plotted),
+    plotted: plottedFrom(r.plotted, r.lanesVersion, defaults.plotted),
+    lanesVersion: LANES_VERSION,
     detailTab: oneOf(DETAIL_TABS, r.detailTab, defaults.detailTab),
     ndRangeNm: oneOf(ND_RANGES_NM, r.ndRangeNm, defaults.ndRangeNm),
   };

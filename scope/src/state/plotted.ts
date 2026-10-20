@@ -68,7 +68,11 @@ export const INTENTS: Partial<Record<HistoryLane, readonly ReadingKey[]>> = {
 export const readingsIn = (lane: HistoryLane): ReadingKey[] => [lane, ...(INTENTS[lane] ?? [])];
 
 /** Plotted on first use. */
-export const DEFAULT_PLOTTED: readonly LaneKey[] = ['alt', 'gs'];
+export const DEFAULT_PLOTTED: readonly LaneKey[] = ['pfd', 'nd', 'alt'];
+
+/** Lanes saved before there were instruments, with the PFD and the ND first, as the panel opened on them. */
+export const withInstruments = (lanes: readonly LaneKey[]): LaneKey[] =>
+  lanes.some(isInstrumentLane) ? [...lanes] : ['pfd', 'nd', ...lanes];
 
 export function removeLane(plotted: readonly LaneKey[], lane: LaneKey): LaneKey[] {
   return plotted.filter((k) => k !== lane);

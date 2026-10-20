@@ -16,6 +16,7 @@ import {
   readingsIn,
   removeLane,
   switchLane,
+  withInstruments,
 } from './plotted';
 
 describe('LANE_GROUPS', () => {
@@ -153,15 +154,34 @@ describe('moveLane', () => {
 });
 
 describe('DEFAULT_PLOTTED', () => {
-  it('plots altitude and ground speed on first use', () => {
+  it('plots the PFD, the ND and altitude on first use', () => {
     // Arrange
-    const expected: LaneKey[] = ['alt', 'gs'];
+    const expected: LaneKey[] = ['pfd', 'nd', 'alt'];
 
     // Act
     const plotted = [...DEFAULT_PLOTTED];
 
     // Assert
     expect(plotted).toEqual(expected);
+  });
+});
+
+describe('withInstruments', () => {
+  it('puts the PFD and the ND first, unless an instrument is plotted already', () => {
+    // Arrange
+    const saved: LaneKey[][] = [['alt', 'gs'], [], ['alt', 'surv'], ['nd'], ['pfd', 'alt']];
+
+    // Act
+    const lanes = saved.map(withInstruments);
+
+    // Assert
+    expect(lanes).toEqual([
+      ['pfd', 'nd', 'alt', 'gs'],
+      ['pfd', 'nd'],
+      ['alt', 'surv'],
+      ['nd'],
+      ['pfd', 'alt'],
+    ]);
   });
 });
 

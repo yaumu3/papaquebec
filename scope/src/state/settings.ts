@@ -1,7 +1,7 @@
 import { createStore } from 'solid-js/store';
 
 import { DEFAULT_LIST_SORT } from './listSort';
-import { loadPersisted, type Persisted, savePersisted } from './persist';
+import { LANES_VERSION, loadPersisted, type Persisted, savePersisted } from './persist';
 import { DEFAULT_PLOTTED } from './plotted';
 import {
   DEFAULT_ND_RANGE_NM,
@@ -23,6 +23,7 @@ const DEFAULTS: Persisted = {
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_LIST_SORT,
   plotted: DEFAULT_PLOTTED,
+  lanesVersion: LANES_VERSION,
   detailTab: 'now',
   ndRangeNm: DEFAULT_ND_RANGE_NM,
 };
@@ -33,7 +34,7 @@ export const persisted: Persisted = storage ? loadPersisted(storage, DEFAULTS) :
 export const [settings, setSettings] = createStore<Settings>(structuredClone(persisted.settings));
 
 /** Writes the current settings and the rest of the persisted state to local storage. */
-export function persist(rest: Omit<Persisted, 'settings'>): void {
+export function persist(rest: Omit<Persisted, 'settings' | 'lanesVersion'>): void {
   if (!storage) return;
   const snapshot: Settings = {
     ...settings,
@@ -42,7 +43,7 @@ export function persist(rest: Omit<Persisted, 'settings'>): void {
     altimeter: { ...settings.altimeter },
     qnh: { ...settings.qnh },
   };
-  savePersisted(storage, { settings: snapshot, ...rest });
+  savePersisted(storage, { settings: snapshot, lanesVersion: LANES_VERSION, ...rest });
 }
 
 export function toggleLayer(key: LayerKey): void {
