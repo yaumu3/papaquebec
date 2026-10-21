@@ -1,26 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../lib/reports';
-import { holdsAll, isLost, oldestHeard } from './freshness';
+import { holdsAll, isLost } from './freshness';
 
 const NOW = 1000;
-
-describe('oldestHeard', () => {
-  it('takes the earliest instant of the keys heard, none when none is', () => {
-    // Arrange
-    const heard = { trackRate: 990, gs: 980 };
-
-    // Act
-    const out = [
-      oldestHeard(heard, ['trackRate', 'gs']),
-      oldestHeard(heard, ['gs', 'selAlt']),
-      oldestHeard(heard, ['selAlt']),
-    ];
-
-    // Assert
-    expect(out).toEqual([980, 980, undefined]);
-  });
-});
 
 describe('holdsAll', () => {
   it('holds a key heard under the lapse ago, not at it or beyond', () => {

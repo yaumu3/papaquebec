@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { HeardKey } from '../../lib/aircraft';
 import { LAPSE_SEC } from '../../lib/reports';
 import { makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
@@ -9,7 +8,6 @@ import {
   barbMarks,
   barsOf,
   gapsIn,
-  heardAt,
   nearestSample,
   newestSample,
   peekAt,
@@ -87,24 +85,6 @@ describe('runsOf', () => {
 
     // Assert
     expect(runs.flat().map((p) => p.t)).toEqual([2, 3, 4, 5]);
-  });
-});
-
-describe('heardAt', () => {
-  it('is the oldest instant of the keys heard, undefined with none', () => {
-    // Arrange
-    const keys: readonly HeardKey[] = ['windSpeed', 'windDir'];
-    const rows = [
-      sample(20, { heard: { windSpeed: 10, windDir: 8 } }),
-      sample(20, { heard: { windDir: 8 } }),
-      sample(20, { heard: { gs: 8 } }),
-    ];
-
-    // Act
-    const instants = rows.map((s) => heardAt(s, keys));
-
-    // Assert
-    expect(instants).toEqual([8, 8, undefined]);
   });
 });
 

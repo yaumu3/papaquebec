@@ -1,3 +1,5 @@
+import type { Heard, HeardKey } from './aircraft';
+
 /**
  * How long a transponder sends the special position identification after the crew presses
  * IDENT (ICAO Annex 10 Volume IV): the ident is shown while its report is this fresh.
@@ -30,4 +32,13 @@ export const LAPSE_SEC = 30;
 /** Whether a report heard at `heardAt` still holds at `now`: heard less than `lapseSec` before. */
 export function holds(heardAt: number | undefined, now: number, lapseSec: number): boolean {
   return heardAt !== undefined && now - heardAt < lapseSec;
+}
+
+/**
+ * When the oldest of the keys heard was heard. A key never heard does not age the value: a reading
+ * is absent exactly when it was not reported, and many aircraft send a selection with no modes.
+ */
+export function oldestHeard(heard: Heard, keys: readonly HeardKey[]): number | undefined {
+  const times = keys.flatMap((key) => heard[key] ?? []);
+  return times.length === 0 ? undefined : Math.min(...times);
 }

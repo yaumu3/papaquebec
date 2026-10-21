@@ -1,5 +1,5 @@
 import type { HeardKey } from '../../lib/aircraft';
-import { LAPSE_SEC } from '../../lib/reports';
+import { LAPSE_SEC, oldestHeard } from '../../lib/reports';
 import type { Sample } from '../../state/track';
 import { type Interval, timeAt } from '../../state/window';
 
@@ -44,16 +44,10 @@ function around(samples: readonly Sample[], i: Interval): Sample[] {
   return samples.slice(Math.max(0, first - 1), Math.min(samples.length, last + 1));
 }
 
-/** When a reading made of the values `keys` was heard: when the oldest of them was; undefined unless one was. */
-export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefined {
-  const instants = keys.flatMap((key) => s.heard[key] ?? []);
-  return instants.length > 0 ? Math.min(...instants) : undefined;
-}
-
 /** Whether the reading made of `keys` was heard less than the gap from `t`; always, without keys. */
 export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
   if (keys.length === 0) return true;
-  const at = heardAt(s, keys);
+  const at = oldestHeard(s.heard, keys);
   return at !== undefined && Math.abs(t - at) < LAPSE_SEC;
 }
 
@@ -78,7 +72,7 @@ export function runsOf(
     };
     for (const s of stretch) {
       const v = read(s);
-      const at = keys.length > 0 ? heardAt(s, keys) : s.t;
+      const at = keys.length > 0 ? oldestHeard(s.heard, keys) : s.t;
       if (v === undefined) {
         end();
         continue;
