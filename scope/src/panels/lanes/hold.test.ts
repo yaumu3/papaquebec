@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  DOUBLE_TAP_MS,
+  DOUBLE_TAP_PX,
   HOLD_MS,
   HOLD_SLOP_PX,
+  isDoubleTap,
   keepsTouch,
   laneGestureOf,
   MENU_HOLD_MS,
@@ -225,5 +228,25 @@ describe('pinchesFrom', () => {
 
     // Assert
     expect(pinches).toEqual([true, true, true, false, false, false, false, false, false]);
+  });
+});
+
+describe('isDoubleTap', () => {
+  it('takes a tap close in time and place to the one before, and no other', () => {
+    // Arrange
+    const first = { x: 100, y: 200, at: 1000 };
+    const rows = [
+      { prev: first, tap: { x: 102, y: 201, at: 1150 } },
+      { prev: first, tap: { x: 100, y: 200, at: 1000 + DOUBLE_TAP_MS } },
+      { prev: first, tap: { x: 100, y: 200, at: 1000 + DOUBLE_TAP_MS + 1 } },
+      { prev: first, tap: { x: 100 + DOUBLE_TAP_PX + 1, y: 200, at: 1100 } },
+      { prev: null, tap: { x: 100, y: 200, at: 1100 } },
+    ];
+
+    // Act
+    const doubles = rows.map((r) => isDoubleTap(r.prev, r.tap));
+
+    // Assert
+    expect(doubles).toEqual([true, true, false, false, false]);
   });
 });

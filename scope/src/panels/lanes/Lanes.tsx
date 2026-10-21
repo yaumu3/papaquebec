@@ -25,14 +25,22 @@ import {
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
-import { contactOf, readsPast, resolveWindow, selectWindow, timeAt, xOf } from '../../state/window';
+import {
+  contactOf,
+  DEFAULT_WINDOW,
+  readsPast,
+  resolveWindow,
+  selectWindow,
+  timeAt,
+  xOf,
+} from '../../state/window';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, ticks } from './axis';
 import { pickOf } from './chips';
 import { liftLeft, slotShown } from './drag';
-import { HOLD_MS, MENU_HOLD_MS } from './hold';
+import { HOLD_MS, isDoubleTap, MENU_HOLD_MS, type Tap } from './hold';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
@@ -96,6 +104,9 @@ export function Lanes(props: { track: Track }) {
   /** The axis row lines up with the plots, so its width is the plots'. */
   const plotWidth = trackWidth(axisRow);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
+  const reset = () => setLanesWindow(hex(), DEFAULT_WINDOW);
+  /** The last finger tap on a history lane, which a second one soon after and near makes a double. */
+  let lastTap: Tap | null = null;
   const plotLeft = () => axisRow()?.getBoundingClientRect().left ?? 0;
   const plotPx = (clientX: number) => clamp(clientX - plotLeft(), 0, plotWidth());
   /** The instant a mouse pressed at, while it selects a span: the band's fixed end. */
@@ -229,6 +240,11 @@ export function Lanes(props: { track: Track }) {
     bin: () => add,
     heights: () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0),
     lanes: plotted,
+    onTap: (tap) => {
+      const double = isDoubleTap(lastTap, tap);
+      if (double) reset();
+      lastTap = double ? null : tap;
+    },
     peek: { move: (clientX) => setHoverPx(plotPx(clientX)), end: () => setHoverPx(null) },
     select: {
       start: (clientX) => setPressedAt(timeAt(plotPx(clientX), visible(), plotWidth())),
@@ -357,6 +373,7 @@ export function Lanes(props: { track: Track }) {
                     past={past()}
                     cursor={cursorX()}
                     band={band()}
+                    onReset={reset}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
                     onMenu={(e) => openLaneMenu(lane, e)}

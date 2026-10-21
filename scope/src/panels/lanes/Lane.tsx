@@ -85,6 +85,8 @@ export function Lane(props: {
   cursor: number | null;
   /** The span being selected, between two points across the plot, if one is. */
   band: { from: number; to: number } | null;
+  /** Resets the window, as a double click on the lane does. */
+  onReset: () => void;
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
@@ -182,6 +184,7 @@ export function Lane(props: {
         else onMoveKey(props.moves, e);
       }}
       onContextMenu={props.onMenu}
+      onDblClick={props.onReset}
       onPointerDown={(e) =>
         props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
       }

@@ -9,6 +9,7 @@ import {
   laneGestureOf,
   MENU_HOLD_MS,
   pinchesFrom,
+  type Tap,
   type TouchStage,
   touchHoldOf,
 } from './hold';
@@ -60,6 +61,8 @@ export function createLaneDrag(deps: {
     close: () => void;
   };
   onDrop: (lane: LaneKey, drop: ReturnType<typeof dropOf>) => void;
+  /** A finger's tap on a history lane: pressed and released with no gesture, in viewport px and ms. */
+  onTap: (tap: Tap) => void;
   /** The cursor a finger moved sideways along a plot carries, in viewport x. */
   peek: { move: (x: number) => void; end: () => void };
   /** The span a mouse selects by dragging sideways on a history lane, in viewport x. */
@@ -245,11 +248,19 @@ export function createLaneDrag(deps: {
       if (!own(u)) return;
       const d = drag();
       const s = swipe();
+      const tap =
+        u.pointerType === 'touch' &&
+        part !== 'instrument' &&
+        stage === 'pressed' &&
+        !d &&
+        !s &&
+        !peeking();
       if (selecting) {
         selecting = false;
         deps.select.end();
       }
       end?.();
+      if (tap) deps.onTap({ x: u.clientX, y: u.clientY, at: u.timeStamp });
       if (stage === 'picker') return;
       if (d) deps.onDrop(d.lane, dropOf(d.from, d.slot, d.overBin));
       else if (s && swipeRemoves(s.dx, s.width)) deps.onDrop(s.lane, 'remove');

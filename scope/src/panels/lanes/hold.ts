@@ -90,3 +90,20 @@ export function keepsTouch(g: {
   const prevent = g.drag || g.swipe || g.picking || g.peek;
   return { prevent, stop: prevent || g.holding };
 }
+
+/** How soon, and how near, a second tap must follow the first to be a double tap. */
+export const DOUBLE_TAP_MS = 300;
+export const DOUBLE_TAP_PX = 24;
+
+/** A tap: where it was, in viewport px, and when, in ms. */
+export interface Tap {
+  x: number;
+  y: number;
+  at: number;
+}
+
+/** Whether `tap` follows `prev` closely enough in time and place to make a double tap with it. */
+export const isDoubleTap = (prev: Tap | null, tap: Tap): boolean =>
+  prev !== null &&
+  tap.at - prev.at <= DOUBLE_TAP_MS &&
+  Math.hypot(tap.x - prev.x, tap.y - prev.y) <= DOUBLE_TAP_PX;
