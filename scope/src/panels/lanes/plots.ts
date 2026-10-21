@@ -7,7 +7,7 @@ import { magneticTrack } from '../../state/magnetic';
 import type { ReadingKey } from '../../state/plotted';
 import { settings } from '../../state/settings';
 import type { Sample } from '../../state/track';
-import { type Wind, windOf } from '../readings';
+import { type Reading, type Wind, windOf } from '../readings';
 import type { Read } from './trace';
 
 /** Where the aircraft goes and where it points, magnetic degrees. */
@@ -105,3 +105,13 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
     quantum: 1,
   },
 };
+
+/** Whether a reading is drawn on a log scale, as a bound. */
+export const isLog = (key: ReadingKey): boolean => {
+  const spec = PLOTS[key];
+  return spec.kind === 'line' && spec.log === true;
+};
+
+/** A reading's value as a lane prints it: with its unit only on a log lane, where the unit changes along it. */
+export const plotText = (key: ReadingKey, r: Reading): string =>
+  isLog(key) && r.unit ? `${r.v} ${r.unit}` : r.v;

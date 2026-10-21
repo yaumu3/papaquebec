@@ -2,6 +2,7 @@ import type { HeardKey } from '../../lib/aircraft';
 import { LAPSE_SEC, oldestHeard } from '../../lib/reports';
 import type { Sample } from '../../state/track';
 import { type Interval, timeAt } from '../../state/window';
+import { heardNear } from './heard';
 
 export interface Point {
   t: number;
@@ -42,13 +43,6 @@ function around(samples: readonly Sample[], i: Interval): Sample[] {
   let last = samples.findIndex((s) => s.t > i.to);
   if (last < 0) last = samples.length;
   return samples.slice(Math.max(0, first - 1), Math.min(samples.length, last + 1));
-}
-
-/** Whether the reading made of `keys` was heard less than the gap from `t`; always, without keys. */
-export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
-  if (keys.length === 0) return true;
-  const at = oldestHeard(s.heard, keys);
-  return at !== undefined && Math.abs(t - at) < LAPSE_SEC;
 }
 
 /**

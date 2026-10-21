@@ -2,8 +2,8 @@ import { climbState } from '../../lib/format';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { NONE, READINGS } from '../readings';
-import { heardNearAt, plotText } from './plot';
-import { PLOTS } from './plots';
+import { heardNearAt } from './heard';
+import { PLOTS, plotText } from './plots';
 
 /**
  * Within this, the two targets agree: the coarser step a selected altitude comes in, 32 ft in the

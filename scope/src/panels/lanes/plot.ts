@@ -7,10 +7,12 @@ import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import type { Interval } from '../../state/window';
-import { HEARD, type Reading, READINGS } from '../readings';
+import { HEARD, READINGS } from '../readings';
 import { fixed, offset, toward } from '../svg';
+import { heardNear, heardNearAt } from './heard';
 import { type Dash, type Heading, PLOTS } from './plots';
-import { barbMarks, heardNear, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
+import { isLog, plotText } from './plots';
+import { barbMarks, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
 
 export interface LaneTrace {
   key: ReadingKey;
@@ -111,16 +113,6 @@ interface ScaleLabel {
 
 /** The metres a power of ten stands for, to six figures, as a bound reads them. */
 const metresOf = (v: number): number => Number((10 ** v).toPrecision(6));
-
-/** Whether a reading is drawn on a log scale, as a bound. */
-const isLog = (key: ReadingKey): boolean => {
-  const spec = PLOTS[key];
-  return spec.kind === 'line' && spec.log === true;
-};
-
-/** A reading's value as a lane prints it: with its unit only on a log lane, where the unit changes along it. */
-export const plotText = (key: ReadingKey, r: Reading): string =>
-  isLog(key) && r.unit ? `${r.v} ${r.unit}` : r.v;
 
 /**
  * The top and bottom of a lane's scale as its reading reads them, bounds on a log scale with
@@ -253,28 +245,6 @@ interface HeadingMark extends Heading {
   sel?: number | undefined;
 }
 
-/** The sample less each of its track, heading and selected heading not heard within the gap of `t`. */
-export function headingHeardNear(s: Sample, t: number): Sample {
-  const out = { ...s };
-  for (const key of [...HEARD.trk, ...HEARD.selHdg]) {
-    if (!heardNear(s, [key], t)) Object.assign(out, { [key]: undefined });
-  }
-  return out;
-}
-
-/**
- * The sample less each reading of the lane of `keys` not heard within the gap of it: the track and
- * the heading each on its own, the values of any other reading together.
- */
-export function heardNearAt(keys: readonly ReadingKey[], at: Sample): Sample {
-  const s: Sample = keys.includes('trk') ? headingHeardNear(at, at.t) : { ...at };
-  for (const key of keys) {
-    if (key === 'trk' || heardNear(at, HEARD[key], at.t)) continue;
-    for (const value of HEARD[key]) Object.assign(s, { [value]: undefined });
-  }
-  return s;
-}
-
 /**
  * What a heading glyph at `t` reads of a sample, each part only while heard within the gap of
  * `t`, the intent `sel` among them; none when neither the track nor the heading was.
@@ -282,7 +252,7 @@ export function heardNearAt(keys: readonly ReadingKey[], at: Sample): Sample {
 export function headingAt(s: Sample, t: number, sel?: ReadingKey): HeadingMark | undefined {
   const spec = PLOTS.trk;
   const intent = sel === undefined ? undefined : PLOTS[sel];
-  const heard = headingHeardNear(s, t);
+  const heard = heardNearAt(['trk', 'selHdg'], s, t);
   const h = spec.kind === 'heading' ? spec.heading(heard) : undefined;
   return h && { ...h, sel: intent?.kind === 'intent' ? intent.y(heard) : undefined };
 }
