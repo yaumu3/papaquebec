@@ -2,7 +2,6 @@ import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
 import { steeringHeading } from '../../../lib/autopilot';
 import { padBearing } from '../../../lib/format';
-import { holds, LAPSE_SEC } from '../../../lib/reports';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
 import { HEARD } from '../../lanes/plots';
@@ -31,7 +30,7 @@ function modeOf(m: Moment<Readout>): NdMode {
   if (m.kind === 'empty') return 'empty';
   const { r: t, instant } = m;
   if (isLost(t)) return 'lost';
-  if (holds(t.heard.track, instant, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
+  if (holdsAll(t, ['track'], instant) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
 }
 
