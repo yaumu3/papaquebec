@@ -18,10 +18,14 @@ export type LanesWindow =
 export const DEFAULT_WINDOW: LanesWindow = { kind: 'live', sec: Infinity };
 export const MIN_WINDOW_SEC = 30;
 
+/** `sec` kept to at least the minimum window and at most the whole contact. */
+const windowSec = (sec: number, contact: Interval): number =>
+  clamp(sec, MIN_WINDOW_SEC, Math.max(MIN_WINDOW_SEC, lengthOf(contact)));
+
 /** The interval of the contact `w` shows, at least the minimum long. */
 export function resolveWindow(w: LanesWindow, contact: Interval): Interval {
   if (w.kind === 'live') {
-    const sec = clamp(w.sec, MIN_WINDOW_SEC, Math.max(MIN_WINDOW_SEC, lengthOf(contact)));
+    const sec = windowSec(w.sec, contact);
     return { from: contact.to - sec, to: contact.to };
   }
   const sec = Math.max(MIN_WINDOW_SEC, lengthOf(w));
@@ -91,7 +95,7 @@ export function zoomWindow(
   contact: Interval,
 ): LanesWindow {
   const length = lengthOf(visible);
-  const sec = Math.max(MIN_WINDOW_SEC, Math.min(length * factor, lengthOf(contact)));
+  const sec = windowSec(length * factor, contact);
   if (w.kind === 'live') return liveOf(sec, contact);
   return settle(pivot - ((pivot - visible.from) / length) * sec, sec, contact);
 }
@@ -142,7 +146,7 @@ export function pinchWindow(
   const { w, visible } = start;
   const length = lengthOf(visible);
   const spread = Math.max(1, Math.abs(b0 - a0)) / Math.max(1, Math.abs(b - a));
-  const sec = clamp(length * spread, MIN_WINDOW_SEC, Math.max(MIN_WINDOW_SEC, lengthOf(contact)));
+  const sec = windowSec(length * spread, contact);
   const mid = (a + b) / 2 / width;
   if (w.kind === 'live')
     return settle(contact.to - (mid - (a0 + b0) / 2 / width) * sec - sec, sec, contact);
