@@ -397,6 +397,23 @@
 .endHeld {
   color: var(--color-selbox);
 }
+/* The span being selected: a light fill with an edge at each end, in front of the plot. */
+.band {
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  z-index: 1;
+  box-sizing: border-box;
+  border-inline: 1px solid var(--color-selbox);
+  pointer-events: none;
+}
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-selbox);
+  opacity: 0.18;
+}
 .timeCursor {
   position: absolute;
   top: 0;

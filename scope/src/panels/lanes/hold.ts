@@ -8,7 +8,8 @@ export const HOLD_SLOP_PX = 10;
 
 /**
  * What a pointer `dx`, `dy` from where it pressed on a lane's `part`, `ms` after, does: a mouse or
- * pen drags the lane once past `slop`; a finger drags it once held within HOLD_SLOP_PX for
+ * pen, once past `slop`, selects a span of a history lane if it moved sideways first and drags the
+ * lane otherwise (an instrument's any way); a finger drags it once held within HOLD_SLOP_PX for
  * HOLD_MS, by the row or the plot alike. A finger moved past that first swipes the row sideways,
  * and is otherwise left to the page. Nothing yet otherwise.
  */
@@ -19,8 +20,11 @@ export function laneGestureOf(
   dy: number,
   ms: number,
   slop: number,
-): 'drag' | 'swipe' | 'pass' | null {
-  if (pointerType !== 'touch') return axisOf(dx, dy, slop) === null ? null : 'drag';
+): 'drag' | 'select' | 'swipe' | 'pass' | null {
+  if (pointerType !== 'touch') {
+    const axis = axisOf(dx, dy, slop);
+    return axis === 'x' && part !== 'instrument' ? 'select' : axis === null ? null : 'drag';
+  }
   const g = touchHoldOf('pressed', part, dx, dy, ms);
   return g === 'lift' ? 'drag' : g === 'swipe' || g === 'pass' ? g : null;
 }

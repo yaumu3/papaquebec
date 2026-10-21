@@ -11,6 +11,7 @@ import {
   readsPast,
   panWindow,
   resolveWindow,
+  selectWindow,
   timeAt,
   xOf,
   zoomWindow,
@@ -316,5 +317,79 @@ describe('panWindow', () => {
 
     // Assert
     expect(panned).toEqual({ kind: 'held', from: 90, to: 290 });
+  });
+});
+
+const heldWindow = (from: number, to: number): LanesWindow => ({ kind: 'held', from, to });
+
+describe('selectWindow', () => {
+  const contact: Interval = { from: 0, to: 2000 };
+  const visible: Interval = { from: 1000, to: 1500 };
+
+  it('holds the band between its ends, whichever way it was dragged', () => {
+    // Arrange
+    const rows = [
+      { t0: 1100, t1: 1200 },
+      { t0: 1200, t1: 1100 },
+    ];
+
+    // Act
+    const windows = rows.map((r) => selectWindow(r.t0, r.t1, visible, contact));
+
+    // Assert
+    expect(windows).toEqual([heldWindow(1100, 1200), heldWindow(1100, 1200)]);
+  });
+
+  it('grows a band shorter than the minimum from its earlier end', () => {
+    // Arrange
+    const rows = [
+      { t0: 1100, t1: 1110 },
+      { t0: 1110, t1: 1100 },
+    ];
+
+    // Act
+    const windows = rows.map((r) => selectWindow(r.t0, r.t1, visible, contact));
+
+    // Assert
+    expect(windows).toEqual([
+      heldWindow(1100, 1100 + MIN_WINDOW_SEC),
+      heldWindow(1100, 1100 + MIN_WINDOW_SEC),
+    ]);
+  });
+
+  it('stays held to the right edge of a held window, and live to the right edge of a live one', () => {
+    // Arrange
+    const nowWindow: Interval = { from: 1700, to: 2000 };
+
+    // Act
+    const windows = [
+      selectWindow(1300, 1500, visible, contact),
+      selectWindow(1800, 2000, nowWindow, contact),
+    ];
+
+    // Assert
+    expect(windows).toEqual([heldWindow(1300, 1500), { kind: 'live', sec: 200 }]);
+  });
+
+  it('goes live when a grown band reaches now', () => {
+    // Arrange
+    const nowWindow: Interval = { from: 1700, to: 2000 };
+
+    // Act
+    const w = selectWindow(1990, 2000, nowWindow, contact);
+
+    // Assert
+    expect(w).toEqual({ kind: 'live', sec: MIN_WINDOW_SEC });
+  });
+
+  it('keeps the band inside the visible window', () => {
+    // Arrange
+    const early = 900;
+
+    // Act
+    const w = selectWindow(early, 1100, visible, contact);
+
+    // Assert
+    expect(w).toEqual(heldWindow(1000, 1100));
   });
 });

@@ -25,7 +25,7 @@ import {
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
-import { contactOf, readsPast, resolveWindow, xOf } from '../../state/window';
+import { contactOf, readsPast, resolveWindow, selectWindow, timeAt, xOf } from '../../state/window';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
@@ -96,6 +96,19 @@ export function Lanes(props: { track: Track }) {
   /** The axis row lines up with the plots, so its width is the plots'. */
   const plotWidth = trackWidth(axisRow);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
+  const plotLeft = () => axisRow()?.getBoundingClientRect().left ?? 0;
+  const plotPx = (clientX: number) => clamp(clientX - plotLeft(), 0, plotWidth());
+  /** The instant a mouse pressed at, while it selects a span: the band's fixed end. */
+  const [pressedAt, setPressedAt] = createSignal<number | null>(null);
+  const band = () => {
+    const t0 = pressedAt();
+    const px = hoverPx();
+    return t0 === null || px === null ? null : { from: clamp(x(t0), 0, plotWidth()), to: px };
+  };
+  const stopSelecting = () => {
+    setPressedAt(null);
+    setHoverPx(null);
+  };
 
   /** The sample under the pointer, as the window moves under it too. */
   const hover = createMemo(() => {
@@ -110,8 +123,9 @@ export function Lanes(props: { track: Track }) {
   const past = () => readsPast(hover() !== null, lanesWindow());
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is held, dragged or swiped. */
   const pointerAt = (e: PointerEvent) => {
+    if (pressedAt() !== null) return;
     const target = e.target instanceof Element ? e.target : null;
-    const px = e.clientX - (axisRow()?.getBoundingClientRect().left ?? 0);
+    const px = e.clientX - plotLeft();
     setHoverPx(
       px < 0 || drag() || swipe() || holding() || !target?.closest('[data-lane="history"]')
         ? null
@@ -219,6 +233,20 @@ export function Lanes(props: { track: Track }) {
     bin: () => add,
     heights: () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0),
     lanes: plotted,
+    select: {
+      start: (clientX) => setPressedAt(timeAt(plotPx(clientX), visible(), plotWidth())),
+      move: (clientX) => setHoverPx(plotPx(clientX)),
+      end: () => {
+        const t0 = pressedAt();
+        const px = hoverPx();
+        if (t0 !== null && px !== null) {
+          const t1 = timeAt(px, visible(), plotWidth());
+          setLanesWindow(hex(), selectWindow(t0, t1, visible(), contact()));
+        }
+        stopSelecting();
+      },
+      cancel: stopSelecting,
+    },
     onDrop: (lane, drop) => {
       if (drop === 'remove') {
         movesOf(lane).onRemove();
@@ -230,7 +258,7 @@ export function Lanes(props: { track: Track }) {
   });
   createWindowInput({
     scroller,
-    plotLeft: () => axisRow()?.getBoundingClientRect().left ?? 0,
+    plotLeft,
     plotWidth,
     window: lanesWindow,
     visible,
@@ -329,6 +357,7 @@ export function Lanes(props: { track: Track }) {
                     at={at()}
                     past={past()}
                     cursor={cursorX()}
+                    band={band()}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
                     onMenu={(e) => openLaneMenu(lane, e)}

@@ -16,8 +16,8 @@ import { swipeRemoves } from './swipe';
 /** How far a pointer travels from where it took hold of a lane before it drags the lane. */
 const SLOP_PX = 4;
 
-/** Where on a lane a pointer took hold of it: its top row, or the plot under it. */
-export type LanePart = 'row' | 'plot';
+/** Where on a lane a pointer took hold of it: a history lane's top row or its plot, or an instrument. */
+export type LanePart = 'row' | 'plot' | 'instrument';
 
 /** A lane dragged: where it came from, the slot it is over, and the pointer. */
 export interface LaneDrag {
@@ -59,6 +59,13 @@ export function createLaneDrag(deps: {
     close: () => void;
   };
   onDrop: (lane: LaneKey, drop: ReturnType<typeof dropOf>) => void;
+  /** The span a mouse selects by dragging sideways on a history lane, in viewport x. */
+  select: {
+    start: (x: number) => void;
+    move: (x: number) => void;
+    end: () => void;
+    cancel: () => void;
+  };
 }): {
   drag: Accessor<LaneDrag | null>;
   swipe: Accessor<LaneSwipe | null>;
@@ -150,6 +157,8 @@ export function createLaneDrag(deps: {
       }
       frame = requestAnimationFrame(scroll);
     };
+    /** Whether the pointer is selecting a span. */
+    let selecting = false;
     /** Where a finger's hold has got to. */
     let stage: TouchStage = 'pressed';
     /** Picks the lane up, the pointer at `x`, `y`: lit where it stands while a finger has not moved it. */
@@ -183,6 +192,10 @@ export function createLaneDrag(deps: {
         pickUp(m.clientX, m.clientY);
         return;
       }
+      if (selecting) {
+        deps.select.move(m.clientX);
+        return;
+      }
       if (d) {
         if (d.still && touchHoldOf('lifted', part, dx, dy, m.timeStamp - e.timeStamp) !== 'drag')
           return;
@@ -201,11 +214,20 @@ export function createLaneDrag(deps: {
         setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
       }
       if (g === 'drag') pickUp(m.clientX, m.clientY);
+      if (g === 'select') {
+        selecting = true;
+        deps.select.start(x0);
+        deps.select.move(m.clientX);
+      }
     };
     const onUp = (u: PointerEvent) => {
       if (!own(u)) return;
       const d = drag();
       const s = swipe();
+      if (selecting) {
+        selecting = false;
+        deps.select.end();
+      }
       end?.();
       if (stage === 'picker') return;
       if (d) deps.onDrop(d.lane, dropOf(d.from, d.slot, d.overBin));
@@ -236,6 +258,7 @@ export function createLaneDrag(deps: {
     el.addEventListener('lostpointercapture', cancel);
     end = () => {
       end = null;
+      if (selecting) deps.select.cancel();
       setPicking(false);
       held = null;
       clearTimeout(lift);

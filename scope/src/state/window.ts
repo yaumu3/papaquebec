@@ -106,3 +106,18 @@ export function panWindow(
   if (w.kind === 'live' && sec >= 0) return w;
   return settle(visible.from + sec, visible.to - visible.from, contact);
 }
+
+/**
+ * The window a band dragged from instant `t0` to `t1` makes, within `visible`: held, grown to the
+ * minimum from its earlier end, live again if it reaches now.
+ */
+export function selectWindow(
+  t0: number,
+  t1: number,
+  visible: Interval,
+  contact: Interval,
+): LanesWindow {
+  const from = clamp(Math.min(t0, t1), visible.from, visible.to);
+  const to = clamp(Math.max(t0, t1), visible.from, visible.to);
+  return settle(from, Math.max(MIN_WINDOW_SEC, to - from), contact);
+}

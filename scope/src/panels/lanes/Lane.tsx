@@ -83,6 +83,8 @@ export function Lane(props: {
   past: boolean;
   /** Where the time cursor stands across the plot, if it does. */
   cursor: number | null;
+  /** The span being selected, between two points across the plot, if one is. */
+  band: { from: number; to: number } | null;
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
@@ -267,6 +269,17 @@ export function Lane(props: {
               </span>
             )}
           </Index>
+        </Show>
+        <Show when={props.band}>
+          {(b) => (
+            <div
+              class={s.band}
+              style={{
+                left: `${Math.min(b().from, b().to)}px`,
+                width: `${Math.abs(b().to - b().from)}px`,
+              }}
+            />
+          )}
         </Show>
         <Show when={props.cursor}>
           {(px) => <div class={s.timeCursor} style={{ left: `${px() - 0.5}px` }} />}
