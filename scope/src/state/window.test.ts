@@ -9,9 +9,11 @@ import {
   type LanesWindow,
   MIN_WINDOW_SEC,
   readsPast,
+  panWindow,
   resolveWindow,
   timeAt,
   xOf,
+  zoomWindow,
 } from './window';
 
 /** A contact of ten minutes. */
@@ -34,7 +36,7 @@ describe('resolveWindow', () => {
     const brief: Interval = { from: 1500, to: 1600 };
 
     // Act
-    const visible = resolveWindow({ kind: 'live', sec: 300 }, brief);
+    const visible = resolveWindow(live(300), brief);
 
     // Assert
     expect(visible).toEqual(brief);
@@ -158,5 +160,161 @@ describe('contactOf', () => {
       { from: 1000, to: 1600 },
       { from: 1600, to: 1600 },
     ]);
+  });
+});
+
+const live = (sec: number): LanesWindow => ({ kind: 'live', sec });
+
+describe('zoomWindow', () => {
+  const contact: Interval = { from: 0, to: 3600 };
+
+  it('scales a live window about its right edge, down to the minimum', () => {
+    // Arrange
+    const rows = [
+      { w: live(300), factor: 2 },
+      { w: live(300), factor: 0.5 },
+      { w: live(40), factor: 0.5 },
+    ];
+
+    // Act
+    const zoomed = rows.map((r) =>
+      zoomWindow(r.w, resolveWindow(r.w, contact), r.factor, 3000, contact),
+    );
+
+    // Assert
+    expect(zoomed).toEqual([live(600), live(150), live(MIN_WINDOW_SEC)]);
+  });
+
+  it('widens to the whole contact and no further', () => {
+    // Arrange
+    const brief: Interval = { from: 3200, to: 3600 };
+
+    // Act
+    const zoomed = zoomWindow(live(300), resolveWindow(live(300), brief), 2, 3500, brief);
+
+    // Assert
+    expect(zoomed).toEqual(live(Infinity));
+  });
+
+  it('narrows from the whole contact and from a contact shorter than the window', () => {
+    // Arrange
+    const brief: Interval = { from: 3500, to: 3600 };
+    const rows = [
+      { w: live(Infinity), c: { from: 3200, to: 3600 }, factor: 0.5 },
+      { w: live(300), c: brief, factor: 0.5 },
+    ];
+
+    // Act
+    const zoomed = rows.map((r) => zoomWindow(r.w, resolveWindow(r.w, r.c), r.factor, 3600, r.c));
+
+    // Assert
+    expect(zoomed).toEqual([live(200), live(50)]);
+  });
+
+  it('keeps the instant under the pointer in place for a held window', () => {
+    // Arrange
+    const held: LanesWindow = { kind: 'held', from: 1000, to: 1200 };
+    const rows = [
+      { pivot: 1100, factor: 0.5 },
+      { pivot: 1000, factor: 2 },
+    ];
+
+    // Act
+    const zoomed = rows.map((r) =>
+      zoomWindow(held, { from: 1000, to: 1200 }, r.factor, r.pivot, contact),
+    );
+
+    // Assert
+    expect(zoomed).toEqual([
+      { kind: 'held', from: 1050, to: 1150 },
+      { kind: 'held', from: 1000, to: 1400 },
+    ]);
+  });
+
+  it('goes live when a held window reaches now, keeping its length', () => {
+    // Arrange
+    const held: LanesWindow = { kind: 'held', from: 3400, to: 3500 };
+
+    // Act
+    const zoomed = zoomWindow(held, { from: 3400, to: 3500 }, 2, 3400, contact);
+
+    // Assert
+    expect(zoomed).toEqual(live(200));
+  });
+
+  it('slides a held window that would start before the contact to its start', () => {
+    // Arrange
+    const held: LanesWindow = { kind: 'held', from: 100, to: 200 };
+    const early: Interval = { from: 90, to: 3600 };
+
+    // Act
+    const zoomed = zoomWindow(held, { from: 100, to: 200 }, 4, 150, early);
+
+    // Assert
+    expect(zoomed).toEqual({ kind: 'held', from: 90, to: 490 });
+  });
+
+  it('goes live over the whole contact when a held window widens past it', () => {
+    // Arrange
+    const held: LanesWindow = { kind: 'held', from: 1000, to: 1200 };
+    const brief: Interval = { from: 900, to: 1300 };
+
+    // Act
+    const zoomed = zoomWindow(held, { from: 1000, to: 1200 }, 4, 1100, brief);
+
+    // Assert
+    expect(zoomed).toEqual(live(Infinity));
+  });
+});
+
+describe('panWindow', () => {
+  const contact: Interval = { from: 90, to: 3600 };
+
+  it('leaves a live window as it is when asked to move toward now', () => {
+    // Arrange
+    const w: LanesWindow = { kind: 'live', sec: 300 };
+
+    // Act
+    const panned = panWindow(w, { from: 3300, to: 3600 }, 60, contact);
+
+    // Assert
+    expect(panned).toBe(w);
+  });
+
+  it('holds a live window that moves back', () => {
+    // Arrange
+    const w: LanesWindow = { kind: 'live', sec: 300 };
+
+    // Act
+    const panned = panWindow(w, { from: 3300, to: 3600 }, -60, contact);
+
+    // Assert
+    expect(panned).toEqual({ kind: 'held', from: 3240, to: 3540 });
+  });
+
+  it('moves a held window, live once it reaches now, held short of it', () => {
+    // Arrange
+    const held: LanesWindow = { kind: 'held', from: 3300, to: 3500 };
+    const visible: Interval = { from: 3300, to: 3500 };
+
+    // Act
+    const panned = [panWindow(held, visible, 50, contact), panWindow(held, visible, 200, contact)];
+
+    // Assert
+    expect(panned).toEqual([
+      { kind: 'held', from: 3350, to: 3550 },
+      { kind: 'live', sec: 200 },
+    ]);
+  });
+
+  it('stops a held window at the start of the contact', () => {
+    // Arrange
+    const held: LanesWindow = { kind: 'held', from: 100, to: 300 };
+
+    // Act
+    const panned = panWindow(held, { from: 100, to: 300 }, -50, contact);
+
+    // Assert
+    expect(panned).toEqual({ kind: 'held', from: 90, to: 290 });
   });
 });

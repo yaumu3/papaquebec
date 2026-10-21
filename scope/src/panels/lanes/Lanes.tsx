@@ -11,6 +11,7 @@ import {
   removePlotLane,
   setHoverInstant,
   setLaneScroll,
+  setLanesWindow,
   switchPlotLane,
 } from '../../state/lanes';
 import {
@@ -49,6 +50,7 @@ import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
 import { TimeAxis } from './TimeAxis';
 import { newestSample, sampleAt } from './trace';
+import { createWindowInput } from './windowInput';
 
 import s from './Lanes.module.css';
 
@@ -225,6 +227,15 @@ export function Lanes(props: { track: Track }) {
       movePlotLane(drop.move, drop.to);
       reveal(lane);
     },
+  });
+  createWindowInput({
+    scroller,
+    plotLeft: () => axisRow()?.getBoundingClientRect().left ?? 0,
+    plotWidth,
+    window: lanesWindow,
+    visible,
+    contact,
+    setWindow: (w) => setLanesWindow(hex(), w),
   });
   /** The drag once the lane is off its place: not while a finger has only lifted it. */
   const moving = () => {

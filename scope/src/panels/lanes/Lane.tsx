@@ -184,7 +184,7 @@ export function Lane(props: {
         props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
       }
     >
-      <div class={s.plot}>
+      <div class={s.plot} data-plot>
         <svg class={s.svg} height={props.height}>
           <Index each={gaps()}>
             {(g) => (
@@ -285,6 +285,7 @@ export function Lane(props: {
         ref={(el) => {
           top = el;
         }}
+        data-row
         class={cx(s.top, props.swipeX !== null && s.swiping)}
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
       >
