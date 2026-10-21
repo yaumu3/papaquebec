@@ -117,7 +117,7 @@ export function ndReadouts(m: Moment<Readout>): NdReadouts {
     gs: read(HEARD.gs, shown(READINGS.gs.format(t))),
     tas: read(HEARD.tas, shown(READINGS.tas.format(t))),
     wind: read(HEARD.wind, wind()),
-    sel: read(HEARD.selHdg, degrees(steeringHeading(t)), true),
+    sel: read(HEARD.selHdg, shown(READINGS.selHdg.format(t)), true),
     hdg: read(['heading'], degrees(t.heading), true),
     tat: read(HEARD.tat, shown(READINGS.tat.format(t), true)),
     sat: read(HEARD.oat, shown(READINGS.oat.format(t), true)),

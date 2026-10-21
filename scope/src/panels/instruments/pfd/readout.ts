@@ -1,10 +1,10 @@
 import { type Altimeter, crewAltitudeFt, selectedFt } from '../../../lib/altitude';
 import { turn } from '../../../lib/geo';
-import { hpaToInHg } from '../../../lib/metar';
 import { holds } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { magneticTrack } from '../../../state/magnetic';
 import type { Readout, Sample } from '../../../state/track';
+import { READINGS } from '../../readings';
 import { eachHolds, holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
 import type { Fpv } from './geometry';
@@ -179,7 +179,6 @@ export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadou
   const roll = ifHolds(t, ['roll'], instant, t.roll);
   const selAlt = asSet(ifHolds(t, ['selAlt'], instant, t.selAlt));
   const fmsAlt = asSet(ifHolds(t, ['fmsAlt'], instant, t.fmsAlt));
-  const qnh = ifHolds(t, ['navQnh'], instant, t.navQnh);
   return {
     ias,
     mach: mach === undefined ? '' : machText(mach),
@@ -189,6 +188,7 @@ export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadou
     selAlt,
     fmsAlt: fmsAlt === selAlt ? undefined : fmsAlt,
     vs: ifHolds(t, ['verticalRate'], instant, t.verticalRate),
-    baro: qnh === undefined ? '' : hpaToInHg(qnh).toFixed(2),
+    baro:
+      holdsAll(t, ['navQnh'], instant) && t.navQnh !== undefined ? READINGS.qnh.format(t).v : '',
   };
 }
