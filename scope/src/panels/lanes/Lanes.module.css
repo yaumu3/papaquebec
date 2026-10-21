@@ -178,12 +178,11 @@
 }
 .plot {
   --chip-height: 14px;
-  --notch-height: 4px;
   --chip-top: calc(var(--space-1) + (var(--lane-top) - var(--chip-height)) / 2);
   position: absolute;
   inset: 0 var(--plot-right) 0 var(--plot-left);
 }
-/* Sized by the lane; the width the plots are drawn to is read off the clock row. */
+/* Sized by the lane; the width the plots are drawn to is read off the axis row. */
 .svg {
   display: block;
   width: 100%;
@@ -242,7 +241,7 @@
 }
 /*
  * What the lane reads at the cursor's instant, at the right on the panel's ground, a little short of
- * the edge; each intent in a slot of its own width, so that none moves another.
+ * the edge.
  */
 .readout {
   display: flex;
