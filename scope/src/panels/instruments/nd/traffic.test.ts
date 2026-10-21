@@ -7,7 +7,7 @@ import { LAPSE_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
-import { makeSample } from '../../../state/sampleFixture';
+import { FRESH, makeSample, NOW, resetDeclination } from '../../../state/sampleFixture';
 import { hexAt } from '../../../state/scope';
 import type { Track } from '../../../state/track';
 import { nowAt } from '../moment';
@@ -26,9 +26,6 @@ import {
   trafficKind,
   verticalArrow,
 } from './traffic';
-
-const NOW = 1000;
-const FRESH = NOW - 1;
 
 describe('relativeAltitudeLabel', () => {
   it('reads hundreds of feet with the sign of the rounded value, two digits at least', () => {
@@ -101,9 +98,7 @@ const OWN_AT = { lat: 35.55, lon: 139.78 };
 const G = ndGeometry(346);
 const EDGE_NM = (20 * (G.r - 4)) / G.r;
 
-afterEach(() => {
-  setDeclinationAt(() => () => 0);
-});
+afterEach(resetDeclination);
 
 const ownShip = (over: Partial<Track> = {}): Track =>
   makeTrack({

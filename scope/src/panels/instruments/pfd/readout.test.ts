@@ -4,7 +4,14 @@ import { STANDARD_ALTIMETER, qnhAltitudeFt } from '../../../lib/altitude';
 import { LAPSE_SEC } from '../../../lib/reports';
 import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
-import { AROUND_LAPSE, makeSample } from '../../../state/sampleFixture';
+import {
+  AROUND_LAPSE,
+  FRESH,
+  makeSample,
+  NOW,
+  resetDeclination,
+  STALE,
+} from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
 import { nowAt } from '../moment';
 import {
@@ -17,13 +24,7 @@ import {
   pfdReadouts,
 } from './readout';
 
-const NOW = 1000;
-
-afterEach(() => {
-  setDeclinationAt(() => () => 0);
-});
-const FRESH = NOW - 1;
-const STALE = NOW - LAPSE_SEC;
+afterEach(resetDeclination);
 
 /** A target whose samples are these, the last being what it reads now. */
 const targetOf = (first: Sample, ...rest: Sample[]) => ({

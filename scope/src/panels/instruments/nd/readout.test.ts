@@ -3,22 +3,24 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { STANDARD_ALTIMETER } from '../../../lib/altitude';
 import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
-import { AROUND_LAPSE, makeSample } from '../../../state/sampleFixture';
+import {
+  AROUND_LAPSE,
+  FRESH,
+  makeSample,
+  NOW,
+  resetDeclination,
+  STALE,
+} from '../../../state/sampleFixture';
 import { readoutOf } from '../../lanes/readout';
 import { nowAt } from '../moment';
 import { boxOf, ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
-const NOW = 1000;
-const FRESH = NOW - 1;
-const STALE = NOW - LAPSE_SEC;
 const AT = { lat: 35.5, lon: 139.8 };
 
 /** The three readings of the selected heading, all known or all not. */
 const held = (known: boolean) => ({ nd: known, bug: known, lane: known });
 
-afterEach(() => {
-  setDeclinationAt(() => () => 0);
-});
+afterEach(resetDeclination);
 
 describe('ndFrame', () => {
   const lapsedTrack = makeSample(NOW, {

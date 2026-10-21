@@ -2,12 +2,10 @@ import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../../lib/reports';
 import { makeTrack } from '../../../render/scene/trackFixture';
-import { AROUND_LAPSE, makeSample } from '../../../state/sampleFixture';
+import { AROUND_LAPSE, makeSample, NOW } from '../../../state/sampleFixture';
 import { NONE, READINGS } from '../../readings';
 import { nowAt } from '../moment';
 import { survCells } from './cells';
-
-const NOW = 1000;
 
 const heardAt = (at: number) => ({ nic: at, rc: at, nacP: at });
 const FRESH = heardAt(NOW - 1);

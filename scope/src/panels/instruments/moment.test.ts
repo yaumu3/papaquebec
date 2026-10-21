@@ -2,10 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../lib/reports';
 import { makeTrack } from '../../render/scene/trackFixture';
-import { makeSample } from '../../state/sampleFixture';
+import { makeSample, NOW } from '../../state/sampleFixture';
 import { lostAt, momentKey, momentOf, nowAt } from './moment';
-
-const NOW = 1000;
 
 describe('momentOf', () => {
   it('draws now unless the panel reads the past, else the sample it reads at its own time, or nothing', () => {

@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { qnhAltitudeFt } from '../../lib/altitude';
 import { HPA_PER_INHG } from '../../lib/units';
 import { setDeclinationAt } from '../../state/magnetic';
 import { INTENTS, READING_KEYS, type ReadingKey } from '../../state/plotted';
-import { makeSample } from '../../state/sampleFixture';
+import { makeSample, resetDeclination } from '../../state/sampleFixture';
 import { PLOTS } from './plots';
+
+afterEach(resetDeclination);
 
 describe('PLOTS', () => {
   it('draws as an intent each reading plotted.ts draws in a lane, and nothing else', () => {
@@ -63,7 +65,6 @@ describe('PLOTS', () => {
 
     // Assert
     expect(headings).toEqual([{ trk: 228, hdg: 240 }, undefined]);
-    setDeclinationAt(() => () => 0);
   });
 
   it('names the engaged modes as the table abbreviates them, and the source as one name', () => {

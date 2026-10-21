@@ -1,5 +1,6 @@
 import type { Heard } from '../lib/aircraft';
 import { LAPSE_SEC } from '../lib/reports';
+import { setDeclinationAt } from './magnetic';
 import type { Sample } from './track';
 import type { Interval } from './window';
 
@@ -52,3 +53,11 @@ export function makeHeardSample(t: number, over: Partial<Sample> = {}): Sample {
   const heard: Heard = Object.fromEntries(Object.keys(over).map((key) => [key, t]));
   return makeSample(t, { ...over, heard });
 }
+
+/** The instant the freshness tests read at, a report a second before it and one a lapse before. */
+export const NOW = 1000;
+export const FRESH = NOW - 1;
+export const STALE = NOW - LAPSE_SEC;
+
+/** Puts the declination back to none. */
+export const resetDeclination = () => setDeclinationAt(() => () => 0);

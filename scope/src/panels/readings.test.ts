@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setDeclinationAt } from '../state/magnetic';
 import { isInstrumentLane, LANE_KEYS } from '../state/plotted';
-import { makeSample } from '../state/sampleFixture';
+import { makeSample, resetDeclination } from '../state/sampleFixture';
 import { LANE_LABELS, NONE, positionReading, READINGS, windOf } from './readings';
+
+afterEach(resetDeclination);
 
 describe('READINGS', () => {
   it('reads the message rate to a tenth per second', () => {
@@ -30,7 +32,6 @@ describe('READINGS', () => {
 
     // Assert
     expect(readings).toEqual([{ v: '228° / 240°' }, { v: '--- / 240°' }]);
-    setDeclinationAt(() => () => 0);
   });
 
   it('reads the selected heading only while it steers, as the lane and the data block do', () => {

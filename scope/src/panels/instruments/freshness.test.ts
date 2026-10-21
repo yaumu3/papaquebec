@@ -2,10 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from '../../lib/aircraft';
 import { LAPSE_SEC } from '../../lib/reports';
-import { AROUND_LAPSE } from '../../state/sampleFixture';
+import { AROUND_LAPSE, NOW } from '../../state/sampleFixture';
 import { eachHolds, holdsAll, ifHolds, isLost } from './freshness';
-
-const NOW = 1000;
 
 describe('holdsAll', () => {
   it('holds a key heard under the lapse ago, not at it or beyond', () => {
