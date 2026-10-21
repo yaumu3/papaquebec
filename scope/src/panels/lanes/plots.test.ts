@@ -51,7 +51,7 @@ describe('PLOTS', () => {
     expect(floored).toEqual([true, false, false]);
   });
 
-  it('reads the track in magnetic, as the table does, with the heading as sent, none without either', () => {
+  it('reads the track in magnetic, as its reading does, with the heading as sent, none without either', () => {
     // Arrange
     setDeclinationAt(() => () => 7);
     const samples = [
@@ -67,7 +67,7 @@ describe('PLOTS', () => {
     expect(headings).toEqual([{ trk: 228, hdg: 240 }, undefined]);
   });
 
-  it('names the engaged modes as the table abbreviates them, and the source as one name', () => {
+  it('names the engaged modes as their reading abbreviates them, and the source as one name', () => {
     // Arrange
     const s = makeSample(1, { navModes: ['autopilot', 'vnav'], source: 'mlat' });
     const [modes, src] = [PLOTS.modes, PLOTS.src];

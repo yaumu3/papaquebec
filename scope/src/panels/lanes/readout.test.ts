@@ -82,7 +82,7 @@ describe('altTargets', () => {
 });
 
 describe('readoutOf', () => {
-  it('reads the lane as the table does, without its unit, but for a bound', () => {
+  it('reads the lane as its reading does, without its unit, but for a bound', () => {
     // Arrange
     const s = heardSample(1, { gs: 462, verticalRate: 1800, nic: 8, rc: 186 });
     const lanes = [['gs'], ['vs'], ['nic']] as const;
