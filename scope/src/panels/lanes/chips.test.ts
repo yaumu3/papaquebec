@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { LaneKey } from '../../state/plotted';
-import { type Chip, chipName, chipOf, laneName, paletteName, pickOf } from './chips';
+import { type Chip, chipName, chipOf, laneName, pickerName, pickOf } from './chips';
 
 describe('chipOf', () => {
   it("tells the palette's own lane, a lane open elsewhere, and one free to pick", () => {
@@ -25,13 +25,13 @@ describe('chipOf', () => {
   });
 });
 
-describe('paletteName', () => {
+describe('pickerName', () => {
   it("names a lane's palette after the lane, and the one with none for adding", () => {
     // Arrange
     const owners: (LaneKey | null)[] = ['alt', null];
 
     // Act
-    const names = owners.map(paletteName);
+    const names = owners.map(pickerName);
 
     // Assert
     expect(names).toEqual(['ALT lane: pick a lane', 'Add a lane']);

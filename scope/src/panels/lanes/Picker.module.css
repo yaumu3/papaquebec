@@ -2,7 +2,7 @@
  * The lanes by group, floating at a point over the page: a column of group names, then each
  * group's chips.
  */
-.palette {
+.picker {
   position: fixed;
   z-index: var(--z-menu);
   display: grid;

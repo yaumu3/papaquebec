@@ -10,8 +10,8 @@ import { clearOfEnds, clockStep, ticks } from './axis';
 import { laneName } from './chips';
 import { CursorChip } from './CursorChip';
 import type { LanePart } from './laneDrag';
-import { isMenuKey } from './menu';
 import { type LaneMoves, onMoveKey, windowKeyOf } from './moves';
+import { isPickerKey } from './pickerPlace';
 import {
   atTicks,
   barbPath,
@@ -214,7 +214,7 @@ export function Lane(props: {
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
         const key = windowKeyOf(e);
-        if (isMenuKey(e)) props.onMenu(e);
+        if (isPickerKey(e)) props.onMenu(e);
         else if (key) {
           e.preventDefault();
           e.stopPropagation();

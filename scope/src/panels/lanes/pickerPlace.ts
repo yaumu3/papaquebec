@@ -5,7 +5,7 @@ import type { Box } from './drag';
 type ContextSource = 'keyboard' | 'touch' | 'mouse';
 
 /** Where a palette is anchored: its top-left at the point, or its bottom-left when it opens up. */
-export interface PaletteAnchor {
+export interface PickerAnchor {
   x: number;
   y: number;
   up: boolean;
@@ -17,12 +17,12 @@ export function clickSourceOf(detail: number): 'keyboard' | 'pointer' {
 }
 
 /** Where + LANE opens its palette: upward from the click, or from its own top-left when it is pressed with a key. */
-export function addMenuAnchor(
+export function addPickerAnchor(
   source: 'keyboard' | 'pointer',
   x: number,
   y: number,
   button: Box,
-): PaletteAnchor {
+): PickerAnchor {
   return source === 'keyboard' ? { x: button.left, y: button.top, up: true } : { x, y, up: true };
 }
 
@@ -30,8 +30,8 @@ export function addMenuAnchor(
  * Where a palette of `size` stands in `view`: at its anchor, on the other side of the point or the
  * left of it where it would pass an edge, then kept whole inside the view.
  */
-export function paletteBox(
-  anchor: PaletteAnchor,
+export function pickerBox(
+  anchor: PickerAnchor,
   size: { width: number; height: number },
   view: { width: number; height: number },
 ): { left: number; top: number } {
@@ -57,16 +57,16 @@ export function contextSourceOf(button: number, pressed: string | null): Context
 }
 
 /** Where a lane's palette opens: at the pointer, from the lane's top-left when asked by key, never for a finger. */
-export function laneMenuAnchor(
+export function lanePickerAnchor(
   source: ContextSource,
   x: number,
   y: number,
   lane: Box,
-): PaletteAnchor | null {
+): PickerAnchor | null {
   if (source === 'touch') return null;
   return source === 'keyboard' ? { x: lane.left, y: lane.top, up: false } : { x, y, up: false };
 }
 
 /** Shift+F10, the menu key where macOS Chromium has none to press. */
-export const isMenuKey = (e: { key: string; shiftKey: boolean }): boolean =>
+export const isPickerKey = (e: { key: string; shiftKey: boolean }): boolean =>
   e.shiftKey && e.key === 'F10';

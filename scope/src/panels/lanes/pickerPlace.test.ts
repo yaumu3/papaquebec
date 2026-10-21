@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
-  addMenuAnchor,
+  addPickerAnchor,
   clickSourceOf,
   contextSourceOf,
-  isMenuKey,
-  laneMenuAnchor,
-  paletteBox,
-} from './menu';
+  isPickerKey,
+  lanePickerAnchor,
+  pickerBox,
+} from './pickerPlace';
 
 describe('clickSourceOf', () => {
   it('tells a click made with the keyboard from one made with a pointer', () => {
@@ -22,7 +22,7 @@ describe('clickSourceOf', () => {
   });
 });
 
-describe('addMenuAnchor', () => {
+describe('addPickerAnchor', () => {
   it("opens upward from the click, or from the button's top-left when it is pressed with a key", () => {
     // Arrange
     const button = { left: 40, top: 300, right: 340, bottom: 324 };
@@ -32,7 +32,7 @@ describe('addMenuAnchor', () => {
     ];
 
     // Act
-    const anchors = rows.map(([source, x, y]) => addMenuAnchor(source, x, y, button));
+    const anchors = rows.map(([source, x, y]) => addPickerAnchor(source, x, y, button));
 
     // Assert
     expect(anchors).toEqual([
@@ -63,7 +63,7 @@ describe('contextSourceOf', () => {
   });
 });
 
-describe('laneMenuAnchor', () => {
+describe('lanePickerAnchor', () => {
   it("opens at the pointer, at the lane's top-left from the keyboard, and not at all for a finger", () => {
     // Arrange
     const lane = { left: 40, top: 300, right: 380, bottom: 385 };
@@ -74,14 +74,14 @@ describe('laneMenuAnchor', () => {
     ];
 
     // Act
-    const anchors = rows.map(([source, x, y]) => laneMenuAnchor(source, x, y, lane));
+    const anchors = rows.map(([source, x, y]) => lanePickerAnchor(source, x, y, lane));
 
     // Assert
     expect(anchors).toEqual([{ x: 100, y: 310, up: false }, { x: 40, y: 300, up: false }, null]);
   });
 });
 
-describe('isMenuKey', () => {
+describe('isPickerKey', () => {
   it('is Shift+F10, which the keyboard asks for a menu with where no menu key stands', () => {
     // Arrange
     const keys = [
@@ -91,14 +91,14 @@ describe('isMenuKey', () => {
     ];
 
     // Act
-    const flags = keys.map(isMenuKey);
+    const flags = keys.map(isPickerKey);
 
     // Assert
     expect(flags).toEqual([true, false, false]);
   });
 });
 
-describe('paletteBox', () => {
+describe('pickerBox', () => {
   it('stands at the anchor where there is room, flips to the other side at an edge, and stays on screen', () => {
     // Arrange
     const size = { width: 200, height: 150 };
@@ -115,7 +115,7 @@ describe('paletteBox', () => {
     ];
 
     // Act
-    const boxes = cases.map((c) => paletteBox(c.anchor, size, c.view));
+    const boxes = cases.map((c) => pickerBox(c.anchor, size, c.view));
 
     // Assert
     expect(boxes).toEqual([

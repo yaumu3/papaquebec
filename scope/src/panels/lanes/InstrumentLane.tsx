@@ -9,8 +9,8 @@ import { Pfd } from '../instruments/pfd/Pfd';
 import { Surv } from '../instruments/surv/Surv';
 import { laneName } from './chips';
 import type { LanePart } from './laneDrag';
-import { isMenuKey } from './menu';
 import { type LaneMoves, onMoveKey } from './moves';
+import { isPickerKey } from './pickerPlace';
 
 import s from './Lanes.module.css';
 
@@ -48,7 +48,7 @@ export function InstrumentLane(props: {
       aria-label={laneName(props.lane, props.index, props.count)}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
-        if (isMenuKey(e)) props.onMenu(e);
+        if (isPickerKey(e)) props.onMenu(e);
         else onMoveKey(props.moves, e);
       }}
       onContextMenu={props.onMenu}

@@ -48,15 +48,15 @@ import { HOLD_MS, isDoubleTap, MENU_HOLD_MS, type Tap } from './hold';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
+import type { LaneMoves } from './moves';
+import { Picker } from './Picker';
 import {
-  addMenuAnchor,
+  addPickerAnchor,
   clickSourceOf,
   contextSourceOf,
-  laneMenuAnchor,
-  type PaletteAnchor,
-} from './menu';
-import type { LaneMoves } from './moves';
-import { Palette } from './Palette';
+  lanePickerAnchor,
+  type PickerAnchor,
+} from './pickerPlace';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
@@ -176,7 +176,7 @@ export function Lanes(props: { track: Track }) {
   const [menu, setMenu] = createSignal<{
     own: LaneKey | null;
     anchor: HTMLElement;
-    at: PaletteAnchor;
+    at: PickerAnchor;
   } | null>(null);
   const closeMenu = () => setMenu(null);
   createEffect(on(hex, closeMenu, { defer: true }));
@@ -189,7 +189,7 @@ export function Lanes(props: { track: Track }) {
     if (!(lane instanceof HTMLElement)) return;
     const source = e instanceof MouseEvent ? contextSourceOf(e.button, pressed) : 'keyboard';
     const point = e instanceof MouseEvent ? { x: e.clientX, y: e.clientY } : { x: 0, y: 0 };
-    const anchor = laneMenuAnchor(source, point.x, point.y, lane.getBoundingClientRect());
+    const anchor = lanePickerAnchor(source, point.x, point.y, lane.getBoundingClientRect());
     if (anchor) setMenu({ own, anchor: lane, at: anchor });
   };
   /** Opens the palette that adds a lane, upward from the click or from the button's corner. */
@@ -197,7 +197,7 @@ export function Lanes(props: { track: Track }) {
     const button = e.currentTarget;
     if (!(button instanceof HTMLElement)) return;
     const source = clickSourceOf(e.detail);
-    const at = addMenuAnchor(source, e.clientX, e.clientY, button.getBoundingClientRect());
+    const at = addPickerAnchor(source, e.clientX, e.clientY, button.getBoundingClientRect());
     setMenu({ own: null, anchor: button, at });
   };
   /** Brings a lane into view and gives it the focus; with none, + LANE. */
@@ -504,7 +504,7 @@ export function Lanes(props: { track: Track }) {
         <Show when={menu()}>
           {(m) => (
             <Portal>
-              <Palette
+              <Picker
                 own={m().own}
                 plotted={plotted()}
                 at={m().at}

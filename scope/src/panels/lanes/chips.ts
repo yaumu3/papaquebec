@@ -11,7 +11,7 @@ export function chipOf(plotted: readonly LaneKey[], own: LaneKey | null, lane: L
 }
 
 /** What the palette of the lane `own`, or of a lane to add when null, is called. */
-export const paletteName = (own: LaneKey | null): string =>
+export const pickerName = (own: LaneKey | null): string =>
   own === null ? 'Add a lane' : `${LANE_LABELS[own]} lane: pick a lane`;
 
 /** What a lane at `index` of `count` is called, with how it is moved. */
