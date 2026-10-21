@@ -8,7 +8,7 @@ import {
   fpvPath,
   windowRect,
 } from './attitudeGeometry';
-import { pfdGeometry } from './geometry';
+import { type PfdGeometry, pfdGeometry } from './geometry';
 
 describe('attitude horizon', () => {
   it('passes through the centre, cutting the window at its edges for ±60° and 0° of roll', () => {
@@ -54,16 +54,21 @@ describe('attitude ladder', () => {
   });
 });
 
-describe('attitude pointer', () => {
-  it('is a triangle at the top of the scale for level flight', () => {
+describe('the parts of the attitude at 346 px', () => {
+  it('stand where the layout puts them', () => {
     // Arrange
     const g = pfdGeometry(346);
+    const rows: [(g: PfdGeometry) => unknown, unknown][] = [
+      [(g) => attitude(g, 0).pointer, 'M155.0 66.0L150.9 76.2L159.1 76.2Z'],
+      [bankIndexPath, 'M155.0 64.0l-6 -9h12Z'],
+      [windowRect, { x: 68, y: 52, width: 174, height: 142, rx: 12 }],
+    ];
 
     // Act
-    const out = attitude(g, 0).pointer;
+    const out = rows.map(([part]) => part(g));
 
     // Assert
-    expect(out).toBe('M155.0 66.0L150.9 76.2L159.1 76.2Z');
+    expect(out).toEqual(rows.map(([, expected]) => expected));
   });
 });
 
@@ -78,32 +83,6 @@ describe('bankScalePath', () => {
     // Assert
     expect((out.match(/M/g) ?? []).length).toBe(10);
     expect(out.startsWith('M103.9 93.5L94.4 88.0')).toBe(true);
-  });
-});
-
-describe('bankIndexPath', () => {
-  it('is a triangle at the top of the scale', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = bankIndexPath(g);
-
-    // Assert
-    expect(out).toBe('M155.0 64.0l-6 -9h12Z');
-  });
-});
-
-describe('windowRect', () => {
-  it('is the attitude window with its rounded corners', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = windowRect(g);
-
-    // Assert
-    expect(out).toEqual({ x: 68, y: 52, width: 174, height: 142, rx: 12 });
   });
 });
 

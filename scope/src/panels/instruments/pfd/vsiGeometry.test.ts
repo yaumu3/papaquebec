@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { pfdGeometry } from './geometry';
+import { type PfdGeometry, pfdGeometry } from './geometry';
 import { vsiDigits, vsiNeedlePath, vsiOffset, vsiScale, vsiStripPath, vsiY } from './vsiGeometry';
 
 describe('vsiOffset', () => {
@@ -31,16 +31,20 @@ describe('vsiY', () => {
   });
 });
 
-describe('vsiStripPath', () => {
-  it('is the strip with its outer corners chamfered', () => {
+describe('the parts of the vertical speed scale at 346 px', () => {
+  it('stand where the layout puts them', () => {
     // Arrange
     const g = pfdGeometry(346);
+    const rows: [(g: PfdGeometry) => unknown, unknown][] = [
+      [vsiStripPath, 'M322.0 42.0H336.0L345.0 64.0V182.0L336.0 204.0H322.0Z'],
+      [(g) => vsiNeedlePath(g, 0), 'M334.0 123.0L343.0 123.0'],
+    ];
 
     // Act
-    const out = vsiStripPath(g);
+    const out = rows.map(([part]) => part(g));
 
     // Assert
-    expect(out).toBe('M322.0 42.0H336.0L345.0 64.0V182.0L336.0 204.0H322.0Z');
+    expect(out).toEqual(rows.map(([, expected]) => expected));
   });
 });
 
@@ -60,19 +64,6 @@ describe('vsiScale', () => {
       { text: '6', x: 324, y: 50 },
       { text: '6', x: 324, y: 196 },
     ]);
-  });
-});
-
-describe('vsiNeedlePath', () => {
-  it('runs from the scale towards a pivot off the right edge, cut short of the edge', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = vsiNeedlePath(g, 0);
-
-    // Assert
-    expect(out).toBe('M334.0 123.0L343.0 123.0');
   });
 });
 

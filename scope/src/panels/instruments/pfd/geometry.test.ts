@@ -25,6 +25,7 @@ import {
   hatchStyle,
   MONO_CAP_EM,
   MONO_MID_TO_BASELINE_EM,
+  type PfdGeometry,
 } from './geometry';
 
 describe('pfdGeometry', () => {
@@ -81,81 +82,27 @@ describe('pfdGeometry', () => {
   });
 });
 
-describe('fmaRulesPath', () => {
-  it('splits the band into three equal columns', () => {
+describe('the parts of the display at 346 px', () => {
+  it('stand where the layout puts them', () => {
     // Arrange
     const g = pfdGeometry(346);
+    const rows: [(g: PfdGeometry) => unknown, unknown][] = [
+      [fmaRulesPath, 'M126.0 2.0V20.0M184.0 2.0V20.0'],
+      [fmaBandPath, 'M68.0 2.0H242.0V20.0H68.0Z'],
+      [speedStripPath, 'M8.0 36.0H54.0V210.0H8.0Z'],
+      [altitudeStripPath, 'M258.0 36.0H316.0V210.0H258.0Z'],
+      [fmaColumnX, [97, 155, 213]],
+      [apY, 42],
+      [speedBoxPath, 'M4.0 105.0H40.0V118.0L45.0 123.0L40.0 128.0V141.0H4.0Z'],
+      [altitudeBoxPath, 'M273.0 105.0H321.0V141.0H273.0V128.0L268.0 123.0L273.0 118.0Z'],
+      [selClipRect, { x: 246, y: 36, width: 74, height: 174 }],
+    ];
 
     // Act
-    const out = fmaRulesPath(g);
+    const out = rows.map(([part]) => part(g));
 
     // Assert
-    expect(out).toBe('M126.0 2.0V20.0M184.0 2.0V20.0');
-  });
-});
-
-describe('fmaBandPath', () => {
-  it('spans the attitude window from y 2 to 20', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = fmaBandPath(g);
-
-    // Assert
-    expect(out).toBe('M68.0 2.0H242.0V20.0H68.0Z');
-  });
-});
-
-describe('speedStripPath', () => {
-  it('frames the speed tape between its ends', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = speedStripPath(g);
-
-    // Assert
-    expect(out).toBe('M8.0 36.0H54.0V210.0H8.0Z');
-  });
-});
-
-describe('altitudeStripPath', () => {
-  it('frames the altitude tape between its ends', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = altitudeStripPath(g);
-
-    // Assert
-    expect(out).toBe('M258.0 36.0H316.0V210.0H258.0Z');
-  });
-});
-
-describe('fmaColumnX', () => {
-  it('centres each column of the band', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = fmaColumnX(g);
-
-    // Assert
-    expect(out).toEqual([97, 155, 213]);
-  });
-});
-
-describe('apY', () => {
-  it('stands just above the attitude window', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = apY(g);
-
-    // Assert
-    expect(out).toBe(42);
+    expect(out).toEqual(rows.map(([, expected]) => expected));
   });
 });
 
@@ -210,19 +157,6 @@ describe('speedTape', () => {
       ['0', '40', '60'],
       ['20', '40'],
     ]);
-  });
-});
-
-describe('speedBoxPath', () => {
-  it('is a box with a spike to the right at the centre line', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = speedBoxPath(g);
-
-    // Assert
-    expect(out).toBe('M4.0 105.0H40.0V118.0L45.0 123.0L40.0 128.0V141.0H4.0Z');
   });
 });
 
@@ -299,19 +233,6 @@ describe('altitudeTape', () => {
 
     // Assert
     expect(out.labels.map((l) => [l.hi, l.lo])).toContainEqual(['−0', '200']);
-  });
-});
-
-describe('altitudeBoxPath', () => {
-  it('is a box with a spike to the left at the centre line', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = altitudeBoxPath(g);
-
-    // Assert
-    expect(out).toBe('M273.0 105.0H321.0V141.0H273.0V128.0L268.0 123.0L273.0 118.0Z');
   });
 });
 
@@ -507,19 +428,6 @@ describe('selBugPath', () => {
       'M249.0 16.0H275.0V56.0H249.0V42.0L255.0 36.0L249.0 30.0Z',
       'M249.0 190.0H275.0V230.0H249.0V216.0L255.0 210.0L249.0 204.0Z',
     ]);
-  });
-});
-
-describe('selClipRect', () => {
-  it('clips the bug to the tape rows, the bug itself standing beyond the edge', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = selClipRect(g);
-
-    // Assert
-    expect(out).toEqual({ x: 246, y: 36, width: 74, height: 174 });
   });
 });
 
