@@ -1,5 +1,5 @@
 import { RAD } from '../../../lib/units';
-import { fixed, offset, toward } from '../../svg';
+import { fixed, offset, type Point, tenth, type TextLabel, toward } from '../../svg';
 import { instrumentHeight } from '../height';
 
 /** The compass arc spans this far either side of the top. */
@@ -42,9 +42,6 @@ export function ndGeometry(w: number): NdGeometry {
   return { w, h, cx: w / 2, cy: Math.min(h - 20, 40 + r), r, r2: r / 2 };
 }
 
-/** A number to a tenth of a pixel, as the drawing is. */
-const tenth = (n: number): number => Number(fixed(n));
-
 /** The radius in pixels that `nm` nautical miles reach at a range of `rangeNm`. */
 export const pxOf = (g: NdGeometry, nm: number, rangeNm: number): number => (nm * g.r) / rangeNm;
 
@@ -62,10 +59,7 @@ export function arcPath(g: NdGeometry, r: number): string {
 export const ringPath = (g: NdGeometry): string => arcPath(g, g.r2);
 
 /** A label of the compass, centred at (x, y). */
-export interface CompassLabel {
-  text: string;
-  x: number;
-  y: number;
+interface CompassLabel extends TextLabel {
   /** The multiples of 30°, set larger. */
   big: boolean;
 }
@@ -150,7 +144,7 @@ export function trackPath(g: NdGeometry): string {
 }
 
 /** The bug outline as (outward from the arc's radius, across): a notch in the foot, towards the arc. */
-const BUG_OUTLINE: readonly (readonly [number, number])[] = [
+const BUG_OUTLINE: readonly Point[] = [
   [9, -7],
   [9, 7],
   [1, 7],
@@ -165,7 +159,7 @@ const BUG_OUTLINE: readonly (readonly [number, number])[] = [
  * through the bug (across 0) is the line the arc ends at, so the cut falls there: the half left
  * of it is inside. The notch's half still points at the arc.
  */
-const BUG_INBOARD_HALF: readonly (readonly [number, number])[] = [
+const BUG_INBOARD_HALF: readonly Point[] = [
   [9, 0],
   [9, -7],
   [1, -7],
@@ -174,12 +168,7 @@ const BUG_INBOARD_HALF: readonly (readonly [number, number])[] = [
 ];
 
 /** The path through `outline` about the bug's own bearing `a`, its across offsets turned to `side`. */
-function bugOutline(
-  g: NdGeometry,
-  a: number,
-  outline: readonly (readonly [number, number])[],
-  side = 1,
-): string {
+function bugOutline(g: NdGeometry, a: number, outline: readonly Point[], side = 1): string {
   const p = toward(g.cx, g.cy, a);
   return outline
     .map(([out, across], i) => `${i ? 'L' : 'M'}${p(g.r + out, across * side)}`)
@@ -198,7 +187,7 @@ export function bugPath(g: NdGeometry, rel: number): string {
 }
 
 /** The heading pointer as (outward from the arc's radius, across): tip on the arc, base outside it. */
-const POINTER_OUTLINE: readonly (readonly [number, number])[] = [
+const POINTER_OUTLINE: readonly Point[] = [
   [1, 0],
   [12, 5],
   [12, -5],
@@ -217,7 +206,7 @@ export interface Trend {
 const TREND_SEC = 90;
 const TREND_FROM_PX = 9;
 /** The seconds of the trend, from and to, that each of its three dashes covers. */
-const TREND_DASHES: readonly (readonly [number, number])[] = [
+const TREND_DASHES: readonly Point[] = [
   [1, 28],
   [32, 58],
   [62, 88],
@@ -244,7 +233,7 @@ export function trendPoints(
 }
 
 /** The trend as three dashes, one for each 30 s. */
-export function trendPath(points: readonly (readonly [number, number])[]): string {
+export function trendPath(points: readonly Point[]): string {
   return TREND_DASHES.map(([from, to]) =>
     points
       .slice(from, to + 1)
@@ -268,7 +257,7 @@ export function levelOffPath(g: NdGeometry, at: number, nm: number, rangeNm: num
 }
 
 /** Where the wind arrow stands, from the top left of the display; it does not scale with it. */
-const WIND_ARROW_CENTRE: readonly [number, number] = [16, 60];
+const WIND_ARROW_CENTRE: Point = [16, 60];
 const WIND_ARROW_HALF_LENGTH_PX = 10;
 const WIND_HEAD_BACK_PX = 5;
 const WIND_HEAD_HALF_WIDTH_PX = 3.5;
@@ -292,7 +281,7 @@ export const THREAT_SIDE_PX = 9;
 export const PEEK_SIDE_PX = 19;
 
 /** The closed outline through `corners`, as a subpath. */
-const outline = (corners: readonly (readonly [number, number])[]): string =>
+const outline = (corners: readonly Point[]): string =>
   `${corners.map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`).join('')}Z`;
 
 /** The diamond of other and proximate traffic, centred at (x, y). */

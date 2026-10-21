@@ -1,5 +1,5 @@
 import { RAD } from '../../../lib/units';
-import { fixed, toward } from '../../svg';
+import { fixed, type Point, tenth, type TextLabel, toward } from '../../svg';
 import { instrumentHeight } from '../height';
 
 const SPEED_LEFT_PX = 8;
@@ -118,9 +118,6 @@ const AP_RISE_PX = 10;
 /** The centre line of the autopilot's label, just above the attitude window. */
 export const apY = (g: PfdGeometry): number => g.wy - AP_RISE_PX;
 
-/** A number to a tenth of a pixel, as the drawing is. */
-const tenth = (n: number): number => Number(fixed(n));
-
 /** Where `value` stands on a tape that shows `span` either side of `at` over its half-height. */
 export const tapeY = (g: PfdGeometry, value: number, at: number, span: number): number =>
   g.yc - ((value - at) * (g.yc - g.yTop)) / span;
@@ -135,15 +132,9 @@ const SPEED_LABEL_GAP_PX = 11;
 /** How far past the visible span a tick is still worked out, so that none is missed at the ends. */
 const SPEED_REACH_KT = 50;
 
-export interface TapeLabel {
-  text: string;
-  x: number;
-  y: number;
-}
-
 export interface SpeedTape {
   ticks: string;
-  labels: TapeLabel[];
+  labels: TextLabel[];
 }
 
 /** The ticks of the speed tape at the inner edge, every 10 kt, and its labels every 20 kt clear of the readout. */
@@ -352,24 +343,16 @@ const LADDER_LABEL_GAP_PX = 9;
 /** The half-length of a rung of the ladder: longer at each 5° and each 10°. */
 const rungHalfLength = (deg: number): number => (deg % 10 === 0 ? 28 : deg % 5 === 0 ? 14 : 7);
 
-export interface AttitudeLabel {
-  text: string;
-  x: number;
-  y: number;
-}
-
 export interface Attitude {
   /** The two parts of the window the horizon divides, as closed paths. */
   sky: string;
   ground: string;
   horizon: string;
   ladder: string;
-  labels: AttitudeLabel[];
+  labels: TextLabel[];
   /** The roll pointer, a triangle on the bank scale. */
   pointer: string;
 }
-
-type Point = readonly [number, number];
 
 /** The parts of a polygon on one side of a line, with the points where the line cuts it. */
 function clipSide(
@@ -421,7 +404,7 @@ export function attitude(g: PfdGeometry, rollDeg: number): Attitude {
   const ground = clipSide(corners, height, false);
   const [from, to] = sky.cuts;
   let ladder = '';
-  const labels: AttitudeLabel[] = [];
+  const labels: TextLabel[] = [];
   for (let deg = -LADDER_SPAN_DEG; deg <= LADDER_SPAN_DEG; deg += LADDER_STEP_DEG) {
     const off = deg * PITCH_PX_PER_DEG;
     if (deg === 0 || off > g.rr - LADDER_TOP_MARGIN_PX) continue;
@@ -854,7 +837,7 @@ const VSI_LABEL_GAP_PX = 2;
 
 export interface VsiScale {
   ticks: string;
-  labels: TapeLabel[];
+  labels: TextLabel[];
 }
 
 /** The zero mark, the ticks at ±500 to ±6000 fpm and the labels of thousands, 1, 2 and 6. */
@@ -893,14 +876,8 @@ const VSI_DIGITS_STEP_FPM = 50;
 const VSI_DIGITS_RISE_PX = 18;
 const VSI_DIGITS_RIGHT_INSET_PX = 2;
 
-export interface VsiDigits {
-  text: string;
-  x: number;
-  y: number;
-}
-
 /** The rate to 50 fpm from 400, right-aligned above the strip for a climb and below it for a descent. */
-export function vsiDigits(g: PfdGeometry, vsFpm: number): VsiDigits | undefined {
+export function vsiDigits(g: PfdGeometry, vsFpm: number): TextLabel | undefined {
   if (Math.abs(vsFpm) < VSI_DIGITS_FROM_FPM) return undefined;
   const rounded = Math.abs(Math.round(vsFpm / VSI_DIGITS_STEP_FPM) * VSI_DIGITS_STEP_FPM);
   const reach = vsiHalf(g) + VSI_DIGITS_RISE_PX;

@@ -1,6 +1,7 @@
 import { type Accessor, createMemo, createSignal } from 'solid-js';
 
 import { clamp } from '../../lib/math';
+import type { Point } from '../svg';
 
 /**
  * How long a shown reading takes to reach a new report, ms: the feed publishes every second, so
@@ -50,9 +51,6 @@ export const retargetGlide = (
   now: number,
   wrap?: number,
 ): Glide | undefined => (to === undefined ? undefined : glideToward(current, to, now, wrap));
-
-/** A point on the display, in pixels. */
-export type Point = readonly [number, number];
 
 /** The glides of a point's two coordinates. */
 export type PointGlides = readonly [Glide, Glide];

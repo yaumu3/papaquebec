@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { Point } from '../svg';
 import {
   type Glide,
   GLIDE_MS,
   glideAt,
-  type Point,
   type PointGlides,
   retargetGlide,
   retargetPoints,
