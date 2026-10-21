@@ -360,16 +360,31 @@ describe('atTicks', () => {
 describe('barbPath', () => {
   it('draws a circle for calm, else a staff toward where the wind comes from with its marks', () => {
     // Arrange
-    const calm = barbPath(10, 20, 0, 1, 16);
+    const rows: [number, number][] = [
+      [0, 1],
+      [37, 1],
+      [0, 5],
+      [37, 5],
+      [0, 15],
+      [37, 15],
+      [0, 65],
+      [37, 65],
+    ];
 
     // Act
-    const north = barbPath(10, 20, 0, 15, 16);
+    const paths = rows.map(([dir, speed]) => barbPath(10, 20, dir, speed, 16));
 
     // Assert
-    expect(calm.startsWith('M')).toBe(true);
-    expect(calm).toContain('a');
-    expect(north.startsWith('M10.0 20.0 L10.0 4.0 ')).toBe(true);
-    expect(north.match(/l/g)).toHaveLength(2);
+    expect(paths).toEqual([
+      'M13.0 20.0 a3 3 0 1 0 -6 0 a3 3 0 1 0 6 0',
+      'M13.0 20.0 a3 3 0 1 0 -6 0 a3 3 0 1 0 6 0',
+      'M10.0 20.0 L10.0 4.0 M10.0 7.0 l3.0 0.0',
+      'M10.0 20.0 L19.6 7.2 M17.8 9.6 l2.4 1.8',
+      'M10.0 20.0 L10.0 4.0 M10.0 4.0 l6.0 0.0 M10.0 7.0 l3.0 0.0',
+      'M10.0 20.0 L19.6 7.2 M19.6 7.2 l4.8 3.6 M17.8 9.6 l2.4 1.8',
+      'M10.0 20.0 L10.0 4.0 M10.0 4.0 L16.0 4.0 L10.0 8.5 Z M10.0 8.5 l6.0 0.0 M10.0 11.5 l3.0 0.0',
+      'M10.0 20.0 L19.6 7.2 M19.6 7.2 L24.4 10.8 L16.9 10.8 Z M16.9 10.8 l4.8 3.6 M15.1 13.2 l2.4 1.8',
+    ]);
   });
 });
 
