@@ -2,7 +2,7 @@ import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
 import { steeringHeading } from '../../../lib/autopilot';
 import { padBearing } from '../../../lib/format';
-import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
+import { holds, LAPSE_SEC } from '../../../lib/reports';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
 import { NONE, type Reading, READINGS } from '../../readings';
@@ -28,7 +28,7 @@ const BLANK_BOX = '---';
 /** The mode the instrument is in: track-up while the magnetic track holds. */
 function modeOf(t: Readout, now: number): NdMode {
   if (isLost(t)) return 'lost';
-  if (holds(t.heard.track, now, INSTRUMENT_SEC) && magneticTrack(t) !== undefined) return 'track';
+  if (holds(t.heard.track, now, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
 }
 

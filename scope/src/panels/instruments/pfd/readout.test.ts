@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER, qnhAltitudeFt } from '../../../lib/altitude';
-import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { LAPSE_SEC } from '../../../lib/reports';
 import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
@@ -22,7 +22,7 @@ afterEach(() => {
   setDeclinationAt(() => () => 0);
 });
 const FRESH = NOW - 1;
-const STALE = NOW - INSTRUMENT_SEC;
+const STALE = NOW - LAPSE_SEC;
 
 /** A target whose samples are these, the last being what it reads now. */
 const targetOf = (first: Sample, ...rest: Sample[]) => ({
@@ -93,9 +93,7 @@ describe('pfdFma', () => {
     const targets = [
       targetOf(makeSample(NOW, { heard: {} })),
       targetOf(makeSample(NOW, { navModes: modes, heard: { navModes: STALE } })),
-      targetOf(
-        makeSample(NOW, { navModes: modes, heard: { navModes: FRESH }, seen: INSTRUMENT_SEC }),
-      ),
+      targetOf(makeSample(NOW, { navModes: modes, heard: { navModes: FRESH }, seen: LAPSE_SEC })),
     ];
 
     // Act
@@ -160,7 +158,7 @@ describe('modeChangedAt', () => {
     // Arrange
     const samples = [
       reporting(90, ['vnav']),
-      makeSample(100, { navModes: ['althold'], heard: { navModes: 80 } }),
+      makeSample(100, { navModes: ['althold'], heard: { navModes: 100 - LAPSE_SEC } }),
       reporting(110, ['vnav']),
     ];
 
@@ -238,7 +236,7 @@ describe('pfdReadouts speed', () => {
     const targets = [
       makeSample(NOW, { ...reported, heard: { ias: STALE, mach: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { ...reported, heard: { ias: FRESH, mach: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { ...reported, heard: { ias: FRESH, mach: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
@@ -267,7 +265,7 @@ describe('pfdReadouts roll', () => {
       makeSample(NOW, { roll: -12, heard: { roll: FRESH } }),
       makeSample(NOW, { roll: -12, heard: { roll: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { roll: -12, heard: { roll: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { roll: -12, heard: { roll: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
@@ -324,7 +322,7 @@ describe('pfdReadouts flight path vector', () => {
       makeSample(NOW, { ...live, heard: { ...heard, verticalRate: STALE } }),
       makeSample(NOW, { ...live, gs: undefined, heard: { verticalRate: FRESH, roll: FRESH } }),
       makeSample(NOW, { ...live, gs: 0, heard }),
-      makeSample(NOW, { ...live, heard, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { ...live, heard, seen: LAPSE_SEC }),
     ];
 
     // Act
@@ -352,7 +350,7 @@ describe('pfdReadouts altitude', () => {
     const targets = [
       makeSample(NOW, { alt: 37000, heard: { alt: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { alt: 37000, heard: { alt: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { alt: 37000, heard: { alt: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
@@ -360,6 +358,18 @@ describe('pfdReadouts altitude', () => {
 
     // Assert
     expect(out).toEqual([{ kind: 'flag' }, { kind: 'flag' }, { kind: 'flag' }]);
+  });
+
+  it('flags the altitude from the lapse on, not before', () => {
+    // Arrange
+    const ages = [20, LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const targets = ages.map((age) => makeSample(NOW, { alt: 37000, heard: { alt: NOW - age } }));
+
+    // Act
+    const out = targets.map((t) => altitudeOf(t).kind);
+
+    // Assert
+    expect(out).toEqual(['feet', 'feet', 'flag', 'flag']);
   });
 
   it('reads the altitude as the crew does, on their setting even when it has gone stale', () => {
@@ -464,7 +474,7 @@ describe('pfdReadouts selected altitudes', () => {
       makeSample(NOW, {
         ...reported,
         heard: { selAlt: FRESH, fmsAlt: FRESH },
-        seen: INSTRUMENT_SEC,
+        seen: LAPSE_SEC,
       }),
     ];
 
@@ -500,7 +510,7 @@ describe('pfdReadouts baro', () => {
     const targets = [
       makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
@@ -521,7 +531,7 @@ describe('pfdReadouts vertical rate', () => {
       makeSample(NOW, {
         verticalRate: -2200,
         heard: { verticalRate: FRESH },
-        seen: INSTRUMENT_SEC,
+        seen: LAPSE_SEC,
       }),
     ];
 

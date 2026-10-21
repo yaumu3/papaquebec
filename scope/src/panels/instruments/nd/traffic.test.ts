@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import type { ResolutionAdvisory, Threat } from '../../../lib/acas';
 import { turn } from '../../../lib/geo';
 import { direct } from '../../../lib/geodesic';
-import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { LAPSE_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
@@ -63,7 +63,7 @@ describe('verticalArrow', () => {
       makeTrack({ verticalRate: 500, heard: held }),
       makeTrack({ verticalRate: -499, heard: held }),
       makeTrack({ verticalRate: -500, heard: held }),
-      makeTrack({ verticalRate: 2000, heard: { verticalRate: NOW - INSTRUMENT_SEC } }),
+      makeTrack({ verticalRate: 2000, heard: { verticalRate: NOW - LAPSE_SEC } }),
       makeTrack({ verticalRate: undefined, heard: held }),
     ];
 
@@ -161,12 +161,25 @@ describe('trafficAround', () => {
     expect(hexes(placed)).toEqual(['up', 'down']);
   });
 
+  it('keeps traffic whose position was heard under the lapse ago, drops it at the lapse', () => {
+    // Arrange
+    const others = [29.9, LAPSE_SEC].map((age) =>
+      traffic(`at-${age}`, 0, 5, { heard: { position: NOW - age, alt: FRESH } }),
+    );
+
+    // Act
+    const placed = trafficAround(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(hexes(placed)).toEqual(['at-29.9']);
+  });
+
   it('drops ground traffic, an altitude not held, a stale or absent position, and own ship', () => {
     // Arrange
     const others = [
       traffic('ground', 0, 5, { alt: 'ground' }),
-      traffic('noalt', 0, 5, { heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
-      traffic('stale', 0, 5, { heard: { position: NOW - INSTRUMENT_SEC, alt: FRESH } }),
+      traffic('noalt', 0, 5, { heard: { position: FRESH, alt: NOW - LAPSE_SEC } }),
+      traffic('stale', 0, 5, { heard: { position: NOW - LAPSE_SEC, alt: FRESH } }),
       traffic('nowhere', 0, 5, { position: { kind: 'none' } }),
       traffic('own', 0, 5),
       traffic('kept', 0, 5),
@@ -200,9 +213,9 @@ describe('trafficAround', () => {
     // Arrange
     const owns = [
       ownShip({ position: { kind: 'none' } }),
-      ownShip({ heard: { position: NOW - INSTRUMENT_SEC, alt: FRESH } }),
+      ownShip({ heard: { position: NOW - LAPSE_SEC, alt: FRESH } }),
       ownShip({ alt: 'ground' }),
-      ownShip({ heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
+      ownShip({ heard: { position: FRESH, alt: NOW - LAPSE_SEC } }),
     ];
     const others = [traffic('a', 0, 5)];
 
@@ -414,9 +427,7 @@ describe('ndTraffic threat by address', () => {
   it('draws no symbol for a threat whose altitude is not held, but still TRAFFIC', () => {
     // Arrange
     const own = ownShip({ ra: advisory({ address: 'thr' }) });
-    const others = [
-      traffic('thr', 10, 4, { heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
-    ];
+    const others = [traffic('thr', 10, 4, { heard: { position: FRESH, alt: NOW - LAPSE_SEC } })];
 
     // Act
     const result = ndTraffic(own, others, NOW, view());
@@ -478,7 +489,7 @@ describe('ndTraffic threat by position', () => {
   it('places nothing without a held heading, nor without a range or a bearing, but still TRAFFIC', () => {
     // Arrange
     const owns = [
-      byPosition({ range: 3, bearing: 20 }, { heard: { ...HELD, heading: NOW - INSTRUMENT_SEC } }),
+      byPosition({ range: 3, bearing: 20 }, { heard: { ...HELD, heading: NOW - LAPSE_SEC } }),
       byPosition(
         { range: 3, bearing: 20 },
         { heading: undefined, heard: { position: FRESH, alt: FRESH } },
@@ -516,7 +527,7 @@ describe('ndTraffic threat by position', () => {
       byPosition({ range: 3, bearing: 20 }),
       byPosition(
         { range: 3, bearing: 20, altitude: 29600 },
-        { heard: { ...HELD, alt: NOW - INSTRUMENT_SEC } },
+        { heard: { ...HELD, alt: NOW - LAPSE_SEC } },
       ),
     ];
 
@@ -558,7 +569,7 @@ describe('ndTraffic offscale', () => {
       [own({ address: 'ghost' }), [traffic('t', 0, 12.5)], view(0, 10)],
       [own({ range: 15, bearing: 20 }, { heading: undefined }), [], view(0, 10)],
       [
-        own({ range: 15, bearing: 20 }, { heard: { ...HELD, heading: NOW - INSTRUMENT_SEC } }),
+        own({ range: 15, bearing: 20 }, { heard: { ...HELD, heading: NOW - LAPSE_SEC } }),
         [],
         view(0, 10),
       ],

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { INSTRUMENT_SEC } from '../../lib/reports';
+import { LAPSE_SEC } from '../../lib/reports';
 import { holdsAll, isLost, oldestHeard } from './freshness';
 
 const NOW = 1000;
@@ -23,9 +23,20 @@ describe('oldestHeard', () => {
 });
 
 describe('holdsAll', () => {
+  it('holds a key heard under the lapse ago, not at it or beyond', () => {
+    // Arrange
+    const ages = [20, LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+
+    // Act
+    const out = ages.map((age) => holdsAll({ heard: { gs: NOW - age } }, ['gs'], NOW));
+
+    // Assert
+    expect(out).toEqual([true, true, false, false]);
+  });
+
   it('fails on one stale key and ignores a key never heard', () => {
     // Arrange
-    const heard = { trackRate: NOW - 1, gs: NOW - INSTRUMENT_SEC };
+    const heard = { trackRate: NOW - 1, gs: NOW - LAPSE_SEC };
 
     // Act
     const out = [
@@ -41,14 +52,14 @@ describe('holdsAll', () => {
 });
 
 describe('isLost', () => {
-  it('is lost from INSTRUMENT_SEC since the last message', () => {
+  it('is lost from LAPSE_SEC since the last message', () => {
     // Arrange
-    const seen = [INSTRUMENT_SEC - 0.1, INSTRUMENT_SEC];
+    const seen = [LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
 
     // Act
     const out = seen.map((s) => isLost({ seen: s }));
 
     // Assert
-    expect(out).toEqual([false, true]);
+    expect(out).toEqual([false, true, true]);
   });
 });

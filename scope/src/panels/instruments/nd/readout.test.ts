@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER } from '../../../lib/altitude';
-import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import { ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
-const STALE = NOW - INSTRUMENT_SEC;
+const STALE = NOW - LAPSE_SEC;
 const AT = { lat: 35.5, lon: 139.8 };
 
 afterEach(() => {
@@ -23,7 +23,7 @@ describe('ndFrame', () => {
     heard: { heading: FRESH, track: STALE },
   });
 
-  it('sets the mode, the box and the flags by what holds, a track heard INSTRUMENT_SEC ago lapsed', () => {
+  it('sets the mode, the box and the flags by what holds, a track heard LAPSE_SEC ago lapsed', () => {
     // Arrange
     const rows = [
       makeSample(NOW, {
@@ -36,6 +36,12 @@ describe('ndFrame', () => {
       makeSample(NOW, { seen: 34, heading: 201, track: 198, heard: { heading: 966, track: 966 } }),
       lapsedTrack,
       makeSample(NOW, { seen: 1 }),
+      makeSample(NOW, {
+        seen: 1,
+        heading: 284,
+        track: 289,
+        heard: { heading: NOW - 20, track: NOW - 20 },
+      }),
     ];
 
     // Act
@@ -48,6 +54,7 @@ describe('ndFrame', () => {
       ['lost', '---', ['TRK']],
       ['blank', '---', ['TRK']],
       ['blank', '---', ['TRK']],
+      ['track', '289', []],
     ]);
   });
 
@@ -154,7 +161,7 @@ describe('ndReadouts', () => {
     expect(Object.values(readouts).map((r) => r.known)).toEqual(Array(7).fill(false));
   });
 
-  it('lets a value lapse at exactly INSTRUMENT_SEC', () => {
+  it('lets a value lapse at exactly LAPSE_SEC', () => {
     // Arrange
     const t = makeSample(NOW, {
       seen: 1,
@@ -186,7 +193,7 @@ describe('ndReadouts', () => {
           windSpeed: modesAt ?? FRESH,
         },
       });
-    const rows = [sel(NOW - 16), sel(NOW - 14), sel(undefined)];
+    const rows = [sel(NOW - LAPSE_SEC - 1), sel(NOW - LAPSE_SEC + 1), sel(undefined)];
 
     // Act
     const readouts = rows.map((t) => ndReadouts(t, NOW));
@@ -199,7 +206,7 @@ describe('ndReadouts', () => {
     ]);
   });
 
-  it('blanks every value of a target not heard for INSTRUMENT_SEC', () => {
+  it('blanks every value of a target not heard for LAPSE_SEC', () => {
     // Arrange
     const t = makeSample(NOW, {
       seen: 34,

@@ -2,7 +2,7 @@ import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt, selectedFt } from '../../../lib/altitude';
 import { turn } from '../../../lib/geo';
 import { hpaToInHg } from '../../../lib/metar';
-import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
+import { holds, LAPSE_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { magneticTrack } from '../../../state/magnetic';
 import type { Readout, Sample, Track } from '../../../state/track';
@@ -47,7 +47,7 @@ export const fmaColumns = (modes: readonly string[]): FmaColumns => ({
  */
 export function modeChangedAt(samples: readonly Sample[], column: FmaColumn): number | undefined {
   const counted = samples.filter(
-    (s) => s.navModes !== undefined && holds(s.heard.navModes, s.t, INSTRUMENT_SEC),
+    (s) => s.navModes !== undefined && holds(s.heard.navModes, s.t, LAPSE_SEC),
   );
   const text = (s: Sample | undefined) => fmaColumns(s?.navModes ?? [])[column];
   const current = text(counted.at(-1));
