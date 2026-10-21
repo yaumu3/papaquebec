@@ -80,7 +80,7 @@ export function createLaneDrag(deps: {
   /** Whether a second finger landing now pinches the window. */
   pinchable: () => boolean;
   /** Ends the gesture on the lane without effect: no drop, no removal. */
-  drop: () => void;
+  abandon: () => void;
   grab: (e: PointerEvent, lane: LaneKey, part: LanePart) => void;
 } {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
@@ -321,5 +321,5 @@ export function createLaneDrag(deps: {
       },
       heldPart,
     );
-  return { drag, swipe, peeking, pinchable, drop: () => end?.(), grab };
+  return { drag, swipe, peeking, pinchable, abandon: () => end?.(), grab };
 }

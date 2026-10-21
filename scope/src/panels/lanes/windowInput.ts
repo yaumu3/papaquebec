@@ -37,7 +37,7 @@ interface WindowInputDeps {
   setWindow: (w: LanesWindow) => void;
   /** Whether a second finger landing now pinches, and ending the first finger's gesture when it does. */
   pinchable: () => boolean;
-  drop: () => void;
+  abandon: () => void;
 }
 
 /** Where on the lanes `target` is. */
@@ -129,7 +129,7 @@ export function createWindowInput(deps: WindowInputDeps): void {
     touches.set(e.pointerId, e.clientX);
     const [one, two] = [...touches];
     if (touches.size === 2 && one && two && deps.pinchable()) {
-      deps.drop();
+      deps.abandon();
       const start = { w: deps.window(), visible: deps.visible() };
       fingers = { ids: [one[0], two[0]], x0: [one[1], two[1]], start };
     }

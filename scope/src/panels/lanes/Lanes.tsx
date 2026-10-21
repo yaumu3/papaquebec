@@ -249,7 +249,7 @@ export function Lanes(props: { track: Track }) {
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
   const heights = () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0);
-  const { drag, swipe, peeking, pinchable, drop, grab } = createLaneDrag({
+  const { drag, swipe, peeking, pinchable, abandon, grab } = createLaneDrag({
     scroller,
     picker: {
       open: (lane, el, fx, fy) =>
@@ -292,7 +292,7 @@ export function Lanes(props: { track: Track }) {
     scroller,
     plotLeft,
     pinchable,
-    drop,
+    abandon,
     plotWidth,
     window: lanesWindow,
     visible,
