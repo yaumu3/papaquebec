@@ -263,6 +263,24 @@ describe('yOf', () => {
 });
 
 describe('gapsIn', () => {
+  it('adds the silence after the last sample while the target is lost, cut to the interval', () => {
+    // Arrange
+    const samples = [sample(100), sample(101)];
+    const rows = [
+      { lost: true, i: { from: 0, to: 200 } },
+      { lost: false, i: { from: 0, to: 200 } },
+      { lost: true, i: { from: 150, to: 200 } },
+      { lost: true, i: { from: 0, to: 100.5 } },
+      { lost: true, i: { from: 0, to: 101 } },
+    ];
+
+    // Act
+    const gaps = rows.map((r) => gapsIn(samples, r.i, r.lost));
+
+    // Assert
+    expect(gaps).toEqual([[{ from: 101, to: 200 }], [], [{ from: 150, to: 200 }], [], []]);
+  });
+
   it('leaves a gap between samples exactly the lapse apart, not ones just under it', () => {
     // Arrange
     const spacings = [29.9, 30, 30.1];

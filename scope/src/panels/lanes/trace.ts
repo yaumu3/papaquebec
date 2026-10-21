@@ -132,8 +132,11 @@ export function yOf(
   return height - padBottom - ((v - r.lo) / (r.hi - r.lo)) * span;
 }
 
-/** The gaps between the stretches of reports, cut to the interval. */
-export function gapsIn(samples: readonly Sample[], i: Interval): Interval[] {
+/**
+ * The gaps between the stretches of reports, cut to the interval; and, while the target is lost,
+ * the silence after the last report.
+ */
+export function gapsIn(samples: readonly Sample[], i: Interval, lost = false): Interval[] {
   const out: Interval[] = [];
   let previous: Sample | undefined;
   for (const stretch of stretches(samples)) {
@@ -144,6 +147,10 @@ export function gapsIn(samples: readonly Sample[], i: Interval): Interval[] {
       if (from < to) out.push({ from, to });
     }
     previous = stretch.at(-1);
+  }
+  const last = samples.at(-1);
+  if (lost && last && Math.max(last.t, i.from) < i.to) {
+    out.push({ from: Math.max(last.t, i.from), to: i.to });
   }
   return out;
 }

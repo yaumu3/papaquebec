@@ -37,6 +37,7 @@ import {
 } from '../../state/window';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
+import { isLost } from '../instruments/freshness';
 import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, ticks } from './axis';
 import { pickOf } from './chips';
@@ -58,7 +59,7 @@ import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
 import { TimeAxis } from './TimeAxis';
-import { newestSample, sampleAt } from './trace';
+import { gapsIn, newestSample, sampleAt } from './trace';
 import { createWindowInput } from './windowInput';
 
 import s from './Lanes.module.css';
@@ -97,6 +98,7 @@ export function Lanes(props: { track: Track }) {
   );
   const contact = createMemo(() => contactOf(samples(), trackStore.stats.now));
   const visible = createMemo(() => resolveWindow(lanesWindow(), contact()));
+  const gaps = createMemo(() => gapsIn(samples(), visible(), isLost(props.track)));
   const now = () => contact().to;
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step(), now()));
@@ -379,6 +381,7 @@ export function Lanes(props: { track: Track }) {
                     keys={readingsIn(lane)}
                     samples={samples()}
                     visible={visible()}
+                    gaps={gaps()}
                     ticks={tickTimes()}
                     width={plotWidth()}
                     height={LANE_PX}
