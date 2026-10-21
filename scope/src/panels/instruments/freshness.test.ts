@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from '../../lib/aircraft';
 import { LAPSE_SEC } from '../../lib/reports';
-import { holdsAll, ifHolds, isLost } from './freshness';
+import { eachHolds, holdsAll, ifHolds, isLost } from './freshness';
 
 const NOW = 1000;
 
@@ -32,6 +32,31 @@ describe('holdsAll', () => {
 
     // Assert
     expect(out).toEqual([true, false, true, false]);
+  });
+});
+
+describe('eachHolds', () => {
+  it('holds only when every key was heard and holds on its own, unlike holdsAll', () => {
+    // Arrange
+    const heard = { gs: NOW - 1, trackRate: NOW - 2, tas: NOW - LAPSE_SEC };
+    const rows: HeardKey[][] = [
+      ['gs', 'trackRate'],
+      ['gs', 'tas'],
+      ['gs', 'selAlt'],
+    ];
+
+    // Act
+    const out = rows.map((keys) => [
+      eachHolds({ heard }, keys, NOW),
+      holdsAll({ heard }, keys, NOW),
+    ]);
+
+    // Assert
+    expect(out).toEqual([
+      [true, true],
+      [false, false],
+      [false, true],
+    ]);
   });
 });
 

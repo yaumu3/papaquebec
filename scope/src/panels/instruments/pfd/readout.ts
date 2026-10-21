@@ -1,4 +1,3 @@
-import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt, selectedFt } from '../../../lib/altitude';
 import { turn } from '../../../lib/geo';
 import { hpaToInHg } from '../../../lib/metar';
@@ -6,7 +5,7 @@ import { holds } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { magneticTrack } from '../../../state/magnetic';
 import type { Readout, Sample } from '../../../state/track';
-import { holdsAll, ifHolds, isLost } from '../freshness';
+import { eachHolds, holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
 import type { Fpv } from './geometry';
 
@@ -127,15 +126,11 @@ const KT_TO_FPM = 101.27;
 const pathAngle = (vsFpm: number, gsKt: number): number =>
   Math.atan2(vsFpm, gsKt * KT_TO_FPM) / RAD;
 
-/** Whether every one of the keys holds on its own: a key never heard does not hold. */
-const allHold = (t: Readout, keys: readonly HeardKey[], instant: number): boolean =>
-  keys.every((key) => holdsAll(t, [key], instant));
-
 /** The turn from the heading to the magnetic track while both hold, else none. */
 function driftOf(t: Readout, instant: number): number {
   const track = magneticTrack(t);
   if (t.heading === undefined || track === undefined) return 0;
-  return allHold(t, ['heading', 'track'], instant) ? turn(t.heading, track) : 0;
+  return eachHolds(t, ['heading', 'track'], instant) ? turn(t.heading, track) : 0;
 }
 
 /**
@@ -145,7 +140,7 @@ function driftOf(t: Readout, instant: number): number {
 function fpvOf(t: Readout, instant: number): Fpv | undefined {
   const { verticalRate: vs, gs } = t;
   if (vs === undefined || gs === undefined || gs <= 0) return undefined;
-  if (!allHold(t, ['roll', 'verticalRate', 'gs'], instant)) return undefined;
+  if (!eachHolds(t, ['roll', 'verticalRate', 'gs'], instant)) return undefined;
   return { fpaDeg: pathAngle(vs, gs), driftDeg: driftOf(t, instant) };
 }
 
