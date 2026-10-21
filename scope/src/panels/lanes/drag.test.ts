@@ -6,12 +6,12 @@ describe('slotShown', () => {
   it('shows the slot under the pointer, or the place the lane left while over the bin', () => {
     // Arrange
     const holds = [
-      { from: 0, slot: 2, bin: false },
-      { from: 0, slot: 2, bin: true },
+      { from: 0, slot: 2, overBin: false },
+      { from: 0, slot: 2, overBin: true },
     ];
 
     // Act
-    const shown = holds.map(({ from, slot, bin }) => slotShown(from, slot, bin));
+    const shown = holds.map(slotShown);
 
     // Assert
     expect(shown).toEqual([2, 0]);

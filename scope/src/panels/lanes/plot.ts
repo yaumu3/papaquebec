@@ -1,16 +1,17 @@
 import type { HeardKey } from '../../lib/aircraft';
 import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
 import { NM_IN_METERS, turn } from '../../lib/geo';
-import { nearestInTime } from '../../lib/nearest';
-import { LAPSE_SEC } from '../../lib/reports';
-import { RAD } from '../../lib/units';
+import { withinLapse } from '../../lib/reports';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import type { Interval } from '../../state/window';
-import { type Reading, READINGS } from '../readings';
+import { HEARD, READINGS } from '../readings';
 import { fixed, offset, toward } from '../svg';
-import { type Dash, HEARD, type Heading, PLOTS } from './plots';
-import { barbMarks, heardNear, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
+import { heardNear, heardNearAt } from './heard';
+import { type Dash, type Heading, PLOTS, type PlotSpec } from './plots';
+import { isLog, plotText } from './plots';
+import { barbMarks, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
+import { nearestSample } from './trace';
 
 export interface LaneTrace {
   key: ReadingKey;
@@ -34,7 +35,7 @@ export function laneTraces(
 ): LaneTrace[] {
   const [lane, ...intents] = keys;
   if (lane === undefined) return [];
-  const own = PLOTS[lane];
+  const own: PlotSpec = PLOTS[lane];
   if (own.kind !== 'line' && own.kind !== 'pair') return [];
   const read = (y: Read, key: ReadingKey = lane) => runsOf(samples, y, visible, HEARD[key]);
   const floor = own.kind === 'line' ? own.floor : undefined;
@@ -43,7 +44,7 @@ export function laneTraces(
     floorRuns.length > 0 ? [{ key: lane, runs: floorRuns, floor: true }] : [];
   const second = own.kind === 'pair' ? [{ key: lane, runs: read(own.y2), dash: own.dash }] : [];
   const drawn = intents.flatMap((key) => {
-    const spec = PLOTS[key];
+    const spec: PlotSpec = PLOTS[key];
     if (spec.kind !== 'intent') return [];
     return [{ key, runs: read(spec.y, key), dash: spec.dash, intent: true as const }];
   });
@@ -88,7 +89,7 @@ const within = (m: number, round: number): boolean =>
  * would have none, a flat line on a step lying along the bottom.
  */
 export function snapped(r: Range, lane: ReadingKey): Range {
-  const spec = PLOTS[lane];
+  const spec: PlotSpec = PLOTS[lane];
   if (spec.kind !== 'line' && spec.kind !== 'pair') return r;
   if (spec.log) {
     const lo = BOUNDS_M.findLast((m) => m <= 10 ** r.lo * (1 + EPS)) ?? 10 ** r.lo;
@@ -104,7 +105,7 @@ export function snapped(r: Range, lane: ReadingKey): Range {
 }
 
 /** A value on a lane's scale, and how it reads. */
-export interface ScaleLabel {
+interface ScaleLabel {
   v: number;
   text: string;
 }
@@ -112,22 +113,12 @@ export interface ScaleLabel {
 /** The metres a power of ten stands for, to six figures, as a bound reads them. */
 const metresOf = (v: number): number => Number((10 ** v).toPrecision(6));
 
-/** Whether a reading is drawn on a log scale, as a bound. */
-const isLog = (key: ReadingKey): boolean => {
-  const spec = PLOTS[key];
-  return spec.kind === 'line' && spec.log === true;
-};
-
-/** A reading's value as a lane prints it: with its unit only on a log lane, where the unit changes along it. */
-export const plotText = (key: ReadingKey, r: Reading): string =>
-  isLog(key) && r.unit ? `${r.v} ${r.unit}` : r.v;
-
 /**
  * The top and bottom of a lane's scale as its reading reads them, bounds on a log scale with
  * their unit, which changes along it; none for a lane without a scale.
  */
 export function scaleLabels(lane: ReadingKey, r: Range): ScaleLabel[] {
-  const spec = PLOTS[lane];
+  const spec: PlotSpec = PLOTS[lane];
   const value = READINGS[lane].value;
   if (!value || (spec.kind !== 'line' && spec.kind !== 'pair')) return [];
   return [r.hi, r.lo].map((v) => ({
@@ -148,14 +139,17 @@ export function pathOf(
 }
 
 /** Samples to read a tick from rather than the nearest, while one lies within reach of it. */
-export interface Preference {
+interface Preference {
   has: (s: Sample) => boolean;
   withinSec: number;
 }
 
+/** Every instant, for a lookup that is not limited to a window. */
+const ALL: Interval = { from: -Infinity, to: Infinity };
+
 /**
  * One reading per tick, from the sample nearest it or the nearest one preferred, read at the
- * tick, unless that lies a gap or more away or lacks it, or its reading, of the `heard` instants,
+ * tick, unless that lies a gap or more away or lacks it, or its reading, by the `keys`,
  * was heard a gap or more away. A preferred sample a gap or more away gives way to the nearest,
  * however far the preference reaches.
  */
@@ -164,18 +158,17 @@ export function atTicks<T extends object>(
   ticks: readonly number[],
   read: (s: Sample, t: number) => T | undefined,
   prefer?: Preference,
-  heard: readonly HeardKey[] = [],
+  keys: readonly HeardKey[] = [],
 ): (T & { t: number })[] {
   const preferred = prefer ? samples.filter(prefer.has) : [];
   const reach = prefer?.withinSec ?? 0;
   return ticks.flatMap((t) => {
-    const near = nearestInTime(preferred, t);
+    const near = nearestSample(preferred, t, ALL);
     const s =
-      near && Math.abs(near.t - t) <= reach && Math.abs(near.t - t) < LAPSE_SEC
+      near && Math.abs(near.t - t) <= reach && withinLapse(near.t, t)
         ? near
-        : nearestInTime(samples, t);
-    const value =
-      s && Math.abs(s.t - t) < LAPSE_SEC && heardNear(s, heard, t) ? read(s, t) : undefined;
+        : nearestSample(samples, t, ALL);
+    const value = s && withinLapse(s.t, t) && heardNear(s, keys, t) ? read(s, t) : undefined;
     return value ? [{ ...value, t }] : [];
   });
 }
@@ -202,24 +195,21 @@ export function barbPath(x: number, y: number, dirDeg: number, speedKt: number, 
     const r = CALM_RADIUS;
     return `M${fixed(x + r)} ${fixed(y)} a${r} ${r} 0 1 0 ${-2 * r} 0 a${r} ${r} 0 1 0 ${2 * r} 0`;
   }
-  const ux = Math.sin(dirDeg * RAD);
-  const uy = -Math.cos(dirDeg * RAD);
-  const px = -uy;
-  const py = ux;
-  const along = (d: number) => `${fixed(x + ux * d)} ${fixed(y + uy * d)}`;
-  let d = `M${fixed(x)} ${fixed(y)} L${along(lengthPx)} `;
+  const at = toward(x, y, dirDeg);
+  const across = toward(0, 0, dirDeg);
+  let d = `M${fixed(x)} ${fixed(y)} L${at(lengthPx)} `;
   let pos = lengthPx;
   for (const mark of marks) {
     if (mark === 'pennant') {
       const base = pos - PENNANT_STEP_PX;
-      d += `M${along(pos)} L${fixed(x + ux * pos + px * FULL_PX)} ${fixed(y + uy * pos + py * FULL_PX)} L${along(base)} Z `;
+      d += `M${at(pos)} L${at(pos, FULL_PX)} L${at(base)} Z `;
       pos = base;
       continue;
     }
     // A lone half barb sits one step in, so it is not taken for the tip.
     if (mark === 'half' && pos === lengthPx) pos -= MARK_STEP_PX;
     const len = mark === 'full' ? FULL_PX : HALF_PX;
-    d += `M${along(pos)} l${fixed(px * len)} ${fixed(py * len)} `;
+    d += `M${at(pos)} l${across(0, len)} `;
     pos -= MARK_STEP_PX;
   }
   return d.trim();
@@ -249,30 +239,8 @@ export const GLYPH_REACH_PX = Math.max(VECTOR_PX, TICK_TO_PX) + STROKE_HALF_PX;
 const tenth = (n: number): number => Math.round(n * 10) / 10;
 
 /** The heading glyph's readings: the track and heading, and the selected heading while it steers. */
-export interface HeadingMark extends Heading {
+interface HeadingMark extends Heading {
   sel?: number | undefined;
-}
-
-/** The sample less each of its track, heading and selected heading not heard within the gap of `t`. */
-export function headingHeardNear(s: Sample, t: number): Sample {
-  const out = { ...s };
-  for (const key of [...HEARD.trk, ...HEARD.selHdg]) {
-    if (!heardNear(s, [key], t)) Object.assign(out, { [key]: undefined });
-  }
-  return out;
-}
-
-/**
- * The sample less each reading of the lane of `keys` not heard within the gap of it: the track and
- * the heading each on its own, the values of any other reading together.
- */
-export function heardNearAt(keys: readonly ReadingKey[], at: Sample): Sample {
-  const s: Sample = keys.includes('trk') ? headingHeardNear(at, at.t) : { ...at };
-  for (const key of keys) {
-    if (key === 'trk' || heardNear(at, HEARD[key], at.t)) continue;
-    for (const value of HEARD[key]) Object.assign(s, { [value]: undefined });
-  }
-  return s;
 }
 
 /**
@@ -280,14 +248,13 @@ export function heardNearAt(keys: readonly ReadingKey[], at: Sample): Sample {
  * `t`, the intent `sel` among them; none when neither the track nor the heading was.
  */
 export function headingAt(s: Sample, t: number, sel?: ReadingKey): HeadingMark | undefined {
-  const spec = PLOTS.trk;
   const intent = sel === undefined ? undefined : PLOTS[sel];
-  const heard = headingHeardNear(s, t);
-  const h = spec.kind === 'heading' ? spec.heading(heard) : undefined;
+  const heard = heardNearAt(['trk', 'selHdg'], s, t);
+  const h = PLOTS.trk.heading(heard);
   return h && { ...h, sel: intent?.kind === 'intent' ? intent.y(heard) : undefined };
 }
 
-export interface HeadingGlyph {
+interface HeadingGlyph {
   /** The aircraft along its heading, when known. */
   aircraft?: string;
   /** The track out of the aircraft's centre. */

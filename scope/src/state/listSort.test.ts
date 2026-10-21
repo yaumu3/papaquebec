@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 
 import { distanceFromSite, sortTracks } from './listSort';
 import { setDeclinationAt } from './magnetic';
+import { resetDeclination } from './sampleFixture';
 import type { Track } from './track';
 
 function track(hex: string, over: Partial<Track> = {}): Track {
@@ -71,7 +72,7 @@ describe('distanceFromSite', () => {
 });
 
 describe('sortTracks', () => {
-  afterEach(() => setDeclinationAt(() => () => 0));
+  afterEach(resetDeclination);
 
   it('sorts by identity label, registration counting as identity', () => {
     // Arrange

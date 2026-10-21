@@ -1,6 +1,5 @@
 import { createUniqueId, Index, Show } from 'solid-js';
 
-import { Flag } from './Flag';
 import {
   type Attitude as AttitudeMarks,
   attitude,
@@ -8,15 +7,16 @@ import {
   bankScalePath,
   fpvAt,
   fpvPath,
-  type PfdGeometry,
   windowRect,
-} from './geometry';
+} from './attitudeGeometry';
+import { Flag } from './Flag';
+import type { PfdGeometry } from './geometry';
 import type { PfdReadouts } from './readout';
 
 import s from './Pfd.module.css';
 
 /** The sky, ground, ladder and bank scale for a roll that holds, with the flight path vector. */
-export interface AttitudeView extends AttitudeMarks {
+interface AttitudeView extends AttitudeMarks {
   roll: number;
   fpv: string | undefined;
 }

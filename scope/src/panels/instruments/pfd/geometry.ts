@@ -1,5 +1,6 @@
+import { clamp } from '../../../lib/math';
 import { RAD } from '../../../lib/units';
-import { fixed, toward } from '../../svg';
+import { fixed, tenth, type TextLabel } from '../../svg';
 import { instrumentHeight } from '../height';
 
 const SPEED_LEFT_PX = 8;
@@ -118,9 +119,6 @@ const AP_RISE_PX = 10;
 /** The centre line of the autopilot's label, just above the attitude window. */
 export const apY = (g: PfdGeometry): number => g.wy - AP_RISE_PX;
 
-/** A number to a tenth of a pixel, as the drawing is. */
-const tenth = (n: number): number => Number(fixed(n));
-
 /** Where `value` stands on a tape that shows `span` either side of `at` over its half-height. */
 export const tapeY = (g: PfdGeometry, value: number, at: number, span: number): number =>
   g.yc - ((value - at) * (g.yc - g.yTop)) / span;
@@ -135,15 +133,9 @@ const SPEED_LABEL_GAP_PX = 11;
 /** How far past the visible span a tick is still worked out, so that none is missed at the ends. */
 const SPEED_REACH_KT = 50;
 
-export interface TapeLabel {
-  text: string;
-  x: number;
-  y: number;
-}
-
 export interface SpeedTape {
   ticks: string;
-  labels: TapeLabel[];
+  labels: TextLabel[];
 }
 
 /** The ticks of the speed tape at the inner edge, every 10 kt, and its labels every 20 kt clear of the readout. */
@@ -164,23 +156,6 @@ export function speedTape(g: PfdGeometry, ias: number): SpeedTape {
 const SPEED_BOX_OUT_PX = 4;
 const SPEED_BOX_IN_PX = 14;
 const READOUT_HALF_HEIGHT_PX = 18;
-
-/**
- * A digit wheel of a readout: its rows top to bottom, and how far it has turned toward the row
- * above the one at rest.
- */
-export interface Wheel<T = string> {
-  rows: readonly T[];
-  /** From 0, at rest, up to but not including 1, the next row fully in. */
-  turned: number;
-}
-
-/**
- * The fraction of its last `step` before the next multiple of `place` that `a` has run: how far a
- * carry wheel has turned.
- */
-const carried = (a: number, place: number, step: number): number =>
-  Math.max(0, (a % place) - (place - step)) / step;
 
 /** Where a wheel's window stands, and how its column is laid out in it. */
 export interface WheelCell {
@@ -203,29 +178,13 @@ export interface WheelCell {
 export const columnTop = (cell: WheelCell, turned: number): number =>
   cell.restTop - cell.above * cell.lineH + turned * cell.lineH;
 
-/** Where the baseline of row `row` of a wheel stands, `turned` of a row along. */
-export const rowBaseline = (cell: WheelCell, row: number, turned: number): number =>
-  cell.y +
-  columnTop(cell, turned) +
-  row * cell.lineH +
-  cell.lineH / 2 +
-  MONO_MID_TO_BASELINE_EM * cell.px;
-
-/**
- * A digit wheel of `place`, rolling from this digit to the next through the last `step` before it.
- */
-const carryWheel = <T>(a: number, place: number, step: number, rows: [T, T]): Wheel<T> => ({
-  rows,
-  turned: carried(a, place, step),
-});
-
 /** JetBrains Mono: advance 600, ascender 1020, descender 300 of 1000 units per em. */
 const MONO_ADVANCE_EM = 0.6;
 /**
  * How far the baseline sits below the middle of a line box, whatever its line height:
  * (1020 − 300) / 2 / 1000. The baseline's depth in a box as tall as its font is 0.5 plus this.
  */
-const MONO_MID_TO_BASELINE_EM = 0.36;
+export const MONO_MID_TO_BASELINE_EM = 0.36;
 /** JetBrains Mono's cap height, 730 of 1000 units per em. */
 export const MONO_CAP_EM = 0.73;
 
@@ -284,41 +243,11 @@ export function speedBoxPath(g: PfdGeometry): string {
   );
 }
 
-export interface SpeedDigits {
-  hundreds: Wheel;
-  tens: Wheel;
-  /** The ones, rows base + 2 down to base − 1 kt. */
-  ones: Wheel;
-}
-
-const TEN_KT = 10;
-const HUNDRED_KT = 100;
-
-const oneDigit = (n: number): string => String(((n % 10) + 10) % 10);
-
-/** The speed as wheels: each digit rolls through the last knot before it changes. */
-export function speedDigits(ias: number): SpeedDigits {
-  const base = Math.floor(ias);
-  const hundreds = Math.floor(ias / HUNDRED_KT);
-  const tens = Math.floor(ias / TEN_KT);
-  return {
-    hundreds: carryWheel(ias, HUNDRED_KT, 1, [
-      String(hundreds + 1),
-      hundreds === 0 ? '' : String(hundreds),
-    ]),
-    tens: carryWheel(ias, TEN_KT, 1, [oneDigit(tens + 1), oneDigit(tens)]),
-    ones: {
-      rows: [2, 1, 0, -1].map((k) => (base + k < 0 ? '' : oneDigit(base + k))),
-      turned: ias - base,
-    },
-  };
-}
-
 const SPEED_DIGIT_PX = 16;
 const SPEED_DRUM_GAP_PX = 12;
 const SPEED_DRUM_LINE_PX = 18;
 
-export interface SpeedReadout {
+interface SpeedReadout {
   /** The tape's centre, where its flag and its Mach stand. */
   midX: number;
   hundreds: WheelCell;
@@ -350,205 +279,10 @@ export function speedReadout(g: PfdGeometry): SpeedReadout {
   };
 }
 
-const PITCH_PX_PER_DEG = 3.6;
-const LADDER_STEP_DEG = 2.5;
-const LADDER_SPAN_DEG = 20;
-const LADDER_TOP_MARGIN_PX = 16;
-const LADDER_BOTTOM_MARGIN_PX = 4;
-const LADDER_LABEL_GAP_PX = 9;
-
-/** The half-length of a rung of the ladder: longer at each 5° and each 10°. */
-const rungHalfLength = (deg: number): number => (deg % 10 === 0 ? 28 : deg % 5 === 0 ? 14 : 7);
-
-export interface AttitudeLabel {
-  text: string;
-  x: number;
-  y: number;
-}
-
-export interface Attitude {
-  /** The two parts of the window the horizon divides, as closed paths. */
-  sky: string;
-  ground: string;
-  horizon: string;
-  ladder: string;
-  labels: AttitudeLabel[];
-  /** The roll pointer, a triangle on the bank scale. */
-  pointer: string;
-}
-
-type Point = readonly [number, number];
-
-/** The parts of a polygon on one side of a line, with the points where the line cuts it. */
-function clipSide(
-  polygon: readonly Point[],
-  distance: (p: Point) => number,
-  keepSky: boolean,
-): { path: string; cuts: Point[] } {
-  const inside = (d: number) => (keepSky ? d >= 0 : d < 0);
-  const points: Point[] = [];
-  const cuts: Point[] = [];
-  polygon.forEach((a, i) => {
-    const b = polygon[(i + 1) % polygon.length];
-    if (!b) return;
-    const da = distance(a);
-    const db = distance(b);
-    if (inside(da)) points.push(a);
-    if (inside(da) === inside(db)) return;
-    const k = da / (da - db);
-    const cut: Point = [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
-    points.push(cut);
-    if (keepSky) cuts.push(cut);
-  });
-  const path = points.length
-    ? `M${points.map(([x, y]) => `${fixed(x)} ${fixed(y)}`).join('L')}Z`
-    : '';
-  return { path, cuts };
-}
-
-/** The directions along the horizon and up from it, in window coordinates, at `rollDeg` of roll. */
-function rolledFrame(rollDeg: number): { along: Point; up: Point } {
-  const r = rollDeg * RAD;
-  return { along: [Math.cos(r), -Math.sin(r)], up: [-Math.sin(r), -Math.cos(r)] };
-}
-
-/**
- * The attitude window at `rollDeg` of roll. Pitch is not broadcast, so the horizon always passes
- * through the window's centre, perpendicular to the rolled up-vector.
- */
-export function attitude(g: PfdGeometry, rollDeg: number): Attitude {
-  const { along, up } = rolledFrame(rollDeg);
-  const corners: Point[] = [
-    [g.wx, g.wy],
-    [g.wxr, g.wy],
-    [g.wxr, g.wyb],
-    [g.wx, g.wyb],
-  ];
-  const height = ([x, y]: Point) => (x - g.acx) * up[0] + (y - g.yc) * up[1];
-  const sky = clipSide(corners, height, true);
-  const ground = clipSide(corners, height, false);
-  const [from, to] = sky.cuts;
-  let ladder = '';
-  const labels: AttitudeLabel[] = [];
-  for (let deg = -LADDER_SPAN_DEG; deg <= LADDER_SPAN_DEG; deg += LADDER_STEP_DEG) {
-    const off = deg * PITCH_PX_PER_DEG;
-    if (deg === 0 || off > g.rr - LADDER_TOP_MARGIN_PX) continue;
-    if (-off > g.wyb - g.yc - LADDER_BOTTOM_MARGIN_PX) continue;
-    const half = rungHalfLength(deg);
-    const cx = g.acx + off * up[0];
-    const cy = g.yc + off * up[1];
-    ladder += `M${fixed(cx - half * along[0])} ${fixed(cy - half * along[1])}L${fixed(cx + half * along[0])} ${fixed(cy + half * along[1])}`;
-    if (deg % 10 !== 0) continue;
-    for (const side of [-1, 1]) {
-      const reach = side * (half + LADDER_LABEL_GAP_PX);
-      labels.push({
-        text: String(Math.abs(deg)),
-        x: tenth(cx + reach * along[0]),
-        y: tenth(cy + reach * along[1]),
-      });
-    }
-  }
-  return {
-    sky: sky.path,
-    ground: ground.path,
-    horizon:
-      from && to ? `M${fixed(from[0])} ${fixed(from[1])}L${fixed(to[0])} ${fixed(to[1])}` : '',
-    ladder,
-    labels,
-    pointer: pointerPath(g, -rollDeg),
-  };
-}
-
-/** The point at `radius` from the scale's centre, `deg` clockwise of the top. */
-const onScale = (g: PfdGeometry, deg: number, radius: number): string =>
-  toward(g.acx, g.yc, deg)(radius);
-
-const POINTER_TIP_INSET_PX = 2;
-const POINTER_BASE_INSET_PX = 12;
-const POINTER_HALF_WIDTH_DEG = 5;
-
-const pointerPath = (g: PfdGeometry, deg: number): string =>
-  `M${onScale(g, deg, g.rr - POINTER_TIP_INSET_PX)}` +
-  `L${onScale(g, deg - POINTER_HALF_WIDTH_DEG, g.rr - POINTER_BASE_INSET_PX)}` +
-  `L${onScale(g, deg + POINTER_HALF_WIDTH_DEG, g.rr - POINTER_BASE_INSET_PX)}Z`;
-
-const BANK_MARKS_DEG: readonly number[] = [-60, -45, -30, -20, -10, 10, 20, 30, 45, 60];
-const BANK_LONG_TICK_PX = 11;
-const BANK_SHORT_TICK_PX = 6;
-
-/** The ticks of the bank scale, longer at 30° and 60°. */
-export const bankScalePath = (g: PfdGeometry): string =>
-  BANK_MARKS_DEG.map((deg) => {
-    const long = Math.abs(deg) % 30 === 0;
-    return `M${onScale(g, deg, g.rr)}L${onScale(g, deg, g.rr + (long ? BANK_LONG_TICK_PX : BANK_SHORT_TICK_PX))}`;
-  }).join('');
-
-const INDEX_HALF_WIDTH_PX = 6;
-const INDEX_HEIGHT_PX = 9;
-
-/** The fixed index at the top of the bank scale, a filled triangle. */
-export const bankIndexPath = (g: PfdGeometry): string =>
-  `M${fixed(g.acx)} ${fixed(g.yc - g.rr)}l${-INDEX_HALF_WIDTH_PX} ${-INDEX_HEIGHT_PX}h${2 * INDEX_HALF_WIDTH_PX}Z`;
-
-const WINDOW_RADIUS_PX = 12;
-
-/** The attitude window as the attributes of an SVG rectangle. */
-export const windowRect = (g: PfdGeometry) => ({
-  x: g.wx,
-  y: g.wy,
-  width: g.wxr - g.wx,
-  height: g.wyb - g.wy,
-  rx: WINDOW_RADIUS_PX,
-});
-
-/** The flight path vector's angles: its climb, and the drift of the track off the heading. */
-export interface Fpv {
-  fpaDeg: number;
-  driftDeg: number;
-}
-
-const FPV_LEFT_PX = 18;
-const FPV_UP_PX = 12;
-const FPV_DOWN_PX = 5;
-
-const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
-
-/**
- * Where the flight path vector stands, in the rolled frame at the ladder's scale, kept whole
- * inside the window.
- */
-export function fpvAt(g: PfdGeometry, rollDeg: number, fpv: Fpv): [number, number] {
-  const { along, up } = rolledFrame(rollDeg);
-  const climb = fpv.fpaDeg * PITCH_PX_PER_DEG;
-  const drift = fpv.driftDeg * PITCH_PX_PER_DEG;
-  const x = g.acx + climb * up[0] + drift * along[0];
-  const y = g.yc + climb * up[1] + drift * along[1];
-  return [
-    clamp(x, g.wx + FPV_LEFT_PX, g.wxr - FPV_LEFT_PX),
-    clamp(y, g.wy + FPV_UP_PX, g.wyb - FPV_DOWN_PX),
-  ];
-}
-
-const FPV_RADIUS_PX = 5;
-const FPV_WING_PX = 13;
-const FPV_FIN_PX = 7;
-
-/** The circle with two wings and a fin, upright, at (x, y). */
-export function fpvPath([x, y]: readonly [number, number]): string {
-  const left = `${fixed(x - FPV_RADIUS_PX)} ${fixed(y)}`;
-  const right = `${fixed(x + FPV_RADIUS_PX)} ${fixed(y)}`;
-  const arc = `A${fixed(FPV_RADIUS_PX)} ${fixed(FPV_RADIUS_PX)} 0 1 0`;
-  return (
-    `M${left}${arc} ${right}${arc} ${left}` +
-    `M${left}h${-FPV_WING_PX}M${right}h${FPV_WING_PX}` +
-    `M${fixed(x)} ${fixed(y - FPV_RADIUS_PX)}v${-FPV_FIN_PX}`
-  );
-}
-
 const ALTITUDE_SPAN_FT = 450;
 const ALTITUDE_STEP_FT = 100;
 const ALTITUDE_LABEL_STEP_FT = 200;
-const ALTITUDE_THOUSAND_FT = 1000;
+export const ALTITUDE_THOUSAND_FT = 1000;
 const ALTITUDE_REACH_FT = 600;
 const ALTITUDE_END_MARGIN_PX = 3;
 const ALTITUDE_LABEL_CLEAR_PX = 24;
@@ -564,7 +298,7 @@ const MINUS = '−';
 const signedThousands = (ft: number): string =>
   `${ft < 0 ? MINUS : ''}${Math.floor(Math.abs(ft) / ALTITUDE_THOUSAND_FT)}`;
 
-export interface AltitudeLabel {
+interface AltitudeLabel {
   /** The thousands, large, and the hundreds, in three small digits. */
   hi: string;
   lo: string;
@@ -621,63 +355,6 @@ export function altitudeBoxPath(g: PfdGeometry): string {
   );
 }
 
-/** What the slot of the ten-thousands shows: a digit, a hatch below 10,000 ft, NEG below zero. */
-export type SlotRow = { kind: 'digit'; text: string } | { kind: 'hatch' } | { kind: 'neg' };
-
-export interface AltitudeDigits {
-  tenThousands: Wheel<SlotRow>;
-  thousands: Wheel;
-  hundreds: Wheel;
-  /** The last two digits, rows base + 40 down to base − 20 ft. */
-  drum: Wheel;
-}
-
-const DRUM_STEP_FT = 20;
-const HUNDRED_FT = 100;
-const TEN_THOUSAND_FT = 10000;
-
-/** The last two digits of a non-negative number. */
-const twoDigits = (n: number): string => String(n % 100).padStart(2, '0');
-
-const slotDigit = (n: number): SlotRow => ({ kind: 'digit', text: String(n) });
-
-/** The slot's row at rest: NEG below zero, a hatch under 10,000 ft, else the ten-thousands digit. */
-function slotRow(ft: number): SlotRow {
-  if (ft < 0) return { kind: 'neg' };
-  return ft < TEN_THOUSAND_FT ? { kind: 'hatch' } : slotDigit(Math.floor(ft / TEN_THOUSAND_FT));
-}
-
-const digitAt = (a: number, place: number, next = 0): string =>
-  String((Math.floor(a / place) + next) % 10);
-
-/**
- * The digits of an altitude as wheels, the absolute value laid out as usual after a sign. Each
- * digit rolls through the last 20 ft before it changes, and the drum stands at the exact place
- * within its 20 ft step.
- */
-export function altitudeDigits(ft: number): AltitudeDigits {
-  const a = Math.abs(ft);
-  const base = Math.floor(a / DRUM_STEP_FT) * DRUM_STEP_FT;
-  return {
-    tenThousands: carryWheel(a, TEN_THOUSAND_FT, DRUM_STEP_FT, [
-      slotDigit(Math.floor(a / TEN_THOUSAND_FT) + 1),
-      slotRow(ft),
-    ]),
-    thousands: carryWheel(a, ALTITUDE_THOUSAND_FT, DRUM_STEP_FT, [
-      digitAt(a, ALTITUDE_THOUSAND_FT, 1),
-      digitAt(a, ALTITUDE_THOUSAND_FT),
-    ]),
-    hundreds: carryWheel(a, HUNDRED_FT, DRUM_STEP_FT, [
-      digitAt(a, HUNDRED_FT, 1),
-      digitAt(a, HUNDRED_FT),
-    ]),
-    drum: {
-      rows: [2, 1, 0, -1].map((k) => twoDigits(Math.abs(base + k * DRUM_STEP_FT))),
-      turned: (a - base) / DRUM_STEP_FT,
-    },
-  };
-}
-
 export const ALTITUDE_THOUSANDS_PX = 17;
 const ALTITUDE_HUNDREDS_PX = 13;
 const ALTITUDE_DIGITS_GAP_PX = 18;
@@ -696,7 +373,7 @@ const HATCH_INK = 0.68;
 /** The hatch block's width as a part of the digit advance. */
 const HATCH_WIDTH_ADVANCE = 0.85;
 
-export interface HatchStyle {
+interface HatchStyle {
   /** Where the block starts in its cell, and how wide it is. */
   left: number;
   width: number;
@@ -720,7 +397,7 @@ export function hatchStyle(px: number): HatchStyle {
   };
 }
 
-export interface AltitudeReadout {
+interface AltitudeReadout {
   /** The middle of the tape, where its flag stands. */
   tapeX: number;
   /** The middle of the box, where GND stands. */
@@ -810,111 +487,4 @@ export function fmsLinePath(g: PfdGeometry, ft: number, fms: number): string | u
   const y = tapeY(g, fms, ft, ALTITUDE_SPAN_FT);
   if (y < g.yTop || y > g.yBot) return undefined;
   return `M${fixed(g.aL)} ${fixed(y)}H${fixed(g.aR)}`;
-}
-
-const VSI_RANGE_FPM = 6000;
-const VSI_HALF_MARGIN_PX = 14;
-const VSI_SCALE_UNITS = 80;
-/** The scale's slope, in units per fpm, up to 1000, up to 2000 and beyond, and where each starts. */
-const VSI_SLOPES: readonly (readonly [number, number, number])[] = [
-  [0, 0, 0.03],
-  [1000, 30, 0.022],
-  [2000, 52, 0.007],
-];
-
-/** The half-height of the vertical speed scale, on the tape's rows less a margin. */
-const vsiHalf = (g: PfdGeometry): number => g.yc - g.yTop - VSI_HALF_MARGIN_PX;
-
-/** How far a vertical rate stands from the centre line, up for a climb; the scale is nonlinear and capped. */
-export function vsiOffset(g: PfdGeometry, vsFpm: number): number {
-  const v = Math.min(Math.abs(vsFpm), VSI_RANGE_FPM);
-  const [from, base, slope] = VSI_SLOPES.findLast(([start]) => v >= start) ?? [0, 0, 0];
-  return Math.sign(vsFpm) * (vsiHalf(g) / VSI_SCALE_UNITS) * (base + (v - from) * slope);
-}
-
-/** Where a vertical rate stands on the scale. */
-export const vsiY = (g: PfdGeometry, vsFpm: number): number => g.yc - vsiOffset(g, vsFpm);
-
-const VSI_CHAMFER_IN_PX = 10;
-const VSI_CHAMFER_SHORT_PX = 8;
-const VSI_CHAMFER_LONG_PX = 14;
-const VSI_RIGHT_INSET_PX = 1;
-
-/** The strip behind the scale, its outer corners chamfered. */
-export function vsiStripPath(g: PfdGeometry): string {
-  const half = vsiHalf(g);
-  const right = g.w - VSI_RIGHT_INSET_PX;
-  const bend = g.w - VSI_CHAMFER_IN_PX;
-  return (
-    `M${fixed(g.vL)} ${fixed(g.yc - half - VSI_CHAMFER_SHORT_PX)}H${fixed(bend)}` +
-    `L${fixed(right)} ${fixed(g.yc - half + VSI_CHAMFER_LONG_PX)}V${fixed(g.yc + half - VSI_CHAMFER_LONG_PX)}` +
-    `L${fixed(bend)} ${fixed(g.yc + half + VSI_CHAMFER_SHORT_PX)}H${fixed(g.vL)}Z`
-  );
-}
-
-const VSI_MARKS_FPM: readonly number[] = [500, 1000, 1500, 2000, 4000, 6000];
-const VSI_LABELLED_FPM: ReadonlySet<number> = new Set([1000, 2000, 6000]);
-const VSI_TICKS_FROM_PX = 10;
-const VSI_ZERO_PX = 7;
-const VSI_LONG_TICK_PX = 5;
-const VSI_SHORT_TICK_PX = 3;
-const VSI_LABEL_GAP_PX = 2;
-
-export interface VsiScale {
-  ticks: string;
-  labels: TapeLabel[];
-}
-
-/** The zero mark, the ticks at ±500 to ±6000 fpm and the labels of thousands, 1, 2 and 6. */
-export function vsiScale(g: PfdGeometry): VsiScale {
-  const x = g.vL + VSI_TICKS_FROM_PX;
-  const out: VsiScale = { ticks: `M${fixed(x)} ${fixed(g.yc)}h${VSI_ZERO_PX}`, labels: [] };
-  for (const mark of VSI_MARKS_FPM) {
-    const labelled = VSI_LABELLED_FPM.has(mark);
-    for (const v of [mark, -mark]) {
-      const y = vsiY(g, v);
-      out.ticks += `M${fixed(x)} ${fixed(y)}h${labelled ? VSI_LONG_TICK_PX : VSI_SHORT_TICK_PX}`;
-      if (labelled) {
-        out.labels.push({ text: String(mark / 1000), x: g.vL + VSI_LABEL_GAP_PX, y: tenth(y) });
-      }
-    }
-  }
-  return out;
-}
-
-const VSI_NEEDLE_TIP_PX = 2;
-const VSI_PIVOT_PX = 70;
-const VSI_NEEDLE_CUT_PX = 3;
-
-/** The needle, from the scale towards a pivot off the right edge at the centre line, cut short of the edge. */
-export function vsiNeedlePath(g: PfdGeometry, vsFpm: number): string {
-  const tipX = g.vL + VSI_TICKS_FROM_PX + VSI_NEEDLE_TIP_PX;
-  const tipY = vsiY(g, vsFpm);
-  const pivotX = g.w + VSI_PIVOT_PX;
-  const k = (g.w - VSI_NEEDLE_CUT_PX - tipX) / (pivotX - tipX);
-  const endY = tipY + (g.yc - tipY) * k;
-  return `M${fixed(tipX)} ${fixed(tipY)}L${fixed(g.w - VSI_NEEDLE_CUT_PX)} ${fixed(endY)}`;
-}
-
-const VSI_DIGITS_FROM_FPM = 400;
-const VSI_DIGITS_STEP_FPM = 50;
-const VSI_DIGITS_RISE_PX = 18;
-const VSI_DIGITS_RIGHT_INSET_PX = 2;
-
-export interface VsiDigits {
-  text: string;
-  x: number;
-  y: number;
-}
-
-/** The rate to 50 fpm from 400, right-aligned above the strip for a climb and below it for a descent. */
-export function vsiDigits(g: PfdGeometry, vsFpm: number): VsiDigits | undefined {
-  if (Math.abs(vsFpm) < VSI_DIGITS_FROM_FPM) return undefined;
-  const rounded = Math.abs(Math.round(vsFpm / VSI_DIGITS_STEP_FPM) * VSI_DIGITS_STEP_FPM);
-  const reach = vsiHalf(g) + VSI_DIGITS_RISE_PX;
-  return {
-    text: String(rounded),
-    x: g.w - VSI_DIGITS_RIGHT_INSET_PX,
-    y: vsFpm > 0 ? g.yc - reach : g.yc + reach,
-  };
 }

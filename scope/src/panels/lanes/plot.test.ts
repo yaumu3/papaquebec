@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../lib/reports';
-import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
-import type { Interval } from '../../state/window';
+import {
+  ALL,
+  AROUND_LAPSE,
+  makeHeardSample as heardSample,
+  makeSample as sample,
+} from '../../state/sampleFixture';
+import type { Sample } from '../../state/track';
 import {
   atTicks,
   barbPath,
@@ -17,8 +22,6 @@ import {
   snapped,
 } from './plot';
 import type { Point, Range } from './trace';
-
-const ALL: Interval = { from: 0, to: 10_000 };
 
 /** The metres a power of ten stands for, to six figures. */
 const metres = (v: number) => Number((10 ** v).toPrecision(6));
@@ -54,6 +57,23 @@ describe('laneTraces', () => {
       ['dashed', [5]],
     ]);
   });
+
+  it('draws nothing for a lane of gantt bars, wind barbs or heading glyphs', () => {
+    // Arrange
+    const samples = [
+      sample(1, { navModes: ['autopilot'], windDir: 300, windSpeed: 12, track: 90, heading: 85 }),
+    ];
+
+    // Act
+    const traces = [
+      laneTraces(samples, ['modes'], ALL),
+      laneTraces(samples, ['wind'], ALL),
+      laneTraces(samples, ['trk'], ALL),
+    ];
+
+    // Assert
+    expect(traces).toEqual([[], [], []]);
+  });
 });
 
 describe('pathOf', () => {
@@ -76,25 +96,6 @@ describe('pathOf', () => {
 
     // Assert
     expect(d).toBe('M0.0 10.0 L10.0 20.0 M16.0 30.0');
-  });
-});
-
-describe('laneTraces', () => {
-  it('draws nothing for a lane of gantt bars, wind barbs or heading glyphs', () => {
-    // Arrange
-    const samples = [
-      sample(1, { navModes: ['autopilot'], windDir: 300, windSpeed: 12, track: 90, heading: 85 }),
-    ];
-
-    // Act
-    const traces = [
-      laneTraces(samples, ['modes'], ALL),
-      laneTraces(samples, ['wind'], ALL),
-      laneTraces(samples, ['trk'], ALL),
-    ];
-
-    // Assert
-    expect(traces).toEqual([[], [], []]);
   });
 });
 
@@ -248,7 +249,7 @@ describe('laneTraces on the ground', () => {
 describe('atTicks', () => {
   it('reads a sample under the lapse from the tick, none exactly the lapse or more', () => {
     // Arrange
-    const rows = [29.9, 30, 30.1].map((d) => [sample(1000 + d, { windDir: 300, windSpeed: 12 })]);
+    const rows = AROUND_LAPSE.map((d) => [sample(1000 + d, { windDir: 300, windSpeed: 12 })]);
     const read = (s: (typeof rows)[number][number]) => ({
       dir: s.windDir ?? 0,
       speed: s.windSpeed ?? 0,
@@ -261,20 +262,38 @@ describe('atTicks', () => {
     expect(barbs).toEqual([1, 0, 0]);
   });
 
-  it('gives way from a preferred sample exactly a gap away to the nearest', () => {
+  const read = (s: Sample) => ({ trk: s.track, hdg: s.heading });
+  const has = (s: Sample) => s.heading !== undefined;
+  type Read = { t: number; trk: number | undefined; hdg: number | undefined };
+
+  it('prefers a sample with a heading within its reach, but never one a gap away', () => {
     // Arrange
-    const samples = [
-      sample(1000, { track: 90 }),
-      sample(1000 + LAPSE_SEC, { track: 92, heading: 85 }),
+    const headed: Read[] = [{ t: 100, trk: 92, hdg: 85 }];
+    const unheaded: Read[] = [{ t: 100, trk: 90, hdg: undefined }];
+    const rows: [Sample[], number, number, Read[]][] = [
+      [
+        [sample(1000, { track: 90 }), sample(1000 + LAPSE_SEC, { track: 92, heading: 85 })],
+        1000,
+        2 * LAPSE_SEC,
+        [{ t: 1000, trk: 90, hdg: undefined }],
+      ],
+      [[sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })], 100, 15, headed],
+      [[sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })], 100, 5, unheaded],
+      [
+        [sample(100, { track: 90 }), sample(100 + LAPSE_SEC + 5, { track: 92, heading: 85 })],
+        100,
+        10 * LAPSE_SEC,
+        unheaded,
+      ],
     ];
-    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
-    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
 
     // Act
-    const reads = atTicks(samples, [1000], read, { has, withinSec: 2 * LAPSE_SEC });
+    const reads = rows.map(([samples, tick, withinSec]) =>
+      atTicks(samples, [tick], read, { has, withinSec }),
+    );
 
     // Assert
-    expect(reads).toEqual([{ t: 1000, trk: 90, hdg: undefined }]);
+    expect(reads).toEqual(rows.map(([, , , expected]) => expected));
   });
 
   it('reads one value per tick from the sample nearest it, none when that is a gap away', () => {
@@ -296,33 +315,15 @@ describe('atTicks', () => {
     expect(barbs).toEqual([{ t: 100, dir: 300, speed: 12 }]);
   });
 
-  it('reads a sample the preference holds for instead, while one lies within its reach', () => {
+  it('reads the earlier of two samples as near as the tick', () => {
     // Arrange
-    const samples = [sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })];
-    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
-    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
+    const samples = [sample(100, { rssi: 1 }), sample(110, { rssi: 2 })];
 
     // Act
-    const reads = [15, 5].map((withinSec) => atTicks(samples, [100], read, { has, withinSec }));
-
-    // Assert: the one with a heading ten seconds off, else the nearest
-    expect(reads).toEqual([[{ t: 100, trk: 92, hdg: 85 }], [{ t: 100, trk: 90, hdg: undefined }]]);
-  });
-
-  it('reads the nearest instead of a preferred sample a gap away, however far the reach', () => {
-    // Arrange
-    const samples = [
-      sample(100, { track: 90 }),
-      sample(100 + LAPSE_SEC + 5, { track: 92, heading: 85 }),
-    ];
-    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
-    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
-
-    // Act
-    const reads = atTicks(samples, [100], read, { has, withinSec: 10 * LAPSE_SEC });
+    const reads = atTicks(samples, [105], (s) => ({ rssi: s.rssi }));
 
     // Assert
-    expect(reads).toEqual([{ t: 100, trk: 90, hdg: undefined }]);
+    expect(reads).toEqual([{ t: 105, rssi: 1 }]);
   });
 
   it('reads nothing at a tick its reading was heard a gap away from, though a sample is near', () => {
@@ -349,16 +350,31 @@ describe('atTicks', () => {
 describe('barbPath', () => {
   it('draws a circle for calm, else a staff toward where the wind comes from with its marks', () => {
     // Arrange
-    const calm = barbPath(10, 20, 0, 1, 16);
+    const rows: [number, number][] = [
+      [0, 1],
+      [37, 1],
+      [0, 5],
+      [37, 5],
+      [0, 15],
+      [37, 15],
+      [0, 65],
+      [37, 65],
+    ];
 
     // Act
-    const north = barbPath(10, 20, 0, 15, 16);
+    const paths = rows.map(([dir, speed]) => barbPath(10, 20, dir, speed, 16));
 
     // Assert
-    expect(calm.startsWith('M')).toBe(true);
-    expect(calm).toContain('a');
-    expect(north.startsWith('M10.0 20.0 L10.0 4.0 ')).toBe(true);
-    expect(north.match(/l/g)).toHaveLength(2);
+    expect(paths).toEqual([
+      'M13.0 20.0 a3 3 0 1 0 -6 0 a3 3 0 1 0 6 0',
+      'M13.0 20.0 a3 3 0 1 0 -6 0 a3 3 0 1 0 6 0',
+      'M10.0 20.0 L10.0 4.0 M10.0 7.0 l3.0 0.0',
+      'M10.0 20.0 L19.6 7.2 M17.8 9.6 l2.4 1.8',
+      'M10.0 20.0 L10.0 4.0 M10.0 4.0 l6.0 0.0 M10.0 7.0 l3.0 0.0',
+      'M10.0 20.0 L19.6 7.2 M19.6 7.2 l4.8 3.6 M17.8 9.6 l2.4 1.8',
+      'M10.0 20.0 L10.0 4.0 M10.0 4.0 L16.0 4.0 L10.0 8.5 Z M10.0 8.5 l6.0 0.0 M10.0 11.5 l3.0 0.0',
+      'M10.0 20.0 L19.6 7.2 M19.6 7.2 L24.4 10.8 L16.9 10.8 Z M16.9 10.8 l4.8 3.6 M15.1 13.2 l2.4 1.8',
+    ]);
   });
 });
 

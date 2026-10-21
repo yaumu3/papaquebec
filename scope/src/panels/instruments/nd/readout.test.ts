@@ -3,22 +3,25 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { STANDARD_ALTIMETER } from '../../../lib/altitude';
 import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
-import { makeSample } from '../../../state/sampleFixture';
+import {
+  agedBy,
+  AROUND_LAPSE,
+  FRESH,
+  makeSample,
+  NOW,
+  resetDeclination,
+  STALE,
+} from '../../../state/sampleFixture';
 import { readoutOf } from '../../lanes/readout';
 import { nowAt } from '../moment';
-import { ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
+import { boxOf, ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
-const NOW = 1000;
-const FRESH = NOW - 1;
-const STALE = NOW - LAPSE_SEC;
 const AT = { lat: 35.5, lon: 139.8 };
 
 /** The three readings of the selected heading, all known or all not. */
 const held = (known: boolean) => ({ nd: known, bug: known, lane: known });
 
-afterEach(() => {
-  setDeclinationAt(() => () => 0);
-});
+afterEach(resetDeclination);
 
 describe('ndFrame', () => {
   const lapsedTrack = makeSample(NOW, {
@@ -50,10 +53,13 @@ describe('ndFrame', () => {
     ];
 
     // Act
-    const frames = rows.map((t) => ndFrame(nowAt(t, NOW)));
+    const frames = rows.map((t) => {
+      const f = ndFrame(nowAt(t, NOW));
+      return [f.mode, boxOf(f.mode, f.orient), f.flags];
+    });
 
     // Assert
-    expect(frames.map((f) => [f.mode, f.box, f.flags])).toEqual([
+    expect(frames).toEqual([
       ['track', '289', []],
       ['track', '047', []],
       ['lost', '---', ['TRK']],
@@ -202,7 +208,7 @@ describe('ndReadouts', () => {
 
   it('holds the selected heading exactly where the SEL HDG lane reads it', () => {
     // Arrange
-    const rows = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].flatMap((age) =>
+    const rows = AROUND_LAPSE.flatMap((age) =>
       [5, 45].map((modesAge) =>
         makeSample(NOW, {
           seen: 1,
@@ -493,18 +499,14 @@ describe('the ND at a peeked sample', () => {
     makeSample(T, { ...base, heard: { ...heardEvery(T), trackRate: T - LAPSE_SEC } }),
     makeSample(T, { ...base, heard: { ...heardEvery(T), selAlt: T - LAPSE_SEC } }),
   ];
-  const liveOf = (s: (typeof rows)[number]) =>
-    makeSample(T + AGE, {
-      ...s,
-      heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
-    });
-
   it('reads a sample at its own time as a live target whose data has exactly that age', () => {
     // Arrange
-    const expected = rows.map(liveOf).map((r) => {
-      const m = nowAt(r, T + AGE);
-      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
-    });
+    const expected = rows
+      .map((s) => agedBy(s, AGE))
+      .map((r) => {
+        const m = nowAt(r, T + AGE);
+        return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
+      });
 
     // Act
     const peeked = rows.map((r) => {
@@ -518,7 +520,7 @@ describe('the ND at a peeked sample', () => {
 
   it('drops the heading pointer exactly where the HDG lane reads a dash', () => {
     // Arrange
-    const samples = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].map((age) =>
+    const samples = AROUND_LAPSE.map((age) =>
       makeSample(T, { ...base, heard: { ...heardEvery(T), heading: T - age } }),
     );
 
@@ -550,7 +552,7 @@ describe('the ND at a peeked sample', () => {
 
     // Assert
     expect(out).toEqual({
-      frame: { mode: 'empty', orient: 123, box: '---', flags: [], lastHeard: undefined },
+      frame: { mode: 'empty', orient: 123, flags: [], lastHeard: undefined },
       corners: ['---', '---', '---', '---°', '---°', '---', '---'],
       symbols: {},
     });

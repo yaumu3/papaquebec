@@ -1,6 +1,7 @@
 import { type Accessor, createMemo, createSignal } from 'solid-js';
 
-import { clamp } from '../../lib/math';
+import { clamp, onCircle } from '../../lib/math';
+import type { Point } from '../svg';
 
 /**
  * How long a shown reading takes to reach a new report, ms: the feed publishes every second, so
@@ -20,8 +21,6 @@ export interface Glide {
 /** How far `to` lies from `from` the short way round a circle of `wrap`. */
 const shortWay = (from: number, to: number, wrap: number): number =>
   ((((to - from) % wrap) + 1.5 * wrap) % wrap) - wrap / 2;
-
-const onCircle = (v: number, wrap: number): number => ((v % wrap) + wrap) % wrap;
 
 /**
  * Where a glide stands at `now`: from its start to its end at one pace, there after `GLIDE_MS`.
@@ -50,9 +49,6 @@ export const retargetGlide = (
   now: number,
   wrap?: number,
 ): Glide | undefined => (to === undefined ? undefined : glideToward(current, to, now, wrap));
-
-/** A point on the display, in pixels. */
-export type Point = readonly [number, number];
 
 /** The glides of a point's two coordinates. */
 export type PointGlides = readonly [Glide, Glide];
@@ -98,7 +94,7 @@ function frameUntil(now: number): void {
 /** Whether a glide begun at `now` has somewhere to go: one standing on its value draws no frame. */
 const setOff = (g: Glide, now: number): boolean => g.startedAt === now && g.from !== g.to;
 
-export interface GlideOptions {
+interface GlideOptions {
   /** The circle an angle is on, 360 for degrees. */
   wrap?: number | undefined;
   /**

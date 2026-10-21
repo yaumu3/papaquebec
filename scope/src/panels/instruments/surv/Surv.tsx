@@ -10,7 +10,7 @@ import { type SurvCell, survCells } from './cells';
 
 import s from './Surv.module.css';
 
-/** One labeled reading in the detail grid; a button for a cell that does something. */
+/** One labeled reading; a button for a cell that does something. */
 function Cell(props: {
   k: string;
   r: Reading;

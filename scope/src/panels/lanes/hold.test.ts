@@ -8,7 +8,7 @@ import {
   isDoubleTap,
   keepsTouch,
   laneGestureOf,
-  MENU_HOLD_MS,
+  PICKER_HOLD_MS,
   pinchesFrom,
   touchHoldOf,
 } from './hold';
@@ -117,9 +117,9 @@ describe('touchHoldOf', () => {
     expect(gestures).toEqual([null, 'lift']);
   });
 
-  it('opens the picker of a lifted lane held within the slop to MENU_HOLD_MS, not before', () => {
+  it('opens the picker of a lifted lane held within the slop to PICKER_HOLD_MS, not before', () => {
     // Arrange
-    const holds = [MENU_HOLD_MS - 1, MENU_HOLD_MS];
+    const holds = [PICKER_HOLD_MS - 1, PICKER_HOLD_MS];
 
     // Act
     const gestures = holds.map((ms) => touchHoldOf('lifted', 'plot', 0, HOLD_SLOP_PX, ms));
@@ -134,7 +134,7 @@ describe('touchHoldOf', () => {
 
     // Act
     const gestures = stages.map((stage) =>
-      touchHoldOf(stage, 'plot', 0, HOLD_SLOP_PX + 1, MENU_HOLD_MS),
+      touchHoldOf(stage, 'plot', 0, HOLD_SLOP_PX + 1, PICKER_HOLD_MS),
     );
 
     // Assert
@@ -143,7 +143,7 @@ describe('touchHoldOf', () => {
 
   it('leaves a lane with its picker open alone while the finger stays within the slop', () => {
     // Arrange
-    const holds = [HOLD_MS, MENU_HOLD_MS + 500];
+    const holds = [HOLD_MS, PICKER_HOLD_MS + 500];
 
     // Act
     const gestures = holds.map((ms) => touchHoldOf('picker', 'row', 3, 3, ms));
@@ -182,14 +182,14 @@ describe('touchHoldOf', () => {
 describe('keepsTouch', () => {
   it("keeps a finger's moves from the sheet at every stage of a gesture on a lane, and from scrolling once it drags, swipes, peeks or picks", () => {
     // Arrange
-    const rest = { drag: false, swipe: false, holding: false, picking: false, peek: false };
+    const rest = { drag: false, swipe: false, holding: false, picking: false, peeking: false };
     const stages = [
       rest,
       { ...rest, holding: true },
       { ...rest, drag: true },
       { ...rest, swipe: true },
       { ...rest, picking: true },
-      { ...rest, peek: true },
+      { ...rest, peeking: true },
     ];
 
     // Act

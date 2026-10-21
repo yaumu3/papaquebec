@@ -1,11 +1,15 @@
 import { createSignal } from 'solid-js';
 
 import { addLane, type LaneKey, moveLane, removeLane, switchLane } from './plotted';
+import { lastHistoryIndex } from './plotted';
 import { persisted } from './settings';
 import { DEFAULT_WINDOW, type LanesWindow } from './window';
 
 /** The lanes of the detail column, in order. */
 export const [plotted, setPlotted] = createSignal<readonly LaneKey[]>(persisted.plotted);
+
+/** Whether the column shows a history lane, which the cursor, a held window and the window control need. */
+export const showsHistory = (): boolean => lastHistoryIndex(plotted()) >= 0;
 
 export function removePlotLane(lane: LaneKey): void {
   setPlotted((p) => removeLane(p, lane));
@@ -24,7 +28,7 @@ export function addPlotLane(lane: LaneKey): void {
 }
 
 /** What the column shows of one target: its window, and how far down its lanes are scrolled. */
-export interface LanesView {
+interface LanesView {
   hex: string | null;
   window: LanesWindow;
   scrollTop: number;

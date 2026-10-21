@@ -1,9 +1,9 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
 
-import { clamp } from '../../lib/math';
 import {
   type Interval,
   type LanesWindow,
+  lengthOf,
   panWindow,
   pinchWindow,
   timeAt,
@@ -31,17 +31,19 @@ interface WindowInputDeps {
   /** Where the plots start across the page, and how wide they are. */
   plotLeft: () => number;
   plotWidth: () => number;
+  /** A point across the page as a point across the plots, kept inside them. */
+  plotPx: (clientX: number) => number;
   window: () => LanesWindow;
   visible: () => Interval;
   contact: () => Interval;
   setWindow: (w: LanesWindow) => void;
   /** Whether a second finger landing now pinches, and ending the first finger's gesture when it does. */
   pinchable: () => boolean;
-  drop: () => void;
+  abandon: () => void;
 }
 
 /** Where on the lanes `target` is. */
-function areaOf(target: EventTarget | null): Area {
+export function areaOf(target: EventTarget | null): Area {
   if (!(target instanceof Element)) return 'other';
   if (target.closest('[data-axis]')) return 'axis';
   if (!target.closest('[data-lane="history"]')) return 'other';
@@ -72,14 +74,11 @@ export function createWindowInput(deps: WindowInputDeps): void {
     start: { w: LanesWindow; visible: Interval };
   } | null = null;
   const move = (to: (w: LanesWindow, visible: Interval) => LanesWindow) => {
-    const w = deps.window();
-    const next = to(w, deps.visible());
-    if (next !== w) deps.setWindow(next);
+    deps.setWindow(to(deps.window(), deps.visible()));
   };
   const zoomBy = (factor: number, clientX: number) =>
     move((w, visible) => {
-      const x = clamp(clientX - deps.plotLeft(), 0, deps.plotWidth());
-      const pivot = timeAt(x, visible, deps.plotWidth());
+      const pivot = timeAt(deps.plotPx(clientX), visible, deps.plotWidth());
       return zoomWindow(w, visible, factor, pivot, deps.contact());
     });
   const onWheel = (e: WheelEvent) => {
@@ -103,7 +102,7 @@ export function createWindowInput(deps: WindowInputDeps): void {
         panWindow(
           w,
           v,
-          (panDelta(evt) * (v.to - v.from)) / Math.max(1, deps.plotWidth()),
+          (panDelta(evt) * lengthOf(v)) / Math.max(1, deps.plotWidth()),
           deps.contact(),
         ),
       );
@@ -129,7 +128,7 @@ export function createWindowInput(deps: WindowInputDeps): void {
     touches.set(e.pointerId, e.clientX);
     const [one, two] = [...touches];
     if (touches.size === 2 && one && two && deps.pinchable()) {
-      deps.drop();
+      deps.abandon();
       const start = { w: deps.window(), visible: deps.visible() };
       fingers = { ids: [one[0], two[0]], x0: [one[1], two[1]], start };
     }

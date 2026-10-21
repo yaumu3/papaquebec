@@ -2,17 +2,11 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   altitudeBoxPath,
-  altitudeDigits,
   altitudeReadout,
   altitudeStripPath,
   altitudeTape,
   apY,
-  attitude,
-  bankIndexPath,
-  bankScalePath,
-  fpvAt,
   fmsLinePath,
-  fpvPath,
   fmaBandPath,
   fmaColumnX,
   fmaRulesPath,
@@ -21,26 +15,17 @@ import {
   selClipRect,
   selDigits,
   speedBoxPath,
-  speedDigits,
   speedReadout,
   speedStripPath,
   speedTape,
   tapeY,
-  type SlotRow,
-  type Wheel,
   type WheelCell,
   columnTop,
   carryPitch,
   hatchStyle,
   MONO_CAP_EM,
-  rowBaseline,
-  vsiDigits,
-  vsiNeedlePath,
-  vsiOffset,
-  vsiScale,
-  vsiStripPath,
-  vsiY,
-  windowRect,
+  MONO_MID_TO_BASELINE_EM,
+  type PfdGeometry,
 } from './geometry';
 
 describe('pfdGeometry', () => {
@@ -97,81 +82,27 @@ describe('pfdGeometry', () => {
   });
 });
 
-describe('fmaRulesPath', () => {
-  it('splits the band into three equal columns', () => {
+describe('the parts of the display at 346 px', () => {
+  it('stand where the layout puts them', () => {
     // Arrange
     const g = pfdGeometry(346);
+    const rows: [(g: PfdGeometry) => unknown, unknown][] = [
+      [fmaRulesPath, 'M126.0 2.0V20.0M184.0 2.0V20.0'],
+      [fmaBandPath, 'M68.0 2.0H242.0V20.0H68.0Z'],
+      [speedStripPath, 'M8.0 36.0H54.0V210.0H8.0Z'],
+      [altitudeStripPath, 'M258.0 36.0H316.0V210.0H258.0Z'],
+      [fmaColumnX, [97, 155, 213]],
+      [apY, 42],
+      [speedBoxPath, 'M4.0 105.0H40.0V118.0L45.0 123.0L40.0 128.0V141.0H4.0Z'],
+      [altitudeBoxPath, 'M273.0 105.0H321.0V141.0H273.0V128.0L268.0 123.0L273.0 118.0Z'],
+      [selClipRect, { x: 246, y: 36, width: 74, height: 174 }],
+    ];
 
     // Act
-    const out = fmaRulesPath(g);
+    const out = rows.map(([part]) => part(g));
 
     // Assert
-    expect(out).toBe('M126.0 2.0V20.0M184.0 2.0V20.0');
-  });
-});
-
-describe('fmaBandPath', () => {
-  it('spans the attitude window from y 2 to 20', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = fmaBandPath(g);
-
-    // Assert
-    expect(out).toBe('M68.0 2.0H242.0V20.0H68.0Z');
-  });
-});
-
-describe('speedStripPath', () => {
-  it('frames the speed tape between its ends', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = speedStripPath(g);
-
-    // Assert
-    expect(out).toBe('M8.0 36.0H54.0V210.0H8.0Z');
-  });
-});
-
-describe('altitudeStripPath', () => {
-  it('frames the altitude tape between its ends', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = altitudeStripPath(g);
-
-    // Assert
-    expect(out).toBe('M258.0 36.0H316.0V210.0H258.0Z');
-  });
-});
-
-describe('fmaColumnX', () => {
-  it('centres each column of the band', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = fmaColumnX(g);
-
-    // Assert
-    expect(out).toEqual([97, 155, 213]);
-  });
-});
-
-describe('apY', () => {
-  it('stands just above the attitude window', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = apY(g);
-
-    // Assert
-    expect(out).toBe(42);
+    expect(out).toEqual(rows.map(([, expected]) => expected));
   });
 });
 
@@ -229,67 +160,7 @@ describe('speedTape', () => {
   });
 });
 
-describe('speedBoxPath', () => {
-  it('is a box with a spike to the right at the centre line', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = speedBoxPath(g);
-
-    // Assert
-    expect(out).toBe('M4.0 105.0H40.0V118.0L45.0 123.0L40.0 128.0V141.0H4.0Z');
-  });
-});
-
 const cellNumbers = (c: WheelCell) => Object.values(c).map((v) => Number(v.toFixed(2)));
-
-const roundedWheels = <T>(ws: Wheel<T>[]) =>
-  ws.map((w) => ({ ...w, turned: Number(w.turned.toFixed(6)) }));
-
-describe('speedDigits', () => {
-  it('rolls the tens and hundreds through the last knot, the ones drum at its exact place', () => {
-    // Arrange
-    const speeds = [259, 260, 259.5, 299.5, 85, 0];
-
-    // Act
-    const out = speeds.map(speedDigits);
-
-    // Assert
-    expect(out.map((d) => roundedWheels([d.hundreds, d.tens, d.ones]))).toEqual([
-      [
-        { rows: ['3', '2'], turned: 0 },
-        { rows: ['6', '5'], turned: 0 },
-        { rows: ['1', '0', '9', '8'], turned: 0 },
-      ],
-      [
-        { rows: ['3', '2'], turned: 0 },
-        { rows: ['7', '6'], turned: 0 },
-        { rows: ['2', '1', '0', '9'], turned: 0 },
-      ],
-      [
-        { rows: ['3', '2'], turned: 0 },
-        { rows: ['6', '5'], turned: 0.5 },
-        { rows: ['1', '0', '9', '8'], turned: 0.5 },
-      ],
-      [
-        { rows: ['3', '2'], turned: 0.5 },
-        { rows: ['0', '9'], turned: 0.5 },
-        { rows: ['1', '0', '9', '8'], turned: 0.5 },
-      ],
-      [
-        { rows: ['1', ''], turned: 0 },
-        { rows: ['9', '8'], turned: 0 },
-        { rows: ['7', '6', '5', '4'], turned: 0 },
-      ],
-      [
-        { rows: ['1', ''], turned: 0 },
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['2', '1', '0', ''], turned: 0 },
-      ],
-    ]);
-  });
-});
 
 describe('speedReadout', () => {
   it('stands a window on each digit, the ones drum clipped inside the box', () => {
@@ -306,165 +177,6 @@ describe('speedReadout', () => {
       [18.4, 106, 9.6, 34, 23, 1, 16, 5.5],
       [29, 106, 10, 34, 18, 2, 16, 8],
     ]);
-  });
-});
-
-describe('attitude horizon', () => {
-  it('passes through the centre, cutting the window at its edges for ±60° and 0° of roll', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-    const rolls = [60, -60, 0];
-
-    // Act
-    const out = rolls.map((roll) => attitude(g, roll).horizon);
-
-    // Assert
-    expect(out).toEqual([
-      'M196.0 52.0L114.0 194.0',
-      'M114.0 52.0L196.0 194.0',
-      'M242.0 123.0L68.0 123.0',
-    ]);
-  });
-
-  it('fills the sky above the horizon and the ground below it at level flight', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = attitude(g, 0);
-
-    // Assert
-    expect(out.sky).toBe('M68.0 52.0L242.0 52.0L242.0 123.0L68.0 123.0Z');
-    expect(out.ground).toBe('M242.0 123.0L242.0 194.0L68.0 194.0L68.0 123.0Z');
-  });
-});
-
-describe('attitude ladder', () => {
-  it('drops the rungs that would leave the window, and numbers those at 10° at both ends', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = attitude(g, 0);
-
-    // Assert
-    expect((out.ladder.match(/M/g) ?? []).length).toBe(11);
-    expect(out.labels.map((l) => l.text)).toEqual(['10', '10', '10', '10']);
-  });
-});
-
-describe('attitude pointer', () => {
-  it('is a triangle at the top of the scale for level flight', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = attitude(g, 0).pointer;
-
-    // Assert
-    expect(out).toBe('M155.0 66.0L150.9 76.2L159.1 76.2Z');
-  });
-});
-
-describe('bankScalePath', () => {
-  it('ticks ±10, 20, 30, 45 and 60°, longer at 30° and 60°', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = bankScalePath(g);
-
-    // Assert
-    expect((out.match(/M/g) ?? []).length).toBe(10);
-    expect(out.startsWith('M103.9 93.5L94.4 88.0')).toBe(true);
-  });
-});
-
-describe('bankIndexPath', () => {
-  it('is a triangle at the top of the scale', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = bankIndexPath(g);
-
-    // Assert
-    expect(out).toBe('M155.0 64.0l-6 -9h12Z');
-  });
-});
-
-describe('windowRect', () => {
-  it('is the attitude window with its rounded corners', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = windowRect(g);
-
-    // Assert
-    expect(out).toEqual({ x: 68, y: 52, width: 174, height: 142, rx: 12 });
-  });
-});
-
-describe('fpvAt', () => {
-  it('stands at the window centre with no climb and no drift', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = fpvAt(g, 0, { fpaDeg: 0, driftDeg: 0 });
-
-    // Assert
-    expect(out).toEqual([155, 123]);
-  });
-
-  it('moves up the climb angle and along the drift at the ladder scale, rolled with the sky', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-    const cases = [0, 90];
-
-    // Act
-    const out = cases.map((roll) => fpvAt(g, roll, { fpaDeg: 5, driftDeg: 10 }).map(Math.round));
-
-    // Assert
-    expect(out).toEqual([
-      [191, 105],
-      [137, 87],
-    ]);
-  });
-
-  it('stays whole inside the window at the right and at the bottom', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-    const cases = [
-      { fpaDeg: 0, driftDeg: 40 },
-      { fpaDeg: -30, driftDeg: 0 },
-    ];
-
-    // Act
-    const out = cases.map((fpv) => fpvAt(g, 0, fpv));
-
-    // Assert
-    expect(out).toEqual([
-      [224, 123],
-      [155, 189],
-    ]);
-  });
-});
-
-describe('fpvPath', () => {
-  it('draws a circle with two wings and a fin', () => {
-    // Arrange
-    const at: [number, number] = [155, 123];
-
-    // Act
-    const out = fpvPath(at);
-
-    // Assert
-    expect(out).toBe(
-      'M150.0 123.0A5.0 5.0 0 1 0 160.0 123.0A5.0 5.0 0 1 0 150.0 123.0' +
-        'M150.0 123.0h-13M160.0 123.0h13M155.0 118.0v-7',
-    );
   });
 });
 
@@ -524,148 +236,6 @@ describe('altitudeTape', () => {
   });
 });
 
-describe('altitudeBoxPath', () => {
-  it('is a box with a spike to the left at the centre line', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = altitudeBoxPath(g);
-
-    // Assert
-    expect(out).toBe('M273.0 105.0H321.0V141.0H273.0V128.0L268.0 123.0L273.0 118.0Z');
-  });
-});
-
-describe('altitudeDigits', () => {
-  it('rolls the thousands, hundreds and drum through the last 20 ft before it changes, the drum at its exact place', () => {
-    // Arrange
-    const altitudes = [
-      29575, 29595, 29995, 29600, 30000, 9990, 8640, -40, 10000, 9980, 0, 9995, 9985,
-    ];
-
-    // Act
-    const out = altitudes.map(altitudeDigits);
-
-    // Assert
-    const wheels = out.map((d) => [d.thousands, d.hundreds, d.drum]);
-    const rounded = wheels.map((row) =>
-      row.map((w) => ({ ...w, turned: Number(w.turned.toFixed(6)) })),
-    );
-    expect(rounded).toEqual([
-      [
-        { rows: ['0', '9'], turned: 0 },
-        { rows: ['6', '5'], turned: 0 },
-        { rows: ['00', '80', '60', '40'], turned: 0.75 },
-      ],
-      [
-        { rows: ['0', '9'], turned: 0 },
-        { rows: ['6', '5'], turned: 0.75 },
-        { rows: ['20', '00', '80', '60'], turned: 0.75 },
-      ],
-      [
-        { rows: ['0', '9'], turned: 0.75 },
-        { rows: ['0', '9'], turned: 0.75 },
-        { rows: ['20', '00', '80', '60'], turned: 0.75 },
-      ],
-      [
-        { rows: ['0', '9'], turned: 0 },
-        { rows: ['7', '6'], turned: 0 },
-        { rows: ['40', '20', '00', '80'], turned: 0 },
-      ],
-      [
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['40', '20', '00', '80'], turned: 0 },
-      ],
-      [
-        { rows: ['0', '9'], turned: 0.5 },
-        { rows: ['0', '9'], turned: 0.5 },
-        { rows: ['20', '00', '80', '60'], turned: 0.5 },
-      ],
-      [
-        { rows: ['9', '8'], turned: 0 },
-        { rows: ['7', '6'], turned: 0 },
-        { rows: ['80', '60', '40', '20'], turned: 0 },
-      ],
-      [
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['80', '60', '40', '20'], turned: 0 },
-      ],
-      [
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['40', '20', '00', '80'], turned: 0 },
-      ],
-      [
-        { rows: ['0', '9'], turned: 0 },
-        { rows: ['0', '9'], turned: 0 },
-        { rows: ['20', '00', '80', '60'], turned: 0 },
-      ],
-      [
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['1', '0'], turned: 0 },
-        { rows: ['40', '20', '00', '20'], turned: 0 },
-      ],
-      [
-        { rows: ['0', '9'], turned: 0.75 },
-        { rows: ['0', '9'], turned: 0.75 },
-        { rows: ['20', '00', '80', '60'], turned: 0.75 },
-      ],
-      [
-        { rows: ['0', '9'], turned: 0.25 },
-        { rows: ['0', '9'], turned: 0.25 },
-        { rows: ['20', '00', '80', '60'], turned: 0.25 },
-      ],
-    ]);
-  });
-});
-
-const digit = (text: string): SlotRow => ({ kind: 'digit', text });
-
-describe('altitudeDigits drum near zero', () => {
-  it('reads the absolute value in the row below 00, which is 20 within 20 ft of zero', () => {
-    // Arrange
-    const altitudes = [0, 15, -10, 20, -40];
-
-    // Act
-    const out = altitudes.map((ft) => altitudeDigits(ft).drum);
-
-    // Assert
-    expect(roundedWheels(out)).toEqual([
-      { rows: ['40', '20', '00', '20'], turned: 0 },
-      { rows: ['40', '20', '00', '20'], turned: 0.75 },
-      { rows: ['40', '20', '00', '20'], turned: 0.5 },
-      { rows: ['60', '40', '20', '00'], turned: 0 },
-      { rows: ['80', '60', '40', '20'], turned: 0 },
-    ]);
-  });
-});
-
-describe('altitudeDigits slot', () => {
-  it('is a digit from 10,000 ft, a hatch below it and NEG below zero, rolling through the last 20 ft', () => {
-    // Arrange
-    const altitudes = [29600, 10000, 9995, 9985, 9980, 8640, 0, -40];
-
-    // Act
-    const out = altitudes.map((ft) => altitudeDigits(ft).tenThousands);
-
-    // Assert
-    const hatch: SlotRow = { kind: 'hatch' };
-    expect(roundedWheels(out)).toEqual([
-      { rows: [digit('3'), digit('2')], turned: 0 },
-      { rows: [digit('2'), digit('1')], turned: 0 },
-      { rows: [digit('1'), hatch], turned: 0.75 },
-      { rows: [digit('1'), hatch], turned: 0.25 },
-      { rows: [digit('1'), hatch], turned: 0 },
-      { rows: [digit('1'), hatch], turned: 0 },
-      { rows: [digit('1'), hatch], turned: 0 },
-      { rows: [digit('1'), { kind: 'neg' }], turned: 0 },
-    ]);
-  });
-});
-
 describe('columnTop', () => {
   it('puts the resting row in place and moves the column down by the turned part of a row', () => {
     // Arrange
@@ -713,6 +283,14 @@ describe('carryPitch', () => {
     expect(out).toEqual([23.5, 23]);
   });
 });
+
+/** Where the baseline of row `row` of a wheel stands, `turned` of a row along. */
+const rowBaseline = (cell: WheelCell, row: number, turned: number): number =>
+  cell.y +
+  columnTop(cell, turned) +
+  row * cell.lineH +
+  cell.lineH / 2 +
+  MONO_MID_TO_BASELINE_EM * cell.px;
 
 describe('carry wheels', () => {
   const g = pfdGeometry(346);
@@ -853,19 +431,6 @@ describe('selBugPath', () => {
   });
 });
 
-describe('selClipRect', () => {
-  it('clips the bug to the tape rows, the bug itself standing beyond the edge', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = selClipRect(g);
-
-    // Assert
-    expect(out).toEqual({ x: 246, y: 36, width: 74, height: 174 });
-  });
-});
-
 describe('fmsLinePath', () => {
   it('crosses the tape at the altitude when in view, and is none when out of it', () => {
     // Arrange
@@ -876,97 +441,5 @@ describe('fmsLinePath', () => {
 
     // Assert
     expect(out).toEqual(['M258.0 65.0H316.0', undefined]);
-  });
-});
-
-describe('vsiOffset', () => {
-  it('follows the nonlinear scale at each breakpoint, capped at 6000 fpm', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-    const rates = [500, 1000, 1500, 2000, 4000, 6000, 9000, -1000];
-
-    // Act
-    const out = rates.map((v) => vsiOffset(g, v));
-
-    // Assert
-    const expected = [13.6875, 27.375, 37.4125, 47.45, 60.225, 73, 73, -27.375];
-    expected.forEach((e, i) => expect(out[i]).toBeCloseTo(e, 4));
-  });
-});
-
-describe('vsiY', () => {
-  it('stands above the centre line for a climb and below it for a descent', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = [vsiY(g, 6000), vsiY(g, 0), vsiY(g, -6000)];
-
-    // Assert
-    expect(out).toEqual([50, 123, 196]);
-  });
-});
-
-describe('vsiStripPath', () => {
-  it('is the strip with its outer corners chamfered', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = vsiStripPath(g);
-
-    // Assert
-    expect(out).toBe('M322.0 42.0H336.0L345.0 64.0V182.0L336.0 204.0H322.0Z');
-  });
-});
-
-describe('vsiScale', () => {
-  it('marks zero and ±500 to ±6000 fpm, labelling 1, 2 and 6 thousand at both signs', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = vsiScale(g);
-
-    // Assert
-    expect(out.ticks.startsWith('M332.0 123.0h7')).toBe(true);
-    expect((out.ticks.match(/M/g) ?? []).length).toBe(13);
-    expect(out.labels.map((l) => l.text)).toEqual(['1', '1', '2', '2', '6', '6']);
-    expect(out.labels.slice(4)).toEqual([
-      { text: '6', x: 324, y: 50 },
-      { text: '6', x: 324, y: 196 },
-    ]);
-  });
-});
-
-describe('vsiNeedlePath', () => {
-  it('runs from the scale towards a pivot off the right edge, cut short of the edge', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-
-    // Act
-    const out = vsiNeedlePath(g, 0);
-
-    // Assert
-    expect(out).toBe('M334.0 123.0L343.0 123.0');
-  });
-});
-
-describe('vsiDigits', () => {
-  it('prints from 400 fpm, to 50, above the strip for a climb and below it for a descent', () => {
-    // Arrange
-    const g = pfdGeometry(346);
-    const rates = [399, 400, 1820, -2210];
-
-    // Act
-    const out = rates.map((v) => vsiDigits(g, v));
-
-    // Assert
-    expect(out).toEqual([
-      undefined,
-      { text: '400', x: 344, y: 32 },
-      { text: '1800', x: 344, y: 32 },
-      { text: '2200', x: 344, y: 214 },
-    ]);
   });
 });

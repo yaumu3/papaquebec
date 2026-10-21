@@ -1,26 +1,23 @@
 import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
 import { steeringHeading } from '../../../lib/autopilot';
-import { padBearing } from '../../../lib/format';
-import { holds, LAPSE_SEC } from '../../../lib/reports';
+import { degreesText, padBearing } from '../../../lib/format';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
-import { HEARD } from '../../lanes/plots';
-import { NONE, type Reading, READINGS } from '../../readings';
-import { holdsAll, isLost } from '../freshness';
+import { HEARD, NONE, type Reading, READINGS, windOf } from '../../readings';
+import { holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
 import type { Trend } from './geometry';
 
 /** The state of the instrument: track-up, lost, blank for want of a track that holds, or empty over a gap. */
-export type NdMode = 'track' | 'lost' | 'blank' | 'empty';
+type NdMode = 'track' | 'lost' | 'blank' | 'empty';
 
-export type NdFlag = 'TRK';
+type NdFlag = 'TRK';
 
 export interface NdFrame {
   mode: NdMode;
   /** The bearing at the top of the display, magnetic. */
   orient: number;
-  box: string;
   flags: readonly NdFlag[];
   lastHeard: string | undefined;
 }
@@ -32,7 +29,7 @@ function modeOf(m: Moment<Readout>): NdMode {
   if (m.kind === 'empty') return 'empty';
   const { r: t, instant } = m;
   if (isLost(t)) return 'lost';
-  if (holds(t.heard.track, instant, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
+  if (holdsAll(t, ['track'], instant) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
 }
 
@@ -60,7 +57,6 @@ export function ndFrame(m: Moment<Readout>, standing = 0): NdFrame {
   return {
     mode,
     orient,
-    box: boxOf(mode, orient),
     flags: FLAGS[mode],
     lastHeard:
       mode === 'lost' && m.kind !== 'empty' ? `LAST HEARD ${Math.round(m.r.seen)} s` : undefined,
@@ -84,7 +80,7 @@ export interface NdReadouts {
 }
 
 const degrees = (deg: number | undefined): string | undefined =>
-  deg === undefined ? undefined : `${padBearing(deg)}°`;
+  deg === undefined ? undefined : degreesText(deg);
 
 /** A reading's value, with its unit when `withUnit`; undefined for the reading of the unknown. */
 const shown = (r: Reading, withUnit = false): string | undefined =>
@@ -109,24 +105,22 @@ const BLANK_READOUTS: NdReadouts = {
 export function ndReadouts(m: Moment<Readout>): NdReadouts {
   if (m.kind === 'empty' || isLost(m.r)) return BLANK_READOUTS;
   const { r: t, instant } = m;
-  const read = (keys: readonly HeardKey[], text: () => string | undefined, degree = false) => {
-    const value = holdsAll(t, keys, instant) ? text() : undefined;
+  const read = (keys: readonly HeardKey[], text: string | undefined, degree = false) => {
+    const value = ifHolds(t, keys, instant, text);
     return value === undefined ? blank(degree) : { text: value, known: true };
   };
   const wind = () => {
-    const from = windFromOf(t);
-    return from === undefined || t.windSpeed === undefined
-      ? undefined
-      : `${padBearing(from)}°/${Math.round(t.windSpeed)}`;
+    const w = windOf(t);
+    return w && `${degreesText(magneticBearing(w.dir, t.at))}/${Math.round(w.speed)}`;
   };
   return {
-    gs: read(['gs'], () => shown(READINGS.gs.format(t))),
-    tas: read(['tas'], () => shown(READINGS.tas.format(t))),
-    wind: read(['windDir', 'windSpeed'], wind),
-    sel: read(HEARD.selHdg, () => degrees(steeringHeading(t)), true),
-    hdg: read(['heading'], () => degrees(t.heading), true),
-    tat: read(['tat'], () => shown(READINGS.tat.format(t), true)),
-    sat: read(['oat'], () => shown(READINGS.oat.format(t), true)),
+    gs: read(HEARD.gs, shown(READINGS.gs.format(t))),
+    tas: read(HEARD.tas, shown(READINGS.tas.format(t))),
+    wind: read(HEARD.wind, wind()),
+    sel: read(HEARD.selHdg, shown(READINGS.selHdg.format(t)), true),
+    hdg: read(['heading'], degrees(t.heading), true),
+    tat: read(HEARD.tat, shown(READINGS.tat.format(t), true)),
+    sat: read(HEARD.oat, shown(READINGS.oat.format(t), true)),
   };
 }
 
@@ -153,15 +147,13 @@ const TREND_MIN_RATE_DEG_S = 0.3;
 export function ndSymbols(m: Moment<Readout>, altimeter: Altimeter): NdSymbols {
   if (m.kind === 'empty' || modeOf(m) !== 'track') return {};
   const { r: t, instant } = m;
-  const live = (keys: readonly HeardKey[], v: number | undefined) =>
-    holdsAll(t, keys, instant) ? v : undefined;
   return {
-    track: live(['track'], magneticTrack(t)),
-    heading: live(['heading'], t.heading),
-    sel: live(HEARD.selHdg, steeringHeading(t)),
+    track: ifHolds(t, ['track'], instant, magneticTrack(t)),
+    heading: ifHolds(t, ['heading'], instant, t.heading),
+    sel: ifHolds(t, HEARD.selHdg, instant, steeringHeading(t)),
     trend: trendOf(t, instant),
     levelOffNm: levelOffOf(t, instant, altimeter),
-    windFrom: live(['windDir', 'windSpeed'], windFromOf(t)),
+    windFrom: ifHolds(t, HEARD.wind, instant, windFromOf(t)),
   };
 }
 
@@ -190,7 +182,7 @@ function levelOffOf(t: Readout, instant: number, altimeter: Altimeter): number |
 }
 
 /** The direction the wind blows from, magnetic, when both its direction and its speed are known. */
-const windFromOf = (t: Readout): number | undefined =>
-  t.windDir === undefined || t.windSpeed === undefined
-    ? undefined
-    : magneticBearing(t.windDir, t.at);
+const windFromOf = (t: Readout): number | undefined => {
+  const w = windOf(t);
+  return w && magneticBearing(w.dir, t.at);
+};

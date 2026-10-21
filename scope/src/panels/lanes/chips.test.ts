@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { LaneKey } from '../../state/plotted';
-import { type Chip, chipName, chipOf, laneName, paletteName, pickOf } from './chips';
+import { type Chip, chipName, chipOf, laneName, pickerName, pickOf } from './chips';
 
 describe('chipOf', () => {
-  it("tells the palette's own lane, a lane open elsewhere, and one free to pick", () => {
+  it("tells the picker's own lane, a lane open elsewhere, and one free to pick", () => {
     // Arrange
     const plotted: LaneKey[] = ['alt', 'gs', 'pfd', 'nd'];
     const rows: [LaneKey | null, LaneKey][] = [
@@ -25,13 +25,13 @@ describe('chipOf', () => {
   });
 });
 
-describe('paletteName', () => {
-  it("names a lane's palette after the lane, and the one with none for adding", () => {
+describe('pickerName', () => {
+  it("names a lane's picker after the lane, and the one with none for adding", () => {
     // Arrange
     const owners: (LaneKey | null)[] = ['alt', null];
 
     // Act
-    const names = owners.map(paletteName);
+    const names = owners.map(pickerName);
 
     // Assert
     expect(names).toEqual(['ALT lane: pick a lane', 'Add a lane']);
@@ -68,8 +68,8 @@ describe('laneName', () => {
 
     // Assert
     expect(names).toEqual([
-      'ALT lane, 1 of 4. Drag it up or down, or press Alt and an arrow key, to move it; drag it sideways to select a span; Delete removes it; Shift+F10 opens its menu. The left and right arrows pan the window, the up and down arrows narrow and widen it, Home resets it.',
-      'GS lane, 3 of 4. Drag it up or down, or press Alt and an arrow key, to move it; drag it sideways to select a span; Delete removes it; Shift+F10 opens its menu. The left and right arrows pan the window, the up and down arrows narrow and widen it, Home resets it.',
+      'ALT lane, 1 of 4. Drag it up or down, or press Alt and an arrow key, to move it; drag it sideways to select a span; Delete removes it; Shift+F10 opens its picker. The left and right arrows pan the window, the up and down arrows narrow and widen it, Home resets it.',
+      'GS lane, 3 of 4. Drag it up or down, or press Alt and an arrow key, to move it; drag it sideways to select a span; Delete removes it; Shift+F10 opens its picker. The left and right arrows pan the window, the up and down arrows narrow and widen it, Home resets it.',
     ]);
   });
 
@@ -82,13 +82,13 @@ describe('laneName', () => {
 
     // Assert
     expect(name).toBe(
-      'PFD lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
+      'PFD lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its picker.',
     );
   });
 });
 
 describe('pickOf', () => {
-  it("switches the palette's lane to a free one, adds a free one to none, and goes to one that is open", () => {
+  it("switches the picker's lane to a free one, adds a free one to none, and goes to one that is open", () => {
     // Arrange
     const plotted: LaneKey[] = ['alt', 'gs', 'pfd'];
     const rows: [LaneKey | null, LaneKey][] = [

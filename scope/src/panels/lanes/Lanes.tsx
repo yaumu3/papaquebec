@@ -4,35 +4,23 @@ import { Portal } from 'solid-js/web';
 import { cx } from '../../design/cx';
 import { clamp } from '../../lib/math';
 import {
-  addPlotLane,
   lanesView,
   movePlotLane,
   plotted,
-  removePlotLane,
   setCursorInstant,
   setHoverInstant,
   setLaneScroll,
-  setLanesWindow,
-  switchPlotLane,
+  showsHistory,
 } from '../../state/lanes';
-import {
-  historyLanesOf,
-  isInstrumentLane,
-  laneAfter,
-  lastHistoryIndex,
-  type LaneKey,
-  readingsIn,
-} from '../../state/plotted';
-import { snapshotVersion } from '../../state/scope';
+import { isInstrumentLane, lastHistoryIndex, type LaneKey, readingsIn } from '../../state/plotted';
 import type { Track } from '../../state/track';
-import { trackStore } from '../../state/tracks';
 import {
-  contactOf,
   DEFAULT_WINDOW,
   keyWindow,
+  lengthOf,
   readsPast,
-  resolveWindow,
   selectWindow,
+  type WindowKey,
   timeAt,
   xOf,
 } from '../../state/window';
@@ -42,27 +30,21 @@ import { isLost } from '../instruments/freshness';
 import { momentOf } from '../instruments/moment';
 import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, ticks } from './axis';
-import { pickOf } from './chips';
 import { axisShift, liftLeft, slotShown } from './drag';
-import { HOLD_MS, isDoubleTap, MENU_HOLD_MS, type Tap } from './hold';
+import { HOLD_MS, isDoubleTap, PICKER_HOLD_MS, type Tap } from './hold';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
-import {
-  addMenuAnchor,
-  clickSourceOf,
-  contextSourceOf,
-  laneMenuAnchor,
-  type PaletteAnchor,
-} from './menu';
-import type { LaneMoves } from './moves';
-import { Palette } from './Palette';
+import { LaneFrame } from './LaneFrame';
+import { Picker } from './Picker';
+import { createPickerState } from './pickerState';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
 import { TimeAxis } from './TimeAxis';
 import { gapsIn, newestSample, peekAt } from './trace';
 import { createWindowInput } from './windowInput';
+import { createWindowView } from './windowView';
 
 import s from './Lanes.module.css';
 
@@ -71,56 +53,35 @@ const LANE_PX = 84;
 /** Between the chip lifted with a dragged lane and the pointer under it. */
 const LIFT_GAP_PX = 4;
 
-/** Applies a pick of `lane` in the palette of `own`: it takes the place of `own`, joins the column, or is open already. */
-function take(own: LaneKey | null, lane: LaneKey): void {
-  const what = pickOf(plotted(), own, lane);
-  if (what === 'switch' && own) switchPlotLane(own, lane);
-  else if (what === 'add') addPlotLane(lane);
-}
-
-/** Whether the column shows a history lane, which the cursor and a held window need. */
-const showsHistory = () => historyLanesOf(plotted()).length > 0;
-
 /** What the lanes plot of the selected target over the visible window, each read at the hovered sample or the last in view. */
 export function Lanes(props: { track: Track }) {
   /** How far across the plots the pointer is, if it is over them. */
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
-  const hex = createMemo(() => props.track.hex);
-  // A memo, so that scrolling the lanes, which keeps the window, redraws none of them.
-  const lanesWindow = createMemo(() => lanesView(hex()).window);
+  const windowView = createWindowView(() => props.track);
+  const { hex, lanesWindow, samples, contact, visible, now, lag, setWindow } = windowView;
   onCleanup(() => {
     setHoverInstant(null);
     setCursorInstant(null);
   });
 
-  /** The samples, told apart from the last snapshot's though the store appends to one array. */
-  const samples = createMemo(
-    () => {
-      snapshotVersion();
-      return props.track.samples;
-    },
-    undefined,
-    { equals: false },
-  );
-  const contact = createMemo(() => contactOf(samples(), trackStore.stats.now));
-  const visible = createMemo(() => resolveWindow(lanesWindow(), contact()));
   const gaps = createMemo(() => gapsIn(samples(), visible(), isLost(props.track)));
-  const now = () => contact().to;
-  const step = createMemo(() => axisStep(visible().to - visible().from));
+  const step = createMemo(() => axisStep(lengthOf(visible())));
   const tickTimes = createMemo(() => ticks(visible(), step(), now()));
 
   const [axisRow, setAxisRow] = createSignal<HTMLDivElement>();
   /** The axis row lines up with the plots, so its width is the plots'. */
   const plotWidth = trackWidth(axisRow);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
-  const reset = () => setLanesWindow(hex(), DEFAULT_WINDOW);
+  const reset = () => setWindow(DEFAULT_WINDOW);
+  const onWindowKey = (key: WindowKey) =>
+    setWindow(keyWindow(key, lanesWindow(), visible(), contact()));
   /** The last finger tap on a history lane, which a second one soon after and near makes a double. */
   let lastTap: Tap | null = null;
   const plotLeft = () => axisRow()?.getBoundingClientRect().left ?? 0;
   const plotPx = (clientX: number) => clamp(clientX - plotLeft(), 0, plotWidth());
-  /** The instant a mouse pressed at, while it selects a span: the band's fixed end. */
+  /** The instant a mouse pressed at, while it selects a span: the span's fixed end. */
   const [pressedAt, setPressedAt] = createSignal<number | null>(null);
-  const band = () => {
+  const span = () => {
     const t0 = pressedAt();
     const px = hoverPx();
     return t0 === null || px === null ? null : { from: clamp(x(t0), 0, plotWidth()), to: px };
@@ -151,7 +112,7 @@ export function Lanes(props: { track: Track }) {
   /** Whether the panel reads an instant other than now. */
   const past = () => readsPast(peek() !== null, lanesWindow(), showsHistory());
   /** What the instruments draw: what the lanes read. */
-  const moment = createMemo(() => momentOf(props.track, past(), at(), trackStore.stats.now));
+  const moment = createMemo(() => momentOf(props.track, past(), at(), now()));
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is dragged or swiped; a finger only peeks. */
   const pointerAt = (e: PointerEvent) => {
     const el = e.target instanceof Element ? e.target.closest('[data-lane="history"]') : null;
@@ -170,71 +131,10 @@ export function Lanes(props: { track: Track }) {
   const bayBox = () => bay()?.getBoundingClientRect();
   /** Each lane, which keeps the focus for it. */
   const lanes = new Map<LaneKey, HTMLElement>();
-  /** The button under the lanes that opens the palette to add one. */
+  /** The button under the lanes that opens the picker to add one. */
   let add: HTMLButtonElement | undefined;
-  /** The palette open, if one is: for a lane, or with none to add one; under its anchor. */
-  const [menu, setMenu] = createSignal<{
-    own: LaneKey | null;
-    anchor: HTMLElement;
-    at: PaletteAnchor;
-  } | null>(null);
-  const closeMenu = () => setMenu(null);
-  createEffect(on(hex, closeMenu, { defer: true }));
-  /** What the last press on the column was made with: a finger's long press ends in a `contextmenu`. */
-  let pressed: string | null = null;
-  /** Opens a lane's palette where it was asked for, or leaves it to the hold when a finger asked. */
-  const openLaneMenu = (own: LaneKey, e: MouseEvent | KeyboardEvent) => {
-    e.preventDefault();
-    const lane = e.currentTarget;
-    if (!(lane instanceof HTMLElement)) return;
-    const source = e instanceof MouseEvent ? contextSourceOf(e.button, pressed) : 'keyboard';
-    const point = e instanceof MouseEvent ? { x: e.clientX, y: e.clientY } : { x: 0, y: 0 };
-    const anchor = laneMenuAnchor(source, point.x, point.y, lane.getBoundingClientRect());
-    if (anchor) setMenu({ own, anchor: lane, at: anchor });
-  };
-  /** Opens the palette that adds a lane, upward from the click or from the button's corner. */
-  const openAdd = (e: MouseEvent) => {
-    const button = e.currentTarget;
-    if (!(button instanceof HTMLElement)) return;
-    const source = clickSourceOf(e.detail);
-    const at = addMenuAnchor(source, e.clientX, e.clientY, button.getBoundingClientRect());
-    setMenu({ own: null, anchor: button, at });
-  };
-  /** Brings a lane into view and gives it the focus; with none, + LANE. */
-  const reveal = (lane: LaneKey | null) => {
-    const el = (lane && lanes.get(lane)) || add;
-    if (!el) return;
-    el.scrollIntoView({ block: 'nearest' });
-    el.focus({ preventScroll: true });
-  };
-  const pick = (lane: LaneKey) => {
-    const m = menu();
-    if (!m) return;
-    closeMenu();
-    take(m.own, lane);
-    reveal(lane);
-  };
-  /** The LANE row of the palette of `own`. */
-  const movesOf = (own: LaneKey): LaneMoves => {
-    const i = () => plotted().indexOf(own);
-    const move = (to: number) => {
-      closeMenu();
-      movePlotLane(i(), to);
-      reveal(own);
-    };
-    return {
-      first: i() === 0,
-      last: i() === plotted().length - 1,
-      onUp: () => move(i() - 1),
-      onDown: () => move(i() + 1),
-      onRemove: () => {
-        const next = laneAfter(plotted(), own);
-        closeMenu();
-        removePlotLane(own);
-        reveal(next);
-      },
-    };
-  };
+  const state = createPickerState({ hex, lanes, add: () => add });
+  const { picker, closePicker, openLanePicker, openAdd, reveal, pick, movesOf } = state;
 
   const [scroller, setScroller] = createSignal<HTMLDivElement>();
   const [view, setView] = createSignal<ScrollView>(scrollView(0, 0, 0));
@@ -249,12 +149,11 @@ export function Lanes(props: { track: Track }) {
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
   const heights = () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0);
-  const { drag, swipe, peeking, pinchable, drop, grab } = createLaneDrag({
+  const { drag, swipe, peeking, pinchable, abandon, grab } = createLaneDrag({
     scroller,
     picker: {
-      open: (lane, el, fx, fy) =>
-        setMenu({ own: lane, anchor: el, at: { x: fx, y: fy, up: false } }),
-      close: closeMenu,
+      open: state.openAt,
+      close: closePicker,
     },
     bin: () => add,
     heights,
@@ -264,16 +163,16 @@ export function Lanes(props: { track: Track }) {
       if (double) reset();
       lastTap = double ? null : tap;
     },
-    peek: { move: (clientX) => setHoverPx(plotPx(clientX)), end: () => setHoverPx(null) },
+    cursorTo: (clientX) => setHoverPx(plotPx(clientX)),
+    peek: { end: () => setHoverPx(null) },
     select: {
       start: (clientX) => setPressedAt(timeAt(plotPx(clientX), visible(), plotWidth())),
-      move: (clientX) => setHoverPx(plotPx(clientX)),
       end: () => {
         const t0 = pressedAt();
         const px = hoverPx();
         if (t0 !== null && px !== null) {
           const t1 = timeAt(px, visible(), plotWidth());
-          setLanesWindow(hex(), selectWindow(t0, t1, visible(), contact()));
+          setWindow(selectWindow(t0, t1, visible(), contact()));
         }
         stopSelecting();
       },
@@ -292,12 +191,13 @@ export function Lanes(props: { track: Track }) {
     scroller,
     plotLeft,
     pinchable,
-    drop,
+    abandon,
     plotWidth,
+    plotPx,
     window: lanesWindow,
     visible,
     contact,
-    setWindow: (w) => setLanesWindow(hex(), w),
+    setWindow,
   });
   /** The drag once the lane is off its place: not while a finger has only lifted it. */
   const moving = () => {
@@ -307,14 +207,7 @@ export function Lanes(props: { track: Track }) {
   /** How far the axis stands off its place: while a lane is dragged it stays where it was. */
   const axisOffset = () => {
     const d = drag();
-    return d
-      ? axisShift(
-          heights(),
-          d.from,
-          slotShown(d.from, d.slot, d.overBin),
-          lastHistoryIndex(plotted()),
-        )
-      : 0;
+    return d ? axisShift(heights(), d.from, slotShown(d), lastHistoryIndex(plotted())) : 0;
   };
   const restoreScroll = () => {
     const el = scroller();
@@ -349,7 +242,7 @@ export function Lanes(props: { track: Track }) {
       data-lanes
       class={cx(s.lanes, drag() && s.grabbing)}
       style={{
-        '--lift-ms': `${MENU_HOLD_MS - HOLD_MS}ms`,
+        '--lift-ms': `${PICKER_HOLD_MS - HOLD_MS}ms`,
       }}
     >
       <div ref={setBay} class={s.bay}>
@@ -363,7 +256,7 @@ export function Lanes(props: { track: Track }) {
             }}
             onPointerMove={pointerAt}
             onPointerDown={(e) => {
-              pressed = e.pointerType;
+              state.press(e.pointerType);
             }}
             onPointerLeave={() => setHoverPx(null)}
           >
@@ -372,68 +265,59 @@ export function Lanes(props: { track: Track }) {
                 onCleanup(() => lanes.delete(lane));
                 const placed = () => {
                   const d = drag();
-                  return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
+                  return d ? placeOf(i(), d.from, slotShown(d)) : i();
                 };
-                return isInstrumentLane(lane) ? (
-                  <InstrumentLane
+                const history = !isInstrumentLane(lane);
+                return (
+                  <LaneFrame
                     lane={lane}
-                    track={props.track}
-                    moment={moment()}
                     index={i()}
                     count={plotted().length}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
-                    onMenu={(e) => openLaneMenu(lane, e)}
+                    onPicker={(e) => openLanePicker(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
-                    slot={moving()?.lane === lane}
+                    hole={moving()?.lane === lane}
                     lifted={drag()?.lane === lane && drag()?.still === true}
-                  />
-                ) : (
-                  <Lane
-                    lane={lane}
-                    index={i()}
-                    count={plotted().length}
-                    keys={readingsIn(lane)}
-                    samples={samples()}
-                    visible={visible()}
-                    gaps={gaps()}
-                    ticks={tickTimes()}
-                    width={plotWidth()}
                     height={LANE_PX}
-                    at={at()}
-                    past={past()}
-                    cursor={cursorX()}
-                    band={band()}
-                    onReset={reset}
-                    onWindowKey={(key) => {
-                      const w = lanesWindow();
-                      const next = keyWindow(key, w, visible(), contact());
-                      if (next !== w) setLanesWindow(hex(), next);
-                    }}
-                    laneRef={(el) => lanes.set(lane, el)}
-                    moves={movesOf(lane)}
-                    onMenu={(e) => openLaneMenu(lane, e)}
-                    onGrab={(e, part) => grab(e, lane, part)}
-                    place={placed()}
-                    slot={moving()?.lane === lane}
-                    lifted={drag()?.lane === lane && drag()?.still === true}
-                    swipeX={(() => {
-                      const sw = swipe();
-                      return sw?.lane === lane ? swipeOffset(sw.dx) : null;
-                    })()}
-                  />
+                    onReset={history ? reset : undefined}
+                    onWindowKey={history ? onWindowKey : undefined}
+                  >
+                    {isInstrumentLane(lane) ? (
+                      <InstrumentLane lane={lane} track={props.track} moment={moment()} />
+                    ) : (
+                      <Lane
+                        lane={lane}
+                        keys={readingsIn(lane)}
+                        samples={samples()}
+                        visible={visible()}
+                        gaps={gaps()}
+                        ticks={tickTimes()}
+                        width={plotWidth()}
+                        height={LANE_PX}
+                        at={at()}
+                        past={past()}
+                        cursor={cursorX()}
+                        span={span()}
+                        swipeX={(() => {
+                          const sw = swipe();
+                          return sw?.lane === lane ? swipeOffset(sw.dx) : null;
+                        })()}
+                      />
+                    )}
+                  </LaneFrame>
                 );
               }}
             </For>
-            <Show when={lastHistoryIndex(plotted()) >= 0}>
+            <Show when={showsHistory()}>
               <TimeAxis
                 ticks={tickTimes()}
                 x={x}
                 width={plotWidth()}
                 now={now()}
                 window={lanesWindow()}
-                lag={now() - visible().to}
+                lag={lag()}
                 order={lastHistoryIndex(plotted())}
                 shift={axisOffset()}
                 rowRef={setAxisRow}
@@ -447,7 +331,7 @@ export function Lanes(props: { track: Track }) {
                 type="button"
                 class={cx(s.add, moving() && s.bin)}
                 aria-haspopup="dialog"
-                aria-expanded={menu()?.anchor === add}
+                aria-expanded={picker()?.anchor === add}
                 onClick={openAdd}
               >
                 <Show when={moving()} fallback="+ LANE">
@@ -501,10 +385,10 @@ export function Lanes(props: { track: Track }) {
             );
           }}
         </Show>
-        <Show when={menu()}>
+        <Show when={picker()}>
           {(m) => (
             <Portal>
-              <Palette
+              <Picker
                 own={m().own}
                 plotted={plotted()}
                 at={m().at}
@@ -515,7 +399,7 @@ export function Lanes(props: { track: Track }) {
                   return own === null ? undefined : movesOf(own);
                 })()}
                 onPick={pick}
-                onClose={closeMenu}
+                onClose={closePicker}
               />
             </Portal>
           )}

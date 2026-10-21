@@ -1,31 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { HeardKey } from '../../lib/aircraft';
 import { LAPSE_SEC } from '../../lib/reports';
-import { holdsAll, isLost, oldestHeard } from './freshness';
-
-const NOW = 1000;
-
-describe('oldestHeard', () => {
-  it('takes the earliest instant of the keys heard, none when none is', () => {
-    // Arrange
-    const heard = { trackRate: 990, gs: 980 };
-
-    // Act
-    const out = [
-      oldestHeard(heard, ['trackRate', 'gs']),
-      oldestHeard(heard, ['gs', 'selAlt']),
-      oldestHeard(heard, ['selAlt']),
-    ];
-
-    // Assert
-    expect(out).toEqual([980, 980, undefined]);
-  });
-});
+import { AROUND_LAPSE, NOW } from '../../state/sampleFixture';
+import { eachHolds, holdsAll, ifHolds, isLost } from './freshness';
 
 describe('holdsAll', () => {
   it('holds a key heard under the lapse ago, not at it or beyond', () => {
     // Arrange
-    const ages = [20, LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const ages = [20, ...AROUND_LAPSE];
 
     // Act
     const out = ages.map((age) => holdsAll({ heard: { gs: NOW - age } }, ['gs'], NOW));
@@ -51,10 +34,53 @@ describe('holdsAll', () => {
   });
 });
 
+describe('eachHolds', () => {
+  it('holds only when every key was heard and holds on its own, unlike holdsAll', () => {
+    // Arrange
+    const heard = { gs: NOW - 1, trackRate: NOW - 2, tas: NOW - LAPSE_SEC };
+    const rows: HeardKey[][] = [
+      ['gs', 'trackRate'],
+      ['gs', 'tas'],
+      ['gs', 'selAlt'],
+    ];
+
+    // Act
+    const out = rows.map((keys) => [
+      eachHolds({ heard }, keys, NOW),
+      holdsAll({ heard }, keys, NOW),
+    ]);
+
+    // Assert
+    expect(out).toEqual([
+      [true, true],
+      [false, false],
+      [false, true],
+    ]);
+  });
+});
+
+describe('ifHolds', () => {
+  it('gives the value while its keys hold, none once one lapses or when never heard', () => {
+    // Arrange
+    const heard = { gs: NOW - 1, tas: NOW - LAPSE_SEC };
+    const rows: [HeardKey[], number][] = [
+      [['gs'], 250],
+      [['gs', 'tas'], 251],
+      [['selAlt'], 252],
+    ];
+
+    // Act
+    const out = rows.map(([keys, v]) => ifHolds({ heard }, keys, NOW, v));
+
+    // Assert
+    expect(out).toEqual([250, undefined, undefined]);
+  });
+});
+
 describe('isLost', () => {
   it('is lost from LAPSE_SEC since the last message', () => {
     // Arrange
-    const seen = [LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const seen = AROUND_LAPSE;
 
     // Act
     const out = seen.map((s) => isLost({ seen: s }));

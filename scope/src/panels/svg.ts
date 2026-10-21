@@ -17,3 +17,23 @@ export const toward = (x: number, y: number, deg: number) => {
   const at = offset(x, y, deg);
   return (a: number, c = 0): string => at(a, c).map(fixed).join(' ');
 };
+
+/** A pair of coordinates: (x, y) in pixels, or (east, north) in NM. */
+export type Point = readonly [number, number];
+
+/** A number to a tenth of a pixel, as the drawing is. */
+export const tenth = (n: number): number => Number(fixed(n));
+
+/** A text set at (x, y). */
+export interface TextLabel {
+  text: string;
+  x: number;
+  y: number;
+}
+
+/** The subpath through `points`: a move to the first, a line to each next. */
+export const polylinePath = (points: readonly Point[]): string =>
+  points.map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`).join('');
+
+/** The closed subpath through `points`. */
+export const polygonPath = (points: readonly Point[]): string => `${polylinePath(points)}Z`;

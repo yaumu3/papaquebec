@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { setDeclinationAt } from '../state/magnetic';
 import { isInstrumentLane, LANE_KEYS } from '../state/plotted';
-import { makeSample } from '../state/sampleFixture';
-import { LANE_LABELS, NONE, positionReading, READINGS } from './readings';
+import { makeSample, resetDeclination } from '../state/sampleFixture';
+import { LANE_LABELS, NONE, positionReading, READINGS, windOf } from './readings';
+
+afterEach(resetDeclination);
 
 describe('READINGS', () => {
   it('reads the message rate to a tenth per second', () => {
@@ -30,7 +32,6 @@ describe('READINGS', () => {
 
     // Assert
     expect(readings).toEqual([{ v: '228° / 240°' }, { v: '--- / 240°' }]);
-    setDeclinationAt(() => () => 0);
   });
 
   it('reads the selected heading only while it steers, as the lane and the data block do', () => {
@@ -185,10 +186,7 @@ describe('positionReading', () => {
     const readings = [positionReading(live), positionReading(undefined)];
 
     // Assert
-    expect(readings).toEqual([
-      { k: 'POSITION', r: { v: '35.73266 139.99644' } },
-      { k: 'POSITION', r: NONE },
-    ]);
+    expect(readings).toEqual([{ v: '35.73266 139.99644' }, NONE]);
   });
 });
 
@@ -207,5 +205,23 @@ describe('LANE_LABELS', () => {
 
     // Assert
     expect(labels).toEqual([...lanes.map((lane) => READINGS[lane].label), 'PFD', 'ND', 'SURV']);
+  });
+});
+
+describe('windOf', () => {
+  it('gives the direction and speed when both are known, none when either is missing', () => {
+    // Arrange
+    const rows: Parameters<typeof windOf>[0][] = [
+      { windDir: 269.4, windSpeed: 35.6 },
+      { windDir: 269.4, windSpeed: undefined },
+      { windDir: undefined, windSpeed: 35.6 },
+      { windDir: undefined, windSpeed: undefined },
+    ];
+
+    // Act
+    const winds = rows.map(windOf);
+
+    // Assert
+    expect(winds).toEqual([{ dir: 269.4, speed: 35.6 }, undefined, undefined, undefined]);
   });
 });

@@ -43,7 +43,7 @@ import {
 } from './readout';
 import { ndTraffic, peekable, peekedSymbol, symbolDrawn, type TrafficKind } from './traffic';
 
-import flags from '../flag.module.css';
+import inst from '../instrument.module.css';
 import s from './Nd.module.css';
 
 /** The small dim name of a value. */
@@ -52,7 +52,7 @@ function Label(props: { children: string }) {
 }
 
 /** A value of a corner: dim for the blank of an unknown, else in its own tone. */
-function Value(props: { r: NdText; class?: string | undefined }) {
+function CornerValue(props: { r: NdText; class?: string | undefined }) {
   return <span class={props.r.known ? props.class : s.unknown}>{props.r.text}</span>;
 }
 
@@ -172,11 +172,11 @@ export function Nd(props: { t: Track; moment: Moment }) {
     <div
       data-nd
       ref={setRoot}
-      class={cx(s.nd, lastFrame() && s.last)}
+      class={cx(inst.frame, s.nd, lastFrame() && s.last)}
       style={{ height: `${g().h}px` }}
     >
       <Show when={width() > 0}>
-        <svg class={s.svg} aria-hidden="true">
+        <svg class={inst.svg} aria-hidden="true">
           <path class={s.ring} d={ringPath(g())} />
           <path class={s.arc} d={arcPath(g(), g().r)} />
           <path class={s.minor} d={marks().minor} />
@@ -262,27 +262,27 @@ export function Nd(props: { t: Track; moment: Moment }) {
         <div class={cx(s.corner, s.topLeft)}>
           <div>
             <Label>GS </Label>
-            <Value r={readouts().gs} class={s.strong} />
+            <CornerValue r={readouts().gs} class={s.strong} />
             <Label>{'  TAS '}</Label>
-            <Value r={readouts().tas} />
+            <CornerValue r={readouts().tas} />
           </div>
-          <Value r={readouts().wind} />
+          <CornerValue r={readouts().wind} />
         </div>
         <div class={cx(s.corner, s.topRight)}>
           <div>
             <Label>SEL </Label>
-            <Value r={readouts().sel} class={s.sel} />
+            <CornerValue r={readouts().sel} class={s.sel} />
           </div>
           <div>
             <Label>HDG </Label>
-            <Value r={readouts().hdg} />
+            <CornerValue r={readouts().hdg} />
           </div>
         </div>
         <div class={cx(s.corner, s.temps)}>
           <Label>TAT</Label>
-          <Value r={readouts().tat} />
+          <CornerValue r={readouts().tat} />
           <Label>SAT</Label>
-          <Value r={readouts().sat} />
+          <CornerValue r={readouts().sat} />
         </div>
         <div class={s.top}>
           <span class={cx(s.label, s.modeLabel)}>TRK</span>
@@ -303,7 +303,7 @@ export function Nd(props: { t: Track; moment: Moment }) {
           <Show when={traffic().traffic}>
             <span class={s.alert}>TRAFFIC</span>
           </Show>
-          <For each={frame().flags}>{(flag) => <span class={flags.flag}>{flag}</span>}</For>
+          <For each={frame().flags}>{(flag) => <span class={inst.flag}>{flag}</span>}</For>
         </div>
         <div class={s.zoom}>
           <ZoomButton label="Zoom in" step={-1} glyph="+" />

@@ -1,11 +1,13 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
 import { qnhAltitudeFt } from '../../lib/altitude';
 import { HPA_PER_INHG } from '../../lib/units';
 import { setDeclinationAt } from '../../state/magnetic';
 import { INTENTS, READING_KEYS, type ReadingKey } from '../../state/plotted';
-import { makeSample } from '../../state/sampleFixture';
+import { makeSample, resetDeclination } from '../../state/sampleFixture';
 import { PLOTS } from './plots';
+
+afterEach(resetDeclination);
 
 describe('PLOTS', () => {
   it('draws as an intent each reading plotted.ts draws in a lane, and nothing else', () => {
@@ -49,7 +51,7 @@ describe('PLOTS', () => {
     expect(floored).toEqual([true, false, false]);
   });
 
-  it('reads the track in magnetic, as the table does, with the heading as sent, none without either', () => {
+  it('reads the track in magnetic, as its reading does, with the heading as sent, none without either', () => {
     // Arrange
     setDeclinationAt(() => () => 7);
     const samples = [
@@ -63,10 +65,9 @@ describe('PLOTS', () => {
 
     // Assert
     expect(headings).toEqual([{ trk: 228, hdg: 240 }, undefined]);
-    setDeclinationAt(() => () => 0);
   });
 
-  it('names the engaged modes as the table abbreviates them, and the source as one name', () => {
+  it('names the engaged modes as their reading abbreviates them, and the source as one name', () => {
     // Arrange
     const s = makeSample(1, { navModes: ['autopilot', 'vnav'], source: 'mlat' });
     const [modes, src] = [PLOTS.modes, PLOTS.src];

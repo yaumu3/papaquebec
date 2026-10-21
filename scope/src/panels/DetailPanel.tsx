@@ -4,8 +4,7 @@ import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { trackLabel } from '../render/scene/rules';
-import { keepViewOf, plotted } from '../state/lanes';
-import { lastHistoryIndex } from '../state/plotted';
+import { keepViewOf, showsHistory } from '../state/lanes';
 import { selected, snapshotVersion } from '../state/scope';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
@@ -65,7 +64,7 @@ function Header(props: { t: Track }) {
         </Show>
         <span>{props.t.hex.toUpperCase()}</span>
         <span class={s.slot}>
-          <Show when={lastHistoryIndex(plotted()) >= 0}>
+          <Show when={showsHistory()}>
             <WindowControl track={props.t} />
           </Show>
         </span>

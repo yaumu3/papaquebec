@@ -331,7 +331,7 @@ describe('selectWindow', () => {
   const contact: Interval = { from: 0, to: 2000 };
   const visible: Interval = { from: 1000, to: 1500 };
 
-  it('holds the band between its ends, whichever way it was dragged', () => {
+  it('holds the span between its ends, whichever way it was dragged', () => {
     // Arrange
     const rows = [
       { t0: 1100, t1: 1200 },
@@ -345,7 +345,7 @@ describe('selectWindow', () => {
     expect(windows).toEqual([heldWindow(1100, 1200), heldWindow(1100, 1200)]);
   });
 
-  it('grows a band shorter than the minimum from its earlier end', () => {
+  it('grows a span shorter than the minimum from its earlier end', () => {
     // Arrange
     const rows = [
       { t0: 1100, t1: 1110 },
@@ -376,7 +376,7 @@ describe('selectWindow', () => {
     expect(windows).toEqual([heldWindow(1300, 1500), { kind: 'live', sec: 200 }]);
   });
 
-  it('goes live when a grown band reaches now', () => {
+  it('goes live when a grown span reaches now', () => {
     // Arrange
     const nowWindow: Interval = { from: 1700, to: 2000 };
 
@@ -387,15 +387,15 @@ describe('selectWindow', () => {
     expect(w).toEqual({ kind: 'live', sec: MIN_WINDOW_SEC });
   });
 
-  it('keeps the band inside the visible window, at either end', () => {
+  it('keeps the span inside the visible window, at either end', () => {
     // Arrange
-    const bands = [
+    const spans = [
       { t0: 900, t1: 1100 },
       { t0: 1400, t1: 1600 },
     ];
 
     // Act
-    const windows = bands.map(({ t0, t1 }) => selectWindow(t0, t1, visible, contact));
+    const windows = spans.map(({ t0, t1 }) => selectWindow(t0, t1, visible, contact));
 
     // Assert
     expect(windows).toEqual([heldWindow(1000, 1100), heldWindow(1400, 1500)]);

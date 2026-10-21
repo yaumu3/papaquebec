@@ -18,24 +18,31 @@ export type LanesWindow =
 export const DEFAULT_WINDOW: LanesWindow = { kind: 'live', sec: Infinity };
 export const MIN_WINDOW_SEC = 30;
 
+/** `sec` kept to at least the minimum window and at most the whole contact. */
+const windowSec = (sec: number, contact: Interval): number =>
+  clamp(sec, MIN_WINDOW_SEC, Math.max(MIN_WINDOW_SEC, lengthOf(contact)));
+
 /** The interval of the contact `w` shows, at least the minimum long. */
 export function resolveWindow(w: LanesWindow, contact: Interval): Interval {
   if (w.kind === 'live') {
-    const sec = clamp(w.sec, MIN_WINDOW_SEC, Math.max(MIN_WINDOW_SEC, contact.to - contact.from));
+    const sec = windowSec(w.sec, contact);
     return { from: contact.to - sec, to: contact.to };
   }
-  const sec = Math.max(MIN_WINDOW_SEC, w.to - w.from);
+  const sec = Math.max(MIN_WINDOW_SEC, lengthOf(w));
   const to = Math.min(Math.max(w.from, contact.from) + sec, contact.to);
   return { from: to - sec, to };
 }
 
+/** How long an interval is. */
+export const lengthOf = (i: Interval): number => i.to - i.from;
+
 /** Where a time falls across `width`. */
 export const xOf = (t: number, i: Interval, width: number): number =>
-  ((t - i.from) / (i.to - i.from)) * width;
+  ((t - i.from) / lengthOf(i)) * width;
 
 /** The time at a point across `width`. */
 export const timeAt = (x: number, i: Interval, width: number): number =>
-  i.from + (x / width) * (i.to - i.from);
+  i.from + (x / width) * lengthOf(i);
 
 /** Whether the panel reads an instant other than now: while peeking, or with the window held; never without a history lane to show it. */
 export const readsPast = (peeking: boolean, w: LanesWindow, shown: boolean): boolean =>
@@ -51,7 +58,7 @@ export const holdWindow = (visible: Interval): LanesWindow => ({
 /** The window live again, as long as `visible`. */
 export const goLive = (visible: Interval): LanesWindow => ({
   kind: 'live',
-  sec: visible.to - visible.from,
+  sec: lengthOf(visible),
 });
 
 /** From the first sample to now; empty at now without any. */
@@ -66,7 +73,7 @@ const EDGE_EPS_SEC = 1e-6;
 /** A live window `sec` long, the whole contact when it is at least as long. */
 const liveOf = (sec: number, contact: Interval): LanesWindow => ({
   kind: 'live',
-  sec: sec >= contact.to - contact.from ? Infinity : sec,
+  sec: sec >= lengthOf(contact) ? Infinity : sec,
 });
 
 /** The window `sec` long starting at `from`: moved up to the contact's start, live when it reaches now. */
@@ -87,8 +94,8 @@ export function zoomWindow(
   pivot: number,
   contact: Interval,
 ): LanesWindow {
-  const length = visible.to - visible.from;
-  const sec = Math.max(MIN_WINDOW_SEC, Math.min(length * factor, contact.to - contact.from));
+  const length = lengthOf(visible);
+  const sec = windowSec(length * factor, contact);
   if (w.kind === 'live') return liveOf(sec, contact);
   return settle(pivot - ((pivot - visible.from) / length) * sec, sec, contact);
 }
@@ -104,11 +111,11 @@ export function panWindow(
   contact: Interval,
 ): LanesWindow {
   if (w.kind === 'live' && sec >= 0) return w;
-  return settle(visible.from + sec, visible.to - visible.from, contact);
+  return settle(visible.from + sec, lengthOf(visible), contact);
 }
 
 /**
- * The window a band dragged from instant `t0` to `t1` makes, within `visible`: held, grown to the
+ * The window a span dragged from instant `t0` to `t1` makes, within `visible`: held, grown to the
  * minimum from its earlier end, live again if it reaches now.
  */
 export function selectWindow(
@@ -137,13 +144,9 @@ export function pinchWindow(
   contact: Interval,
 ): LanesWindow {
   const { w, visible } = start;
-  const length = visible.to - visible.from;
+  const length = lengthOf(visible);
   const spread = Math.max(1, Math.abs(b0 - a0)) / Math.max(1, Math.abs(b - a));
-  const sec = clamp(
-    length * spread,
-    MIN_WINDOW_SEC,
-    Math.max(MIN_WINDOW_SEC, contact.to - contact.from),
-  );
+  const sec = windowSec(length * spread, contact);
   const mid = (a + b) / 2 / width;
   if (w.kind === 'live')
     return settle(contact.to - (mid - (a0 + b0) / 2 / width) * sec - sec, sec, contact);
@@ -161,7 +164,7 @@ export function keyWindow(
   visible: Interval,
   contact: Interval,
 ): LanesWindow {
-  const length = visible.to - visible.from;
+  const length = lengthOf(visible);
   const middle = (visible.from + visible.to) / 2;
   switch (key) {
     case 'ArrowLeft':

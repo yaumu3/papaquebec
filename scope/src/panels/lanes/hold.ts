@@ -30,7 +30,7 @@ export function laneGestureOf(
 }
 
 /** How long a finger holds a lifted lane, from its press, for its picker. */
-export const MENU_HOLD_MS = 900;
+export const PICKER_HOLD_MS = 900;
 
 /** Where a finger's hold on a lane has got to: resting, lifted in place, or with the picker open. */
 export type TouchStage = 'pressed' | 'lifted' | 'picker';
@@ -38,7 +38,7 @@ export type TouchStage = 'pressed' | 'lifted' | 'picker';
 /**
  * What a finger `dx`, `dy` from its press on a lane's `part`, `ms` after, does at a `stage`. Resting,
  * it lifts the lane at HOLD_MS; lifted and held within HOLD_SLOP_PX it opens the picker at
- * MENU_HOLD_MS; moved past that after the lift it drags the lane. Moved sideways first, it swipes
+ * PICKER_HOLD_MS; moved past that after the lift it drags the lane. Moved sideways first, it swipes
  * the row or peeks along a plot; moved otherwise, it is left to the page.
  */
 export function touchHoldOf(
@@ -51,21 +51,27 @@ export function touchHoldOf(
   const axis = axisOf(dx, dy, HOLD_SLOP_PX);
   if (stage !== 'pressed') {
     if (axis !== null) return 'drag';
-    return stage === 'lifted' && ms >= MENU_HOLD_MS ? 'picker' : null;
+    return stage === 'lifted' && ms >= PICKER_HOLD_MS ? 'picker' : null;
   }
   if (axis === null) return ms >= HOLD_MS ? 'lift' : null;
   if (axis !== 'x') return 'pass';
   return part === 'row' ? 'swipe' : part === 'plot' ? 'peek' : 'pass';
 }
 
+/** What a finger is doing on a lane. */
+export interface TouchFlags {
+  drag: boolean;
+  swipe: boolean;
+  holding: boolean;
+  picking: boolean;
+  peeking: boolean;
+}
+
 /**
  * Whether a second finger landing now pinches the window: while the first rests or peeks on a
  * history lane's `part`, not once it has dragged, swiped or opened the picker.
  */
-export const pinchesFrom = (
-  g: { holding: boolean; peeking: boolean; drag: boolean; swipe: boolean; picking: boolean },
-  part: LanePart | null,
-): boolean =>
+export const pinchesFrom = (g: TouchFlags, part: LanePart | null): boolean =>
   (g.holding || g.peeking) &&
   !g.drag &&
   !g.swipe &&
@@ -77,17 +83,8 @@ export const pinchesFrom = (
  * What a finger's move over the lanes is kept from: scrolling, once it drags, swipes, peeks or
  * picks; the sheet, from the press on a lane until the finger lifts.
  */
-export function keepsTouch(g: {
-  drag: boolean;
-  swipe: boolean;
-  holding: boolean;
-  picking: boolean;
-  peek: boolean;
-}): {
-  prevent: boolean;
-  stop: boolean;
-} {
-  const prevent = g.drag || g.swipe || g.picking || g.peek;
+export function keepsTouch(g: TouchFlags): { prevent: boolean; stop: boolean } {
+  const prevent = g.drag || g.swipe || g.picking || g.peeking;
   return { prevent, stop: prevent || g.holding };
 }
 

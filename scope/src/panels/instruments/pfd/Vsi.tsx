@@ -1,20 +1,15 @@
 import { Index, Show } from 'solid-js';
 
-import {
-  type PfdGeometry,
-  vsiDigits,
-  vsiNeedlePath,
-  type VsiScale,
-  vsiStripPath,
-  type VsiDigits,
-} from './geometry';
+import type { TextLabel } from '../../svg';
+import type { PfdGeometry } from './geometry';
+import { vsiDigits, vsiNeedlePath, type VsiScale, vsiStripPath } from './vsiGeometry';
 
 import s from './Pfd.module.css';
 
 /** The needle and digits of a vertical rate that holds. */
-export interface NeedleView {
+interface NeedleView {
   path: string;
-  digits: VsiDigits | undefined;
+  digits: TextLabel | undefined;
 }
 
 /** The needle on the rate as shown, the digits on the rate as reported, while it holds. */

@@ -1,5 +1,4 @@
 import { epuM } from '../../lib/accuracy';
-import type { HeardKey } from '../../lib/aircraft';
 import { crewAltitudeFt } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { modeNames, sourceName } from '../../lib/format';
@@ -8,12 +7,8 @@ import { magneticTrack } from '../../state/magnetic';
 import type { ReadingKey } from '../../state/plotted';
 import { settings } from '../../state/settings';
 import type { Sample } from '../../state/track';
+import { type Reading, type Wind, windOf } from '../readings';
 import type { Read } from './trace';
-
-export interface Wind {
-  dir: number;
-  speed: number;
-}
 
 /** Where the aircraft goes and where it points, magnetic degrees. */
 export interface Heading {
@@ -54,12 +49,7 @@ export type PlotSpec =
   | { kind: 'heading'; heading: (s: Sample) => Heading | undefined }
   | { kind: 'intent'; y: Read; dash?: Dash };
 
-const wind = (s: Sample): Wind | undefined =>
-  s.windDir === undefined || s.windSpeed === undefined
-    ? undefined
-    : { dir: s.windDir, speed: s.windSpeed };
-
-/** The track in magnetic, as the table reads it, and the heading as sent. */
+/** The track in magnetic, as the readings show it, and the heading as sent. */
 const heading = (s: Sample): Heading | undefined => {
   const trk = magneticTrack(s);
   const hdg = s.heading;
@@ -75,7 +65,7 @@ const logOf = (m: number | undefined): number | undefined =>
   m === undefined ? undefined : Math.log10(m);
 
 /** How each reading is drawn; `INTENTS` in `state/plotted.ts` says which lane an intent goes in. */
-export const PLOTS: Record<ReadingKey, PlotSpec> = {
+export const PLOTS = {
   // As the crew reads it, so that an aircraft holding its selected altitude sits on that line.
   alt: {
     kind: 'line',
@@ -95,7 +85,7 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   ias: { kind: 'line', y: (s) => s.ias, quantum: 10 },
   tas: { kind: 'line', y: (s) => s.tas, quantum: 10 },
   mach: { kind: 'line', y: (s) => s.mach, quantum: 0.01 },
-  wind: { kind: 'barbs', barb: wind },
+  wind: { kind: 'barbs', barb: windOf },
   oat: { kind: 'line', y: (s) => s.oat, quantum: 1 },
   tat: { kind: 'line', y: (s) => s.tat, quantum: 1 },
   nic: { kind: 'line', y: (s) => logOf(s.rc), log: true },
@@ -114,30 +104,14 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
     dash: 'dashed',
     quantum: 1,
   },
+} satisfies Record<ReadingKey, PlotSpec>;
+
+/** Whether a reading is drawn on a log scale, as a bound. */
+export const isLog = (key: ReadingKey): boolean => {
+  const spec: PlotSpec = PLOTS[key];
+  return spec.kind === 'line' && spec.log === true;
 };
 
-/** The values each reading is made of, by the instants they are heard at; none for the reception's own. */
-export const HEARD: Record<ReadingKey, readonly HeardKey[]> = {
-  alt: ['alt'],
-  selAlt: ['selAlt'],
-  fmsAlt: ['fmsAlt'],
-  vs: ['verticalRate'],
-  trk: ['track', 'heading'],
-  selHdg: ['selHeading'],
-  roll: ['roll'],
-  gs: ['gs'],
-  qnh: ['navQnh'],
-  modes: ['navModes'],
-  ias: ['ias'],
-  tas: ['tas'],
-  mach: ['mach'],
-  wind: ['windSpeed', 'windDir'],
-  oat: ['oat'],
-  tat: ['tat'],
-  nic: ['nic', 'rc'],
-  nacp: ['nacP'],
-  src: [],
-  rssi: [],
-  msgs: [],
-  age: [],
-};
+/** A reading's value as a lane prints it: with its unit only on a log lane, where the unit changes along it. */
+export const plotText = (key: ReadingKey, r: Reading): string =>
+  isLog(key) && r.unit ? `${r.v} ${r.unit}` : r.v;

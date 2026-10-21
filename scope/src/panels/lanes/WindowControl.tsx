@@ -1,13 +1,12 @@
-import { createMemo, Show } from 'solid-js';
+import { Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import { formatAgo } from '../../lib/format';
-import { cursorInstant, lanesView, setLanesWindow } from '../../state/lanes';
-import { snapshotVersion } from '../../state/scope';
+import { cursorInstant } from '../../state/lanes';
 import type { Track } from '../../state/track';
-import { trackStore } from '../../state/tracks';
-import { contactOf, goLive, holdWindow, resolveWindow } from '../../state/window';
+import { goLive, holdWindow } from '../../state/window';
 import { controlLabel } from './control';
+import { createWindowView } from './windowView';
 
 import s from './WindowControl.module.css';
 
@@ -16,17 +15,9 @@ import s from './WindowControl.module.css';
  * held; while the cursor peeks, its age covers the button, which stays under it and keeps the focus.
  */
 export function WindowControl(props: { track: Track }) {
-  const hex = () => props.track.hex;
-  // A memo, so that a resting pointer's readout goes on counting as the snapshots arrive.
-  const now = createMemo(() => {
-    snapshotVersion();
-    return trackStore.stats.now;
-  });
-  const lanesWindow = createMemo(() => lanesView(hex()).window);
-  const visible = () => resolveWindow(lanesWindow(), contactOf(props.track.samples, now()));
+  const { lanesWindow, visible, now, lag, setWindow } = createWindowView(() => props.track);
   const held = () => lanesWindow().kind === 'held';
-  const lag = () => now() - visible().to;
-  const toggle = () => setLanesWindow(hex(), held() ? goLive(visible()) : holdWindow(visible()));
+  const toggle = () => setWindow(held() ? goLive(visible()) : holdWindow(visible()));
   return (
     <span class={s.control}>
       <button

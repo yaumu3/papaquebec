@@ -4,23 +4,23 @@ import { cx } from '../../design/cx';
 import { LANE_GROUPS, type LaneKey } from '../../state/plotted';
 import { wrapIndex } from '../../ui/wrap';
 import { LANE_LABELS } from '../readings';
-import { chipName, chipOf, paletteName } from './chips';
+import { chipName, chipOf, pickerName } from './chips';
 import { type Box, clipBox } from './drag';
-import { type PaletteAnchor, paletteBox } from './menu';
 import { type LaneMoves, onMoveKey } from './moves';
+import { type PickerAnchor, pickerBox } from './pickerPlace';
 
-import s from './Palette.module.css';
+import s from './Picker.module.css';
 
 /**
  * The lanes by group as chips, to switch the lane `own` to another or, with none, to add one;
  * under a rule, a lane's own row of moves. It floats over the page at a point, kept inside the
  * window, with the rest of the page dimmed but what it is for.
  */
-export function Palette(props: {
+export function Picker(props: {
   own: LaneKey | null;
   plotted: readonly LaneKey[];
   /** The point it stands at. */
-  at: PaletteAnchor;
+  at: PickerAnchor;
   /** The control that opened it, which stands lit and gets the focus back. */
   anchor: HTMLElement;
   /** Where the page shows the anchor, which only its part inside stands lit. */
@@ -32,7 +32,7 @@ export function Palette(props: {
   let el!: HTMLDivElement;
   /** Closes it and gives the focus back to what it is for. */
   const close = () => {
-    // Read before closing, which unmounts the palette and its props with it.
+    // Read before closing, which unmounts the picker and its props with it.
     const anchor = props.anchor;
     props.onClose();
     anchor.focus({ preventScroll: true });
@@ -43,7 +43,7 @@ export function Palette(props: {
     e.stopPropagation();
     close();
   };
-  /** Tabs round the palette's buttons, as a dialog keeps the focus to itself. */
+  /** Tabs round the picker's buttons, as a dialog keeps the focus to itself. */
   const tabRound = (e: KeyboardEvent) => {
     const stops = [...el.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
     if (stops.length === 0) return;
@@ -62,7 +62,7 @@ export function Palette(props: {
   const lit = props.clip ? clipBox(anchorBox, props.clip) : anchorBox;
   /** Stands it at its anchor, written straight to the element so that it takes the focus at once. */
   const place = () => {
-    const box = paletteBox(
+    const box = pickerBox(
       props.at,
       { width: el.offsetWidth, height: el.offsetHeight },
       { width: window.innerWidth, height: window.innerHeight },
@@ -112,11 +112,11 @@ export function Palette(props: {
           el = e;
         }}
         data-lanes
-        class={s.palette}
+        class={s.picker}
         role="dialog"
         aria-modal="true"
         onMouseDown={keepFocus}
-        aria-label={paletteName(props.own)}
+        aria-label={pickerName(props.own)}
         onKeyDown={(e) => {
           if (e.key === 'Tab') tabRound(e);
           else if (props.moves) onMoveKey(props.moves, e);

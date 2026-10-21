@@ -4,8 +4,8 @@ import { inverse } from '../../../lib/geodesic';
 import { RAD } from '../../../lib/units';
 import { magneticBearing } from '../../../state/magnetic';
 import type { Position, Track } from '../../../state/track';
-import { holdsAll } from '../freshness';
-import type { Point } from '../glide';
+import type { Point } from '../../svg';
+import { holdsAll, ifHolds } from '../freshness';
 import type { Moment } from '../moment';
 import { type NdGeometry, ndPoint, onArc, pxOf } from './geometry';
 import { type NdFrame } from './readout';
@@ -52,7 +52,7 @@ const EDGE_PX = 4;
 const PLANE_MARGIN = 1.1;
 
 /** What the ND is showing: its mode and orientation, its range and its geometry. */
-export interface NdView {
+interface NdView {
   frame: Pick<NdFrame, 'mode' | 'orient'>;
   rangeNm: number;
   g: NdGeometry;
@@ -84,10 +84,10 @@ interface Origin {
 }
 
 const heldPosition = (t: Track, now: number): LivePosition | undefined =>
-  t.position.kind === 'live' && holdsAll(t, ['position'], now) ? t.position : undefined;
+  ifHolds(t, ['position'], now, t.position.kind === 'live' ? t.position : undefined);
 
 const heldAltitude = (t: Track, now: number): number | undefined =>
-  typeof t.alt === 'number' && holdsAll(t, ['alt'], now) ? t.alt : undefined;
+  ifHolds(t, ['alt'], now, typeof t.alt === 'number' ? t.alt : undefined);
 
 /** Whether two points of the plane lie within `limitNm` of each other, with the margin: the cheap test before a geodesic. */
 export function nearOnPlane(
@@ -239,7 +239,7 @@ export function symbolDrawn(
 }
 
 /** What the ND draws of the traffic: the symbols in paint order, and the annunciations. */
-export interface NdTraffic {
+interface NdTraffic {
   symbols: TrafficSymbol[];
   traffic: boolean;
   offscale: boolean;
@@ -263,7 +263,7 @@ function placeThreat(own: Track, threat: Track | undefined, now: number, view: N
   return placeOnDisplay(origin, threat, alt, at, view);
 }
 
-const NONE: NdTraffic = { symbols: [], traffic: false, offscale: false };
+const NO_TRAFFIC: NdTraffic = { symbols: [], traffic: false, offscale: false };
 
 /** The label of a relative altitude for a symbol centred at (x, y): above it, or below it for traffic below. */
 function labelOf(x: number, y: number, deltaFt: number): TrafficSymbol['label'] {
@@ -335,8 +335,8 @@ function estimateOffscale(own: Track, now: number, view: NdView): boolean {
   return !!estimate && !pointOnDisplay(view, estimate.rel, estimate.rangeNm);
 }
 
-/** The symbol of the threat given by position, labelled when both its altitude and own ship's are known. */
-function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol | undefined {
+/** The symbol of the estimated threat, labelled when both its altitude and own ship's are known. */
+function estimatedThreat(own: Track, now: number, view: NdView): TrafficSymbol | undefined {
   const estimate = estimateOf(own, now, view);
   const point = estimate && pointOnDisplay(view, estimate.rel, estimate.rangeNm);
   if (!estimate || !point) return undefined;
@@ -353,7 +353,8 @@ function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol 
  * sample, as the panel keeps no past of the other aircraft.
  */
 export function ndTraffic(m: Moment, others: Iterable<Track>, view: NdView): NdTraffic {
-  if (m.kind !== 'now' || view.frame.mode === 'lost' || view.frame.mode === 'blank') return NONE;
+  if (m.kind !== 'now' || view.frame.mode === 'lost' || view.frame.mode === 'blank')
+    return NO_TRAFFIC;
   const { r: own, instant: now } = m;
   const address = threatAddress(own.ra);
   const all = [...others];
@@ -369,8 +370,8 @@ export function ndTraffic(m: Moment, others: Iterable<Track>, view: NdView): NdT
   const threatTrack = all.find((t) => t.hex === address);
   const threat = placeThreat(own, threatTrack, now, view);
   if (threat) symbols.push(symbolOf('threat', threat, now));
-  const byPosition = threatByPosition(own, now, view);
-  if (byPosition) symbols.push(byPosition);
+  const estimated = estimatedThreat(own, now, view);
+  if (estimated) symbols.push(estimated);
   const offscale = addressOffscale(own, threatTrack, now, view) || estimateOffscale(own, now, view);
   return { symbols, traffic: advisoryActive(own.ra), offscale };
 }

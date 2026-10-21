@@ -13,7 +13,7 @@ import {
   climbArrow,
   emergencyCode,
   formatGsWake,
-  padBearing,
+  degreesText,
   type Priority,
   statusTags,
 } from '../../lib/format';
@@ -94,7 +94,7 @@ export function blockExtraLines(block: DataBlock): number {
 
 function headingLine(t: Track): string | null {
   const heading = steeringHeading(t);
-  return heading === undefined ? null : `${padBearing(heading)}°`;
+  return heading === undefined ? null : degreesText(heading);
 }
 
 /** Level and trend, then the selected level, or a check while the aircraft holds it. */

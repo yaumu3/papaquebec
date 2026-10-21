@@ -1,5 +1,7 @@
+import { onCircle } from '../../../lib/math';
 import { RAD } from '../../../lib/units';
-import { fixed, offset, toward } from '../../svg';
+import { fixed, offset, polygonPath, polylinePath, tenth, toward } from '../../svg';
+import type { Point, TextLabel } from '../../svg';
 import { instrumentHeight } from '../height';
 
 /** The compass arc spans this far either side of the top. */
@@ -42,9 +44,6 @@ export function ndGeometry(w: number): NdGeometry {
   return { w, h, cx: w / 2, cy: Math.min(h - 20, 40 + r), r, r2: r / 2 };
 }
 
-/** A number to a tenth of a pixel, as the drawing is. */
-const tenth = (n: number): number => Number(fixed(n));
-
 /** The radius in pixels that `nm` nautical miles reach at a range of `rangeNm`. */
 export const pxOf = (g: NdGeometry, nm: number, rangeNm: number): number => (nm * g.r) / rangeNm;
 
@@ -62,22 +61,17 @@ export function arcPath(g: NdGeometry, r: number): string {
 export const ringPath = (g: NdGeometry): string => arcPath(g, g.r2);
 
 /** A label of the compass, centred at (x, y). */
-export interface CompassLabel {
-  text: string;
-  x: number;
-  y: number;
+interface CompassLabel extends TextLabel {
   /** The multiples of 30°, set larger. */
   big: boolean;
 }
 
-export interface Compass {
+interface Compass {
   /** The ticks of every 5°, one path, and of every 10°, another. */
   minor: string;
   major: string;
   labels: CompassLabel[];
 }
-
-const norm = (deg: number): number => ((deg % 360) + 360) % 360;
 
 /** The ticks and labels of the arc, with `orient` degrees magnetic at the top. */
 export function compass(g: NdGeometry, orient: number): Compass {
@@ -85,7 +79,7 @@ export function compass(g: NdGeometry, orient: number): Compass {
   const first = Math.ceil((orient - SPAN_DEG) / TICK_STEP_DEG) * TICK_STEP_DEG;
   for (let b = first; b <= orient + SPAN_DEG; b += TICK_STEP_DEG) {
     const a = b - orient;
-    const major = norm(b) % 10 === 0;
+    const major = onCircle(b, 360) % 10 === 0;
     const at = toward(g.cx, g.cy, a);
     const segment = `M${at(g.r)}L${at(g.r - (major ? MAJOR_TICK_PX : MINOR_TICK_PX))}`;
     if (!major) {
@@ -94,7 +88,7 @@ export function compass(g: NdGeometry, orient: number): Compass {
     }
     out.major += segment;
     if (Math.abs(a) > LABEL_SPAN_DEG) continue;
-    const tens = norm(b) / 10;
+    const tens = onCircle(b, 360) / 10;
     const big = tens % 3 === 0;
     const [x, y] = ndPoint(g, a, g.r - (big ? BIG_LABEL_INSET_PX : SMALL_LABEL_INSET_PX));
     out.labels.push({ text: String(tens), x: tenth(x), y: tenth(y), big });
@@ -150,7 +144,7 @@ export function trackPath(g: NdGeometry): string {
 }
 
 /** The bug outline as (outward from the arc's radius, across): a notch in the foot, towards the arc. */
-const BUG_OUTLINE: readonly (readonly [number, number])[] = [
+const BUG_OUTLINE: readonly Point[] = [
   [9, -7],
   [9, 7],
   [1, 7],
@@ -165,7 +159,7 @@ const BUG_OUTLINE: readonly (readonly [number, number])[] = [
  * through the bug (across 0) is the line the arc ends at, so the cut falls there: the half left
  * of it is inside. The notch's half still points at the arc.
  */
-const BUG_INBOARD_HALF: readonly (readonly [number, number])[] = [
+const BUG_INBOARD_HALF: readonly Point[] = [
   [9, 0],
   [9, -7],
   [1, -7],
@@ -173,17 +167,10 @@ const BUG_INBOARD_HALF: readonly (readonly [number, number])[] = [
   [5, 0],
 ];
 
-/** The path through `outline` about the bug's own bearing `a`, its across offsets turned to `side`. */
-function bugOutline(
-  g: NdGeometry,
-  a: number,
-  outline: readonly (readonly [number, number])[],
-  side = 1,
-): string {
-  const p = toward(g.cx, g.cy, a);
-  return outline
-    .map(([out, across], i) => `${i ? 'L' : 'M'}${p(g.r + out, across * side)}`)
-    .join('');
+/** The points of `outline` about the bug's own bearing `a`, its across offsets turned to `side`. */
+function bugOutline(g: NdGeometry, a: number, outline: readonly Point[], side = 1): Point[] {
+  const p = offset(g.cx, g.cy, a);
+  return outline.map(([out, across]) => p(g.r + out, across * side));
 }
 
 /**
@@ -192,13 +179,13 @@ function bugOutline(
  * which draws as an open path so that no stroke runs along the cut.
  */
 export function bugPath(g: NdGeometry, rel: number): string {
-  if (onArc(rel)) return `${bugOutline(g, rel, BUG_OUTLINE)}Z`;
+  if (onArc(rel)) return polygonPath(bugOutline(g, rel, BUG_OUTLINE));
   const side = Math.sign(rel);
-  return bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side);
+  return polylinePath(bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side));
 }
 
 /** The heading pointer as (outward from the arc's radius, across): tip on the arc, base outside it. */
-const POINTER_OUTLINE: readonly (readonly [number, number])[] = [
+const POINTER_OUTLINE: readonly Point[] = [
   [1, 0],
   [12, 5],
   [12, -5],
@@ -206,7 +193,7 @@ const POINTER_OUTLINE: readonly (readonly [number, number])[] = [
 
 /** The heading pointer, an open triangle pointing in at the arc; empty off the arc. */
 export const headingPointerPath = (g: NdGeometry, rel: number): string =>
-  onArc(rel) ? `${bugOutline(g, rel, POINTER_OUTLINE)}Z` : '';
+  onArc(rel) ? polygonPath(bugOutline(g, rel, POINTER_OUTLINE)) : '';
 
 /** How the track turns and how fast the aircraft goes: what the trend vector extends. */
 export interface Trend {
@@ -217,7 +204,7 @@ export interface Trend {
 const TREND_SEC = 90;
 const TREND_FROM_PX = 9;
 /** The seconds of the trend, from and to, that each of its three dashes covers. */
-const TREND_DASHES: readonly (readonly [number, number])[] = [
+const TREND_DASHES: readonly Point[] = [
   [1, 28],
   [32, 58],
   [62, 88],
@@ -244,13 +231,8 @@ export function trendPoints(
 }
 
 /** The trend as three dashes, one for each 30 s. */
-export function trendPath(points: readonly (readonly [number, number])[]): string {
-  return TREND_DASHES.map(([from, to]) =>
-    points
-      .slice(from, to + 1)
-      .map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`)
-      .join(''),
-  ).join('');
+export function trendPath(points: readonly Point[]): string {
+  return TREND_DASHES.map(([from, to]) => polylinePath(points.slice(from, to + 1))).join('');
 }
 
 /** The level-off arc is drawn only this far from the aircraft symbol, and short of the compass arc. */
@@ -268,7 +250,7 @@ export function levelOffPath(g: NdGeometry, at: number, nm: number, rangeNm: num
 }
 
 /** Where the wind arrow stands, from the top left of the display; it does not scale with it. */
-const WIND_ARROW_CENTRE: readonly [number, number] = [16, 60];
+const WIND_ARROW_CENTRE: Point = [16, 60];
 const WIND_ARROW_HALF_LENGTH_PX = 10;
 const WIND_HEAD_BACK_PX = 5;
 const WIND_HEAD_HALF_WIDTH_PX = 3.5;
@@ -291,14 +273,10 @@ export const THREAT_SIDE_PX = 9;
 /** The square marking the hovered aircraft. */
 export const PEEK_SIDE_PX = 19;
 
-/** The closed outline through `corners`, as a subpath. */
-const outline = (corners: readonly (readonly [number, number])[]): string =>
-  `${corners.map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`).join('')}Z`;
-
 /** The diamond of other and proximate traffic, centred at (x, y). */
 export function trafficDiamondPath(x: number, y: number): string {
   const d = TRAFFIC_HALF_DIAGONAL_PX;
-  return outline([
+  return polygonPath([
     [x, y - d],
     [x + d, y],
     [x, y + d],
@@ -309,7 +287,7 @@ export function trafficDiamondPath(x: number, y: number): string {
 /** The square of side `side`, centred at (x, y). */
 export function squarePath(x: number, y: number, side: number): string {
   const h = side / 2;
-  return outline([
+  return polygonPath([
     [x - h, y - h],
     [x + h, y - h],
     [x + h, y + h],

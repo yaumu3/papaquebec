@@ -2,7 +2,7 @@ import type { Readout, Sample, Track } from '../../state/track';
 import { isLost } from './freshness';
 
 /** The target as it is now. */
-export interface Now<R extends Readout = Track> {
+interface Now<R extends Readout = Track> {
   kind: 'now';
   r: R;
   /** When freshness is judged: the snapshot's time. */

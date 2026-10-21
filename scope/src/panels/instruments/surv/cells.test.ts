@@ -2,12 +2,10 @@ import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../../lib/reports';
 import { makeTrack } from '../../../render/scene/trackFixture';
-import { makeSample } from '../../../state/sampleFixture';
+import { agedBy, AROUND_LAPSE, makeSample, NOW } from '../../../state/sampleFixture';
 import { NONE, READINGS } from '../../readings';
 import { nowAt } from '../moment';
 import { survCells } from './cells';
-
-const NOW = 1000;
 
 const heardAt = (at: number) => ({ nic: at, rc: at, nacP: at });
 const FRESH = heardAt(NOW - 1);
@@ -65,7 +63,7 @@ describe('survCells', () => {
 
   it('lapses NIC and NACP from the lapse on, as their lanes do', () => {
     // Arrange
-    const ages = [29.9, 30, 30.1];
+    const ages = AROUND_LAPSE;
 
     // Act
     const out = ages.map((age) =>
@@ -93,7 +91,7 @@ describe('survCells', () => {
 
   it('dims the position once it is as old as the lapse', () => {
     // Arrange
-    const ages = [29.9, 30, 30.1];
+    const ages = AROUND_LAPSE;
 
     // Act
     const dims = ages.map((seenPos) => cellsOf({ seenPos }).find((c) => c.key === 'pos')?.dim);
@@ -156,9 +154,7 @@ describe('survCells at a peeked sample', () => {
 
   it('reads a sample at its own time as a live target whose data has exactly that age', () => {
     // Arrange
-    const expected = sampleRows
-      .map((s) => makeSample(T + AGE, { ...s, heard: heardAt((s.heard.nic ?? 0) + AGE) }))
-      .map((r) => survCells(nowAt(r, T + AGE)));
+    const expected = sampleRows.map((s) => agedBy(s, AGE)).map((r) => survCells(nowAt(r, T + AGE)));
 
     // Act
     const peeked = sampleRows.map((r) => survCells({ kind: 'sample', r, instant: r.t }));

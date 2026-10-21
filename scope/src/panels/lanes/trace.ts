@@ -1,7 +1,8 @@
 import type { HeardKey } from '../../lib/aircraft';
-import { LAPSE_SEC } from '../../lib/reports';
+import { LAPSE_SEC, oldestHeard, withinLapse } from '../../lib/reports';
 import type { Sample } from '../../state/track';
 import { type Interval, timeAt } from '../../state/window';
+import { heardNear } from './heard';
 
 export interface Point {
   t: number;
@@ -35,38 +36,27 @@ function stretches(samples: readonly Sample[]): Sample[][] {
   return out;
 }
 
+/** The indices of the samples inside the interval, from `start` up to but not including `end`. */
+function indicesIn(samples: readonly Sample[], i: Interval): { start: number; end: number } {
+  return { start: countBefore(samples, i.from), end: countBefore(samples, i.to, true) };
+}
+
 /** The sample before the interval through the one after it, so a trace runs off the edges. */
 function around(samples: readonly Sample[], i: Interval): Sample[] {
-  let first = samples.findIndex((s) => s.t >= i.from);
-  if (first < 0) first = samples.length;
-  let last = samples.findIndex((s) => s.t > i.to);
-  if (last < 0) last = samples.length;
-  return samples.slice(Math.max(0, first - 1), Math.min(samples.length, last + 1));
-}
-
-/** When a reading made of the values `keys` was heard: when the oldest of them was; undefined unless one was. */
-export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefined {
-  const instants = keys.flatMap((key) => s.heard[key] ?? []);
-  return instants.length > 0 ? Math.min(...instants) : undefined;
-}
-
-/** Whether the reading made of `keys` was heard less than the gap from `t`; always, without keys. */
-export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
-  if (keys.length === 0) return true;
-  const at = heardAt(s, keys);
-  return at !== undefined && Math.abs(t - at) < LAPSE_SEC;
+  const { start, end } = indicesIn(samples, i);
+  return samples.slice(Math.max(0, start - 1), Math.min(samples.length, end + 1));
 }
 
 /**
  * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
- * the `heard` instants of the reading, only a sample with a new report of it, heard within the gap
+ * the `keys` the reading is heard by, only a sample with a new report of it, heard within the gap
  * of the sample, is a point, and a run breaks where the reading went unheard for the gap or longer.
  */
 export function runsOf(
   samples: readonly Sample[],
   read: Read,
   i: Interval,
-  heard: readonly HeardKey[] = [],
+  keys: readonly HeardKey[] = [],
 ): Point[][] {
   const runs: Point[][] = [];
   for (const stretch of stretches(around(samples, i))) {
@@ -78,12 +68,12 @@ export function runsOf(
     };
     for (const s of stretch) {
       const v = read(s);
-      const at = heard.length > 0 ? heardAt(s, heard) : s.t;
+      const at = keys.length > 0 ? oldestHeard(s.heard, keys) : s.t;
       if (v === undefined) {
         end();
         continue;
       }
-      if (at === undefined || at === last || !heardNear(s, heard, s.t)) continue;
+      if (at === undefined || at === last || !withinLapse(s.t, at)) continue;
       if (last !== undefined && at - last >= LAPSE_SEC) end();
       run.push({ t: s.t, v });
       last = at;
@@ -176,8 +166,7 @@ function countBefore(samples: readonly Sample[], t: number, through = false): nu
  * any. The samples are oldest first.
  */
 export function nearestSample(samples: readonly Sample[], t: number, i: Interval): Sample | null {
-  const start = countBefore(samples, i.from);
-  const end = countBefore(samples, i.to, true);
+  const { start, end } = indicesIn(samples, i);
   const k = Math.min(Math.max(countBefore(samples, t), start), end);
   const before = k > start ? samples[k - 1] : undefined;
   const after = k < end ? samples[k] : undefined;
@@ -186,7 +175,7 @@ export function nearestSample(samples: readonly Sample[], t: number, i: Interval
 }
 
 /** What a point across a plot stands for: its instant, and the sample there; none over a gap. */
-export interface Peek {
+interface Peek {
   t: number;
   sample: Sample | null;
 }
@@ -220,11 +209,11 @@ export function peekAt(
 
 /** The last sample inside the interval; null without any. The samples are oldest first. */
 export function newestSample(samples: readonly Sample[], i: Interval): Sample | null {
-  const end = countBefore(samples, i.to, true);
-  return end > countBefore(samples, i.from) ? (samples[end - 1] ?? null) : null;
+  const { start, end } = indicesIn(samples, i);
+  return end > start ? (samples[end - 1] ?? null) : null;
 }
 
-export interface Bar {
+interface Bar {
   name: string;
   /** The stretches during which the name was reported. */
   on: Interval[];
@@ -233,19 +222,19 @@ export interface Bar {
 /**
  * A bar per name reported, in order of first report: each stretch runs from the sample that
  * first reports the name to the last that does before one that does not, or a gap. With the
- * `heard` instants of the names, a sample whose names went unheard for the gap or longer reports
+ * `keys` the names are heard by, a sample whose names went unheard for the gap or longer reports
  * none.
  */
 export function barsOf(
   samples: readonly Sample[],
   names: (s: Sample) => readonly string[] | undefined,
-  heard: readonly HeardKey[] = [],
+  keys: readonly HeardKey[] = [],
 ): Bar[] {
   const bars = new Map<string, Bar>();
   for (const stretch of stretches(samples)) {
     let previous: Sample | undefined;
     for (const s of stretch) {
-      const named = heardNear(s, heard, s.t) ? names(s) : undefined;
+      const named = heardNear(s, keys, s.t) ? names(s) : undefined;
       for (const name of named ?? []) {
         const bar = bars.get(name) ?? { name, on: [] };
         bars.set(name, bar);
@@ -259,7 +248,7 @@ export function barsOf(
   return [...bars.values()];
 }
 
-export type BarbMark = 'pennant' | 'full' | 'half';
+type BarbMark = 'pennant' | 'full' | 'half';
 
 /** The marks of a wind barb, as the station plot draws them: a pennant per 50 kt, a barb per 10, a half barb for 5. */
 export function barbMarks(speedKt: number): BarbMark[] {

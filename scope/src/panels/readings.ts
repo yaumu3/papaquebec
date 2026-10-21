@@ -1,14 +1,14 @@
 import { epuM } from '../lib/accuracy';
+import type { HeardKey } from '../lib/aircraft';
 import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
 import { steeringHeading } from '../lib/autopilot';
 import {
-  climbArrow,
   formatAge,
   formatBoundM,
   formatMach,
   formatModes,
   formatRoll,
-  padBearing,
+  degreesText,
   sourceName,
 } from '../lib/format';
 import type { GeoPoint } from '../lib/geo';
@@ -28,23 +28,19 @@ import type { Readout } from '../state/track';
 export interface Reading {
   v: string;
   unit?: string;
-  /** A lit marker after the unit, such as the climb arrow. */
-  tail?: string;
-  /** A second value after a dot, in the plain text tone whatever the cell's own. */
-  also?: string;
-  /** A unit after the second value. */
-  alsoUnit?: string;
 }
 
 /** The one reading of anything unknown; a cell dims when it holds this. */
 export const NONE: Reading = { v: '---' };
 
-export const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
+const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
 
-/** The position as one cell. */
-export function positionReading(at: GeoPoint | undefined): { k: string; r: Reading } {
-  if (at === undefined) return { k: 'POSITION', r: NONE };
-  return { k: 'POSITION', r: { v: `${at.lat.toFixed(5)} ${at.lon.toFixed(5)}` } };
+/** What SURV labels the position. */
+export const POSITION_LABEL = 'POSITION';
+
+/** The position as a reading. */
+export function positionReading(at: GeoPoint | undefined): Reading {
+  return at === undefined ? NONE : { v: `${at.lat.toFixed(5)} ${at.lon.toFixed(5)}` };
 }
 
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>
@@ -57,18 +53,17 @@ const signed = (v: number | undefined, unit: string): Reading => {
 };
 
 /** A bearing with its degree mark, or the blank of the unknown. */
-const degrees = (deg: number | undefined): string =>
-  deg === undefined ? '---' : `${padBearing(deg)}°`;
+const degrees = (deg: number | undefined): string => (deg === undefined ? '---' : degreesText(deg));
 
 const bearing = (deg: number | undefined): Reading =>
   deg === undefined ? NONE : { v: degrees(deg) };
 
-function levelReading(d: DisplayAltitude, tail = ''): Reading {
+function levelReading(d: DisplayAltitude): Reading {
   switch (d.kind) {
     case 'altitude':
-      return { v: String(d.feet), unit: 'ft', tail };
+      return { v: String(d.feet), unit: 'ft' };
     case 'level':
-      return { v: `FL${String(Math.round(d.feet / 100)).padStart(3, '0')}`, tail };
+      return { v: `FL${String(Math.round(d.feet / 100)).padStart(3, '0')}` };
     case 'ground':
       return { v: 'GND' };
     default:
@@ -77,7 +72,7 @@ function levelReading(d: DisplayAltitude, tail = ''): Reading {
 }
 
 const altitudeReading = (r: Readout): Reading =>
-  levelReading(displayAltitude(r.alt, settings.altimeter), climbArrow(r.verticalRate).trim());
+  levelReading(displayAltitude(r.alt, settings.altimeter));
 
 const selectedReading = (ft: number | undefined): Reading =>
   levelReading(displayAltitude(ft, uncorrected(settings.altimeter)));
@@ -89,10 +84,22 @@ function trackReading(r: Readout): Reading {
   return { v: `${degrees(mag)} / ${degrees(r.heading)}` };
 }
 
+/** Where the wind blows from and how fast: degrees true and knots. */
+export interface Wind {
+  dir: number;
+  speed: number;
+}
+
+/** The wind when both its direction and its speed are known. */
+export const windOf = (r: Pick<Readout, 'windDir' | 'windSpeed'>): Wind | undefined =>
+  r.windDir === undefined || r.windSpeed === undefined
+    ? undefined
+    : { dir: r.windDir, speed: r.windSpeed };
+
 /** Where the wind blows from, then how fast; blank unless both are known. */
 function windReading(r: Readout): Reading {
-  if (r.windDir === undefined || r.windSpeed === undefined) return NONE;
-  return { v: `${degrees(r.windDir)} / ${Math.round(r.windSpeed)}`, unit: 'kt' };
+  const wind = windOf(r);
+  return wind ? { v: `${degrees(wind.dir)} / ${Math.round(wind.speed)}`, unit: 'kt' } : NONE;
 }
 
 const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));
@@ -133,7 +140,7 @@ const bank = (deg: number | undefined): Reading =>
 const machReading = (v: number | undefined): Reading =>
   v === undefined ? NONE : { v: formatMach(v) };
 
-export interface ReadingSpec {
+interface ReadingSpec {
   label: string;
   format: (r: Readout) => Reading;
   /** A number of the reading, in its own unit, as it reads. */
@@ -164,6 +171,32 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   rssi: { label: 'RSSI', format: (r) => dB(r.rssi), value: dB },
   msgs: { label: 'MSGS', format: (r) => perSecond(r.messageRate), value: perSecond },
   age: { label: 'SEEN / POS', format: ageReading, value: (v) => ({ v: formatAge(v), unit: 's' }) },
+};
+
+/** The values each reading is made of, by the instants they are heard at; none for the reception's own. */
+export const HEARD: Record<ReadingKey, readonly HeardKey[]> = {
+  alt: ['alt'],
+  selAlt: ['selAlt'],
+  fmsAlt: ['fmsAlt'],
+  vs: ['verticalRate'],
+  trk: ['track', 'heading'],
+  selHdg: ['selHeading'],
+  roll: ['roll'],
+  gs: ['gs'],
+  qnh: ['navQnh'],
+  modes: ['navModes'],
+  ias: ['ias'],
+  tas: ['tas'],
+  mach: ['mach'],
+  wind: ['windSpeed', 'windDir'],
+  oat: ['oat'],
+  tat: ['tat'],
+  nic: ['nic', 'rc'],
+  nacp: ['nacP'],
+  src: [],
+  rssi: [],
+  msgs: [],
+  age: [],
 };
 
 /** What each lane of an instrument is called. */

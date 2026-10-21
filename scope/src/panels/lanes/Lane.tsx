@@ -3,15 +3,11 @@ import { type Accessor, createMemo, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { HistoryLane, ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Interval, type WindowKey, xOf } from '../../state/window';
-import { LANE_LABELS, NONE } from '../readings';
+import { type Interval, lengthOf, xOf } from '../../state/window';
+import { HEARD, LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
-import { laneName } from './chips';
 import { CursorChip } from './CursorChip';
-import type { LanePart } from './laneDrag';
-import { isMenuKey } from './menu';
-import { type LaneMoves, onMoveKey, windowKeyOf } from './moves';
 import {
   atTicks,
   barbPath,
@@ -25,7 +21,7 @@ import {
   pathOf,
   scaleLabels,
 } from './plot';
-import { type Dash, HEARD, PLOTS } from './plots';
+import { type Dash, PLOTS, type PlotSpec } from './plots';
 import { heldIntents, type LaneReadout, readoutSlots, shownReadout, type Slot } from './readout';
 import { barsOf, yOf } from './trace';
 
@@ -60,16 +56,13 @@ const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash
 
 /** The dash an intent is drawn with, if any. */
 const dashOf = (key: ReadingKey): Dash | undefined => {
-  const p = PLOTS[key];
+  const p: PlotSpec = PLOTS[key];
   return p.kind === 'intent' ? p.dash : undefined;
 };
 
 /** One lane of the bay: a top row with its name and readout, then its scale and its plot over the window. */
 export function Lane(props: {
   lane: HistoryLane;
-  /** Its place among the lanes, and how many there are. */
-  index: number;
-  count: number;
   /** The lane's own reading, then the intents drawn in it. */
   keys: readonly ReadingKey[];
   samples: readonly Sample[];
@@ -86,24 +79,9 @@ export function Lane(props: {
   /** Where the time cursor stands across the plot, if it does. */
   cursor: number | null;
   /** The span being selected, between two points across the plot, if one is. */
-  band: { from: number; to: number } | null;
-  /** Resets the window, as a double click on the lane does. */
-  onReset: () => void;
-  /** Pans, narrows, widens or resets the window, as a key on the lane asks. */
-  onWindowKey: (key: WindowKey) => void;
-  /** The lane itself, which keeps the focus for it. */
-  laneRef: (el: HTMLDivElement) => void;
-  moves: LaneMoves;
-  /** What asks for the lane's palette. */
-  onMenu: (e: MouseEvent | KeyboardEvent) => void;
-  onGrab: (e: PointerEvent, part: LanePart) => void;
-  /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
-  place: number;
+  span: { from: number; to: number } | null;
   /** How far a finger has swiped the top row left, while one does. */
   swipeX: number | null;
-  slot: boolean;
-  /** Whether a finger has lifted it and not moved it yet: lit where it stands. */
-  lifted: boolean;
 }) {
   const spec = PLOTS[props.lane];
   const label = LANE_LABELS[props.lane];
@@ -131,7 +109,7 @@ export function Lane(props: {
   const rowHeight = () => (props.height - PAD_TOP_PX - PAD_BOTTOM_PX) / Math.max(1, bars().length);
   /** The shortest round clock step that keeps glyphs at least `pitch` apart across the window. */
   const stepEvery = (pitch: number) =>
-    clockStep(props.visible.to - props.visible.from, Math.max(1, Math.floor(props.width / pitch)));
+    clockStep(lengthOf(props.visible), Math.max(1, Math.floor(props.width / pitch)));
   /** The ticks of `step` at which a mark reaching `reach` round each fits whole in the plot. */
   const ticksAt = (step: number, reach: number) =>
     clearOfEnds(ticks(props.visible, step), x, props.width, reach);
@@ -167,7 +145,6 @@ export function Lane(props: {
     const r = readout();
     return r ? readoutSlots(r, held()) : [];
   };
-  let top: HTMLDivElement | undefined;
   /** What the lane reads at the cursor, in its top row or, while a cursor stands, in the chip. */
   const readoutView = (r: Accessor<LaneReadout>) => (
     <div class={s.readout}>
@@ -201,31 +178,7 @@ export function Lane(props: {
   );
 
   return (
-    <div
-      ref={props.laneRef}
-      data-lane="history"
-      class={cx(s.lane, props.slot && s.hole, props.lifted && s.lifted)}
-      style={{ height: `${props.height}px`, order: props.place }}
-      tabindex="0"
-      role="group"
-      aria-roledescription="lane"
-      aria-label={laneName(props.lane, props.index, props.count)}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        const key = windowKeyOf(e);
-        if (isMenuKey(e)) props.onMenu(e);
-        else if (key) {
-          e.preventDefault();
-          e.stopPropagation();
-          props.onWindowKey(key);
-        } else onMoveKey(props.moves, e);
-      }}
-      onContextMenu={props.onMenu}
-      onDblClick={props.onReset}
-      onPointerDown={(e) =>
-        props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
-      }
-    >
+    <>
       <div class={s.plot} data-plot>
         <svg class={s.svg} height={props.height}>
           <Index each={props.gaps}>
@@ -310,10 +263,10 @@ export function Lane(props: {
             )}
           </Index>
         </Show>
-        <Show when={props.band}>
+        <Show when={props.span}>
           {(b) => (
             <div
-              class={s.band}
+              class={s.span}
               style={{
                 left: `${Math.min(b().from, b().to)}px`,
                 width: `${Math.abs(b().to - b().from)}px`,
@@ -346,9 +299,6 @@ export function Lane(props: {
         </Index>
       </div>
       <div
-        ref={(el) => {
-          top = el;
-        }}
         data-row
         class={cx(s.top, props.swipeX !== null && s.swiping)}
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
@@ -356,6 +306,6 @@ export function Lane(props: {
         <span class={s.name}>{label}</span>
         <Show when={props.cursor === null ? readout() : null}>{readoutView}</Show>
       </div>
-    </div>
+    </>
   );
 }

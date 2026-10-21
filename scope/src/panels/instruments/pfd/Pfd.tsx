@@ -10,11 +10,13 @@ import { AltitudeMarks, AltitudeText, altitudeView, targetOf } from './AltitudeT
 import { AttitudeMarks, AttitudeText, attitudeView } from './Attitude';
 import { FlagsShown } from './Flag';
 import { FmaMarks, FmaText } from './Fma';
-import { pfdGeometry, vsiScale } from './geometry';
+import { pfdGeometry } from './geometry';
 import { feetOf, pfdFma, pfdReadouts } from './readout';
 import { SpeedMarks, SpeedText, speedView } from './SpeedTape';
 import { needleView, VsiMarks, VsiText } from './Vsi';
+import { vsiScale } from './vsiGeometry';
 
+import inst from '../instrument.module.css';
 import s from './Pfd.module.css';
 
 /** The primary flight display of a target: its modes, speed, attitude, altitude and vertical speed. */
@@ -40,11 +42,11 @@ export function Pfd(props: { t: Track; moment: Moment }) {
     <div
       data-pfd
       ref={setRoot}
-      class={cx(s.pfd, lost() && s.last)}
+      class={cx(inst.frame, s.pfd, lost() && s.last)}
       style={{ height: `${g().h}px` }}
     >
       <Show when={width() > 0}>
-        <svg class={s.svg} aria-hidden="true">
+        <svg class={inst.svg} aria-hidden="true">
           <AttitudeMarks g={g()} view={attitude()} />
           <SpeedMarks g={g()} view={speed()} />
           <AltitudeMarks g={g()} read={r().altitude} view={altitude()} sel={sel()} fms={fms()} />

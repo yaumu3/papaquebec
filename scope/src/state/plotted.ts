@@ -31,7 +31,7 @@ const INSTRUMENT_LANES = ['pfd', 'nd', 'surv'] as const;
 
 export type InstrumentLane = (typeof INSTRUMENT_LANES)[number];
 
-/** The lanes by group, in the order the palette offers them. */
+/** The lanes by group, in the order the picker offers them. */
 export const LANE_GROUPS = [
   { name: 'INST', lanes: INSTRUMENT_LANES },
   { name: 'FLT', lanes: ['alt', 'vs', 'gs', 'trk', 'roll'] },
@@ -53,10 +53,6 @@ export const isLaneKey = (k: unknown): k is LaneKey => LANE_KEYS.some((lane) => 
 
 export const isInstrumentLane = (k: LaneKey): k is InstrumentLane =>
   INSTRUMENT_LANES.some((lane) => lane === k);
-
-/** The lanes of `plotted` that draw a reading's history, in their order. */
-export const historyLanesOf = (plotted: readonly LaneKey[]): HistoryLane[] =>
-  plotted.filter((k) => !isInstrumentLane(k));
 
 /** The intents drawn in a lane, on its scale, whenever reported. */
 export const INTENTS: Partial<Record<HistoryLane, readonly ReadingKey[]>> = {

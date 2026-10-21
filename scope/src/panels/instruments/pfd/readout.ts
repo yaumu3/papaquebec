@@ -1,14 +1,13 @@
-import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt, selectedFt } from '../../../lib/altitude';
 import { turn } from '../../../lib/geo';
-import { hpaToInHg } from '../../../lib/metar';
-import { holds, LAPSE_SEC } from '../../../lib/reports';
+import { holds } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { magneticTrack } from '../../../state/magnetic';
 import type { Readout, Sample } from '../../../state/track';
-import { holdsAll, isLost } from '../freshness';
+import { READINGS } from '../../readings';
+import { eachHolds, holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
-import type { Fpv } from './geometry';
+import type { Fpv } from './attitudeGeometry';
 
 /** The labels the PFD gives the modes, in the order a column shows them when two are engaged. */
 const LATERAL_MODES: readonly (readonly [string, string])[] = [
@@ -24,11 +23,11 @@ const VERTICAL_MODES: readonly (readonly [string, string])[] = [
  * How long a column's box stands after its text changed, as Boeing's PFDs box a mode change for
  * 10 seconds.
  */
-export const MODE_CHANGE_SEC = 10;
+const MODE_CHANGE_SEC = 10;
 
-export type FmaColumn = 'lateral' | 'vertical';
+type FmaColumn = 'lateral' | 'vertical';
 
-export type FmaColumns = Record<FmaColumn, string | undefined>;
+type FmaColumns = Record<FmaColumn, string | undefined>;
 
 const labelOf = (
   modes: readonly string[],
@@ -52,7 +51,7 @@ export function modeChangedAt(
   instant: number,
 ): number | undefined {
   const counted = samples.filter(
-    (s) => s.t <= instant && s.navModes !== undefined && holds(s.heard.navModes, s.t, LAPSE_SEC),
+    (s) => s.t <= instant && s.navModes !== undefined && holdsAll(s, ['navModes'], s.t),
   );
   const text = (s: Sample | undefined) => fmaColumns(s?.navModes ?? [])[column];
   const current = text(counted.at(-1));
@@ -127,15 +126,11 @@ const KT_TO_FPM = 101.27;
 const pathAngle = (vsFpm: number, gsKt: number): number =>
   Math.atan2(vsFpm, gsKt * KT_TO_FPM) / RAD;
 
-/** Whether every one of the keys holds on its own: a key never heard does not hold. */
-const allHold = (t: Readout, keys: readonly HeardKey[], instant: number): boolean =>
-  keys.every((key) => holdsAll(t, [key], instant));
-
 /** The turn from the heading to the magnetic track while both hold, else none. */
 function driftOf(t: Readout, instant: number): number {
   const track = magneticTrack(t);
   if (t.heading === undefined || track === undefined) return 0;
-  return allHold(t, ['heading', 'track'], instant) ? turn(t.heading, track) : 0;
+  return eachHolds(t, ['heading', 'track'], instant) ? turn(t.heading, track) : 0;
 }
 
 /**
@@ -144,8 +139,8 @@ function driftOf(t: Readout, instant: number): number {
  */
 function fpvOf(t: Readout, instant: number): Fpv | undefined {
   const { verticalRate: vs, gs } = t;
-  if (isLost(t) || vs === undefined || gs === undefined || gs <= 0) return undefined;
-  if (!allHold(t, ['roll', 'verticalRate', 'gs'], instant)) return undefined;
+  if (vs === undefined || gs === undefined || gs <= 0) return undefined;
+  if (!eachHolds(t, ['roll', 'verticalRate', 'gs'], instant)) return undefined;
   return { fpaDeg: pathAngle(vs, gs), driftDeg: driftOf(t, instant) };
 }
 
@@ -154,18 +149,11 @@ function fpvOf(t: Readout, instant: number): Fpv | undefined {
  * capture of the selected altitude agrees with the data block's tick.
  */
 function altitudeOf(t: Readout, instant: number, altimeter: Altimeter): PfdAltitude {
-  if (isLost(t) || !holdsAll(t, ['alt'], instant)) return { kind: 'flag' };
+  if (!holdsAll(t, ['alt'], instant)) return { kind: 'flag' };
   if (t.alt === 'ground') return { kind: 'ground' };
   const ft = crewAltitudeFt(t, altimeter);
   return ft === undefined ? { kind: 'flag' } : { kind: 'feet', ft };
 }
-
-/** A reading of the target while it holds and the target is not lost. */
-const liveValue = (
-  t: Readout,
-  key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt' | 'navQnh' | 'verticalRate',
-  instant: number,
-): number | undefined => (!isLost(t) && holdsAll(t, [key], instant) ? t[key] : undefined);
 
 const asSet = (ft: number | undefined): number | undefined =>
   ft === undefined ? undefined : selectedFt(ft);
@@ -184,14 +172,13 @@ const EMPTY_READOUTS: PfdReadouts = {
 
 /** The values of the instrument, each while its keys hold and the target is not lost; none over a gap. */
 export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadouts {
-  if (m.kind === 'empty') return EMPTY_READOUTS;
+  if (m.kind === 'empty' || isLost(m.r)) return EMPTY_READOUTS;
   const { r: t, instant } = m;
-  const ias = liveValue(t, 'ias', instant);
-  const mach = liveValue(t, 'mach', instant);
-  const roll = liveValue(t, 'roll', instant);
-  const selAlt = asSet(liveValue(t, 'selAlt', instant));
-  const fmsAlt = asSet(liveValue(t, 'fmsAlt', instant));
-  const qnh = liveValue(t, 'navQnh', instant);
+  const ias = ifHolds(t, ['ias'], instant, t.ias);
+  const mach = ifHolds(t, ['mach'], instant, t.mach);
+  const roll = ifHolds(t, ['roll'], instant, t.roll);
+  const selAlt = asSet(ifHolds(t, ['selAlt'], instant, t.selAlt));
+  const fmsAlt = asSet(ifHolds(t, ['fmsAlt'], instant, t.fmsAlt));
   return {
     ias,
     mach: mach === undefined ? '' : machText(mach),
@@ -200,7 +187,8 @@ export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadou
     altitude: altitudeOf(t, instant, altimeter),
     selAlt,
     fmsAlt: fmsAlt === selAlt ? undefined : fmsAlt,
-    vs: liveValue(t, 'verticalRate', instant),
-    baro: qnh === undefined ? '' : hpaToInHg(qnh).toFixed(2),
+    vs: ifHolds(t, ['verticalRate'], instant, t.verticalRate),
+    baro:
+      holdsAll(t, ['navQnh'], instant) && t.navQnh !== undefined ? READINGS.qnh.format(t).v : '',
   };
 }

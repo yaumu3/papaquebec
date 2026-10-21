@@ -2,8 +2,8 @@ import { climbState } from '../../lib/format';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { NONE, READINGS } from '../readings';
-import { heardNearAt, plotText } from './plot';
-import { PLOTS } from './plots';
+import { heardNearAt } from './heard';
+import { PLOTS, plotText } from './plots';
 
 /**
  * Within this, the two targets agree: the coarser step a selected altitude comes in, 32 ft in the
@@ -64,7 +64,7 @@ function fmsFirst(
 }
 
 /** An intent as a lane's readout prints it. */
-export interface IntentText {
+interface IntentText {
   key: ReadingKey;
   text: string;
 }
@@ -98,10 +98,9 @@ function intentsOf(
 ): { keys: ReadingKey[]; agreed: boolean } {
   const [lane, ...intents] = keys;
   if (lane !== 'alt') return { keys: intents, agreed: false };
-  const alt = PLOTS.alt;
   const sel = intents.includes('selAlt') ? s.selAlt : undefined;
   const fms = intents.includes('fmsAlt') ? s.fmsAlt : undefined;
-  const targets = altTargets(alt.kind === 'line' ? alt.y(s) : undefined, s.verticalRate, sel, fms);
+  const targets = altTargets(PLOTS.alt.y(s), s.verticalRate, sel, fms);
   if (!targets) return { keys: [], agreed: false };
   const { first, other } = targets;
   return {

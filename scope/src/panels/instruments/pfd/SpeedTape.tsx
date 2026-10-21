@@ -3,20 +3,19 @@ import { Index, Show } from 'solid-js';
 import { Flag } from './Flag';
 import {
   type PfdGeometry,
-  type SpeedDigits,
   type SpeedTape as SpeedTapeMarks,
   speedBoxPath,
-  speedDigits,
   speedReadout,
   speedStripPath,
   speedTape,
 } from './geometry';
 import { Wheel } from './Wheel';
+import { type SpeedDigits, speedDigits } from './wheels';
 
 import s from './Pfd.module.css';
 
 /** The speed tape and its readout's digits, for a speed that holds. */
-export interface SpeedView {
+interface SpeedView {
   tape: SpeedTapeMarks;
   digits: SpeedDigits;
 }

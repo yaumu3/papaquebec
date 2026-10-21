@@ -7,7 +7,7 @@ import { LAPSE_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
-import { makeSample } from '../../../state/sampleFixture';
+import { FRESH, makeSample, NOW, resetDeclination } from '../../../state/sampleFixture';
 import { hexAt } from '../../../state/scope';
 import type { Track } from '../../../state/track';
 import { nowAt } from '../moment';
@@ -26,9 +26,6 @@ import {
   trafficKind,
   verticalArrow,
 } from './traffic';
-
-const NOW = 1000;
-const FRESH = NOW - 1;
 
 describe('relativeAltitudeLabel', () => {
   it('reads hundreds of feet with the sign of the rounded value, two digits at least', () => {
@@ -101,9 +98,7 @@ const OWN_AT = { lat: 35.55, lon: 139.78 };
 const G = ndGeometry(346);
 const EDGE_NM = (20 * (G.r - 4)) / G.r;
 
-afterEach(() => {
-  setDeclinationAt(() => () => 0);
-});
+afterEach(resetDeclination);
 
 const ownShip = (over: Partial<Track> = {}): Track =>
   makeTrack({
@@ -459,14 +454,14 @@ describe('ndTraffic threat by address', () => {
   });
 });
 
-describe('ndTraffic threat by position', () => {
+describe('ndTraffic estimated threat', () => {
   const HELD = { position: FRESH, alt: FRESH, heading: FRESH };
-  const byPosition = (threat: Threat, over: Partial<Track> = {}): Track =>
+  const estimating = (threat: Threat, over: Partial<Track> = {}): Track =>
     ownShip({ heading: 152, heard: HELD, ra: advisory(threat), ...over });
 
   it('keys each symbol by its track, and the threat placed by range and bearing as the estimate', () => {
     // Arrange
-    const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
+    const own = estimating({ range: 3, bearing: 20, altitude: 29600 });
     const others = [traffic('near', 150, 3)];
 
     // Act
@@ -478,7 +473,7 @@ describe('ndTraffic threat by position', () => {
 
   it('carries where each symbol lies from own ship, east and north in NM, magnetic north up', () => {
     // Arrange
-    const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
+    const own = estimating({ range: 3, bearing: 20, altitude: 29600 });
     const others = [traffic('ahead', 150, 5)];
     const [east, north] = [3 * Math.sin(172 * RAD), 3 * Math.cos(172 * RAD)];
 
@@ -494,7 +489,7 @@ describe('ndTraffic threat by position', () => {
 
   it('places it at its range, on its bearing from the heading, with the label of its altitude', () => {
     // Arrange
-    const own = byPosition({ range: 3, bearing: 20, altitude: 29600 });
+    const own = estimating({ range: 3, bearing: 20, altitude: 29600 });
     const [x, y] = ndPoint(G, turn(150, 152 + 20), pxOf(G, 3, 20));
 
     // Act
@@ -510,13 +505,13 @@ describe('ndTraffic threat by position', () => {
   it('places nothing without a held heading, nor without a range or a bearing, but still TRAFFIC', () => {
     // Arrange
     const owns = [
-      byPosition({ range: 3, bearing: 20 }, { heard: { ...HELD, heading: NOW - LAPSE_SEC } }),
-      byPosition(
+      estimating({ range: 3, bearing: 20 }, { heard: { ...HELD, heading: NOW - LAPSE_SEC } }),
+      estimating(
         { range: 3, bearing: 20 },
         { heading: undefined, heard: { position: FRESH, alt: FRESH } },
       ),
-      byPosition({ bearing: 20 }),
-      byPosition({ range: 3 }),
+      estimating({ bearing: 20 }),
+      estimating({ range: 3 }),
     ];
 
     // Act
@@ -533,7 +528,7 @@ describe('ndTraffic threat by position', () => {
 
   it('places it without own ship held position', () => {
     // Arrange
-    const own = byPosition({ range: 3, bearing: 20 }, { position: { kind: 'none' } });
+    const own = estimating({ range: 3, bearing: 20 }, { position: { kind: 'none' } });
 
     // Act
     const result = ndTraffic(nowAt(own, NOW), [], view(150));
@@ -545,8 +540,8 @@ describe('ndTraffic threat by position', () => {
   it('gives no label without the threat altitude or without own altitude held', () => {
     // Arrange
     const owns = [
-      byPosition({ range: 3, bearing: 20 }),
-      byPosition(
+      estimating({ range: 3, bearing: 20 }),
+      estimating(
         { range: 3, bearing: 20, altitude: 29600 },
         { heard: { ...HELD, alt: NOW - LAPSE_SEC } },
       ),
