@@ -4,25 +4,11 @@
   --nd-label: var(--color-level);
   --nd-small: var(--text-dim);
   --zoom-w: 28px;
-  position: relative;
-  margin-top: var(--space-4);
-  background: var(--instrument-bg);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
 }
 .last {
   --nd-ink: var(--text-muted);
   --nd-label: var(--text-muted);
   --nd-small: var(--text-muted);
-}
-.svg {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke-linejoin: round;
 }
 .ring {
   stroke: var(--nd-ring);

@@ -1,24 +1,10 @@
 /* The ink of the frame, which the last frame of a target not heard drops to muted. */
 .pfd {
   --pfd-ink: var(--text);
-  position: relative;
-  margin-top: var(--space-4);
-  background: var(--instrument-bg);
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
   overflow: hidden;
 }
 .last {
   --pfd-ink: var(--text-muted);
-}
-.svg {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  fill: none;
-  stroke-linejoin: round;
 }
 .strip {
   fill: var(--pfd-strip);

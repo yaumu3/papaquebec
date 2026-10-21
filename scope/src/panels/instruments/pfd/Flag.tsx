@@ -2,7 +2,7 @@ import { type Accessor, createContext, type JSX, Show, useContext } from 'solid-
 
 import { cx } from '../../../design/cx';
 
-import flags from '../flag.module.css';
+import inst from '../instrument.module.css';
 import s from './Pfd.module.css';
 
 const Shown = createContext<Accessor<boolean>>(() => true);
@@ -17,7 +17,7 @@ export function Flag(props: { text: string; x: number; y: number }) {
   const shown = useContext(Shown);
   return (
     <Show when={shown()}>
-      <span class={cx(flags.flag, s.flag)} style={{ left: `${props.x}px`, top: `${props.y}px` }}>
+      <span class={cx(inst.flag, s.flag)} style={{ left: `${props.x}px`, top: `${props.y}px` }}>
         {props.text}
       </span>
     </Show>
