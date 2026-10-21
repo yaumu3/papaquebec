@@ -10,7 +10,7 @@ export interface Now<R extends Readout = Track> {
 }
 
 /** A sample drawn at its own time: the peeked one, or the newest in a held window. */
-export interface Then {
+interface Then {
   kind: 'sample';
   r: Sample;
   instant: number;
