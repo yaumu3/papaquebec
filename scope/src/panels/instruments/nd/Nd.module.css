@@ -277,7 +277,7 @@
  * lower one down, so that they do not overlap. The insets count from the padding edge, a pixel
  * inside the border. The area is no wider than the display's edge to the 8 px gap before the
  * alerts, so it never covers one. Only 6 px lie below the pair, so the lower area hangs 12 px
- * below the display, over the gap above the table, where nothing takes a tap; that is why the
+ * below the display, over the gap beneath it, where nothing takes a tap; that is why the
  * display does not clip its overflow, and the SVG clips its own drawing.
  */
 .zoomButton::before {

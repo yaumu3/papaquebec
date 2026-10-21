@@ -59,7 +59,7 @@ const wind = (s: Sample): Wind | undefined =>
     ? undefined
     : { dir: s.windDir, speed: s.windSpeed };
 
-/** The track in magnetic, as the table reads it, and the heading as sent. */
+/** The track in magnetic, as the readings show it, and the heading as sent. */
 const heading = (s: Sample): Heading | undefined => {
   const trk = magneticTrack(s);
   const hdg = s.heading;

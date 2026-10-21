@@ -461,7 +461,7 @@
   color: var(--plot-intent-dim);
   stroke: var(--plot-intent-dim);
 }
-/* An intent the contact has had, unknown at the cursor's instant: dimmed as the table dims it. */
+/* An intent the contact has had, unknown at the cursor's instant: dimmed like any unknown reading. */
 .unknown {
   color: var(--text-dim);
   stroke: var(--text-dim);
