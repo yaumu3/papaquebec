@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { axisStep, chipAt, clearOf, clockLabel, clockStep, clearOfEnds, ticks } from './axis';
-
-/** 12:36:10Z on the first day of the epoch. */
-const T = 12 * 3600 + 36 * 60 + 10;
+import type { LanesWindow } from '../../state/window';
+import { axisStep, clearOf, clearOfEnds, clockStep, endLabel, ticks } from './axis';
 
 describe('axisStep', () => {
   it('takes the shortest step that labels a span a few times over', () => {
@@ -36,7 +34,7 @@ describe('clockStep', () => {
 });
 
 describe('ticks', () => {
-  it('falls on the round clock times inside the interval, its ends included', () => {
+  it('falls on the multiples of the step inside the interval, its ends included', () => {
     // Arrange
     const interval = { from: 1000, to: 1560 };
 
@@ -46,18 +44,48 @@ describe('ticks', () => {
     // Assert
     expect(at).toEqual([1080, 1200, 1320, 1440, 1560]);
   });
-});
 
-describe('clockLabel', () => {
-  it('reads to the minute, and to the second once the step is shorter than one', () => {
+  it('falls on whole steps before the origin, so that the grid marks ages', () => {
     // Arrange
-    const minute = T - 10;
+    const interval = { from: 1000, to: 1560 };
+    const now = 1570;
 
     // Act
-    const labels = [clockLabel(minute, 120), clockLabel(T, 30)];
+    const at = ticks(interval, 120, now);
 
     // Assert
-    expect(labels).toEqual(['12:36', '12:36:10']);
+    expect(at).toEqual([1090, 1210, 1330, 1450]);
+  });
+
+  it('moves with the origin as it grows', () => {
+    // Arrange
+    const interval = { from: 1000, to: 1560 };
+
+    // Act
+    const at = [ticks(interval, 120, 1570), ticks(interval, 120, 1571)];
+
+    // Assert
+    expect(at).toEqual([
+      [1090, 1210, 1330, 1450],
+      [1091, 1211, 1331, 1451],
+    ]);
+  });
+});
+
+describe('endLabel', () => {
+  it('reads NOW while live and the lag with a chevron while held', () => {
+    // Arrange
+    const live: LanesWindow = { kind: 'live', sec: 300 };
+    const held: LanesWindow = { kind: 'held', from: 1000, to: 1300 };
+
+    // Act
+    const labels = [endLabel(live, 0), endLabel(held, 200)];
+
+    // Assert
+    expect(labels).toEqual([
+      { text: 'NOW', held: false },
+      { text: '−03:20 ›', held: true },
+    ]);
   });
 });
 
@@ -75,21 +103,8 @@ describe('clearOfEnds', () => {
   });
 });
 
-describe('chipAt', () => {
-  it('centres the chip on the cursor, kept inside the plot', () => {
-    // Arrange
-    const xs = [150, 10, 295];
-
-    // Act
-    const lefts = xs.map((x) => chipAt(x, 60, 300));
-
-    // Assert
-    expect(lefts).toEqual([120, 0, 240]);
-  });
-});
-
 describe('clearOf', () => {
-  it('tells which labels miss the chip', () => {
+  it('tells which labels miss the end label', () => {
     // Arrange
     const xs = [60, 180, 230, 300];
 

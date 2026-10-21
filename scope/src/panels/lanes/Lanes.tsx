@@ -2,7 +2,6 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from
 import { Portal } from 'solid-js/web';
 
 import { cx } from '../../design/cx';
-import { clockTime } from '../../lib/format';
 import { clamp } from '../../lib/math';
 import {
   addPlotLane,
@@ -18,6 +17,7 @@ import {
   historyLanesOf,
   isInstrumentLane,
   laneAfter,
+  lastHistoryIndex,
   type LaneKey,
   readingsIn,
 } from '../../state/plotted';
@@ -28,7 +28,7 @@ import { type Interval, readsPast, resolveWindow, xOf } from '../../state/window
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
-import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, ticks } from './axis';
+import { axisStep, ticks } from './axis';
 import { pickOf } from './chips';
 import { liftLeft, slotShown } from './drag';
 import { HOLD_MS, MENU_HOLD_MS } from './hold';
@@ -47,24 +47,13 @@ import { Palette } from './Palette';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
+import { TimeAxis } from './TimeAxis';
 import { newestSample, sampleAt } from './trace';
 
 import s from './Lanes.module.css';
 
 /** Each lane's height, a hairline under it. */
 const LANE_PX = 84;
-/** The left edge of a cursor `px` across the plots, as the viewport, wider by the overhang and the gutter, places it. */
-const cursorLeft = (px: number): string =>
-  `calc(var(--lane-overhang) + var(--plot-left) + ${px - 0.5}px)`;
-/** The chip's padding either side of its time. */
-const CHIP_PAD_PX = 3;
-/** A clock time to the second, measured for the clock labels' width per character. */
-const RULER = '00:00:00';
-/** The least room between the chip and a clock label. */
-const CHIP_GAP_PX = 4;
-/** The notch under the chip, pointing down the cursor. */
-const NOTCH_W_PX = 7;
-const NOTCH_H_PX = 4;
 /** Between the chip lifted with a dragged lane and the pointer under it. */
 const LIFT_GAP_PX = 4;
 
@@ -100,12 +89,13 @@ export function Lanes(props: { track: Track }) {
     return { from: samples()[0]?.t ?? now, to: now };
   });
   const visible = createMemo(() => resolveWindow(lanesWindow(), contact()));
+  const now = () => contact().to;
   const step = createMemo(() => axisStep(visible().to - visible().from));
-  const tickTimes = createMemo(() => ticks(visible(), step()));
+  const tickTimes = createMemo(() => ticks(visible(), step(), now()));
 
-  const [labels, setLabels] = createSignal<HTMLDivElement>();
-  /** The axis labels line up with the plots, so their width is the plots'. */
-  const plotWidth = trackWidth(labels);
+  const [axisRow, setAxisRow] = createSignal<HTMLDivElement>();
+  /** The axis row lines up with the plots, so its width is the plots'. */
+  const plotWidth = trackWidth(axisRow);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
 
   /** The sample under the pointer, as the window moves under it too. */
@@ -122,7 +112,7 @@ export function Lanes(props: { track: Track }) {
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is held, dragged or swiped. */
   const pointerAt = (e: PointerEvent) => {
     const target = e.target instanceof Element ? e.target : null;
-    const px = e.clientX - (labels()?.getBoundingClientRect().left ?? 0);
+    const px = e.clientX - (axisRow()?.getBoundingClientRect().left ?? 0);
     setHoverPx(
       px < 0 || drag() || swipe() || holding() || !target?.closest('[data-lane="history"]')
         ? null
@@ -130,10 +120,6 @@ export function Lanes(props: { track: Track }) {
     );
   };
 
-  const [chipText, setChipText] = createSignal<HTMLSpanElement>();
-  const chipTextWidth = trackWidth(chipText);
-  const [ruler, setRuler] = createSignal<HTMLSpanElement>();
-  const rulerWidth = trackWidth(ruler);
   /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere unless hovering a history lane. */
   const cursorX = () => {
     const a = hover();
@@ -141,26 +127,6 @@ export function Lanes(props: { track: Track }) {
       ? clamp(Math.floor(x(a.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5)
       : null;
   };
-  /** The chip's width: its time, padding and border. */
-  const chipWidth = () => chipTextWidth() + 2 * (CHIP_PAD_PX + 1);
-  const chipLeft = (px: number) => chipAt(px, chipWidth(), plotWidth());
-  /** Half a clock label's width, at the ruler's width per character: the labels of one step are as long as each other. */
-  const labelHalf = () => {
-    const first = tickTimes()[0];
-    return first === undefined
-      ? 0
-      : (clockLabel(first, step()).length * rulerWidth()) / RULER.length / 2;
-  };
-  /** The ticks whose labels fit whole over the plots. */
-  const labelTimes = createMemo(() => clearOfEnds(tickTimes(), x, plotWidth(), labelHalf()));
-  /** Whether each clock label stands clear of the chip, which hides those it would overlap. */
-  const clockClear = createMemo(() => {
-    const times = labelTimes();
-    const cursor = cursorX();
-    if (cursor === null) return times.map(() => true);
-    const left = chipLeft(cursor);
-    return clearOf(times.map(x), left, left + chipWidth(), labelHalf() + CHIP_GAP_PX);
-  });
 
   const [bay, setBay] = createSignal<HTMLDivElement>();
   const bayBox = () => bay()?.getBoundingClientRect();
@@ -302,59 +268,11 @@ export function Lanes(props: { track: Track }) {
       class={cx(s.lanes, drag() && s.grabbing)}
       style={{
         '--lane-height': `${LANE_PX}px`,
-        '--notch-height': `${NOTCH_H_PX}px`,
         '--lift-ms': `${MENU_HOLD_MS - HOLD_MS}ms`,
       }}
     >
-      <div class={s.axis}>
-        <div ref={setLabels} class={s.labels}>
-          <For each={labelTimes()}>
-            {(t, i) => (
-              <Show when={clockClear()[i()]}>
-                <span class={s.label} style={{ left: `${x(t)}px` }}>
-                  {clockLabel(t, step())}
-                </span>
-              </Show>
-            )}
-          </For>
-          <span ref={setRuler} class={cx(s.label, s.ruler)} aria-hidden="true">
-            {RULER}
-          </span>
-          <Show when={cursorX() !== null && at()}>
-            {(a) => (
-              <>
-                <span
-                  class={s.chip}
-                  style={{
-                    left: `${chipLeft(cursorX() ?? 0)}px`,
-                    padding: `0 ${CHIP_PAD_PX}px`,
-                  }}
-                >
-                  <span ref={setChipText} class={s.chipTime}>
-                    {clockTime(a().t)}
-                  </span>
-                </span>
-                <svg
-                  class={s.notch}
-                  style={{ left: `${(cursorX() ?? 0) - NOTCH_W_PX / 2}px` }}
-                  width={NOTCH_W_PX}
-                  height={NOTCH_H_PX}
-                >
-                  <path d={`M0 0 H${NOTCH_W_PX} L${NOTCH_W_PX / 2} ${NOTCH_H_PX} Z`} />
-                </svg>
-              </>
-            )}
-          </Show>
-        </div>
-      </div>
       <div ref={setBay} class={s.bay}>
-        <div
-          class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}
-          style={(() => {
-            const px = cursorX();
-            return px === null ? {} : { '--cursor-left': cursorLeft(px) };
-          })()}
-        >
+        <div class={cx(s.viewport, view().cutTop && s.cutTop, view().cutBottom && s.cutBottom)}>
           <div
             ref={setScroller}
             class={s.scroller}
@@ -418,6 +336,18 @@ export function Lanes(props: { track: Track }) {
                 );
               }}
             </For>
+            <Show when={lastHistoryIndex(plotted()) >= 0}>
+              <TimeAxis
+                ticks={tickTimes()}
+                x={x}
+                width={plotWidth()}
+                now={now()}
+                window={lanesWindow()}
+                lag={now() - visible().to}
+                order={lastHistoryIndex(plotted())}
+                rowRef={setAxisRow}
+              />
+            </Show>
             <div class={s.addRow} style={{ order: plotted().length }}>
               <button
                 ref={(el) => {

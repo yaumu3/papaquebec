@@ -33,7 +33,7 @@ import s from './Lanes.module.css';
 /** The data band: below the lane's top row, where its name sits, and clear of its foot. */
 const PAD_TOP_PX = 28;
 const PAD_BOTTOM_PX = 11;
-/** How far the clock lines and the gaps stop short of the lane's top and bottom. */
+/** How far the grid lines and the gaps stop short of the lane's top and bottom. */
 const GRID_INSET_PX = 4;
 /** Kept clear above and below a gantt bar, within its row. */
 const BAR_INSET_PX = 2;

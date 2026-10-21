@@ -9,6 +9,7 @@ import {
   historyLanesOf,
   isInstrumentLane,
   laneAfter,
+  lastHistoryIndex,
   LANE_KEYS,
   type LaneKey,
   moveLane,
@@ -243,5 +244,24 @@ describe('laneAfter', () => {
 
     // Assert
     expect(after).toEqual(['gs', 'vs', null, null]);
+  });
+});
+
+describe('lastHistoryIndex', () => {
+  it('is the place of the last history lane, -1 with none', () => {
+    // Arrange
+    const columns: LaneKey[][] = [
+      ['pfd', 'alt', 'nd', 'gs', 'surv'],
+      ['alt', 'pfd'],
+      ['alt', 'gs'],
+      ['pfd', 'nd'],
+      [],
+    ];
+
+    // Act
+    const indices = columns.map(lastHistoryIndex);
+
+    // Assert
+    expect(indices).toEqual([3, 0, 1, -1, -1]);
   });
 });
