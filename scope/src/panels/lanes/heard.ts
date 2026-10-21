@@ -1,5 +1,5 @@
 import type { HeardKey } from '../../lib/aircraft';
-import { LAPSE_SEC, oldestHeard } from '../../lib/reports';
+import { oldestHeard, withinLapse } from '../../lib/reports';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { HEARD } from '../readings';
@@ -8,7 +8,7 @@ import { HEARD } from '../readings';
 export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
   if (keys.length === 0) return true;
   const at = oldestHeard(s.heard, keys);
-  return at !== undefined && Math.abs(t - at) < LAPSE_SEC;
+  return at !== undefined && withinLapse(t, at);
 }
 
 /**

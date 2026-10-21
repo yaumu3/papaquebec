@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from './aircraft';
-import { holds, oldestHeard } from './reports';
+import { holds, LAPSE_SEC, oldestHeard, withinLapse } from './reports';
 
 describe('holds', () => {
   it('holds while the report is younger than the lapse, and never without one', () => {
@@ -38,5 +38,18 @@ describe('oldestHeard', () => {
 
     // Assert
     expect(out).toEqual([980, 980, undefined, 8, undefined]);
+  });
+});
+
+describe('withinLapse', () => {
+  it('is true under the lapse apart, either way round, and false at it or beyond', () => {
+    // Arrange
+    const gaps = [LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+
+    // Act
+    const out = gaps.flatMap((gap) => [withinLapse(100, 100 + gap), withinLapse(100 + gap, 100)]);
+
+    // Assert
+    expect(out).toEqual([true, true, false, false, false, false]);
   });
 });

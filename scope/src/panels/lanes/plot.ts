@@ -2,7 +2,7 @@ import type { HeardKey } from '../../lib/aircraft';
 import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
 import { NM_IN_METERS, turn } from '../../lib/geo';
 import { nearestInTime } from '../../lib/nearest';
-import { LAPSE_SEC } from '../../lib/reports';
+import { withinLapse } from '../../lib/reports';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
@@ -163,11 +163,10 @@ export function atTicks<T extends object>(
   return ticks.flatMap((t) => {
     const near = nearestInTime(preferred, t);
     const s =
-      near && Math.abs(near.t - t) <= reach && Math.abs(near.t - t) < LAPSE_SEC
+      near && Math.abs(near.t - t) <= reach && withinLapse(near.t, t)
         ? near
         : nearestInTime(samples, t);
-    const value =
-      s && Math.abs(s.t - t) < LAPSE_SEC && heardNear(s, keys, t) ? read(s, t) : undefined;
+    const value = s && withinLapse(s.t, t) && heardNear(s, keys, t) ? read(s, t) : undefined;
     return value ? [{ ...value, t }] : [];
   });
 }

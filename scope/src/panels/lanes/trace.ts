@@ -1,5 +1,5 @@
 import type { HeardKey } from '../../lib/aircraft';
-import { LAPSE_SEC, oldestHeard } from '../../lib/reports';
+import { LAPSE_SEC, oldestHeard, withinLapse } from '../../lib/reports';
 import type { Sample } from '../../state/track';
 import { type Interval, timeAt } from '../../state/window';
 import { heardNear } from './heard';
@@ -71,7 +71,7 @@ export function runsOf(
         end();
         continue;
       }
-      if (at === undefined || at === last || !heardNear(s, keys, s.t)) continue;
+      if (at === undefined || at === last || !withinLapse(s.t, at)) continue;
       if (last !== undefined && at - last >= LAPSE_SEC) end();
       run.push({ t: s.t, v });
       last = at;
