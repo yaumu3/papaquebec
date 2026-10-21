@@ -335,8 +335,8 @@ function estimateOffscale(own: Track, now: number, view: NdView): boolean {
   return !!estimate && !pointOnDisplay(view, estimate.rel, estimate.rangeNm);
 }
 
-/** The symbol of the threat given by position, labelled when both its altitude and own ship's are known. */
-function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol | undefined {
+/** The symbol of the estimated threat, labelled when both its altitude and own ship's are known. */
+function estimatedThreat(own: Track, now: number, view: NdView): TrafficSymbol | undefined {
   const estimate = estimateOf(own, now, view);
   const point = estimate && pointOnDisplay(view, estimate.rel, estimate.rangeNm);
   if (!estimate || !point) return undefined;
@@ -369,8 +369,8 @@ export function ndTraffic(m: Moment, others: Iterable<Track>, view: NdView): NdT
   const threatTrack = all.find((t) => t.hex === address);
   const threat = placeThreat(own, threatTrack, now, view);
   if (threat) symbols.push(symbolOf('threat', threat, now));
-  const byPosition = threatByPosition(own, now, view);
-  if (byPosition) symbols.push(byPosition);
+  const estimated = estimatedThreat(own, now, view);
+  if (estimated) symbols.push(estimated);
   const offscale = addressOffscale(own, threatTrack, now, view) || estimateOffscale(own, now, view);
   return { symbols, traffic: advisoryActive(own.ra), offscale };
 }
