@@ -501,20 +501,19 @@ describe('the ND at a peeked sample', () => {
 
   it('reads a sample at its own time as a live target whose data has exactly that age', () => {
     // Arrange
-    const live = rows.map(liveOf);
+    const expected = rows.map(liveOf).map((r) => {
+      const m = nowAt(r, T + AGE);
+      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
+    });
 
     // Act
     const peeked = rows.map((r) => {
       const m = { kind: 'sample', r, instant: r.t } as const;
       return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
     });
-    const now = live.map((r) => {
-      const m = nowAt(r, T + AGE);
-      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
-    });
 
     // Assert
-    expect(peeked).toEqual(now);
+    expect(peeked).toEqual(expected);
   });
 
   it('drops the heading pointer exactly where the HDG lane reads a dash', () => {

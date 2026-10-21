@@ -156,16 +156,15 @@ describe('survCells at a peeked sample', () => {
 
   it('reads a sample at its own time as a live target whose data has exactly that age', () => {
     // Arrange
-    const live = sampleRows.map((s) =>
-      makeSample(T + AGE, { ...s, heard: heardAt((s.heard.nic ?? 0) + AGE) }),
-    );
+    const expected = sampleRows
+      .map((s) => makeSample(T + AGE, { ...s, heard: heardAt((s.heard.nic ?? 0) + AGE) }))
+      .map((r) => survCells(nowAt(r, T + AGE)));
 
     // Act
     const peeked = sampleRows.map((r) => survCells({ kind: 'sample', r, instant: r.t }));
-    const now = live.map((r) => survCells(nowAt(r, T + AGE)));
 
     // Assert
-    expect(peeked).toEqual(now);
+    expect(peeked).toEqual(expected);
   });
 
   it('reads the message rate as a dash where the sample has none', () => {

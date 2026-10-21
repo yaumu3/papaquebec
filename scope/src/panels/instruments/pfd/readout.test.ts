@@ -587,6 +587,7 @@ describe('the instrument at a peeked sample', () => {
         alt: 12000,
         verticalRate: 500,
         gs: 300,
+        navModes: ['lnav'],
         heard: {
           ias: 1 - LAPSE_SEC,
           roll: 1,
@@ -621,15 +622,19 @@ describe('the instrument at a peeked sample', () => {
         heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
       }),
     );
+    const expected = shifted.map((r) => {
+      const m = nowAt(r, 1 + AGE);
+      return { readouts: pfdReadouts(m, STANDARD_ALTIMETER), fma: pfdFma(m, [r]) };
+    });
 
     // Act
-    const peeked = rows.map((r) =>
-      pfdReadouts({ kind: 'sample', r, instant: r.t }, STANDARD_ALTIMETER),
-    );
-    const live = shifted.map((r) => pfdReadouts(nowAt(r, 1 + AGE), STANDARD_ALTIMETER));
+    const peeked = rows.map((r) => {
+      const m = { kind: 'sample', r, instant: r.t } as const;
+      return { readouts: pfdReadouts(m, STANDARD_ALTIMETER), fma: pfdFma(m, [r]) };
+    });
 
     // Assert
-    expect(peeked).toEqual(live);
+    expect(peeked).toEqual(expected);
   });
 
   it('shows nothing, and no annunciator, for the empty moment', () => {
