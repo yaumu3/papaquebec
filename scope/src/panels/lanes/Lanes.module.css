@@ -78,7 +78,7 @@
   pointer-events: none;
 }
 /*
- * Under the last lane, the last thing in the scroll: + LANE, which opens the palette to add a lane, on
+ * Under the last lane, the last thing in the scroll: + LANE, which opens the picker to add a lane, on
  * the panel's ground so that the map does not show through it.
  */
 .addRow {

@@ -26,8 +26,8 @@ export function InstrumentLane(props: {
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
-  /** What asks for the lane's palette. */
-  onMenu: (e: MouseEvent | KeyboardEvent) => void;
+  /** What asks for the lane's picker. */
+  onPicker: (e: MouseEvent | KeyboardEvent) => void;
   onGrab: (e: PointerEvent, part: LanePart) => void;
   /** Where it stands among the lanes while one is dragged. */
   place: number;
@@ -48,10 +48,10 @@ export function InstrumentLane(props: {
       aria-label={laneName(props.lane, props.index, props.count)}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
-        if (isPickerKey(e)) props.onMenu(e);
+        if (isPickerKey(e)) props.onPicker(e);
         else onMoveKey(props.moves, e);
       }}
-      onContextMenu={props.onMenu}
+      onContextMenu={props.onPicker}
       onPointerDown={(e) => props.onGrab(e, 'instrument')}
     >
       <Switch>

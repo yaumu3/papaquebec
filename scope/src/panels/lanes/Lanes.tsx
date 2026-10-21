@@ -44,7 +44,7 @@ import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, ticks } from './axis';
 import { pickOf } from './chips';
 import { axisShift, liftLeft, slotShown } from './drag';
-import { HOLD_MS, isDoubleTap, MENU_HOLD_MS, type Tap } from './hold';
+import { HOLD_MS, isDoubleTap, PICKER_HOLD_MS, type Tap } from './hold';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
@@ -71,7 +71,7 @@ const LANE_PX = 84;
 /** Between the chip lifted with a dragged lane and the pointer under it. */
 const LIFT_GAP_PX = 4;
 
-/** Applies a pick of `lane` in the palette of `own`: it takes the place of `own`, joins the column, or is open already. */
+/** Applies a pick of `lane` in the picker of `own`: it takes the place of `own`, joins the column, or is open already. */
 function take(own: LaneKey | null, lane: LaneKey): void {
   const what = pickOf(plotted(), own, lane);
   if (what === 'switch' && own) switchPlotLane(own, lane);
@@ -170,35 +170,35 @@ export function Lanes(props: { track: Track }) {
   const bayBox = () => bay()?.getBoundingClientRect();
   /** Each lane, which keeps the focus for it. */
   const lanes = new Map<LaneKey, HTMLElement>();
-  /** The button under the lanes that opens the palette to add one. */
+  /** The button under the lanes that opens the picker to add one. */
   let add: HTMLButtonElement | undefined;
-  /** The palette open, if one is: for a lane, or with none to add one; under its anchor. */
-  const [menu, setMenu] = createSignal<{
+  /** The picker open, if one is: for a lane, or with none to add one; under its anchor. */
+  const [picker, setPicker] = createSignal<{
     own: LaneKey | null;
     anchor: HTMLElement;
     at: PickerAnchor;
   } | null>(null);
-  const closeMenu = () => setMenu(null);
-  createEffect(on(hex, closeMenu, { defer: true }));
+  const closePicker = () => setPicker(null);
+  createEffect(on(hex, closePicker, { defer: true }));
   /** What the last press on the column was made with: a finger's long press ends in a `contextmenu`. */
   let pressed: string | null = null;
-  /** Opens a lane's palette where it was asked for, or leaves it to the hold when a finger asked. */
-  const openLaneMenu = (own: LaneKey, e: MouseEvent | KeyboardEvent) => {
+  /** Opens a lane's picker where it was asked for, or leaves it to the hold when a finger asked. */
+  const openLanePicker = (own: LaneKey, e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
     const lane = e.currentTarget;
     if (!(lane instanceof HTMLElement)) return;
     const source = e instanceof MouseEvent ? contextSourceOf(e.button, pressed) : 'keyboard';
     const point = e instanceof MouseEvent ? { x: e.clientX, y: e.clientY } : { x: 0, y: 0 };
     const anchor = lanePickerAnchor(source, point.x, point.y, lane.getBoundingClientRect());
-    if (anchor) setMenu({ own, anchor: lane, at: anchor });
+    if (anchor) setPicker({ own, anchor: lane, at: anchor });
   };
-  /** Opens the palette that adds a lane, upward from the click or from the button's corner. */
+  /** Opens the picker that adds a lane, upward from the click or from the button's corner. */
   const openAdd = (e: MouseEvent) => {
     const button = e.currentTarget;
     if (!(button instanceof HTMLElement)) return;
     const source = clickSourceOf(e.detail);
     const at = addPickerAnchor(source, e.clientX, e.clientY, button.getBoundingClientRect());
-    setMenu({ own: null, anchor: button, at });
+    setPicker({ own: null, anchor: button, at });
   };
   /** Brings a lane into view and gives it the focus; with none, + LANE. */
   const reveal = (lane: LaneKey | null) => {
@@ -208,17 +208,17 @@ export function Lanes(props: { track: Track }) {
     el.focus({ preventScroll: true });
   };
   const pick = (lane: LaneKey) => {
-    const m = menu();
+    const m = picker();
     if (!m) return;
-    closeMenu();
+    closePicker();
     take(m.own, lane);
     reveal(lane);
   };
-  /** The LANE row of the palette of `own`. */
+  /** The LANE row of the picker of `own`. */
   const movesOf = (own: LaneKey): LaneMoves => {
     const i = () => plotted().indexOf(own);
     const move = (to: number) => {
-      closeMenu();
+      closePicker();
       movePlotLane(i(), to);
       reveal(own);
     };
@@ -229,7 +229,7 @@ export function Lanes(props: { track: Track }) {
       onDown: () => move(i() + 1),
       onRemove: () => {
         const next = laneAfter(plotted(), own);
-        closeMenu();
+        closePicker();
         removePlotLane(own);
         reveal(next);
       },
@@ -253,8 +253,8 @@ export function Lanes(props: { track: Track }) {
     scroller,
     picker: {
       open: (lane, el, fx, fy) =>
-        setMenu({ own: lane, anchor: el, at: { x: fx, y: fy, up: false } }),
-      close: closeMenu,
+        setPicker({ own: lane, anchor: el, at: { x: fx, y: fy, up: false } }),
+      close: closePicker,
     },
     bin: () => add,
     heights,
@@ -349,7 +349,7 @@ export function Lanes(props: { track: Track }) {
       data-lanes
       class={cx(s.lanes, drag() && s.grabbing)}
       style={{
-        '--lift-ms': `${MENU_HOLD_MS - HOLD_MS}ms`,
+        '--lift-ms': `${PICKER_HOLD_MS - HOLD_MS}ms`,
       }}
     >
       <div ref={setBay} class={s.bay}>
@@ -383,7 +383,7 @@ export function Lanes(props: { track: Track }) {
                     count={plotted().length}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
-                    onMenu={(e) => openLaneMenu(lane, e)}
+                    onPicker={(e) => openLanePicker(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
                     hole={moving()?.lane === lane}
@@ -413,7 +413,7 @@ export function Lanes(props: { track: Track }) {
                     }}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
-                    onMenu={(e) => openLaneMenu(lane, e)}
+                    onPicker={(e) => openLanePicker(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
                     hole={moving()?.lane === lane}
@@ -447,7 +447,7 @@ export function Lanes(props: { track: Track }) {
                 type="button"
                 class={cx(s.add, moving() && s.bin)}
                 aria-haspopup="dialog"
-                aria-expanded={menu()?.anchor === add}
+                aria-expanded={picker()?.anchor === add}
                 onClick={openAdd}
               >
                 <Show when={moving()} fallback="+ LANE">
@@ -501,7 +501,7 @@ export function Lanes(props: { track: Track }) {
             );
           }}
         </Show>
-        <Show when={menu()}>
+        <Show when={picker()}>
           {(m) => (
             <Portal>
               <Picker
@@ -515,7 +515,7 @@ export function Lanes(props: { track: Track }) {
                   return own === null ? undefined : movesOf(own);
                 })()}
                 onPick={pick}
-                onClose={closeMenu}
+                onClose={closePicker}
               />
             </Portal>
           )}

@@ -31,7 +31,7 @@ const INSTRUMENT_LANES = ['pfd', 'nd', 'surv'] as const;
 
 export type InstrumentLane = (typeof INSTRUMENT_LANES)[number];
 
-/** The lanes by group, in the order the palette offers them. */
+/** The lanes by group, in the order the picker offers them. */
 export const LANE_GROUPS = [
   { name: 'INST', lanes: INSTRUMENT_LANES },
   { name: 'FLT', lanes: ['alt', 'vs', 'gs', 'trk', 'roll'] },

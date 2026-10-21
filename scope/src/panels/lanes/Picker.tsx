@@ -32,7 +32,7 @@ export function Picker(props: {
   let el!: HTMLDivElement;
   /** Closes it and gives the focus back to what it is for. */
   const close = () => {
-    // Read before closing, which unmounts the palette and its props with it.
+    // Read before closing, which unmounts the picker and its props with it.
     const anchor = props.anchor;
     props.onClose();
     anchor.focus({ preventScroll: true });
@@ -43,7 +43,7 @@ export function Picker(props: {
     e.stopPropagation();
     close();
   };
-  /** Tabs round the palette's buttons, as a dialog keeps the focus to itself. */
+  /** Tabs round the picker's buttons, as a dialog keeps the focus to itself. */
   const tabRound = (e: KeyboardEvent) => {
     const stops = [...el.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
     if (stops.length === 0) return;

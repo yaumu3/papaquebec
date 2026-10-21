@@ -10,7 +10,7 @@ export interface LaneMoves {
   onRemove: () => void;
 }
 
-/** Does to a lane what a key or a palette's LANE row asks, unless it stands at the end it would leave by. */
+/** Does to a lane what a key or a picker's LANE row asks, unless it stands at the end it would leave by. */
 export function perform(m: LaneMoves, ask: 'up' | 'down' | 'remove'): void {
   if (ask === 'up' && !m.first) m.onUp();
   else if (ask === 'down' && !m.last) m.onDown();

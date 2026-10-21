@@ -94,8 +94,8 @@ export function Lane(props: {
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
-  /** What asks for the lane's palette. */
-  onMenu: (e: MouseEvent | KeyboardEvent) => void;
+  /** What asks for the lane's picker. */
+  onPicker: (e: MouseEvent | KeyboardEvent) => void;
   onGrab: (e: PointerEvent, part: LanePart) => void;
   /** Where it stands among the lanes while one is dragged. */
   place: number;
@@ -214,14 +214,14 @@ export function Lane(props: {
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
         const key = windowKeyOf(e);
-        if (isPickerKey(e)) props.onMenu(e);
+        if (isPickerKey(e)) props.onPicker(e);
         else if (key) {
           e.preventDefault();
           e.stopPropagation();
           props.onWindowKey(key);
         } else onMoveKey(props.moves, e);
       }}
-      onContextMenu={props.onMenu}
+      onContextMenu={props.onPicker}
       onDblClick={props.onReset}
       onPointerDown={(e) =>
         props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')

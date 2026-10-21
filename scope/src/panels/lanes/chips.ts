@@ -1,16 +1,16 @@
 import { isInstrumentLane, type LaneKey } from '../../state/plotted';
 import { LANE_LABELS } from '../readings';
 
-/** A lane's chip in the palette: the lane the palette is for, one open elsewhere, or one free to pick. */
+/** A lane's chip in the picker: the lane the picker is for, one open elsewhere, or one free to pick. */
 export type Chip = 'own' | 'open' | 'free';
 
-/** The chip of `lane` in the palette of the lane `own`, or of a lane to add when null. */
+/** The chip of `lane` in the picker of the lane `own`, or of a lane to add when null. */
 export function chipOf(plotted: readonly LaneKey[], own: LaneKey | null, lane: LaneKey): Chip {
   if (lane === own) return 'own';
   return plotted.includes(lane) ? 'open' : 'free';
 }
 
-/** What the palette of the lane `own`, or of a lane to add when null, is called. */
+/** What the picker of the lane `own`, or of a lane to add when null, is called. */
 export const pickerName = (own: LaneKey | null): string =>
   own === null ? 'Add a lane' : `${LANE_LABELS[own]} lane: pick a lane`;
 
@@ -24,7 +24,7 @@ export const laneName = (lane: LaneKey, index: number, count: number): string =>
 export const chipName = (lane: LaneKey, chip: Chip): string | undefined =>
   chip === 'open' ? `${LANE_LABELS[lane]}, already open` : undefined;
 
-/** What picking `lane` in the palette of `own`, or of a lane to add when null, does: take its place, join the column, or go to the lane open already. */
+/** What picking `lane` in the picker of `own`, or of a lane to add when null, does: take its place, join the column, or go to the lane open already. */
 export function pickOf(
   plotted: readonly LaneKey[],
   own: LaneKey | null,

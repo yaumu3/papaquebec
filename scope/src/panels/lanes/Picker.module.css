@@ -41,7 +41,7 @@
 .chip:hover {
   background: var(--control-hover);
 }
-/* The lane the palette is for. */
+/* The lane the picker is for. */
 .own,
 .own:hover {
   border-color: var(--text);
@@ -90,7 +90,7 @@
   border-color: var(--color-emergency);
   color: var(--color-emergency);
 }
-/* Dims the page but the palette and what it is for, and takes the touch or click that closes it. */
+/* Dims the page but the picker and what it is for, and takes the touch or click that closes it. */
 .backdrop {
   position: fixed;
   inset: 0;

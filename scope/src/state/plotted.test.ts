@@ -21,7 +21,7 @@ import {
 } from './plotted';
 
 describe('LANE_GROUPS', () => {
-  it('lists the lanes by group, as the palette offers them', () => {
+  it('lists the lanes by group, as the picker offers them', () => {
     // Arrange
     const expected = [
       { name: 'INST', lanes: ['pfd', 'nd', 'surv'] },

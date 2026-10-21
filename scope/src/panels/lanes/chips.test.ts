@@ -4,7 +4,7 @@ import type { LaneKey } from '../../state/plotted';
 import { type Chip, chipName, chipOf, laneName, pickerName, pickOf } from './chips';
 
 describe('chipOf', () => {
-  it("tells the palette's own lane, a lane open elsewhere, and one free to pick", () => {
+  it("tells the picker's own lane, a lane open elsewhere, and one free to pick", () => {
     // Arrange
     const plotted: LaneKey[] = ['alt', 'gs', 'pfd', 'nd'];
     const rows: [LaneKey | null, LaneKey][] = [
@@ -26,7 +26,7 @@ describe('chipOf', () => {
 });
 
 describe('pickerName', () => {
-  it("names a lane's palette after the lane, and the one with none for adding", () => {
+  it("names a lane's picker after the lane, and the one with none for adding", () => {
     // Arrange
     const owners: (LaneKey | null)[] = ['alt', null];
 
@@ -88,7 +88,7 @@ describe('laneName', () => {
 });
 
 describe('pickOf', () => {
-  it("switches the palette's lane to a free one, adds a free one to none, and goes to one that is open", () => {
+  it("switches the picker's lane to a free one, adds a free one to none, and goes to one that is open", () => {
     // Arrange
     const plotted: LaneKey[] = ['alt', 'gs', 'pfd'];
     const rows: [LaneKey | null, LaneKey][] = [

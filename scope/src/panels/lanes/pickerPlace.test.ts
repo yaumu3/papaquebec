@@ -43,7 +43,7 @@ describe('addPickerAnchor', () => {
 });
 
 describe('contextSourceOf', () => {
-  it('tells a menu asked for with the keyboard, a finger held down, or a mouse or pen', () => {
+  it('tells a picker asked for with the keyboard, a finger held down, or a mouse or pen', () => {
     // Arrange
     const events: [number, string | null][] = [
       [-1, null],
@@ -82,7 +82,7 @@ describe('lanePickerAnchor', () => {
 });
 
 describe('isPickerKey', () => {
-  it('is Shift+F10, which the keyboard asks for a menu with where no menu key stands', () => {
+  it('is Shift+F10, which the keyboard asks for a picker with where no menu key stands', () => {
     // Arrange
     const keys = [
       { key: 'F10', shiftKey: true },

@@ -7,7 +7,7 @@ import {
   HOLD_MS,
   keepsTouch,
   laneGestureOf,
-  MENU_HOLD_MS,
+  PICKER_HOLD_MS,
   pinchesFrom,
   type Tap,
   type TouchStage,
@@ -281,7 +281,7 @@ export function createLaneDrag(deps: {
           pickUp(last.x, last.y, true);
         }, HOLD_MS)
       : undefined;
-    const picker = touch ? setTimeout(openPicker, MENU_HOLD_MS) : undefined;
+    const picker = touch ? setTimeout(openPicker, PICKER_HOLD_MS) : undefined;
     window.addEventListener('keydown', onKey, { capture: true });
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerup', onUp);

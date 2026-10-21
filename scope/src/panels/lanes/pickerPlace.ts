@@ -1,10 +1,10 @@
 import { clamp } from '../../lib/math';
 import type { Box } from './drag';
 
-/** What asked for a lane's palette. */
+/** What asked for a lane's picker. */
 type ContextSource = 'keyboard' | 'touch' | 'mouse';
 
-/** Where a palette is anchored: its top-left at the point, or its bottom-left when it opens up. */
+/** Where a picker is anchored: its top-left at the point, or its bottom-left when it opens up. */
 export interface PickerAnchor {
   x: number;
   y: number;
@@ -16,7 +16,7 @@ export function clickSourceOf(detail: number): 'keyboard' | 'pointer' {
   return detail === 0 ? 'keyboard' : 'pointer';
 }
 
-/** Where + LANE opens its palette: upward from the click, or from its own top-left when it is pressed with a key. */
+/** Where + LANE opens its picker: upward from the click, or from its own top-left when it is pressed with a key. */
 export function addPickerAnchor(
   source: 'keyboard' | 'pointer',
   x: number,
@@ -27,7 +27,7 @@ export function addPickerAnchor(
 }
 
 /**
- * Where a palette of `size` stands in `view`: at its anchor, on the other side of the point or the
+ * Where a picker of `size` stands in `view`: at its anchor, on the other side of the point or the
  * left of it where it would pass an edge, then kept whole inside the view.
  */
 export function pickerBox(
@@ -48,7 +48,7 @@ export function pickerBox(
 }
 
 /**
- * What asked for a lane's menu. The menu key fires `contextmenu` with button -1; a press that
+ * What asked for a lane's picker. The menu key fires `contextmenu` with button -1; a press that
  * began with a finger is a touch, which the hold answers; any other press is a mouse or pen.
  */
 export function contextSourceOf(button: number, pressed: string | null): ContextSource {
@@ -56,7 +56,7 @@ export function contextSourceOf(button: number, pressed: string | null): Context
   return pressed === 'touch' ? 'touch' : 'mouse';
 }
 
-/** Where a lane's palette opens: at the pointer, from the lane's top-left when asked by key, never for a finger. */
+/** Where a lane's picker opens: at the pointer, from the lane's top-left when asked by key, never for a finger. */
 export function lanePickerAnchor(
   source: ContextSource,
   x: number,
