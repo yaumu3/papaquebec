@@ -1,6 +1,6 @@
 import { type Accessor, createMemo, createSignal } from 'solid-js';
 
-import { clamp } from '../../lib/math';
+import { clamp, onCircle } from '../../lib/math';
 import type { Point } from '../svg';
 
 /**
@@ -21,8 +21,6 @@ export interface Glide {
 /** How far `to` lies from `from` the short way round a circle of `wrap`. */
 const shortWay = (from: number, to: number, wrap: number): number =>
   ((((to - from) % wrap) + 1.5 * wrap) % wrap) - wrap / 2;
-
-const onCircle = (v: number, wrap: number): number => ((v % wrap) + wrap) % wrap;
 
 /**
  * Where a glide stands at `now`: from its start to its end at one pace, there after `GLIDE_MS`.

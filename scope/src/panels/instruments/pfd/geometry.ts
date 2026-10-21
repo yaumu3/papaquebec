@@ -1,3 +1,4 @@
+import { clamp } from '../../../lib/math';
 import { RAD } from '../../../lib/units';
 import { fixed, type Point, polygonPath, tenth, type TextLabel, toward } from '../../svg';
 import { instrumentHeight } from '../height';
@@ -482,8 +483,6 @@ export interface Fpv {
 const FPV_LEFT_PX = 18;
 const FPV_UP_PX = 12;
 const FPV_DOWN_PX = 5;
-
-const clamp = (n: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, n));
 
 /**
  * Where the flight path vector stands, in the rolled frame at the ladder's scale, kept whole

@@ -1,3 +1,4 @@
+import { onCircle } from '../../../lib/math';
 import { RAD } from '../../../lib/units';
 import { fixed, offset, polygonPath, polylinePath, tenth, toward } from '../../svg';
 import type { Point, TextLabel } from '../../svg';
@@ -72,15 +73,13 @@ interface Compass {
   labels: CompassLabel[];
 }
 
-const norm = (deg: number): number => ((deg % 360) + 360) % 360;
-
 /** The ticks and labels of the arc, with `orient` degrees magnetic at the top. */
 export function compass(g: NdGeometry, orient: number): Compass {
   const out: Compass = { minor: '', major: '', labels: [] };
   const first = Math.ceil((orient - SPAN_DEG) / TICK_STEP_DEG) * TICK_STEP_DEG;
   for (let b = first; b <= orient + SPAN_DEG; b += TICK_STEP_DEG) {
     const a = b - orient;
-    const major = norm(b) % 10 === 0;
+    const major = onCircle(b, 360) % 10 === 0;
     const at = toward(g.cx, g.cy, a);
     const segment = `M${at(g.r)}L${at(g.r - (major ? MAJOR_TICK_PX : MINOR_TICK_PX))}`;
     if (!major) {
@@ -89,7 +88,7 @@ export function compass(g: NdGeometry, orient: number): Compass {
     }
     out.major += segment;
     if (Math.abs(a) > LABEL_SPAN_DEG) continue;
-    const tens = norm(b) / 10;
+    const tens = onCircle(b, 360) / 10;
     const big = tens % 3 === 0;
     const [x, y] = ndPoint(g, a, g.r - (big ? BIG_LABEL_INSET_PX : SMALL_LABEL_INSET_PX));
     out.labels.push({ text: String(tens), x: tenth(x), y: tenth(y), big });
