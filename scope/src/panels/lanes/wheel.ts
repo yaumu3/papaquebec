@@ -1,8 +1,8 @@
 /** Where on the lanes a wheel event lands. */
 export type Area = 'plot' | 'axis' | 'row' | 'gutter' | 'other';
 
-/** What a wheel gesture does: scroll the column, zoom the window or pan it. */
-export type WheelMeaning = 'scroll' | 'zoom' | 'pan';
+/** What a wheel gesture does: scroll the column, zoom the window, pan it, or pinch it (a trackpad's ctrl wheel). */
+export type WheelMeaning = 'scroll' | 'zoom' | 'pan' | 'pinch';
 
 /** A wheel event as the rules read it: deltas in pixels, `at` in ms. */
 export interface WheelEvt {
@@ -10,6 +10,7 @@ export interface WheelEvt {
   dx: number;
   dy: number;
   shift: boolean;
+  ctrl: boolean;
   at: number;
 }
 
@@ -17,6 +18,7 @@ export interface WheelEvt {
 export interface WheelGesture {
   meaning: WheelMeaning;
   at: number;
+  ctrl: boolean;
 }
 
 /** The pause that ends a wheel gesture: momentum scrolling keeps its events closer than this. */
@@ -36,14 +38,18 @@ const isSideways = (e: WheelEvt): boolean =>
 
 function meaningOf(e: WheelEvt): WheelMeaning {
   if (e.area !== 'plot' && e.area !== 'axis') return 'scroll';
+  if (e.ctrl) return 'pinch';
   return isSideways(e) ? 'pan' : 'zoom';
 }
 
-/** The gesture `e` belongs to: the one before it if it came within the gap, else a new one by where and which way. */
+/** The gesture `e` belongs to: the one before it if it came within the gap with ctrl as it was, else a new one by where and which way. */
 export function wheelGestureOf(prev: WheelGesture | null, e: WheelEvt): WheelGesture {
-  const continues = prev !== null && e.at - prev.at <= WHEEL_GAP_MS;
-  return { meaning: continues ? prev.meaning : meaningOf(e), at: e.at };
+  const continues = prev !== null && e.at - prev.at <= WHEEL_GAP_MS && prev.ctrl === e.ctrl;
+  return { meaning: continues ? prev.meaning : meaningOf(e), at: e.at, ctrl: e.ctrl };
 }
 
 /** Whether the lanes take the gesture, so that the page does not scroll or navigate from it. */
 export const consumes = (meaning: WheelMeaning): boolean => meaning !== 'scroll';
+
+/** The factor for the window's length when Safari's pinch scale goes from `prev` to `scale`: spreading narrows it. */
+export const gestureFactor = (prev: number, scale: number): number => prev / scale;

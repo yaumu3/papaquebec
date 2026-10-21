@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import {
   type Area,
   consumes,
+  gestureFactor,
   type WheelEvt,
   type WheelMeaning,
   WHEEL_GAP_MS,
@@ -17,6 +18,7 @@ const evt = (over: Partial<WheelEvt>): WheelEvt => ({
   dx: 0,
   dy: 100,
   shift: false,
+  ctrl: false,
   at: 1000,
   ...over,
 });
@@ -65,8 +67,8 @@ describe('wheelGestureOf', () => {
 
   it('keeps the meaning a gesture began with while the events follow within the gap', () => {
     // Arrange
-    const scrolling: WheelGesture = { meaning: 'scroll', at: 1000 };
-    const zooming: WheelGesture = { meaning: 'zoom', at: 1000 };
+    const scrolling: WheelGesture = { meaning: 'scroll', at: 1000, ctrl: false };
+    const zooming: WheelGesture = { meaning: 'zoom', at: 1000, ctrl: false };
     const soon = 1000 + WHEEL_GAP_MS;
 
     // Act
@@ -82,14 +84,70 @@ describe('wheelGestureOf', () => {
 
   it('decides afresh after the gap', () => {
     // Arrange
-    const scrolling: WheelGesture = { meaning: 'scroll', at: 1000 };
+    const scrolling: WheelGesture = { meaning: 'scroll', at: 1000, ctrl: false };
     const late = 1000 + WHEEL_GAP_MS + 1;
 
     // Act
     const next = wheelGestureOf(scrolling, evt({ area: 'plot', at: late }));
 
     // Assert
-    expect(next).toEqual({ meaning: 'zoom', at: late });
+    expect(next).toEqual({ meaning: 'zoom', at: late, ctrl: false });
+  });
+});
+
+describe('wheelGestureOf with ctrl', () => {
+  it('is a pinch over a plot or the axis, and left to the page elsewhere', () => {
+    // Arrange
+    const areas: Area[] = ['plot', 'axis', 'gutter', 'row', 'other'];
+
+    // Act
+    const meanings = areas.map((area) => wheelGestureOf(null, evt({ area, ctrl: true })).meaning);
+
+    // Assert
+    expect(meanings).toEqual(['pinch', 'pinch', 'scroll', 'scroll', 'scroll']);
+  });
+
+  it('starts afresh when ctrl changes inside the gap', () => {
+    // Arrange
+    const zooming: WheelGesture = { meaning: 'zoom', at: 1000, ctrl: false };
+    const pinching: WheelGesture = { meaning: 'pinch', at: 1000, ctrl: true };
+
+    // Act
+    const next = [
+      wheelGestureOf(zooming, evt({ ctrl: true, at: 1050 })),
+      wheelGestureOf(pinching, evt({ ctrl: false, at: 1050 })),
+    ];
+
+    // Assert
+    expect(next.map((g) => g.meaning)).toEqual(['pinch', 'zoom']);
+  });
+
+  it('keeps a pinch going while the ctrl events follow within the gap', () => {
+    // Arrange
+    const pinching: WheelGesture = { meaning: 'pinch', at: 1000, ctrl: true };
+
+    // Act
+    const next = wheelGestureOf(pinching, evt({ area: 'gutter', ctrl: true, at: 1050 }));
+
+    // Assert
+    expect(next).toEqual({ meaning: 'pinch', at: 1050, ctrl: true });
+  });
+});
+
+describe('gestureFactor', () => {
+  it('narrows the window as the fingers spread and widens it as they close', () => {
+    // Arrange
+    const rows = [
+      { prev: 1, scale: 2 },
+      { prev: 1, scale: 0.5 },
+      { prev: 2, scale: 2 },
+    ];
+
+    // Act
+    const factors = rows.map((r) => gestureFactor(r.prev, r.scale));
+
+    // Assert
+    expect(factors).toEqual([0.5, 2, 1]);
   });
 });
 
@@ -111,14 +169,14 @@ describe('panDelta', () => {
 });
 
 describe('consumes', () => {
-  it('takes zoom and pan, not scroll', () => {
+  it('takes zoom, pan and pinch, not scroll', () => {
     // Arrange
-    const meanings = ['zoom', 'pan', 'scroll'] as const;
+    const meanings = ['zoom', 'pan', 'pinch', 'scroll'] as const;
 
     // Act
     const taken = meanings.map(consumes);
 
     // Assert
-    expect(taken).toEqual([true, true, false]);
+    expect(taken).toEqual([true, true, true, false]);
   });
 });
