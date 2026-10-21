@@ -118,9 +118,9 @@ export function Lanes(props: { track: Track }) {
   let lastTap: Tap | null = null;
   const plotLeft = () => axisRow()?.getBoundingClientRect().left ?? 0;
   const plotPx = (clientX: number) => clamp(clientX - plotLeft(), 0, plotWidth());
-  /** The instant a mouse pressed at, while it selects a span: the band's fixed end. */
+  /** The instant a mouse pressed at, while it selects a span: the span's fixed end. */
   const [pressedAt, setPressedAt] = createSignal<number | null>(null);
-  const band = () => {
+  const span = () => {
     const t0 = pressedAt();
     const px = hoverPx();
     return t0 === null || px === null ? null : { from: clamp(x(t0), 0, plotWidth()), to: px };
@@ -404,7 +404,7 @@ export function Lanes(props: { track: Track }) {
                     at={at()}
                     past={past()}
                     cursor={cursorX()}
-                    band={band()}
+                    span={span()}
                     onReset={reset}
                     onWindowKey={(key) => {
                       const w = lanesWindow();

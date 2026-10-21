@@ -86,7 +86,7 @@ export function Lane(props: {
   /** Where the time cursor stands across the plot, if it does. */
   cursor: number | null;
   /** The span being selected, between two points across the plot, if one is. */
-  band: { from: number; to: number } | null;
+  span: { from: number; to: number } | null;
   /** Resets the window, as a double click on the lane does. */
   onReset: () => void;
   /** Pans, narrows, widens or resets the window, as a key on the lane asks. */
@@ -311,10 +311,10 @@ export function Lane(props: {
             )}
           </Index>
         </Show>
-        <Show when={props.band}>
+        <Show when={props.span}>
           {(b) => (
             <div
-              class={s.band}
+              class={s.span}
               style={{
                 left: `${Math.min(b().from, b().to)}px`,
                 width: `${Math.abs(b().to - b().from)}px`,

@@ -108,7 +108,7 @@ export function panWindow(
 }
 
 /**
- * The window a band dragged from instant `t0` to `t1` makes, within `visible`: held, grown to the
+ * The window a span dragged from instant `t0` to `t1` makes, within `visible`: held, grown to the
  * minimum from its earlier end, live again if it reaches now.
  */
 export function selectWindow(
