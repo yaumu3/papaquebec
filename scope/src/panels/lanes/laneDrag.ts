@@ -63,15 +63,12 @@ export function createLaneDrag(deps: {
   onDrop: (lane: LaneKey, drop: ReturnType<typeof dropOf>) => void;
   /** A finger's tap on a history lane: pressed and released with no gesture, in viewport px and ms. */
   onTap: (tap: Tap) => void;
-  /** The cursor a finger moved sideways along a plot carries, in viewport x. */
-  peek: { move: (x: number) => void; end: () => void };
+  /** Puts the cursor at a viewport x, for a finger peeking along a plot or a mouse selecting a span. */
+  cursorTo: (x: number) => void;
+  /** What a finger's peek ends with. */
+  peek: { end: () => void };
   /** The span a mouse selects by dragging sideways on a history lane, in viewport x. */
-  select: {
-    start: (x: number) => void;
-    move: (x: number) => void;
-    end: () => void;
-    cancel: () => void;
-  };
+  select: { start: (x: number) => void; end: () => void; cancel: () => void };
 }): {
   drag: Accessor<LaneDrag | null>;
   swipe: Accessor<LaneSwipe | null>;
@@ -209,7 +206,7 @@ export function createLaneDrag(deps: {
         return;
       }
       if (selecting || peeking()) {
-        (selecting ? deps.select : deps.peek).move(m.clientX);
+        deps.cursorTo(m.clientX);
         return;
       }
       if (d) {
@@ -235,12 +232,12 @@ export function createLaneDrag(deps: {
         clearTimeout(lift);
         clearTimeout(picker);
         setPeeking(true);
-        deps.peek.move(m.clientX);
+        deps.cursorTo(m.clientX);
       }
       if (g === 'select') {
         selecting = true;
         deps.select.start(x0);
-        deps.select.move(m.clientX);
+        deps.cursorTo(m.clientX);
       }
     };
     const onUp = (u: PointerEvent) => {

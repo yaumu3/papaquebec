@@ -262,10 +262,10 @@ export function Lanes(props: { track: Track }) {
       if (double) reset();
       lastTap = double ? null : tap;
     },
-    peek: { move: (clientX) => setHoverPx(plotPx(clientX)), end: () => setHoverPx(null) },
+    cursorTo: (clientX) => setHoverPx(plotPx(clientX)),
+    peek: { end: () => setHoverPx(null) },
     select: {
       start: (clientX) => setPressedAt(timeAt(plotPx(clientX), visible(), plotWidth())),
-      move: (clientX) => setHoverPx(plotPx(clientX)),
       end: () => {
         const t0 = pressedAt();
         const px = hoverPx();
