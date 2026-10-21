@@ -56,6 +56,23 @@ describe('laneTraces', () => {
       ['dashed', [5]],
     ]);
   });
+
+  it('draws nothing for a lane of gantt bars, wind barbs or heading glyphs', () => {
+    // Arrange
+    const samples = [
+      sample(1, { navModes: ['autopilot'], windDir: 300, windSpeed: 12, track: 90, heading: 85 }),
+    ];
+
+    // Act
+    const traces = [
+      laneTraces(samples, ['modes'], ALL),
+      laneTraces(samples, ['wind'], ALL),
+      laneTraces(samples, ['trk'], ALL),
+    ];
+
+    // Assert
+    expect(traces).toEqual([[], [], []]);
+  });
 });
 
 describe('pathOf', () => {
@@ -78,25 +95,6 @@ describe('pathOf', () => {
 
     // Assert
     expect(d).toBe('M0.0 10.0 L10.0 20.0 M16.0 30.0');
-  });
-});
-
-describe('laneTraces', () => {
-  it('draws nothing for a lane of gantt bars, wind barbs or heading glyphs', () => {
-    // Arrange
-    const samples = [
-      sample(1, { navModes: ['autopilot'], windDir: 300, windSpeed: 12, track: 90, heading: 85 }),
-    ];
-
-    // Act
-    const traces = [
-      laneTraces(samples, ['modes'], ALL),
-      laneTraces(samples, ['wind'], ALL),
-      laneTraces(samples, ['trk'], ALL),
-    ];
-
-    // Assert
-    expect(traces).toEqual([[], [], []]);
   });
 });
 
