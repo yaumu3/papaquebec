@@ -58,7 +58,7 @@ export function InstrumentLane(props: {
           <Pfd t={props.track} moment={props.moment} />
         </Match>
         <Match when={props.lane === 'nd'}>
-          <Nd t={props.track} />
+          <Nd t={props.track} moment={props.moment} />
         </Match>
         <Match when={props.lane === 'surv'}>
           <Surv t={props.track} />

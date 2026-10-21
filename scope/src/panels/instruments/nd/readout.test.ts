@@ -457,3 +457,102 @@ describe('ndSymbols wind', () => {
     expect(symbols.windFrom).toBeUndefined();
   });
 });
+
+describe('the ND at a peeked sample', () => {
+  const AGE = 200;
+  const T = 1;
+  const heard = (at: number) => ({
+    heading: at,
+    track: at,
+    gs: at,
+    trackRate: at,
+    selHeading: at,
+    selAlt: at,
+    alt: at,
+    verticalRate: at,
+  });
+  const base = {
+    seen: 1,
+    heading: 284,
+    track: 289,
+    gs: 460,
+    trackRate: 1.5,
+    selHeading: 310,
+    navModes: ['autopilot'],
+    selAlt: 30_000,
+    alt: 20_000,
+    verticalRate: 1000,
+    at: AT,
+  };
+  const rows = [
+    makeSample(T, { ...base, heard: heard(T) }),
+    makeSample(T, { ...base, heard: { ...heard(T), heading: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heard(T), track: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heard(T), selHeading: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heard(T), trackRate: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heard(T), selAlt: T - LAPSE_SEC } }),
+  ];
+  const liveOf = (s: (typeof rows)[number]) =>
+    makeSample(T + AGE, {
+      ...s,
+      heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
+    });
+
+  it('reads a sample at its own time as a live target whose data has exactly that age', () => {
+    // Arrange
+    const live = rows.map(liveOf);
+
+    // Act
+    const peeked = rows.map((r) => {
+      const m = { kind: 'sample', r, instant: r.t } as const;
+      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
+    });
+    const now = live.map((r) => {
+      const m = nowAt(r, T + AGE);
+      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
+    });
+
+    // Assert
+    expect(peeked).toEqual(now);
+  });
+
+  it('drops the heading pointer exactly where the HDG lane reads a dash', () => {
+    // Arrange
+    const samples = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].map((age) =>
+      makeSample(T, { ...base, heard: { ...heard(T), heading: T - age } }),
+    );
+
+    // Act
+    const out = samples.map((s) => ({
+      pointer:
+        ndSymbols({ kind: 'sample', r: s, instant: s.t }, STANDARD_ALTIMETER).heading !== undefined,
+      lane: !readoutOf(['trk'], s).value.endsWith('---'),
+    }));
+
+    // Assert
+    expect(out).toEqual([
+      { pointer: true, lane: true },
+      { pointer: false, lane: false },
+      { pointer: false, lane: false },
+    ]);
+  });
+
+  it('stands the compass where it last stood, with a dash, no flags and no symbols, over a gap', () => {
+    // Arrange
+    const empty = { kind: 'empty' } as const;
+
+    // Act
+    const out = {
+      frame: ndFrame(empty, 123),
+      corners: texts(ndReadouts(empty)),
+      symbols: ndSymbols(empty, STANDARD_ALTIMETER),
+    };
+
+    // Assert
+    expect(out).toEqual({
+      frame: { mode: 'empty', orient: 123, box: '---', flags: [], lastHeard: undefined },
+      corners: ['---', '---', '---', '---°', '---°', '---', '---'],
+      symbols: {},
+    });
+  });
+});

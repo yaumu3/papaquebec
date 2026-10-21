@@ -8,11 +8,11 @@ import type { Readout } from '../../../state/track';
 import { HEARD } from '../../lanes/plots';
 import { NONE, type Reading, READINGS } from '../../readings';
 import { holdsAll, isLost } from '../freshness';
-import type { Present } from '../moment';
+import type { Moment } from '../moment';
 import type { Trend } from './geometry';
 
-/** The state of the instrument: track-up, lost, or blank for want of a track that holds. */
-export type NdMode = 'track' | 'lost' | 'blank';
+/** The state of the instrument: track-up, lost, blank for want of a track that holds, or empty over a gap. */
+export type NdMode = 'track' | 'lost' | 'blank' | 'empty';
 
 export type NdFlag = 'TRK';
 
@@ -28,7 +28,9 @@ export interface NdFrame {
 const BLANK_BOX = '---';
 
 /** The mode the instrument is in: track-up while the magnetic track holds. */
-function modeOf({ r: t, instant }: Present<Readout>): NdMode {
+function modeOf(m: Moment<Readout>): NdMode {
+  if (m.kind === 'empty') return 'empty';
+  const { r: t, instant } = m;
   if (isLost(t)) return 'lost';
   if (holds(t.heard.track, instant, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
@@ -41,23 +43,27 @@ const FLAGS: Record<NdMode, readonly NdFlag[]> = {
   track: [],
   lost: ['TRK'],
   blank: ['TRK'],
+  empty: [],
 };
 
 /** What the box at the top reads: the bearing at the top of a live display, else the blank. */
 export const boxOf = (mode: NdMode, orient: number): string =>
   mode === 'track' ? padBearing(orient) : BLANK_BOX;
 
-/** What the top of the ND reads, and the flags beside it, from the freshness of the target's readings. */
-export function ndFrame(m: Present<Readout>): NdFrame {
-  const t = m.r;
+/**
+ * What the top of the ND reads, and the flags beside it, from the freshness of the target's
+ * readings; over a gap, the compass stays on the orientation `standing` and nothing is flagged.
+ */
+export function ndFrame(m: Moment<Readout>, standing = 0): NdFrame {
   const mode = modeOf(m);
-  const orient = orientOf(t);
+  const orient = m.kind === 'empty' ? standing : orientOf(m.r);
   return {
     mode,
     orient,
     box: boxOf(mode, orient),
     flags: FLAGS[mode],
-    lastHeard: mode === 'lost' ? `LAST HEARD ${Math.round(t.seen)} s` : undefined,
+    lastHeard:
+      mode === 'lost' && m.kind !== 'empty' ? `LAST HEARD ${Math.round(m.r.seen)} s` : undefined,
   };
 }
 
@@ -84,14 +90,28 @@ const degrees = (deg: number | undefined): string | undefined =>
 const shown = (r: Reading, withUnit = false): string | undefined =>
   r === NONE ? undefined : `${r.v}${withUnit ? (r.unit ?? '') : ''}`;
 
-/** The corners of the ND: each value on its own freshness, all blank once the target is lost. */
-export function ndReadouts({ r: t, instant }: Present<Readout>): NdReadouts {
-  const lost = isLost(t);
+const blank = (degree = false): NdText => ({ text: degree ? '---°' : '---', known: false });
+
+const BLANK_READOUTS: NdReadouts = {
+  gs: blank(),
+  tas: blank(),
+  wind: blank(),
+  sel: blank(true),
+  hdg: blank(true),
+  tat: blank(),
+  sat: blank(),
+};
+
+/**
+ * The corners of the ND: each value on its own freshness, all blank once the target is lost and
+ * over a gap.
+ */
+export function ndReadouts(m: Moment<Readout>): NdReadouts {
+  if (m.kind === 'empty' || isLost(m.r)) return BLANK_READOUTS;
+  const { r: t, instant } = m;
   const read = (keys: readonly HeardKey[], text: () => string | undefined, degree = false) => {
-    const fresh = !lost && holdsAll(t, keys, instant);
-    const value = fresh ? text() : undefined;
-    if (value !== undefined) return { text: value, known: true };
-    return { text: degree ? '---°' : '---', known: false };
+    const value = holdsAll(t, keys, instant) ? text() : undefined;
+    return value === undefined ? blank(degree) : { text: value, known: true };
   };
   const wind = () => {
     const from = windFromOf(t);
@@ -126,9 +146,12 @@ export interface NdSymbols {
 /** A turn slower than this, in degrees per second, is flight in a straight line: no trend is drawn. */
 const TREND_MIN_RATE_DEG_S = 0.3;
 
-/** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
-export function ndSymbols(m: Present<Readout>, altimeter: Altimeter): NdSymbols {
-  if (modeOf(m) !== 'track') return {};
+/**
+ * The symbols of a live frame; none in a blank, lost or empty one, where the compass stands on a
+ * last orientation.
+ */
+export function ndSymbols(m: Moment<Readout>, altimeter: Altimeter): NdSymbols {
+  if (m.kind === 'empty' || modeOf(m) !== 'track') return {};
   const { r: t, instant } = m;
   const live = (keys: readonly HeardKey[], v: number | undefined) =>
     holdsAll(t, keys, instant) ? v : undefined;

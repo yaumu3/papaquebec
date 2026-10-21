@@ -7,6 +7,7 @@ import { LAPSE_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
+import { makeSample } from '../../../state/sampleFixture';
 import { hexAt } from '../../../state/scope';
 import type { Track } from '../../../state/track';
 import { nowAt } from '../moment';
@@ -364,6 +365,23 @@ describe('ndTraffic', () => {
 
     // Assert
     expect(results).toEqual(Array.from({ length: 4 }, () => none));
+  });
+
+  it('draws no traffic, no advisory and no annunciation while peeking or over a gap', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const others = [traffic('thr', 10, 4), traffic('a', 0, 5)];
+    const moments = [
+      { kind: 'sample', r: makeSample(NOW - 5, own), instant: NOW - 5 } as const,
+      { kind: 'empty' } as const,
+    ];
+    const none = { symbols: [], traffic: false, offscale: false };
+
+    // Act
+    const results = moments.map((m) => ndTraffic(m, others, view()));
+
+    // Assert
+    expect(results).toEqual([none, none]);
   });
 });
 
