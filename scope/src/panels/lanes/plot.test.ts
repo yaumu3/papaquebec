@@ -296,6 +296,17 @@ describe('atTicks', () => {
     expect(barbs).toEqual([{ t: 100, dir: 300, speed: 12 }]);
   });
 
+  it('reads the earlier of two samples as near as the tick', () => {
+    // Arrange
+    const samples = [sample(100, { rssi: 1 }), sample(110, { rssi: 2 })];
+
+    // Act
+    const reads = atTicks(samples, [105], (s) => ({ rssi: s.rssi }));
+
+    // Assert
+    expect(reads).toEqual([{ t: 105, rssi: 1 }]);
+  });
+
   it('reads a sample the preference holds for instead, while one lies within its reach', () => {
     // Arrange
     const samples = [sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })];

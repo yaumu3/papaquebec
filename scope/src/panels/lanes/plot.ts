@@ -1,7 +1,6 @@
 import type { HeardKey } from '../../lib/aircraft';
 import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
 import { NM_IN_METERS, turn } from '../../lib/geo';
-import { nearestInTime } from '../../lib/nearest';
 import { withinLapse } from '../../lib/reports';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
@@ -13,6 +12,7 @@ import { heardNear, heardNearAt } from './heard';
 import { type Dash, type Heading, PLOTS } from './plots';
 import { isLog, plotText } from './plots';
 import { barbMarks, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
+import { nearestSample } from './trace';
 
 export interface LaneTrace {
   key: ReadingKey;
@@ -145,6 +145,9 @@ interface Preference {
   withinSec: number;
 }
 
+/** Every instant, for a lookup that is not limited to a window. */
+const ALL: Interval = { from: -Infinity, to: Infinity };
+
 /**
  * One reading per tick, from the sample nearest it or the nearest one preferred, read at the
  * tick, unless that lies a gap or more away or lacks it, or its reading, by the `keys`,
@@ -161,11 +164,11 @@ export function atTicks<T extends object>(
   const preferred = prefer ? samples.filter(prefer.has) : [];
   const reach = prefer?.withinSec ?? 0;
   return ticks.flatMap((t) => {
-    const near = nearestInTime(preferred, t);
+    const near = nearestSample(preferred, t, ALL);
     const s =
       near && Math.abs(near.t - t) <= reach && withinLapse(near.t, t)
         ? near
-        : nearestInTime(samples, t);
+        : nearestSample(samples, t, ALL);
     const value = s && withinLapse(s.t, t) && heardNear(s, keys, t) ? read(s, t) : undefined;
     return value ? [{ ...value, t }] : [];
   });

@@ -36,13 +36,15 @@ function stretches(samples: readonly Sample[]): Sample[][] {
   return out;
 }
 
+/** The indices of the samples inside the interval, from `start` up to but not including `end`. */
+function indicesIn(samples: readonly Sample[], i: Interval): { start: number; end: number } {
+  return { start: countBefore(samples, i.from), end: countBefore(samples, i.to, true) };
+}
+
 /** The sample before the interval through the one after it, so a trace runs off the edges. */
 function around(samples: readonly Sample[], i: Interval): Sample[] {
-  let first = samples.findIndex((s) => s.t >= i.from);
-  if (first < 0) first = samples.length;
-  let last = samples.findIndex((s) => s.t > i.to);
-  if (last < 0) last = samples.length;
-  return samples.slice(Math.max(0, first - 1), Math.min(samples.length, last + 1));
+  const { start, end } = indicesIn(samples, i);
+  return samples.slice(Math.max(0, start - 1), Math.min(samples.length, end + 1));
 }
 
 /**
@@ -164,8 +166,7 @@ function countBefore(samples: readonly Sample[], t: number, through = false): nu
  * any. The samples are oldest first.
  */
 export function nearestSample(samples: readonly Sample[], t: number, i: Interval): Sample | null {
-  const start = countBefore(samples, i.from);
-  const end = countBefore(samples, i.to, true);
+  const { start, end } = indicesIn(samples, i);
   const k = Math.min(Math.max(countBefore(samples, t), start), end);
   const before = k > start ? samples[k - 1] : undefined;
   const after = k < end ? samples[k] : undefined;
@@ -208,8 +209,8 @@ export function peekAt(
 
 /** The last sample inside the interval; null without any. The samples are oldest first. */
 export function newestSample(samples: readonly Sample[], i: Interval): Sample | null {
-  const end = countBefore(samples, i.to, true);
-  return end > countBefore(samples, i.from) ? (samples[end - 1] ?? null) : null;
+  const { start, end } = indicesIn(samples, i);
+  return end > start ? (samples[end - 1] ?? null) : null;
 }
 
 interface Bar {
