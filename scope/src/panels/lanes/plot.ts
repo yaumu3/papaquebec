@@ -2,7 +2,6 @@ import type { HeardKey } from '../../lib/aircraft';
 import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
 import { NM_IN_METERS, turn } from '../../lib/geo';
 import { withinLapse } from '../../lib/reports';
-import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import type { Interval } from '../../state/window';
@@ -196,24 +195,21 @@ export function barbPath(x: number, y: number, dirDeg: number, speedKt: number, 
     const r = CALM_RADIUS;
     return `M${fixed(x + r)} ${fixed(y)} a${r} ${r} 0 1 0 ${-2 * r} 0 a${r} ${r} 0 1 0 ${2 * r} 0`;
   }
-  const ux = Math.sin(dirDeg * RAD);
-  const uy = -Math.cos(dirDeg * RAD);
-  const px = -uy;
-  const py = ux;
-  const along = (d: number) => `${fixed(x + ux * d)} ${fixed(y + uy * d)}`;
-  let d = `M${fixed(x)} ${fixed(y)} L${along(lengthPx)} `;
+  const at = toward(x, y, dirDeg);
+  const across = toward(0, 0, dirDeg);
+  let d = `M${fixed(x)} ${fixed(y)} L${at(lengthPx)} `;
   let pos = lengthPx;
   for (const mark of marks) {
     if (mark === 'pennant') {
       const base = pos - PENNANT_STEP_PX;
-      d += `M${along(pos)} L${fixed(x + ux * pos + px * FULL_PX)} ${fixed(y + uy * pos + py * FULL_PX)} L${along(base)} Z `;
+      d += `M${at(pos)} L${at(pos, FULL_PX)} L${at(base)} Z `;
       pos = base;
       continue;
     }
     // A lone half barb sits one step in, so it is not taken for the tip.
     if (mark === 'half' && pos === lengthPx) pos -= MARK_STEP_PX;
     const len = mark === 'full' ? FULL_PX : HALF_PX;
-    d += `M${along(pos)} l${fixed(px * len)} ${fixed(py * len)} `;
+    d += `M${at(pos)} l${across(0, len)} `;
     pos -= MARK_STEP_PX;
   }
   return d.trim();
