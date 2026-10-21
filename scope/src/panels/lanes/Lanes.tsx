@@ -82,11 +82,9 @@ function take(own: LaneKey | null, lane: LaneKey): void {
 export function Lanes(props: { track: Track }) {
   /** How far across the plots the pointer is, if it is over them. */
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
-  // A memo, so that only another target resets the hover, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
   // A memo, so that scrolling the lanes, which keeps the window, redraws none of them.
   const lanesWindow = createMemo(() => lanesView(hex()).window);
-  createEffect(on(hex, () => setHoverPx(null), { defer: true }));
   onCleanup(() => {
     setHoverInstant(null);
     setCursorInstant(null);
