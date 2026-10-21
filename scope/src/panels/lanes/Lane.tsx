@@ -97,11 +97,12 @@ export function Lane(props: {
   /** What asks for the lane's palette. */
   onMenu: (e: MouseEvent | KeyboardEvent) => void;
   onGrab: (e: PointerEvent, part: LanePart) => void;
-  /** Where it stands among the lanes while one is dragged, and whether it is that one, shown as its slot. */
+  /** Where it stands among the lanes while one is dragged. */
   place: number;
+  /** Whether it is the lane dragged, shown as a hole where it will land. */
+  hole: boolean;
   /** How far a finger has swiped the top row left, while one does. */
   swipeX: number | null;
-  slot: boolean;
   /** Whether a finger has lifted it and not moved it yet: lit where it stands. */
   lifted: boolean;
 }) {
@@ -204,7 +205,7 @@ export function Lane(props: {
     <div
       ref={props.laneRef}
       data-lane="history"
-      class={cx(s.lane, props.slot && s.hole, props.lifted && s.lifted)}
+      class={cx(s.lane, props.hole && s.hole, props.lifted && s.lifted)}
       style={{ height: `${props.height}px`, order: props.place }}
       tabindex="0"
       role="group"

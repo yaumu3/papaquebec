@@ -386,7 +386,7 @@ export function Lanes(props: { track: Track }) {
                     onMenu={(e) => openLaneMenu(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
-                    slot={moving()?.lane === lane}
+                    hole={moving()?.lane === lane}
                     lifted={drag()?.lane === lane && drag()?.still === true}
                   />
                 ) : (
@@ -416,7 +416,7 @@ export function Lanes(props: { track: Track }) {
                     onMenu={(e) => openLaneMenu(lane, e)}
                     onGrab={(e, part) => grab(e, lane, part)}
                     place={placed()}
-                    slot={moving()?.lane === lane}
+                    hole={moving()?.lane === lane}
                     lifted={drag()?.lane === lane && drag()?.still === true}
                     swipeX={(() => {
                       const sw = swipe();
