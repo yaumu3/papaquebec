@@ -34,10 +34,12 @@ export const NONE: Reading = { v: '---' };
 
 export const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
 
-/** The position as one cell. */
-export function positionReading(at: GeoPoint | undefined): { k: string; r: Reading } {
-  if (at === undefined) return { k: 'POSITION', r: NONE };
-  return { k: 'POSITION', r: { v: `${at.lat.toFixed(5)} ${at.lon.toFixed(5)}` } };
+/** What SURV labels the position. */
+export const POSITION_LABEL = 'POSITION';
+
+/** The position as a reading. */
+export function positionReading(at: GeoPoint | undefined): Reading {
+  return at === undefined ? NONE : { v: `${at.lat.toFixed(5)} ${at.lon.toFixed(5)}` };
 }
 
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>

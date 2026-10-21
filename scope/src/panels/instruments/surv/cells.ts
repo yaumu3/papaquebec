@@ -1,7 +1,7 @@
 import { isStale } from '../../../render/scene/rules';
 import type { Readout } from '../../../state/track';
 import { HEARD } from '../../lanes/plots';
-import { NONE, positionReading, type Reading, READINGS } from '../../readings';
+import { NONE, POSITION_LABEL, positionReading, type Reading, READINGS } from '../../readings';
 import { holdsAll } from '../freshness';
 import type { Moment } from '../moment';
 
@@ -23,7 +23,7 @@ const READ_KEYS = ['nic', 'nacp', 'src', 'rssi', 'msgs', 'age'] as const;
 const dash = (key: SurvKey, k: string): SurvCell => ({ key, k, r: NONE, dim: true });
 
 const SURV_DASHES: SurvCell[] = [
-  dash('pos', positionReading(undefined).k),
+  dash('pos', POSITION_LABEL),
   ...READ_KEYS.map((key) => dash(key, READINGS[key].label)),
 ];
 
@@ -36,7 +36,7 @@ export function survCells(m: Moment<Readout>): SurvCell[] {
   const { r: t, instant } = m;
   const position = positionReading(t.at);
   return [
-    { key: 'pos', k: position.k, r: position.r, dim: t.at === undefined || isStale(t) },
+    { key: 'pos', k: POSITION_LABEL, r: position, dim: t.at === undefined || isStale(t) },
     ...READ_KEYS.map((key) => {
       const lapsed = LAPSING.has(key) && !holdsAll(t, HEARD[key], instant);
       const r = lapsed ? NONE : READINGS[key].format(t);

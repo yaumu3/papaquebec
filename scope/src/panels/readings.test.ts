@@ -185,10 +185,7 @@ describe('positionReading', () => {
     const readings = [positionReading(live), positionReading(undefined)];
 
     // Assert
-    expect(readings).toEqual([
-      { k: 'POSITION', r: { v: '35.73266 139.99644' } },
-      { k: 'POSITION', r: NONE },
-    ]);
+    expect(readings).toEqual([{ v: '35.73266 139.99644' }, NONE]);
   });
 });
 
