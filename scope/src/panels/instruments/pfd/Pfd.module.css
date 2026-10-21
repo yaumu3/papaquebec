@@ -15,7 +15,9 @@
 .fma {
   fill: var(--pfd-fma);
 }
-.rules {
+.rules,
+.bars,
+.scale {
   stroke: var(--pfd-ink);
   stroke-width: 1.2;
 }
@@ -94,16 +96,13 @@
   stroke: var(--text);
   stroke-width: 1.6;
 }
-.bank {
+.bank,
+.pointer {
   stroke: var(--text);
   stroke-width: 1.5;
 }
 .index {
   fill: var(--text);
-}
-.pointer {
-  stroke: var(--text);
-  stroke-width: 1.5;
 }
 .fpvHalo,
 .fpv {
@@ -132,10 +131,6 @@
 }
 .hundredsLabel {
   font-size: var(--text-xs);
-}
-.bars {
-  stroke: var(--pfd-ink);
-  stroke-width: 1.2;
 }
 .thousands {
   font-size: var(--text-pfd-alt);
@@ -203,22 +198,16 @@
 .unit {
   font-size: var(--text-xs);
 }
-.scale {
-  stroke: var(--pfd-ink);
-  stroke-width: 1.2;
-}
 .needle {
   stroke: var(--pfd-ink);
   stroke-width: 2;
   stroke-linecap: round;
 }
 .vsiLabel {
-  color: var(--pfd-ink);
   font-size: var(--text-pfd-xs);
   transform: translateY(-50%);
 }
 .vsiDigits {
-  color: var(--pfd-ink);
   font-size: var(--text-md);
   transform: translate(-100%, -50%);
 }

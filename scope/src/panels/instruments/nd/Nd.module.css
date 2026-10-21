@@ -165,7 +165,8 @@
   stroke: var(--text);
   stroke-width: 1.5;
 }
-.trend {
+.trend,
+.wind {
   stroke: var(--text);
   stroke-width: 1.6;
   stroke-linecap: round;
@@ -173,11 +174,6 @@
 .levelOff {
   stroke: var(--color-level);
   stroke-width: 2.2;
-  stroke-linecap: round;
-}
-.wind {
-  stroke: var(--text);
-  stroke-width: 1.6;
   stroke-linecap: round;
 }
 .trafficOther {
