@@ -122,12 +122,10 @@ export function createLaneDrag(deps: {
   createEffect(() => {
     const sc = deps.scroller();
     if (!sc) return;
-    sc.addEventListener('touchmove', keep, { passive: false });
-    sc.addEventListener('scroll', reread);
-    onCleanup(() => {
-      sc.removeEventListener('touchmove', keep);
-      sc.removeEventListener('scroll', reread);
-    });
+    const ac = new AbortController();
+    sc.addEventListener('touchmove', keep, { passive: false, signal: ac.signal });
+    sc.addEventListener('scroll', reread, { signal: ac.signal });
+    onCleanup(() => ac.abort());
   });
 
   /** The drag with the slot and the bin read again at the pointer `x`, `y`. */
@@ -279,11 +277,13 @@ export function createLaneDrag(deps: {
         }, HOLD_MS)
       : undefined;
     const picker = touch ? setTimeout(openPicker, PICKER_HOLD_MS) : undefined;
-    window.addEventListener('keydown', onKey, { capture: true });
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerup', onUp);
-    el.addEventListener('pointercancel', cancel);
-    el.addEventListener('lostpointercapture', cancel);
+    const ac = new AbortController();
+    const { signal } = ac;
+    window.addEventListener('keydown', onKey, { capture: true, signal });
+    el.addEventListener('pointermove', onMove, { signal });
+    el.addEventListener('pointerup', onUp, { signal });
+    el.addEventListener('pointercancel', cancel, { signal });
+    el.addEventListener('lostpointercapture', cancel, { signal });
     end = () => {
       end = null;
       if (selecting) deps.select.cancel();
@@ -295,11 +295,7 @@ export function createLaneDrag(deps: {
       clearTimeout(lift);
       clearTimeout(picker);
       cancelAnimationFrame(frame);
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerup', onUp);
-      el.removeEventListener('pointercancel', cancel);
-      el.removeEventListener('lostpointercapture', cancel);
-      window.removeEventListener('keydown', onKey, { capture: true });
+      ac.abort();
       if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
       setDrag(null);
       setSwipe(null);
