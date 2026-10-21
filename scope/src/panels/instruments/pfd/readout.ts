@@ -144,7 +144,7 @@ function driftOf(t: Readout, instant: number): number {
  */
 function fpvOf(t: Readout, instant: number): Fpv | undefined {
   const { verticalRate: vs, gs } = t;
-  if (isLost(t) || vs === undefined || gs === undefined || gs <= 0) return undefined;
+  if (vs === undefined || gs === undefined || gs <= 0) return undefined;
   if (!allHold(t, ['roll', 'verticalRate', 'gs'], instant)) return undefined;
   return { fpaDeg: pathAngle(vs, gs), driftDeg: driftOf(t, instant) };
 }
@@ -154,18 +154,18 @@ function fpvOf(t: Readout, instant: number): Fpv | undefined {
  * capture of the selected altitude agrees with the data block's tick.
  */
 function altitudeOf(t: Readout, instant: number, altimeter: Altimeter): PfdAltitude {
-  if (isLost(t) || !holdsAll(t, ['alt'], instant)) return { kind: 'flag' };
+  if (!holdsAll(t, ['alt'], instant)) return { kind: 'flag' };
   if (t.alt === 'ground') return { kind: 'ground' };
   const ft = crewAltitudeFt(t, altimeter);
   return ft === undefined ? { kind: 'flag' } : { kind: 'feet', ft };
 }
 
-/** A reading of the target while it holds and the target is not lost. */
+/** A reading of the target while it holds. */
 const liveValue = (
   t: Readout,
   key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt' | 'navQnh' | 'verticalRate',
   instant: number,
-): number | undefined => (!isLost(t) && holdsAll(t, [key], instant) ? t[key] : undefined);
+): number | undefined => (holdsAll(t, [key], instant) ? t[key] : undefined);
 
 const asSet = (ft: number | undefined): number | undefined =>
   ft === undefined ? undefined : selectedFt(ft);
@@ -184,7 +184,7 @@ const EMPTY_READOUTS: PfdReadouts = {
 
 /** The values of the instrument, each while its keys hold and the target is not lost; none over a gap. */
 export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadouts {
-  if (m.kind === 'empty') return EMPTY_READOUTS;
+  if (m.kind === 'empty' || isLost(m.r)) return EMPTY_READOUTS;
   const { r: t, instant } = m;
   const ias = liveValue(t, 'ias', instant);
   const mach = liveValue(t, 'mach', instant);
