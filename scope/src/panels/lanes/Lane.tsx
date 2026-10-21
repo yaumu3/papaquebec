@@ -79,8 +79,9 @@ export function Lane(props: {
   ticks: readonly number[];
   width: number;
   height: number;
-  /** The sample the lane is read at, and whether that is off now: peeking, or the window held. */
+  /** The sample the lane is read at; none over a gap or without samples. */
   at: Sample | null;
+  /** Whether the lane reads an instant other than now: peeking, or the window held. */
   past: boolean;
   /** Where the time cursor stands across the plot, if it does. */
   cursor: number | null;
@@ -159,7 +160,9 @@ export function Lane(props: {
       withinSec: step / 2,
     }).map((h) => headingGlyph(x(h.t), mid(), h));
   });
-  const readout = createMemo(() => (props.at ? readoutOf(props.keys, props.at) : null));
+  const readout = createMemo(() =>
+    props.at || props.cursor !== null ? readoutOf(props.keys, props.at) : null,
+  );
   /** The intents the contact had, over all of it, so that panning moves no slot. */
   const held = createMemo(() => heldIntents(props.keys, props.samples));
   const slots = () => {

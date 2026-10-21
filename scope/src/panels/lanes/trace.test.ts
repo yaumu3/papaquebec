@@ -12,7 +12,7 @@ import {
   heardAt,
   nearestSample,
   newestSample,
-  sampleAt,
+  peekAt,
   type Point,
   rangeOf,
   runsOf,
@@ -443,7 +443,7 @@ describe('newestSample', () => {
   });
 });
 
-describe('sampleAt', () => {
+describe('peekAt', () => {
   it('takes the sample nearest the time a point across the plot stands for, inside the window', () => {
     // Arrange
     const samples = [sample(100), sample(110), sample(120), sample(130)];
@@ -457,9 +457,82 @@ describe('sampleAt', () => {
     ];
 
     // Act
-    const found = rows.map((r) => sampleAt(samples, r.px, r.i, 300));
+    const found = rows.map((r) => peekAt(samples, r.px, r.i, 300, false));
 
     // Assert
-    expect(found.map((s) => s?.t)).toEqual([100, 110, 130, 120, undefined]);
+    expect(found.map((p) => p?.sample?.t)).toEqual([100, 110, 130, 120, undefined]);
+  });
+
+  it('stands at the pointer with no sample over a gap, at the nearest one at its edges and outside', () => {
+    // Arrange
+    const samples = [sample(100), sample(131), sample(140)];
+    const window = { from: 100, to: 140 };
+    const times = [100, 100.1, 115, 130.9, 131, 135, 140];
+
+    // Act
+    const found = times.map((t) => peekAt(samples, (t - 100) * 10, window, 400, false));
+
+    // Assert
+    expect(found.map((p) => [p?.t, p?.sample?.t])).toEqual([
+      [100, 100],
+      [100.1, undefined],
+      [115, undefined],
+      [130.9, undefined],
+      [131, 131],
+      [131, 131],
+      [140, 140],
+    ]);
+  });
+
+  it('snaps to the nearest sample over a silence shorter than a gap', () => {
+    // Arrange
+    const samples = [sample(100), sample(129.9)];
+    const window = { from: 100, to: 130 };
+    const times = [110, 115];
+
+    // Act
+    const found = times.map((t) => peekAt(samples, (t - 100) * 10, window, 300, false));
+
+    // Assert
+    expect(found.map((p) => [p?.t, p?.sample?.t])).toEqual([
+      [100, 100],
+      [129.9, 129.9],
+    ]);
+  });
+
+  it('stands at the pointer after the last sample while the target is lost, not otherwise', () => {
+    // Arrange
+    const samples = [sample(100), sample(110)];
+    const window = { from: 100, to: 200 };
+    const rows = [
+      { lost: true, t: 150 },
+      { lost: false, t: 150 },
+      { lost: true, t: 110 },
+    ];
+
+    // Act
+    const found = rows.map((r) => peekAt(samples, r.t - 100, window, 100, r.lost));
+
+    // Assert
+    expect(found.map((p) => [p?.t, p?.sample?.t])).toEqual([
+      [150, undefined],
+      [110, 110],
+      [110, 110],
+    ]);
+  });
+
+  it('has no sample exactly where gapsIn shades', () => {
+    // Arrange
+    const samples = [sample(100), sample(131), sample(140), sample(200)];
+    const window = { from: 0, to: 300 };
+    const times = [99, 100, 100.5, 115, 130.9, 131, 135, 140, 150, 199.9, 200, 250];
+    const gaps = gapsIn(samples, window, true);
+
+    // Act
+    const found = times.map((t) => peekAt(samples, t, window, 300, true)?.sample === null);
+
+    // Assert
+    const shaded = times.map((t) => gaps.some((g) => t > g.from && t < g.to));
+    expect(found).toEqual(shaded);
   });
 });

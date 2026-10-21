@@ -16,13 +16,16 @@ export interface Range {
   hi: number;
 }
 
+/** Whether two reports, oldest first, are a gap apart: the lapse or more. */
+const apart = (a: Sample, b: Sample): boolean => b.t - a.t >= LAPSE_SEC;
+
 /** The samples in stretches of reports less than the gap apart. */
 function stretches(samples: readonly Sample[]): Sample[][] {
   const out: Sample[][] = [];
   let stretch: Sample[] = [];
   for (const s of samples) {
     const last = stretch.at(-1);
-    if (last && s.t - last.t >= LAPSE_SEC) {
+    if (last && apart(last, s)) {
       out.push(stretch);
       stretch = [];
     }
@@ -182,14 +185,37 @@ export function nearestSample(samples: readonly Sample[], t: number, i: Interval
   return t - before.t <= after.t - t ? before : after;
 }
 
-/** The sample inside the interval nearest the time a point `px` across a plot `width` wide stands for; null without any. */
-export function sampleAt(
+/** What a point across a plot stands for: its instant, and the sample there; none over a gap. */
+export interface Peek {
+  t: number;
+  sample: Sample | null;
+}
+
+/** Whether `t` lies inside a gap: between two samples a gap apart, or after the last while lost. */
+function overGap(samples: readonly Sample[], t: number, lost: boolean): boolean {
+  const k = countBefore(samples, t);
+  const before = samples[k - 1];
+  const after = samples[k];
+  if (!before || t === after?.t) return false;
+  return after ? apart(before, after) : lost;
+}
+
+/**
+ * What the point `px` across a plot `width` wide stands for: the sample inside the interval
+ * nearest its time, at that sample's time; over a gap, no sample, at the pointer's own time; null
+ * without any.
+ */
+export function peekAt(
   samples: readonly Sample[],
   px: number,
   i: Interval,
   width: number,
-): Sample | null {
-  return nearestSample(samples, timeAt(px, i, width), i);
+  lost: boolean,
+): Peek | null {
+  const t = timeAt(px, i, width);
+  if (overGap(samples, t, lost)) return { t, sample: null };
+  const sample = nearestSample(samples, t, i);
+  return sample && { t: sample.t, sample };
 }
 
 /** The last sample inside the interval; null without any. The samples are oldest first. */

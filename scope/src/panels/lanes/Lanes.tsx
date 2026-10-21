@@ -9,6 +9,7 @@ import {
   movePlotLane,
   plotted,
   removePlotLane,
+  setCursorInstant,
   setHoverInstant,
   setLaneScroll,
   setLanesWindow,
@@ -59,7 +60,7 @@ import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
 import { TimeAxis } from './TimeAxis';
-import { gapsIn, newestSample, sampleAt } from './trace';
+import { gapsIn, newestSample, peekAt } from './trace';
 import { createWindowInput } from './windowInput';
 
 import s from './Lanes.module.css';
@@ -85,7 +86,10 @@ export function Lanes(props: { track: Track }) {
   // A memo, so that scrolling the lanes, which keeps the window, redraws none of them.
   const lanesWindow = createMemo(() => lanesView(hex()).window);
   createEffect(on(hex, () => setHoverPx(null), { defer: true }));
-  onCleanup(() => setHoverInstant(null));
+  onCleanup(() => {
+    setHoverInstant(null);
+    setCursorInstant(null);
+  });
 
   /** The samples, told apart from the last snapshot's though the store appends to one array. */
   const samples = createMemo(
@@ -124,17 +128,26 @@ export function Lanes(props: { track: Track }) {
     setHoverPx(null);
   };
 
-  /** The sample under the pointer, as the window moves under it too. */
-  const hover = createMemo(() => {
+  /** The cursor under the pointer, as the window moves under it too; none without a history lane. */
+  const peek = createMemo(() => {
     const px = hoverPx();
-    return px === null ? null : sampleAt(samples(), px, visible(), plotWidth());
+    if (px === null || historyLanesOf(plotted()).length === 0) return null;
+    return peekAt(samples(), px, visible(), plotWidth(), isLost(props.track));
   });
-  // The scope rings the hovered sample on the trail.
-  createEffect(on(hover, (h) => setHoverInstant(h?.t ?? null)));
-  /** The sample the lanes are read at: the hovered one, else the newest in view. */
-  const at = createMemo(() => hover() ?? newestSample(samples(), visible()));
+  // The scope rings the peeked sample on the trail, none over a gap.
+  createEffect(
+    on(peek, (p) => {
+      setHoverInstant(p?.sample?.t ?? null);
+      setCursorInstant(p?.t ?? null);
+    }),
+  );
+  /** The sample the lanes are read at: the peeked one, none over a gap, else the newest in view. */
+  const at = createMemo(() => {
+    const p = peek();
+    return p ? p.sample : newestSample(samples(), visible());
+  });
   /** Whether the lanes read an instant other than now. */
-  const past = () => readsPast(hover() !== null, lanesWindow());
+  const past = () => readsPast(peek() !== null, lanesWindow());
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is dragged or swiped; a finger only peeks. */
   const pointerAt = (e: PointerEvent) => {
     const el = e.target instanceof Element ? e.target.closest('[data-lane="history"]') : null;
@@ -145,10 +158,8 @@ export function Lanes(props: { track: Track }) {
 
   /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere unless hovering a history lane. */
   const cursorX = () => {
-    const a = hover();
-    return a && historyLanesOf(plotted()).length > 0
-      ? clamp(Math.floor(x(a.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5)
-      : null;
+    const p = peek();
+    return p ? clamp(Math.floor(x(p.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5) : null;
   };
 
   const [bay, setBay] = createSignal<HTMLDivElement>();

@@ -112,9 +112,10 @@ function intentsOf(
 
 /**
  * What the lane of `keys`, its own reading then the intents drawn in it, reads at the sample `at`;
- * each reading unknown unless heard within the gap of it.
+ * each reading unknown unless heard within the gap of it; with no sample, the dash of a gap.
  */
-export function readoutOf(keys: readonly ReadingKey[], at: Sample): LaneReadout {
+export function readoutOf(keys: readonly ReadingKey[], at: Sample | null): LaneReadout {
+  if (!at) return { value: NONE.v };
   const [lane] = keys;
   const s = heardNearAt(keys, at);
   const own = lane && textOf(lane, s);

@@ -290,3 +290,16 @@ describe('readoutSlots', () => {
     ]);
   });
 });
+
+describe('readoutOf over a gap', () => {
+  it('reads the dash of no sample, not as an unknown reading', () => {
+    // Arrange
+    const lanes = [['alt'], ['trk', 'selHdg']] as const;
+
+    // Act
+    const readouts = lanes.map((keys) => readoutOf(keys, null));
+
+    // Assert
+    expect(readouts).toEqual([{ value: '---' }, { value: '---' }]);
+  });
+});
