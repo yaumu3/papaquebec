@@ -7,12 +7,8 @@ import { magneticTrack } from '../../state/magnetic';
 import type { ReadingKey } from '../../state/plotted';
 import { settings } from '../../state/settings';
 import type { Sample } from '../../state/track';
+import { type Wind, windOf } from '../readings';
 import type { Read } from './trace';
-
-export interface Wind {
-  dir: number;
-  speed: number;
-}
 
 /** Where the aircraft goes and where it points, magnetic degrees. */
 export interface Heading {
@@ -53,11 +49,6 @@ type PlotSpec =
   | { kind: 'heading'; heading: (s: Sample) => Heading | undefined }
   | { kind: 'intent'; y: Read; dash?: Dash };
 
-const wind = (s: Sample): Wind | undefined =>
-  s.windDir === undefined || s.windSpeed === undefined
-    ? undefined
-    : { dir: s.windDir, speed: s.windSpeed };
-
 /** The track in magnetic, as the readings show it, and the heading as sent. */
 const heading = (s: Sample): Heading | undefined => {
   const trk = magneticTrack(s);
@@ -94,7 +85,7 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
   ias: { kind: 'line', y: (s) => s.ias, quantum: 10 },
   tas: { kind: 'line', y: (s) => s.tas, quantum: 10 },
   mach: { kind: 'line', y: (s) => s.mach, quantum: 0.01 },
-  wind: { kind: 'barbs', barb: wind },
+  wind: { kind: 'barbs', barb: windOf },
   oat: { kind: 'line', y: (s) => s.oat, quantum: 1 },
   tat: { kind: 'line', y: (s) => s.tat, quantum: 1 },
   nic: { kind: 'line', y: (s) => logOf(s.rc), log: true },

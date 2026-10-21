@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { setDeclinationAt } from '../state/magnetic';
 import { isInstrumentLane, LANE_KEYS } from '../state/plotted';
 import { makeSample } from '../state/sampleFixture';
-import { LANE_LABELS, NONE, positionReading, READINGS } from './readings';
+import { LANE_LABELS, NONE, positionReading, READINGS, windOf } from './readings';
 
 describe('READINGS', () => {
   it('reads the message rate to a tenth per second', () => {
@@ -204,5 +204,23 @@ describe('LANE_LABELS', () => {
 
     // Assert
     expect(labels).toEqual([...lanes.map((lane) => READINGS[lane].label), 'PFD', 'ND', 'SURV']);
+  });
+});
+
+describe('windOf', () => {
+  it('gives the direction and speed when both are known, none when either is missing', () => {
+    // Arrange
+    const rows: Parameters<typeof windOf>[0][] = [
+      { windDir: 269.4, windSpeed: 35.6 },
+      { windDir: 269.4, windSpeed: undefined },
+      { windDir: undefined, windSpeed: 35.6 },
+      { windDir: undefined, windSpeed: undefined },
+    ];
+
+    // Act
+    const winds = rows.map(windOf);
+
+    // Assert
+    expect(winds).toEqual([{ dir: 269.4, speed: 35.6 }, undefined, undefined, undefined]);
   });
 });

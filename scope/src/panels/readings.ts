@@ -85,10 +85,22 @@ function trackReading(r: Readout): Reading {
   return { v: `${degrees(mag)} / ${degrees(r.heading)}` };
 }
 
+/** Where the wind blows from and how fast: degrees true and knots. */
+export interface Wind {
+  dir: number;
+  speed: number;
+}
+
+/** The wind when both its direction and its speed are known. */
+export const windOf = (r: Pick<Readout, 'windDir' | 'windSpeed'>): Wind | undefined =>
+  r.windDir === undefined || r.windSpeed === undefined
+    ? undefined
+    : { dir: r.windDir, speed: r.windSpeed };
+
 /** Where the wind blows from, then how fast; blank unless both are known. */
 function windReading(r: Readout): Reading {
-  if (r.windDir === undefined || r.windSpeed === undefined) return NONE;
-  return { v: `${degrees(r.windDir)} / ${Math.round(r.windSpeed)}`, unit: 'kt' };
+  const wind = windOf(r);
+  return wind ? { v: `${degrees(wind.dir)} / ${Math.round(wind.speed)}`, unit: 'kt' } : NONE;
 }
 
 const inHg = (hpa: number | undefined) => (hpa === undefined ? undefined : hpaToInHg(hpa));

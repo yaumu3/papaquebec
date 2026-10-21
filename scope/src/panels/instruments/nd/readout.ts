@@ -4,7 +4,7 @@ import { steeringHeading } from '../../../lib/autopilot';
 import { padBearing } from '../../../lib/format';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
-import { HEARD, NONE, type Reading, READINGS } from '../../readings';
+import { HEARD, NONE, type Reading, READINGS, windOf } from '../../readings';
 import { holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
 import type { Trend } from './geometry';
@@ -110,10 +110,8 @@ export function ndReadouts(m: Moment<Readout>): NdReadouts {
     return value === undefined ? blank(degree) : { text: value, known: true };
   };
   const wind = () => {
-    const from = windFromOf(t);
-    return from === undefined || t.windSpeed === undefined
-      ? undefined
-      : `${padBearing(from)}°/${Math.round(t.windSpeed)}`;
+    const w = windOf(t);
+    return w && `${padBearing(magneticBearing(w.dir, t.at))}°/${Math.round(w.speed)}`;
   };
   return {
     gs: read(HEARD.gs, shown(READINGS.gs.format(t))),
@@ -184,7 +182,7 @@ function levelOffOf(t: Readout, instant: number, altimeter: Altimeter): number |
 }
 
 /** The direction the wind blows from, magnetic, when both its direction and its speed are known. */
-const windFromOf = (t: Readout): number | undefined =>
-  t.windDir === undefined || t.windSpeed === undefined
-    ? undefined
-    : magneticBearing(t.windDir, t.at);
+const windFromOf = (t: Readout): number | undefined => {
+  const w = windOf(t);
+  return w && magneticBearing(w.dir, t.at);
+};
