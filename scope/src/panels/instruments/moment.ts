@@ -19,9 +19,6 @@ export interface Then {
 /** What the instruments draw: the target now, a sample while peeking, or nothing over a gap. */
 export type Moment<R extends Readout = Track> = Now<R> | Then | { kind: 'empty' };
 
-/** A moment with a target to read, for the instruments that do not yet draw the empty one. */
-export type Present<R extends Readout = Track> = Now<R> | Then;
-
 /** The target as it is `now`. */
 export const nowAt = <R extends Readout>(r: R, now: number): Now<R> => ({
   kind: 'now',

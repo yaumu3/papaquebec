@@ -1,8 +1,9 @@
 import { isStale } from '../../../render/scene/rules';
+import type { Readout } from '../../../state/track';
 import { HEARD } from '../../lanes/plots';
 import { NONE, positionReading, type Reading, READINGS } from '../../readings';
 import { holdsAll } from '../freshness';
-import type { Present } from '../moment';
+import type { Moment } from '../moment';
 
 export type SurvKey = 'pos' | 'nic' | 'nacp' | 'src' | 'rssi' | 'msgs' | 'age';
 
@@ -19,8 +20,20 @@ const LAPSING: ReadonlySet<SurvKey> = new Set(['nic', 'nacp']);
 
 const READ_KEYS = ['nic', 'nacp', 'src', 'rssi', 'msgs', 'age'] as const;
 
-/** The cells of SURV in their order: the position, then the readings of the surveillance and the reception. */
-export function survCells({ r: t, instant }: Present): SurvCell[] {
+const dash = (key: SurvKey, k: string): SurvCell => ({ key, k, r: NONE, dim: true });
+
+const SURV_DASHES: SurvCell[] = [
+  dash('pos', positionReading(undefined).k),
+  ...READ_KEYS.map((key) => dash(key, READINGS[key].label)),
+];
+
+/**
+ * The cells of SURV in their order: the position, then the readings of the surveillance and the
+ * reception; over a gap, every one a dimmed dash.
+ */
+export function survCells(m: Moment<Readout>): SurvCell[] {
+  if (m.kind === 'empty') return SURV_DASHES;
+  const { r: t, instant } = m;
   const position = positionReading(t.at);
   return [
     { key: 'pos', k: position.k, r: position.r, dim: t.at === undefined || isStale(t) },

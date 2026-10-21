@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import { LAPSE_SEC } from '../../../lib/reports';
 import { makeTrack } from '../../../render/scene/trackFixture';
+import { makeSample } from '../../../state/sampleFixture';
 import { NONE, READINGS } from '../../readings';
 import { nowAt } from '../moment';
 import { survCells } from './cells';
@@ -113,5 +115,82 @@ describe('survCells', () => {
       ['rssi', false, false],
       ['msgs', false, false],
     ]);
+  });
+});
+
+describe('survCells at a peeked sample', () => {
+  const AGE = 200;
+  const T = 1;
+  const sampleRows = [
+    makeSample(T, {
+      at: { lat: 35.5, lon: 139.8 },
+      rssi: -9,
+      messageRate: 3,
+      seen: 2,
+      seenPos: 4,
+      nic: 8,
+      rc: 100,
+      nacP: 9,
+      heard: heardAt(T),
+    }),
+    makeSample(T, {
+      at: { lat: 35.5, lon: 139.8 },
+      rssi: -9,
+      messageRate: 3,
+      seen: 2,
+      seenPos: 31,
+      nic: 8,
+      rc: 100,
+      nacP: 9,
+      heard: heardAt(T - LAPSE_SEC),
+    }),
+    makeSample(T, {
+      at: undefined,
+      rssi: undefined,
+      messageRate: 3,
+      seen: 2,
+      seenPos: undefined,
+      heard: heardAt(T),
+    }),
+  ];
+
+  it('reads a sample at its own time as a live target whose data has exactly that age', () => {
+    // Arrange
+    const live = sampleRows.map((s) =>
+      makeSample(T + AGE, { ...s, heard: heardAt((s.heard.nic ?? 0) + AGE) }),
+    );
+
+    // Act
+    const peeked = sampleRows.map((r) => survCells({ kind: 'sample', r, instant: r.t }));
+    const now = live.map((r) => survCells(nowAt(r, T + AGE)));
+
+    // Assert
+    expect(peeked).toEqual(now);
+  });
+
+  it('reads the message rate as a dash where the sample has none', () => {
+    // Arrange
+    const first = makeSample(T, { messageRate: undefined, heard: heardAt(T) });
+
+    // Act
+    const msgs = survCells({ kind: 'sample', r: first, instant: T }).find((c) => c.key === 'msgs');
+
+    // Assert
+    expect([msgs?.r, msgs?.dim]).toEqual([NONE, true]);
+  });
+
+  it('dashes and dims every cell over a gap, the source too', () => {
+    // Arrange
+    const empty = { kind: 'empty' } as const;
+
+    // Act
+    const cells = survCells(empty);
+
+    // Assert
+    expect(cells.map((c) => [c.key, c.r, c.dim])).toEqual(
+      (['pos', 'nic', 'nacp', 'src', 'rssi', 'msgs', 'age'] as const).map(
+        (key) => [key, NONE, true] as const,
+      ),
+    );
   });
 });

@@ -3,10 +3,9 @@ import { createMemo, Index, type JSX, Show } from 'solid-js';
 import { cx } from '../../../design/cx';
 import { setPan } from '../../../state/scope';
 import type { Track } from '../../../state/track';
-import { trackStore } from '../../../state/tracks';
 import type { Reading } from '../../readings';
 import { Value } from '../../Value';
-import { nowAt } from '../moment';
+import type { Moment } from '../moment';
 import { type SurvCell, survCells } from './cells';
 
 import s from './Surv.module.css';
@@ -77,8 +76,8 @@ function SurvCellView(props: { cell: SurvCell; t: Track }) {
 }
 
 /** The surveillance readings: where the position comes from and how well it is heard. */
-export function Surv(props: { t: Track }) {
-  const cells = createMemo(() => survCells(nowAt(props.t, trackStore.stats.now)));
+export function Surv(props: { t: Track; moment: Moment }) {
+  const cells = createMemo(() => survCells(props.moment));
   return (
     <div class={s.surv}>
       <Group name="POS">
