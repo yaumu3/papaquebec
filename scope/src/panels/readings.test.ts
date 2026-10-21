@@ -179,10 +179,10 @@ describe('READINGS values', () => {
 describe('positionReading', () => {
   it('names a live fix and dashes none', () => {
     // Arrange
-    const live = { kind: 'live', lat: 35.73266, lon: 139.99644, x: 1, y: 2 } as const;
+    const live = { lat: 35.73266, lon: 139.99644 };
 
     // Act
-    const readings = [positionReading(live), positionReading({ kind: 'none' })];
+    const readings = [positionReading(live), positionReading(undefined)];
 
     // Assert
     expect(readings).toEqual([

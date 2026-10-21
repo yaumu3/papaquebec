@@ -11,6 +11,7 @@ import {
   padBearing,
   sourceName,
 } from '../lib/format';
+import type { GeoPoint } from '../lib/geo';
 import { hpaToInHg } from '../lib/metar';
 import { magneticTrack } from '../state/magnetic';
 import {
@@ -21,7 +22,7 @@ import {
   type ReadingKey,
 } from '../state/plotted';
 import { settings } from '../state/settings';
-import type { Position, Readout } from '../state/track';
+import type { Readout } from '../state/track';
 
 /** A value with its unit kept apart so the unit can be set quieter than the number. */
 export interface Reading {
@@ -41,9 +42,9 @@ export const NONE: Reading = { v: '---' };
 export const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
 
 /** The position as one cell. */
-export function positionReading(p: Position): { k: string; r: Reading } {
-  if (p.kind === 'none') return { k: 'POSITION', r: NONE };
-  return { k: 'POSITION', r: { v: `${p.lat.toFixed(5)} ${p.lon.toFixed(5)}` } };
+export function positionReading(at: GeoPoint | undefined): { k: string; r: Reading } {
+  if (at === undefined) return { k: 'POSITION', r: NONE };
+  return { k: 'POSITION', r: { v: `${at.lat.toFixed(5)} ${at.lon.toFixed(5)}` } };
 }
 
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>
