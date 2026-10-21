@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from '../../lib/aircraft';
 import { makeSample as sample } from '../../state/sampleFixture';
-import type { Interval } from '../../state/span';
 import type { Sample } from '../../state/track';
+import type { Interval } from '../../state/window';
 import {
   barbMarks,
   barsOf,

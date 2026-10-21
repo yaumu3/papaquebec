@@ -2,7 +2,7 @@ import { createSignal } from 'solid-js';
 
 import { addLane, type LaneKey, moveLane, removeLane, switchLane } from './plotted';
 import { persisted } from './settings';
-import { type Span, WHOLE } from './span';
+import { DEFAULT_WINDOW, type LanesWindow } from './window';
 
 /** The lanes of the detail column, in order. */
 export const [plotted, setPlotted] = createSignal<readonly LaneKey[]>(persisted.plotted);
@@ -23,23 +23,27 @@ export function addPlotLane(lane: LaneKey): void {
   setPlotted((p) => addLane(p, lane));
 }
 
-/** What the column shows of one target: its span, and how far down its lanes are scrolled. */
+/** What the column shows of one target: its window, and how far down its lanes are scrolled. */
 export interface LanesView {
   hex: string | null;
-  span: Span;
+  window: LanesWindow;
   scrollTop: number;
 }
 
-const [view, setView] = createSignal<LanesView>({ hex: null, span: WHOLE, scrollTop: 0 });
+const [view, setView] = createSignal<LanesView>({
+  hex: null,
+  window: DEFAULT_WINDOW,
+  scrollTop: 0,
+});
 
 const viewOf = (v: LanesView, hex: string | null): LanesView =>
-  v.hex === hex ? v : { hex, span: WHOLE, scrollTop: 0 };
+  v.hex === hex ? v : { hex, window: DEFAULT_WINDOW, scrollTop: 0 };
 
-/** The column's view of `hex`; any target but the one kept starts whole and at the top. */
+/** The column's view of `hex`; any target but the one kept starts on the default window and at the top. */
 export const lanesView = (hex: string | null): LanesView => viewOf(view(), hex);
 
-export function setLanesSpan(hex: string | null, span: Span): void {
-  setView((v) => ({ ...viewOf(v, hex), span }));
+export function setLanesWindow(hex: string | null, next: LanesWindow): void {
+  setView((v) => ({ ...viewOf(v, hex), window: next }));
 }
 
 export function setLaneScroll(hex: string | null, scrollTop: number): void {

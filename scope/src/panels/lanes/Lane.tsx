@@ -2,8 +2,8 @@ import { createMemo, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import type { HistoryLane, ReadingKey } from '../../state/plotted';
-import { type Interval, xOf } from '../../state/span';
 import type { Sample } from '../../state/track';
+import { type Interval, xOf } from '../../state/window';
 import { LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
@@ -65,7 +65,7 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
   return p.kind === 'intent' ? p.dash : undefined;
 };
 
-/** One lane of the bay: a top row with its name and readout, then its scale and its plot over the visible span. */
+/** One lane of the bay: a top row with its name and readout, then its scale and its plot over the window. */
 export function Lane(props: {
   lane: HistoryLane;
   /** Its place among the lanes, and how many there are. */
@@ -122,7 +122,7 @@ export function Lane(props: {
     spec.kind === 'gantt' ? barsOf(props.samples, spec.names, HEARD[props.lane]) : [],
   );
   const rowHeight = () => (props.height - PAD_TOP_PX - PAD_BOTTOM_PX) / Math.max(1, bars().length);
-  /** The shortest round clock step that keeps glyphs at least `pitch` apart across the visible span. */
+  /** The shortest round clock step that keeps glyphs at least `pitch` apart across the window. */
   const stepEvery = (pitch: number) =>
     clockStep(props.visible.to - props.visible.from, Math.max(1, Math.floor(props.width / pitch)));
   /** The ticks of `step` at which a mark reaching `reach` round each fits whole in the plot. */

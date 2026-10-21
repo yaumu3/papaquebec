@@ -22,9 +22,9 @@ import {
   readingsIn,
 } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
-import { type Interval, resolveSpan, xOf } from '../../state/span';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
+import { type Interval, resolveWindow, xOf } from '../../state/window';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
@@ -75,14 +75,14 @@ function take(own: LaneKey | null, lane: LaneKey): void {
   else if (what === 'add') addPlotLane(lane);
 }
 
-/** What the lanes plot of the selected target over the visible span, each read at the hovered sample or the last in view. */
+/** What the lanes plot of the selected target over the visible window, each read at the hovered sample or the last in view. */
 export function Lanes(props: { track: Track }) {
   /** How far across the plots the pointer is, if it is over them. */
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
   // A memo, so that only another target resets the hover, not every snapshot of this one.
   const hex = createMemo(() => props.track.hex);
-  // A memo, so that scrolling the lanes, which keeps the span, redraws none of them.
-  const span = createMemo(() => lanesView(hex()).span);
+  // A memo, so that scrolling the lanes, which keeps the window, redraws none of them.
+  const lanesWindow = createMemo(() => lanesView(hex()).window);
   createEffect(on(hex, () => setHoverPx(null), { defer: true }));
   onCleanup(() => setHoverInstant(null));
 
@@ -99,7 +99,7 @@ export function Lanes(props: { track: Track }) {
     const now = trackStore.stats.now;
     return { from: samples()[0]?.t ?? now, to: now };
   });
-  const visible = createMemo(() => resolveSpan(span(), contact()));
+  const visible = createMemo(() => resolveWindow(lanesWindow(), contact()));
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
@@ -108,7 +108,7 @@ export function Lanes(props: { track: Track }) {
   const plotWidth = trackWidth(labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
 
-  /** The sample under the pointer, as the span moves under it too. */
+  /** The sample under the pointer, as the window moves under it too. */
   const hover = createMemo(() => {
     const px = hoverPx();
     return px === null ? null : sampleAt(samples(), px, visible(), plotWidth());

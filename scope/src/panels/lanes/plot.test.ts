@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
-import type { Interval } from '../../state/span';
+import type { Interval } from '../../state/window';
 import {
   atTicks,
   barbPath,
