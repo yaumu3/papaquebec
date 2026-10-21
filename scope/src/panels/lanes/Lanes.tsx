@@ -127,10 +127,11 @@ export function Lanes(props: { track: Track }) {
     setHoverPx(null);
   };
 
+  const showsHistory = () => historyLanesOf(plotted()).length > 0;
   /** The cursor under the pointer, as the window moves under it too; none without a history lane. */
   const peek = createMemo(() => {
     const px = hoverPx();
-    if (px === null || historyLanesOf(plotted()).length === 0) return null;
+    if (px === null || !showsHistory()) return null;
     return peekAt(samples(), px, visible(), plotWidth(), isLost(props.track));
   });
   // The scope rings the peeked sample on the trail, none over a gap.
@@ -145,12 +146,10 @@ export function Lanes(props: { track: Track }) {
     const p = peek();
     return p ? p.sample : newestSample(samples(), visible());
   });
-  /** Whether the lanes read an instant other than now. */
-  const past = () => readsPast(peek() !== null, lanesWindow());
-  /** What the instruments draw at the cursor. */
-  const moment = createMemo(() =>
-    momentOf(props.track, peek() !== null, at(), trackStore.stats.now),
-  );
+  /** Whether the panel reads an instant other than now. */
+  const past = () => readsPast(peek() !== null, lanesWindow(), showsHistory());
+  /** What the instruments draw: what the lanes read. */
+  const moment = createMemo(() => momentOf(props.track, past(), at(), trackStore.stats.now));
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is dragged or swiped; a finger only peeks. */
   const pointerAt = (e: PointerEvent) => {
     const el = e.target instanceof Element ? e.target.closest('[data-lane="history"]') : null;

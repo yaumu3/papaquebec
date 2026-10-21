@@ -86,7 +86,7 @@ export function Nd(props: { t: Track; moment: Moment }) {
   /**
    * The glides stand at once on another target, and when the frame changes mode: a target heard
    * again, or whose track lapses or comes back, is shown where it is, not on its way
-   * from where the last frame left it; so does each peeked sample, and the return to now.
+   * from where the last frame left it; so does each sample drawn, and the return to now.
    */
   const key = () => `${props.t.hex}/${frame().mode}/${momentKey(props.moment)}`;
   const orient = glided(() => frame().orient, { wrap: 360, key });

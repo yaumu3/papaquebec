@@ -367,7 +367,7 @@ describe('ndTraffic', () => {
     expect(results).toEqual(Array.from({ length: 4 }, () => none));
   });
 
-  it('draws no traffic, no advisory and no annunciation while peeking or over a gap', () => {
+  it('draws no traffic, no advisory and no annunciation at a sample or over a gap', () => {
     // Arrange
     const own = ownShip({ ra: advisory({ address: 'thr' }) });
     const others = [traffic('thr', 10, 4), traffic('a', 0, 5)];

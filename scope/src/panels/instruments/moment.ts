@@ -9,14 +9,14 @@ export interface Now<R extends Readout = Track> {
   instant: number;
 }
 
-/** A sample drawn at its own time. */
+/** A sample drawn at its own time: the peeked one, or the newest in a held window. */
 export interface Then {
   kind: 'sample';
   r: Sample;
   instant: number;
 }
 
-/** What the instruments draw: the target now, a sample while peeking, or nothing over a gap. */
+/** What the instruments draw: the target now, a sample while peeking or held, or nothing where the lanes read none. */
 export type Moment<R extends Readout = Track> = Now<R> | Then | { kind: 'empty' };
 
 /** The target as it is `now`. */

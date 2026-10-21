@@ -105,22 +105,25 @@ describe('xOf and timeAt', () => {
 });
 
 describe('readsPast', () => {
-  it('reads the past while peeking or held, the present only live and not peeking', () => {
+  it('reads the past while peeking or held, never without a history lane', () => {
     // Arrange
     const live: LanesWindow = { kind: 'live', sec: 300 };
     const held: LanesWindow = { kind: 'held', from: 1000, to: 1300 };
     const rows = [
-      { peeking: false, w: live },
-      { peeking: true, w: live },
-      { peeking: false, w: held },
-      { peeking: true, w: held },
+      { peeking: false, w: live, shown: true },
+      { peeking: true, w: live, shown: true },
+      { peeking: false, w: held, shown: true },
+      { peeking: true, w: held, shown: true },
+      { peeking: false, w: live, shown: false },
+      { peeking: false, w: held, shown: false },
+      { peeking: true, w: held, shown: false },
     ];
 
     // Act
-    const past = rows.map((r) => readsPast(r.peeking, r.w));
+    const past = rows.map((r) => readsPast(r.peeking, r.w, r.shown));
 
     // Assert
-    expect(past).toEqual([false, true, true, true]);
+    expect(past).toEqual([false, true, true, true, false, false, false]);
   });
 });
 

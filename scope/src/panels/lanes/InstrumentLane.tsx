@@ -18,7 +18,7 @@ import s from './Lanes.module.css';
 export function InstrumentLane(props: {
   lane: InstrumentKey;
   track: Track;
-  /** What the instruments draw: now, the sample under the cursor, or nothing over a gap. */
+  /** What the instruments draw: now, the sample the lanes read, or nothing where they read none. */
   moment: Moment;
   /** Its place among the lanes, and how many there are. */
   index: number;

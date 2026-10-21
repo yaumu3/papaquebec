@@ -349,8 +349,8 @@ function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol 
 }
 
 /**
- * The traffic the display draws around own ship; none on a lost or blank display, nor while
- * peeking, as the panel keeps no past of the other aircraft.
+ * The traffic the display draws around own ship; none on a lost or blank display, nor at a
+ * sample, as the panel keeps no past of the other aircraft.
  */
 export function ndTraffic(m: Moment, others: Iterable<Track>, view: NdView): NdTraffic {
   if (m.kind !== 'now' || view.frame.mode === 'lost' || view.frame.mode === 'blank') return NONE;
