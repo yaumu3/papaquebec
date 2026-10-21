@@ -4,6 +4,7 @@ import { STANDARD_ALTIMETER } from '../../../lib/altitude';
 import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
+import { readoutOf } from '../../lanes/readout';
 import { ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
 const NOW = 1000;
@@ -179,31 +180,47 @@ describe('ndReadouts', () => {
 
   it('is as old as the oldest of the inputs of a derived value', () => {
     // Arrange
-    const sel = (modesAt: number | undefined) =>
+    const wind = (speedAt: number) =>
       makeSample(NOW, {
         seen: 1,
-        selHeading: 310,
-        navModes: modesAt === undefined ? undefined : ['autopilot'],
         windDir: 276,
         windSpeed: 40,
-        heard: {
-          selHeading: FRESH,
-          ...(modesAt === undefined ? {} : { navModes: modesAt }),
-          windDir: FRESH,
-          windSpeed: modesAt ?? FRESH,
-        },
+        heard: { windDir: FRESH, windSpeed: speedAt },
       });
-    const rows = [sel(NOW - LAPSE_SEC - 1), sel(NOW - LAPSE_SEC + 1), sel(undefined)];
+    const rows = [wind(NOW - LAPSE_SEC - 1), wind(NOW - LAPSE_SEC + 1), wind(FRESH)];
 
     // Act
     const readouts = rows.map((t) => ndReadouts(t, NOW));
 
     // Assert
-    expect(readouts.map((r) => [r.sel.text, r.wind.text])).toEqual([
-      ['---°', '---'],
-      ['310°', '276°/40'],
-      ['310°', '276°/40'],
-    ]);
+    expect(readouts.map((r) => r.wind.text)).toEqual(['---', '276°/40', '276°/40']);
+  });
+
+  it('holds the selected heading exactly where the SEL HDG lane reads it', () => {
+    // Arrange
+    const rows = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].flatMap((age) =>
+      [5, 45].map((modesAge) =>
+        makeSample(NOW, {
+          seen: 1,
+          track: 289,
+          at: AT,
+          selHeading: 310,
+          navModes: ['autopilot'],
+          heard: { track: FRESH, selHeading: NOW - age, navModes: NOW - modesAge },
+        }),
+      ),
+    );
+    const held = (known: boolean) => ({ nd: known, bug: known, lane: known });
+
+    // Act
+    const out = rows.map((t) => ({
+      nd: ndReadouts(t, NOW).sel.known,
+      bug: ndSymbols(t, NOW, STANDARD_ALTIMETER).sel !== undefined,
+      lane: readoutOf(['trk', 'selHdg'], t).first !== undefined,
+    }));
+
+    // Assert
+    expect(out).toEqual([true, true, false, false, false, false].map(held));
   });
 
   it('blanks every value of a target not heard for LAPSE_SEC', () => {

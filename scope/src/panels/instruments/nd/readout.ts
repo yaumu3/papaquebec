@@ -5,6 +5,7 @@ import { padBearing } from '../../../lib/format';
 import { holds, LAPSE_SEC } from '../../../lib/reports';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
+import { HEARD } from '../../lanes/plots';
 import { NONE, type Reading, READINGS } from '../../readings';
 import { holdsAll, isLost } from '../freshness';
 import type { Trend } from './geometry';
@@ -100,7 +101,7 @@ export function ndReadouts(t: Readout, now: number): NdReadouts {
     gs: read(['gs'], () => shown(READINGS.gs.format(t))),
     tas: read(['tas'], () => shown(READINGS.tas.format(t))),
     wind: read(['windDir', 'windSpeed'], wind),
-    sel: read(['selHeading', 'navModes'], () => degrees(steeringHeading(t)), true),
+    sel: read(HEARD.selHdg, () => degrees(steeringHeading(t)), true),
     hdg: read(['heading'], () => degrees(t.heading), true),
     tat: read(['tat'], () => shown(READINGS.tat.format(t), true)),
     sat: read(['oat'], () => shown(READINGS.oat.format(t), true)),
@@ -131,7 +132,7 @@ export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymb
   return {
     track: live(['track'], magneticTrack(t)),
     heading: live(['heading'], t.heading),
-    sel: live(['selHeading', 'navModes'], steeringHeading(t)),
+    sel: live(HEARD.selHdg, steeringHeading(t)),
     trend: trendOf(t, now),
     levelOffNm: levelOffOf(t, now, altimeter),
     windFrom: live(['windDir', 'windSpeed'], windFromOf(t)),
