@@ -59,14 +59,14 @@ export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): bool
 
 /**
  * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
- * the `heard` instants of the reading, only a sample with a new report of it, heard within the gap
+ * the `keys` the reading is heard by, only a sample with a new report of it, heard within the gap
  * of the sample, is a point, and a run breaks where the reading went unheard for the gap or longer.
  */
 export function runsOf(
   samples: readonly Sample[],
   read: Read,
   i: Interval,
-  heard: readonly HeardKey[] = [],
+  keys: readonly HeardKey[] = [],
 ): Point[][] {
   const runs: Point[][] = [];
   for (const stretch of stretches(around(samples, i))) {
@@ -78,12 +78,12 @@ export function runsOf(
     };
     for (const s of stretch) {
       const v = read(s);
-      const at = heard.length > 0 ? heardAt(s, heard) : s.t;
+      const at = keys.length > 0 ? heardAt(s, keys) : s.t;
       if (v === undefined) {
         end();
         continue;
       }
-      if (at === undefined || at === last || !heardNear(s, heard, s.t)) continue;
+      if (at === undefined || at === last || !heardNear(s, keys, s.t)) continue;
       if (last !== undefined && at - last >= LAPSE_SEC) end();
       run.push({ t: s.t, v });
       last = at;
@@ -233,19 +233,19 @@ interface Bar {
 /**
  * A bar per name reported, in order of first report: each stretch runs from the sample that
  * first reports the name to the last that does before one that does not, or a gap. With the
- * `heard` instants of the names, a sample whose names went unheard for the gap or longer reports
+ * `keys` the names are heard by, a sample whose names went unheard for the gap or longer reports
  * none.
  */
 export function barsOf(
   samples: readonly Sample[],
   names: (s: Sample) => readonly string[] | undefined,
-  heard: readonly HeardKey[] = [],
+  keys: readonly HeardKey[] = [],
 ): Bar[] {
   const bars = new Map<string, Bar>();
   for (const stretch of stretches(samples)) {
     let previous: Sample | undefined;
     for (const s of stretch) {
-      const named = heardNear(s, heard, s.t) ? names(s) : undefined;
+      const named = heardNear(s, keys, s.t) ? names(s) : undefined;
       for (const name of named ?? []) {
         const bar = bars.get(name) ?? { name, on: [] };
         bars.set(name, bar);

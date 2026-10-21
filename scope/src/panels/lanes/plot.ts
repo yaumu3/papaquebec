@@ -155,7 +155,7 @@ interface Preference {
 
 /**
  * One reading per tick, from the sample nearest it or the nearest one preferred, read at the
- * tick, unless that lies a gap or more away or lacks it, or its reading, of the `heard` instants,
+ * tick, unless that lies a gap or more away or lacks it, or its reading, by the `keys`,
  * was heard a gap or more away. A preferred sample a gap or more away gives way to the nearest,
  * however far the preference reaches.
  */
@@ -164,7 +164,7 @@ export function atTicks<T extends object>(
   ticks: readonly number[],
   read: (s: Sample, t: number) => T | undefined,
   prefer?: Preference,
-  heard: readonly HeardKey[] = [],
+  keys: readonly HeardKey[] = [],
 ): (T & { t: number })[] {
   const preferred = prefer ? samples.filter(prefer.has) : [];
   const reach = prefer?.withinSec ?? 0;
@@ -175,7 +175,7 @@ export function atTicks<T extends object>(
         ? near
         : nearestInTime(samples, t);
     const value =
-      s && Math.abs(s.t - t) < LAPSE_SEC && heardNear(s, heard, t) ? read(s, t) : undefined;
+      s && Math.abs(s.t - t) < LAPSE_SEC && heardNear(s, keys, t) ? read(s, t) : undefined;
     return value ? [{ ...value, t }] : [];
   });
 }
