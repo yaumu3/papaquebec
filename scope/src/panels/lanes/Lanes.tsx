@@ -292,6 +292,7 @@ export function Lanes(props: { track: Track }) {
     pinchable,
     abandon,
     plotWidth,
+    plotPx,
     window: lanesWindow,
     visible,
     contact,

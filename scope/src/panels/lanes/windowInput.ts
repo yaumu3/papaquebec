@@ -1,6 +1,5 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
 
-import { clamp } from '../../lib/math';
 import {
   type Interval,
   type LanesWindow,
@@ -32,6 +31,8 @@ interface WindowInputDeps {
   /** Where the plots start across the page, and how wide they are. */
   plotLeft: () => number;
   plotWidth: () => number;
+  /** A point across the page as a point across the plots, kept inside them. */
+  plotPx: (clientX: number) => number;
   window: () => LanesWindow;
   visible: () => Interval;
   contact: () => Interval;
@@ -79,8 +80,7 @@ export function createWindowInput(deps: WindowInputDeps): void {
   };
   const zoomBy = (factor: number, clientX: number) =>
     move((w, visible) => {
-      const x = clamp(clientX - deps.plotLeft(), 0, deps.plotWidth());
-      const pivot = timeAt(x, visible, deps.plotWidth());
+      const pivot = timeAt(deps.plotPx(clientX), visible, deps.plotWidth());
       return zoomWindow(w, visible, factor, pivot, deps.contact());
     });
   const onWheel = (e: WheelEvent) => {
