@@ -7,12 +7,16 @@ import { survCells } from './cells';
 
 const NOW = 1000;
 
-const cellsOf = (over: Parameters<typeof makeTrack>[0]) => survCells(nowAt(makeTrack(over), NOW));
+const heardAt = (at: number) => ({ nic: at, rc: at, nacP: at });
+const FRESH = heardAt(NOW - 1);
+
+const cellsOf = (over: Parameters<typeof makeTrack>[0]) =>
+  survCells(nowAt(makeTrack({ heard: FRESH, ...over }), NOW));
 
 describe('survCells', () => {
   it('reads the position, the surveillance quality and the reception, in their order', () => {
     // Arrange
-    const t = makeTrack({ messageRate: 4.2, rssi: -12.3 });
+    const t = makeTrack({ messageRate: 4.2, rssi: -12.3, heard: FRESH });
 
     // Act
     const cells = survCells(nowAt(t, NOW));
@@ -55,5 +59,59 @@ describe('survCells', () => {
 
     // Assert
     expect(dims).toEqual([false, true]);
+  });
+
+  it('lapses NIC and NACP from the lapse on, as their lanes do', () => {
+    // Arrange
+    const ages = [29.9, 30, 30.1];
+
+    // Act
+    const out = ages.map((age) =>
+      cellsOf({ heard: heardAt(NOW - age) })
+        .filter((c) => c.key === 'nic' || c.key === 'nacp')
+        .map((c) => [c.r === NONE, c.dim]),
+    );
+
+    // Assert
+    expect(out).toEqual([
+      [
+        [false, false],
+        [false, false],
+      ],
+      [
+        [true, true],
+        [true, true],
+      ],
+      [
+        [true, true],
+        [true, true],
+      ],
+    ]);
+  });
+
+  it('dims the position once it is as old as the lapse', () => {
+    // Arrange
+    const ages = [29.9, 30, 30.1];
+
+    // Act
+    const dims = ages.map((seenPos) => cellsOf({ seenPos }).find((c) => c.key === 'pos')?.dim);
+
+    // Assert
+    expect(dims).toEqual([false, true, true]);
+  });
+
+  it('never lapses the source, the signal strength or the message rate', () => {
+    // Arrange
+    const over = { heard: {}, messageRate: 4.2, rssi: -12.3 };
+
+    // Act
+    const cells = cellsOf(over).filter((c) => ['src', 'rssi', 'msgs'].includes(c.key));
+
+    // Assert
+    expect(cells.map((c) => [c.key, c.r === NONE, c.dim])).toEqual([
+      ['src', false, false],
+      ['rssi', false, false],
+      ['msgs', false, false],
+    ]);
   });
 });

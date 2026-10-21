@@ -2,7 +2,7 @@ import { PALETTE } from '../../design/palette';
 import { climbState, emergencyCode } from '../../lib/format';
 import { LAPSE_SEC } from '../../lib/reports';
 import type { Visibility } from '../../state/filter';
-import type { Track } from '../../state/track';
+import type { Readings, Track } from '../../state/track';
 import { Shape } from '../protocol';
 
 /** The scope's palette. Color encodes state; nothing here is decorative. */
@@ -50,7 +50,7 @@ export function airspaceColor(kind: string | undefined): string {
 }
 
 /** Whether the position is as old as the lapse, or older. */
-export function isStale(t: Track): boolean {
+export function isStale(t: Pick<Readings, 'seenPos'>): boolean {
   return (t.seenPos ?? 0) >= LAPSE_SEC;
 }
 
