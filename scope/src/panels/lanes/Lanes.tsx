@@ -319,7 +319,6 @@ export function Lanes(props: { track: Track }) {
       data-lanes
       class={cx(s.lanes, drag() && s.grabbing)}
       style={{
-        '--lane-height': `${LANE_PX}px`,
         '--lift-ms': `${MENU_HOLD_MS - HOLD_MS}ms`,
       }}
     >

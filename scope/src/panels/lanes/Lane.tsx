@@ -31,8 +31,8 @@ import { barsOf, gapsIn, yOf } from './trace';
 
 import s from './Lanes.module.css';
 
-/** The data band: below the lane's top row, where its name sits, and clear of its foot. */
-const PAD_TOP_PX = 28;
+/** The data band: under the lane's top row, with as much room below the row as above it, and clear of its foot. */
+const PAD_TOP_PX = 22;
 const PAD_BOTTOM_PX = 11;
 /** How far the grid lines and the gaps stop short of the lane's top and bottom. */
 const GRID_INSET_PX = 4;
