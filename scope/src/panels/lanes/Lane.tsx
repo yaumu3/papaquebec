@@ -57,7 +57,7 @@ const slotText = (slot: Slot): string => (slot.blank ? '' : (slot.text ?? NONE.v
 const unknown = (slot: Slot): boolean => slot.text === undefined && !slot.blank;
 
 /** The class that dashes a trace, if any. */
-export const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
+const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
 
 /** The dash an intent is drawn with, if any. */
 const dashOf = (key: ReadingKey): Dash | undefined => {

@@ -379,27 +379,6 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/*
- * Over the minimap: when the contact starts and ends at the left, while the window shows only part
- * of it, and the visible span at the right.
- */
-.span {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin: var(--space-4) 0 var(--space-1);
-  color: var(--text);
-  font-size: var(--text-xs);
-  line-height: 1;
-  letter-spacing: var(--tracking);
-  white-space: nowrap;
-}
-.contactSpan {
-  color: var(--plot-label);
-}
-.visibleSpan {
-  margin-left: auto;
-}
 /* The clock over the lanes, a hairline under it. */
 .axis {
   margin-top: var(--space-4);
@@ -476,41 +455,7 @@
 .timeCursor.live {
   background: var(--color-selbox);
 }
-/* The hovered instant on the minimap. */
-.cursor {
-  stroke: var(--color-selbox);
-}
-/* Sized by the panel; its own width is read back for the coordinates. */
-.timeline {
-  display: block;
-  width: 100%;
-  overflow: visible;
-  touch-action: none;
-}
-.timeline:focus-visible {
-  outline: 1px solid var(--text);
-  outline-offset: 2px;
-}
-/* The cursor tells what a press would take hold of. */
-.resize {
-  cursor: ew-resize;
-}
-.move {
-  cursor: grab;
-}
-.select {
-  cursor: crosshair;
-}
-.frame {
-  fill: none;
-  stroke: var(--control-hover);
-}
-.mini {
-  fill: none;
-  stroke: var(--text-dim);
-  stroke-width: 1;
-}
-/* What the aircraft is set to do, in the lanes and the minimap alike. */
+/* What the aircraft is set to do. */
 .intent {
   stroke: var(--plot-intent);
 }
@@ -523,21 +468,4 @@
 .unknown {
   color: var(--text-dim);
   stroke: var(--text-dim);
-}
-.dim {
-  fill: var(--panel-bg);
-  fill-opacity: 0.6;
-}
-.window {
-  fill: var(--text);
-  fill-opacity: 0.06;
-  stroke: var(--text);
-}
-.handle {
-  fill: var(--text);
-}
-.selection {
-  fill: var(--color-selbox);
-  fill-opacity: 0.18;
-  stroke: var(--color-selbox);
 }

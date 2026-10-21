@@ -201,13 +201,6 @@ export function restSample(samples: readonly Sample[], i: Interval): Rest | null
   return sample ? { sample, current: end === samples.length } : null;
 }
 
-/** Whether the interval holds every sample, oldest first; true of none. */
-export function seesAll(i: Interval, samples: readonly Sample[]): boolean {
-  const first = samples[0];
-  const last = samples.at(-1);
-  return !first || !last || (i.from <= first.t && i.to >= last.t);
-}
-
 export interface Bar {
   name: string;
   /** The stretches during which the name was reported. */

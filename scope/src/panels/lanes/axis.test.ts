@@ -1,15 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import {
-  axisStep,
-  chipAt,
-  clearOf,
-  clockLabel,
-  clockStep,
-  clearOfEnds,
-  spanLabel,
-  ticks,
-} from './axis';
+import { axisStep, chipAt, clearOf, clockLabel, clockStep, clearOfEnds, ticks } from './axis';
 
 /** 12:36:10Z on the first day of the epoch. */
 const T = 12 * 3600 + 36 * 60 + 10;
@@ -81,27 +72,6 @@ describe('clearOfEnds', () => {
 
     // Assert
     expect(kept).toEqual([10, 50, 90]);
-  });
-});
-
-describe('spanLabel', () => {
-  it('reads the ends of the span as its axis does, then how long it is', () => {
-    // Arrange
-    const spans = [
-      { from: T - 10 - 7 * 60, to: T - 10 - 2 * 60 },
-      { from: T, to: T + 90 },
-      { from: T, to: T + 40 },
-    ];
-
-    // Act
-    const labels = spans.map(spanLabel);
-
-    // Assert
-    expect(labels).toEqual([
-      '12:29 – 12:34 · 5 MIN',
-      '12:36:10 – 12:37:40 · 2 MIN',
-      '12:36:10 – 12:36:50 · 40 S',
-    ]);
   });
 });
 

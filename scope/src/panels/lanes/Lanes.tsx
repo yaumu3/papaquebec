@@ -7,11 +7,9 @@ import { clamp } from '../../lib/math';
 import {
   addPlotLane,
   lanesView,
-  hoverInstant,
   movePlotLane,
   plotted,
   removePlotLane,
-  setLanesSpan,
   setHoverInstant,
   setLaneScroll,
   switchPlotLane,
@@ -24,13 +22,13 @@ import {
   readingsIn,
 } from '../../state/plotted';
 import { snapshotVersion } from '../../state/scope';
-import { type Interval, resolveSpan, type Span, xOf } from '../../state/span';
+import { type Interval, resolveSpan, xOf } from '../../state/span';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
-import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, spanLabel, ticks } from './axis';
+import { axisStep, chipAt, clearOf, clearOfEnds, clockLabel, ticks } from './axis';
 import { pickOf } from './chips';
 import { liftLeft, slotShown } from './drag';
 import { HOLD_MS, MENU_HOLD_MS } from './hold';
@@ -49,15 +47,12 @@ import { Palette } from './Palette';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
-import { Timeline } from './Timeline';
-import { restSample, sampleAt, seesAll } from './trace';
+import { restSample, sampleAt } from './trace';
 
 import s from './Lanes.module.css';
 
 /** Each lane's height, a hairline under it. */
 const LANE_PX = 84;
-/** A step of a minute, at which a clock label reads to the minute. */
-const MINUTE_SEC = 60;
 /** The left edge of a cursor `px` across the plots, as the viewport, wider by the overhang and the gutter, places it. */
 const cursorLeft = (px: number): string =>
   `calc(var(--lane-overhang) + var(--plot-left) + ${px - 0.5}px)`;
@@ -88,7 +83,6 @@ export function Lanes(props: { track: Track }) {
   const hex = createMemo(() => props.track.hex);
   // A memo, so that scrolling the lanes, which keeps the span, redraws none of them.
   const span = createMemo(() => lanesView(hex()).span);
-  const setSpan = (next: Span) => setLanesSpan(hex(), next);
   createEffect(on(hex, () => setHoverPx(null), { defer: true }));
   onCleanup(() => setHoverInstant(null));
 
@@ -109,9 +103,7 @@ export function Lanes(props: { track: Track }) {
   const step = createMemo(() => axisStep(visible().to - visible().from));
   const tickTimes = createMemo(() => ticks(visible(), step()));
 
-  const [top, setTop] = createSignal<HTMLDivElement>();
   const [labels, setLabels] = createSignal<HTMLDivElement>();
-  const width = trackWidth(top);
   /** The axis labels line up with the plots, so their width is the plots'. */
   const plotWidth = trackWidth(labels);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
@@ -316,23 +308,6 @@ export function Lanes(props: { track: Track }) {
         '--lift-ms': `${MENU_HOLD_MS - HOLD_MS}ms`,
       }}
     >
-      <div ref={setTop} class={s.span}>
-        <Show when={!seesAll(visible(), samples())}>
-          <span class={s.contactSpan}>
-            {clockLabel(contact().from, MINUTE_SEC)} – {clockLabel(contact().to, MINUTE_SEC)}
-          </span>
-        </Show>
-        <span class={s.visibleSpan}>{spanLabel(visible())}</span>
-      </div>
-      <Timeline
-        samples={samples()}
-        lanes={historyLanesOf(plotted()).map(readingsIn)}
-        contact={contact()}
-        visible={visible()}
-        width={width()}
-        hover={hoverInstant()}
-        onSpan={setSpan}
-      />
       <div class={s.axis}>
         <div ref={setLabels} class={s.labels}>
           <For each={labelTimes()}>
