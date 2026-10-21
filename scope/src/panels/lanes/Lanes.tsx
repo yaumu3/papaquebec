@@ -78,6 +78,9 @@ function take(own: LaneKey | null, lane: LaneKey): void {
   else if (what === 'add') addPlotLane(lane);
 }
 
+/** Whether the column shows a history lane, which the cursor and a held window need. */
+const showsHistory = () => historyLanesOf(plotted()).length > 0;
+
 /** What the lanes plot of the selected target over the visible window, each read at the hovered sample or the last in view. */
 export function Lanes(props: { track: Track }) {
   /** How far across the plots the pointer is, if it is over them. */
@@ -127,7 +130,6 @@ export function Lanes(props: { track: Track }) {
     setHoverPx(null);
   };
 
-  const showsHistory = () => historyLanesOf(plotted()).length > 0;
   /** The cursor under the pointer, as the window moves under it too; none without a history lane. */
   const peek = createMemo(() => {
     const px = hoverPx();

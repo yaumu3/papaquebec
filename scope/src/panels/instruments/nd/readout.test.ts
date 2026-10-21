@@ -458,19 +458,20 @@ describe('ndSymbols wind', () => {
   });
 });
 
+const heardEvery = (at: number) => ({
+  heading: at,
+  track: at,
+  gs: at,
+  trackRate: at,
+  selHeading: at,
+  selAlt: at,
+  alt: at,
+  verticalRate: at,
+});
+
 describe('the ND at a peeked sample', () => {
   const AGE = 200;
   const T = 1;
-  const heard = (at: number) => ({
-    heading: at,
-    track: at,
-    gs: at,
-    trackRate: at,
-    selHeading: at,
-    selAlt: at,
-    alt: at,
-    verticalRate: at,
-  });
   const base = {
     seen: 1,
     heading: 284,
@@ -485,12 +486,12 @@ describe('the ND at a peeked sample', () => {
     at: AT,
   };
   const rows = [
-    makeSample(T, { ...base, heard: heard(T) }),
-    makeSample(T, { ...base, heard: { ...heard(T), heading: T - LAPSE_SEC } }),
-    makeSample(T, { ...base, heard: { ...heard(T), track: T - LAPSE_SEC } }),
-    makeSample(T, { ...base, heard: { ...heard(T), selHeading: T - LAPSE_SEC } }),
-    makeSample(T, { ...base, heard: { ...heard(T), trackRate: T - LAPSE_SEC } }),
-    makeSample(T, { ...base, heard: { ...heard(T), selAlt: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: heardEvery(T) }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), heading: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), track: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), selHeading: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), trackRate: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), selAlt: T - LAPSE_SEC } }),
   ];
   const liveOf = (s: (typeof rows)[number]) =>
     makeSample(T + AGE, {
@@ -519,7 +520,7 @@ describe('the ND at a peeked sample', () => {
   it('drops the heading pointer exactly where the HDG lane reads a dash', () => {
     // Arrange
     const samples = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].map((age) =>
-      makeSample(T, { ...base, heard: { ...heard(T), heading: T - age } }),
+      makeSample(T, { ...base, heard: { ...heardEvery(T), heading: T - age } }),
     );
 
     // Act
