@@ -42,7 +42,7 @@ interface WindowInputDeps {
 }
 
 /** Where on the lanes `target` is. */
-function areaOf(target: EventTarget | null): Area {
+export function areaOf(target: EventTarget | null): Area {
   if (!(target instanceof Element)) return 'other';
   if (target.closest('[data-axis]')) return 'axis';
   if (!target.closest('[data-lane="history"]')) return 'other';

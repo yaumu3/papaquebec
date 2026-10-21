@@ -28,6 +28,7 @@ import {
 import { type Dash, PLOTS, type PlotSpec } from './plots';
 import { heldIntents, type LaneReadout, readoutSlots, shownReadout, type Slot } from './readout';
 import { barsOf, yOf } from './trace';
+import { areaOf } from './windowInput';
 
 import s from './Lanes.module.css';
 
@@ -168,7 +169,6 @@ export function Lane(props: {
     const r = readout();
     return r ? readoutSlots(r, held()) : [];
   };
-  let top: HTMLDivElement | undefined;
   /** What the lane reads at the cursor, in its top row or, while a cursor stands, in the chip. */
   const readoutView = (r: Accessor<LaneReadout>) => (
     <div class={s.readout}>
@@ -223,9 +223,7 @@ export function Lane(props: {
       }}
       onContextMenu={props.onPicker}
       onDblClick={props.onReset}
-      onPointerDown={(e) =>
-        props.onGrab(e, e.target instanceof Node && top?.contains(e.target) ? 'row' : 'plot')
-      }
+      onPointerDown={(e) => props.onGrab(e, areaOf(e.target) === 'row' ? 'row' : 'plot')}
     >
       <div class={s.plot} data-plot>
         <svg class={s.svg} height={props.height}>
@@ -347,9 +345,6 @@ export function Lane(props: {
         </Index>
       </div>
       <div
-        ref={(el) => {
-          top = el;
-        }}
         data-row
         class={cx(s.top, props.swipeX !== null && s.swiping)}
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
