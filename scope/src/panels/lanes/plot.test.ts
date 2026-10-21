@@ -7,6 +7,7 @@ import {
   makeHeardSample as heardSample,
   makeSample as sample,
 } from '../../state/sampleFixture';
+import type { Sample } from '../../state/track';
 import {
   atTicks,
   barbPath,
@@ -261,20 +262,38 @@ describe('atTicks', () => {
     expect(barbs).toEqual([1, 0, 0]);
   });
 
-  it('gives way from a preferred sample exactly a gap away to the nearest', () => {
+  const read = (s: Sample) => ({ trk: s.track, hdg: s.heading });
+  const has = (s: Sample) => s.heading !== undefined;
+  type Read = { t: number; trk: number | undefined; hdg: number | undefined };
+
+  it('prefers a sample with a heading within its reach, but never one a gap away', () => {
     // Arrange
-    const samples = [
-      sample(1000, { track: 90 }),
-      sample(1000 + LAPSE_SEC, { track: 92, heading: 85 }),
+    const headed: Read[] = [{ t: 100, trk: 92, hdg: 85 }];
+    const unheaded: Read[] = [{ t: 100, trk: 90, hdg: undefined }];
+    const rows: [Sample[], number, number, Read[]][] = [
+      [
+        [sample(1000, { track: 90 }), sample(1000 + LAPSE_SEC, { track: 92, heading: 85 })],
+        1000,
+        2 * LAPSE_SEC,
+        [{ t: 1000, trk: 90, hdg: undefined }],
+      ],
+      [[sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })], 100, 15, headed],
+      [[sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })], 100, 5, unheaded],
+      [
+        [sample(100, { track: 90 }), sample(100 + LAPSE_SEC + 5, { track: 92, heading: 85 })],
+        100,
+        10 * LAPSE_SEC,
+        unheaded,
+      ],
     ];
-    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
-    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
 
     // Act
-    const reads = atTicks(samples, [1000], read, { has, withinSec: 2 * LAPSE_SEC });
+    const reads = rows.map(([samples, tick, withinSec]) =>
+      atTicks(samples, [tick], read, { has, withinSec }),
+    );
 
     // Assert
-    expect(reads).toEqual([{ t: 1000, trk: 90, hdg: undefined }]);
+    expect(reads).toEqual(rows.map(([, , , expected]) => expected));
   });
 
   it('reads one value per tick from the sample nearest it, none when that is a gap away', () => {
@@ -305,35 +324,6 @@ describe('atTicks', () => {
 
     // Assert
     expect(reads).toEqual([{ t: 105, rssi: 1 }]);
-  });
-
-  it('reads a sample the preference holds for instead, while one lies within its reach', () => {
-    // Arrange
-    const samples = [sample(98, { track: 90 }), sample(110, { track: 92, heading: 85 })];
-    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
-    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
-
-    // Act
-    const reads = [15, 5].map((withinSec) => atTicks(samples, [100], read, { has, withinSec }));
-
-    // Assert: the one with a heading ten seconds off, else the nearest
-    expect(reads).toEqual([[{ t: 100, trk: 92, hdg: 85 }], [{ t: 100, trk: 90, hdg: undefined }]]);
-  });
-
-  it('reads the nearest instead of a preferred sample a gap away, however far the reach', () => {
-    // Arrange
-    const samples = [
-      sample(100, { track: 90 }),
-      sample(100 + LAPSE_SEC + 5, { track: 92, heading: 85 }),
-    ];
-    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
-    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
-
-    // Act
-    const reads = atTicks(samples, [100], read, { has, withinSec: 10 * LAPSE_SEC });
-
-    // Assert
-    expect(reads).toEqual([{ t: 100, trk: 90, hdg: undefined }]);
   });
 
   it('reads nothing at a tick its reading was heard a gap away from, though a sample is near', () => {
