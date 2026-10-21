@@ -33,7 +33,7 @@ import {
   carryPitch,
   hatchStyle,
   MONO_CAP_EM,
-  rowBaseline,
+  MONO_MID_TO_BASELINE_EM,
   vsiDigits,
   vsiNeedlePath,
   vsiOffset,
@@ -713,6 +713,14 @@ describe('carryPitch', () => {
     expect(out).toEqual([23.5, 23]);
   });
 });
+
+/** Where the baseline of row `row` of a wheel stands, `turned` of a row along. */
+const rowBaseline = (cell: WheelCell, row: number, turned: number): number =>
+  cell.y +
+  columnTop(cell, turned) +
+  row * cell.lineH +
+  cell.lineH / 2 +
+  MONO_MID_TO_BASELINE_EM * cell.px;
 
 describe('carry wheels', () => {
   const g = pfdGeometry(346);

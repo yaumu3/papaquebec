@@ -203,14 +203,6 @@ export interface WheelCell {
 export const columnTop = (cell: WheelCell, turned: number): number =>
   cell.restTop - cell.above * cell.lineH + turned * cell.lineH;
 
-/** Where the baseline of row `row` of a wheel stands, `turned` of a row along. */
-export const rowBaseline = (cell: WheelCell, row: number, turned: number): number =>
-  cell.y +
-  columnTop(cell, turned) +
-  row * cell.lineH +
-  cell.lineH / 2 +
-  MONO_MID_TO_BASELINE_EM * cell.px;
-
 /**
  * A digit wheel of `place`, rolling from this digit to the next through the last `step` before it.
  */
@@ -225,7 +217,7 @@ const MONO_ADVANCE_EM = 0.6;
  * How far the baseline sits below the middle of a line box, whatever its line height:
  * (1020 − 300) / 2 / 1000. The baseline's depth in a box as tall as its font is 0.5 plus this.
  */
-const MONO_MID_TO_BASELINE_EM = 0.36;
+export const MONO_MID_TO_BASELINE_EM = 0.36;
 /** JetBrains Mono's cap height, 730 of 1000 units per em. */
 export const MONO_CAP_EM = 0.73;
 
