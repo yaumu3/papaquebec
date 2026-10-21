@@ -52,7 +52,7 @@ function Label(props: { children: string }) {
 }
 
 /** A value of a corner: dim for the blank of an unknown, else in its own tone. */
-function Value(props: { r: NdText; class?: string | undefined }) {
+function CornerValue(props: { r: NdText; class?: string | undefined }) {
   return <span class={props.r.known ? props.class : s.unknown}>{props.r.text}</span>;
 }
 
@@ -262,27 +262,27 @@ export function Nd(props: { t: Track; moment: Moment }) {
         <div class={cx(s.corner, s.topLeft)}>
           <div>
             <Label>GS </Label>
-            <Value r={readouts().gs} class={s.strong} />
+            <CornerValue r={readouts().gs} class={s.strong} />
             <Label>{'  TAS '}</Label>
-            <Value r={readouts().tas} />
+            <CornerValue r={readouts().tas} />
           </div>
-          <Value r={readouts().wind} />
+          <CornerValue r={readouts().wind} />
         </div>
         <div class={cx(s.corner, s.topRight)}>
           <div>
             <Label>SEL </Label>
-            <Value r={readouts().sel} class={s.sel} />
+            <CornerValue r={readouts().sel} class={s.sel} />
           </div>
           <div>
             <Label>HDG </Label>
-            <Value r={readouts().hdg} />
+            <CornerValue r={readouts().hdg} />
           </div>
         </div>
         <div class={cx(s.corner, s.temps)}>
           <Label>TAT</Label>
-          <Value r={readouts().tat} />
+          <CornerValue r={readouts().tat} />
           <Label>SAT</Label>
-          <Value r={readouts().sat} />
+          <CornerValue r={readouts().sat} />
         </div>
         <div class={s.top}>
           <span class={cx(s.label, s.modeLabel)}>TRK</span>

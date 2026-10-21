@@ -263,7 +263,7 @@ function placeThreat(own: Track, threat: Track | undefined, now: number, view: N
   return placeOnDisplay(origin, threat, alt, at, view);
 }
 
-const NONE: NdTraffic = { symbols: [], traffic: false, offscale: false };
+const NO_TRAFFIC: NdTraffic = { symbols: [], traffic: false, offscale: false };
 
 /** The label of a relative altitude for a symbol centred at (x, y): above it, or below it for traffic below. */
 function labelOf(x: number, y: number, deltaFt: number): TrafficSymbol['label'] {
@@ -353,7 +353,8 @@ function estimatedThreat(own: Track, now: number, view: NdView): TrafficSymbol |
  * sample, as the panel keeps no past of the other aircraft.
  */
 export function ndTraffic(m: Moment, others: Iterable<Track>, view: NdView): NdTraffic {
-  if (m.kind !== 'now' || view.frame.mode === 'lost' || view.frame.mode === 'blank') return NONE;
+  if (m.kind !== 'now' || view.frame.mode === 'lost' || view.frame.mode === 'blank')
+    return NO_TRAFFIC;
   const { r: own, instant: now } = m;
   const address = threatAddress(own.ra);
   const all = [...others];
