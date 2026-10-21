@@ -74,9 +74,7 @@ export function createWindowInput(deps: WindowInputDeps): void {
     start: { w: LanesWindow; visible: Interval };
   } | null = null;
   const move = (to: (w: LanesWindow, visible: Interval) => LanesWindow) => {
-    const w = deps.window();
-    const next = to(w, deps.visible());
-    if (next !== w) deps.setWindow(next);
+    deps.setWindow(to(deps.window(), deps.visible()));
   };
   const zoomBy = (factor: number, clientX: number) =>
     move((w, visible) => {

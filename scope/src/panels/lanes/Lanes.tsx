@@ -12,7 +12,6 @@ import {
   setCursorInstant,
   setHoverInstant,
   setLaneScroll,
-  setLanesWindow,
   showsHistory,
   switchPlotLane,
 } from '../../state/lanes';
@@ -23,16 +22,12 @@ import {
   type LaneKey,
   readingsIn,
 } from '../../state/plotted';
-import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
-import { trackStore } from '../../state/tracks';
 import {
-  contactOf,
   DEFAULT_WINDOW,
   keyWindow,
   lengthOf,
   readsPast,
-  resolveWindow,
   selectWindow,
   type WindowKey,
   timeAt,
@@ -66,6 +61,7 @@ import { swipeOffset } from './swipe';
 import { TimeAxis } from './TimeAxis';
 import { gapsIn, newestSample, peekAt } from './trace';
 import { createWindowInput } from './windowInput';
+import { createWindowView } from './windowView';
 
 import s from './Lanes.module.css';
 
@@ -85,27 +81,14 @@ function take(own: LaneKey | null, lane: LaneKey): void {
 export function Lanes(props: { track: Track }) {
   /** How far across the plots the pointer is, if it is over them. */
   const [hoverPx, setHoverPx] = createSignal<number | null>(null);
-  const hex = createMemo(() => props.track.hex);
-  // A memo, so that scrolling the lanes, which keeps the window, redraws none of them.
-  const lanesWindow = createMemo(() => lanesView(hex()).window);
+  const windowView = createWindowView(() => props.track);
+  const { hex, lanesWindow, samples, contact, visible, now, lag, setWindow } = windowView;
   onCleanup(() => {
     setHoverInstant(null);
     setCursorInstant(null);
   });
 
-  /** The samples, told apart from the last snapshot's though the store appends to one array. */
-  const samples = createMemo(
-    () => {
-      snapshotVersion();
-      return props.track.samples;
-    },
-    undefined,
-    { equals: false },
-  );
-  const contact = createMemo(() => contactOf(samples(), trackStore.stats.now));
-  const visible = createMemo(() => resolveWindow(lanesWindow(), contact()));
   const gaps = createMemo(() => gapsIn(samples(), visible(), isLost(props.track)));
-  const now = () => contact().to;
   const step = createMemo(() => axisStep(lengthOf(visible())));
   const tickTimes = createMemo(() => ticks(visible(), step(), now()));
 
@@ -113,12 +96,9 @@ export function Lanes(props: { track: Track }) {
   /** The axis row lines up with the plots, so its width is the plots'. */
   const plotWidth = trackWidth(axisRow);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
-  const reset = () => setLanesWindow(hex(), DEFAULT_WINDOW);
-  const onWindowKey = (key: WindowKey) => {
-    const w = lanesWindow();
-    const next = keyWindow(key, w, visible(), contact());
-    if (next !== w) setLanesWindow(hex(), next);
-  };
+  const reset = () => setWindow(DEFAULT_WINDOW);
+  const onWindowKey = (key: WindowKey) =>
+    setWindow(keyWindow(key, lanesWindow(), visible(), contact()));
   /** The last finger tap on a history lane, which a second one soon after and near makes a double. */
   let lastTap: Tap | null = null;
   const plotLeft = () => axisRow()?.getBoundingClientRect().left ?? 0;
@@ -156,7 +136,7 @@ export function Lanes(props: { track: Track }) {
   /** Whether the panel reads an instant other than now. */
   const past = () => readsPast(peek() !== null, lanesWindow(), showsHistory());
   /** What the instruments draw: what the lanes read. */
-  const moment = createMemo(() => momentOf(props.track, past(), at(), trackStore.stats.now));
+  const moment = createMemo(() => momentOf(props.track, past(), at(), now()));
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is dragged or swiped; a finger only peeks. */
   const pointerAt = (e: PointerEvent) => {
     const el = e.target instanceof Element ? e.target.closest('[data-lane="history"]') : null;
@@ -278,7 +258,7 @@ export function Lanes(props: { track: Track }) {
         const px = hoverPx();
         if (t0 !== null && px !== null) {
           const t1 = timeAt(px, visible(), plotWidth());
-          setLanesWindow(hex(), selectWindow(t0, t1, visible(), contact()));
+          setWindow(selectWindow(t0, t1, visible(), contact()));
         }
         stopSelecting();
       },
@@ -303,7 +283,7 @@ export function Lanes(props: { track: Track }) {
     window: lanesWindow,
     visible,
     contact,
-    setWindow: (w) => setLanesWindow(hex(), w),
+    setWindow,
   });
   /** The drag once the lane is off its place: not while a finger has only lifted it. */
   const moving = () => {
@@ -423,7 +403,7 @@ export function Lanes(props: { track: Track }) {
                 width={plotWidth()}
                 now={now()}
                 window={lanesWindow()}
-                lag={now() - visible().to}
+                lag={lag()}
                 order={lastHistoryIndex(plotted())}
                 shift={axisOffset()}
                 rowRef={setAxisRow}
