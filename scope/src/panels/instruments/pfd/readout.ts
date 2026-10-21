@@ -6,7 +6,7 @@ import { holds } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { magneticTrack } from '../../../state/magnetic';
 import type { Readout, Sample } from '../../../state/track';
-import { holdsAll, isLost } from '../freshness';
+import { holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
 import type { Fpv } from './geometry';
 
@@ -160,13 +160,6 @@ function altitudeOf(t: Readout, instant: number, altimeter: Altimeter): PfdAltit
   return ft === undefined ? { kind: 'flag' } : { kind: 'feet', ft };
 }
 
-/** A reading of the target while it holds. */
-const liveValue = (
-  t: Readout,
-  key: 'ias' | 'mach' | 'roll' | 'selAlt' | 'fmsAlt' | 'navQnh' | 'verticalRate',
-  instant: number,
-): number | undefined => (holdsAll(t, [key], instant) ? t[key] : undefined);
-
 const asSet = (ft: number | undefined): number | undefined =>
   ft === undefined ? undefined : selectedFt(ft);
 
@@ -186,12 +179,12 @@ const EMPTY_READOUTS: PfdReadouts = {
 export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadouts {
   if (m.kind === 'empty' || isLost(m.r)) return EMPTY_READOUTS;
   const { r: t, instant } = m;
-  const ias = liveValue(t, 'ias', instant);
-  const mach = liveValue(t, 'mach', instant);
-  const roll = liveValue(t, 'roll', instant);
-  const selAlt = asSet(liveValue(t, 'selAlt', instant));
-  const fmsAlt = asSet(liveValue(t, 'fmsAlt', instant));
-  const qnh = liveValue(t, 'navQnh', instant);
+  const ias = ifHolds(t, ['ias'], instant, t.ias);
+  const mach = ifHolds(t, ['mach'], instant, t.mach);
+  const roll = ifHolds(t, ['roll'], instant, t.roll);
+  const selAlt = asSet(ifHolds(t, ['selAlt'], instant, t.selAlt));
+  const fmsAlt = asSet(ifHolds(t, ['fmsAlt'], instant, t.fmsAlt));
+  const qnh = ifHolds(t, ['navQnh'], instant, t.navQnh);
   return {
     ias,
     mach: mach === undefined ? '' : machText(mach),
@@ -200,7 +193,7 @@ export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadou
     altitude: altitudeOf(t, instant, altimeter),
     selAlt,
     fmsAlt: fmsAlt === selAlt ? undefined : fmsAlt,
-    vs: liveValue(t, 'verticalRate', instant),
+    vs: ifHolds(t, ['verticalRate'], instant, t.verticalRate),
     baro: qnh === undefined ? '' : hpaToInHg(qnh).toFixed(2),
   };
 }

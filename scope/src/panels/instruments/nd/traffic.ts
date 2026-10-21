@@ -4,7 +4,7 @@ import { inverse } from '../../../lib/geodesic';
 import { RAD } from '../../../lib/units';
 import { magneticBearing } from '../../../state/magnetic';
 import type { Position, Track } from '../../../state/track';
-import { holdsAll } from '../freshness';
+import { holdsAll, ifHolds } from '../freshness';
 import type { Point } from '../glide';
 import type { Moment } from '../moment';
 import { type NdGeometry, ndPoint, onArc, pxOf } from './geometry';
@@ -84,10 +84,10 @@ interface Origin {
 }
 
 const heldPosition = (t: Track, now: number): LivePosition | undefined =>
-  t.position.kind === 'live' && holdsAll(t, ['position'], now) ? t.position : undefined;
+  ifHolds(t, ['position'], now, t.position.kind === 'live' ? t.position : undefined);
 
 const heldAltitude = (t: Track, now: number): number | undefined =>
-  typeof t.alt === 'number' && holdsAll(t, ['alt'], now) ? t.alt : undefined;
+  ifHolds(t, ['alt'], now, typeof t.alt === 'number' ? t.alt : undefined);
 
 /** Whether two points of the plane lie within `limitNm` of each other, with the margin: the cheap test before a geodesic. */
 export function nearOnPlane(

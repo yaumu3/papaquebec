@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { HeardKey } from '../../lib/aircraft';
 import { LAPSE_SEC } from '../../lib/reports';
-import { holdsAll, isLost } from './freshness';
+import { holdsAll, ifHolds, isLost } from './freshness';
 
 const NOW = 1000;
 
@@ -31,6 +32,24 @@ describe('holdsAll', () => {
 
     // Assert
     expect(out).toEqual([true, false, true, false]);
+  });
+});
+
+describe('ifHolds', () => {
+  it('gives the value while its keys hold, none once one lapses or when never heard', () => {
+    // Arrange
+    const heard = { gs: NOW - 1, tas: NOW - LAPSE_SEC };
+    const rows: [HeardKey[], number][] = [
+      [['gs'], 250],
+      [['gs', 'tas'], 251],
+      [['selAlt'], 252],
+    ];
+
+    // Act
+    const out = rows.map(([keys, v]) => ifHolds({ heard }, keys, NOW, v));
+
+    // Assert
+    expect(out).toEqual([250, undefined, undefined]);
   });
 });
 
