@@ -40,7 +40,7 @@ import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, ticks } from './axis';
 import { pickOf } from './chips';
-import { liftLeft, slotShown } from './drag';
+import { axisShift, liftLeft, slotShown } from './drag';
 import { HOLD_MS, isDoubleTap, MENU_HOLD_MS, type Tap } from './hold';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
@@ -231,6 +231,7 @@ export function Lanes(props: { track: Track }) {
     const a = at();
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
+  const heights = () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0);
   const { drag, swipe, peeking, pinchable, drop, grab } = createLaneDrag({
     scroller,
     picker: {
@@ -239,7 +240,7 @@ export function Lanes(props: { track: Track }) {
       close: closeMenu,
     },
     bin: () => add,
-    heights: () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0),
+    heights,
     lanes: plotted,
     onTap: (tap) => {
       const double = isDoubleTap(lastTap, tap);
@@ -285,6 +286,18 @@ export function Lanes(props: { track: Track }) {
   const moving = () => {
     const d = drag();
     return d && !d.still ? d : null;
+  };
+  /** How far the axis stands off its place: while a lane is dragged it stays where it was. */
+  const axisOffset = () => {
+    const d = drag();
+    return d
+      ? axisShift(
+          heights(),
+          d.from,
+          slotShown(d.from, d.slot, d.overBin),
+          lastHistoryIndex(plotted()),
+        )
+      : 0;
   };
   const restoreScroll = () => {
     const el = scroller();
@@ -403,6 +416,7 @@ export function Lanes(props: { track: Track }) {
                 window={lanesWindow()}
                 lag={now() - visible().to}
                 order={lastHistoryIndex(plotted())}
+                shift={axisOffset()}
                 rowRef={setAxisRow}
               />
             </Show>

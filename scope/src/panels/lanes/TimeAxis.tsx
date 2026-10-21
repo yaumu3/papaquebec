@@ -27,6 +27,8 @@ export function TimeAxis(props: {
   /** How far back the window ends, seconds. */
   lag: number;
   order: number;
+  /** How far it stands off its place, px: a lane drag leaves it where it was. */
+  shift: number;
   rowRef: (el: HTMLDivElement) => void;
 }) {
   const [ruler, setRuler] = createSignal<HTMLSpanElement>();
@@ -43,7 +45,12 @@ export function TimeAxis(props: {
   );
 
   return (
-    <div ref={props.rowRef} data-axis class={s.axis} style={{ order: props.order }}>
+    <div
+      ref={props.rowRef}
+      data-axis
+      class={s.axis}
+      style={{ order: props.order, top: `${props.shift}px` }}
+    >
       <For each={inside()}>
         {(t, i) => (
           <Show when={clear()[i()]}>
