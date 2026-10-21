@@ -40,3 +40,22 @@ export const timeAt = (x: number, i: Interval, width: number): number =>
 /** Whether the lanes read an instant other than now: while peeking, or with the window held. */
 export const readsPast = (peeking: boolean, w: LanesWindow): boolean =>
   peeking || w.kind === 'held';
+
+/** The window held where it stands, `visible` being what it shows. */
+export const holdWindow = (visible: Interval): LanesWindow => ({
+  kind: 'held',
+  from: visible.from,
+  to: visible.to,
+});
+
+/** The window live again, as long as `visible`. */
+export const goLive = (visible: Interval): LanesWindow => ({
+  kind: 'live',
+  sec: visible.to - visible.from,
+});
+
+/** From the first sample to now; empty at now without any. */
+export const contactOf = (samples: readonly { t: number }[], now: number): Interval => ({
+  from: samples[0]?.t ?? now,
+  to: now,
+});

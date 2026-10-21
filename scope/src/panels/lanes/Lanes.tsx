@@ -24,7 +24,7 @@ import {
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
-import { type Interval, readsPast, resolveWindow, xOf } from '../../state/window';
+import { contactOf, readsPast, resolveWindow, xOf } from '../../state/window';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
@@ -84,10 +84,7 @@ export function Lanes(props: { track: Track }) {
     undefined,
     { equals: false },
   );
-  const contact = createMemo<Interval>(() => {
-    const now = trackStore.stats.now;
-    return { from: samples()[0]?.t ?? now, to: now };
-  });
+  const contact = createMemo(() => contactOf(samples(), trackStore.stats.now));
   const visible = createMemo(() => resolveWindow(lanesWindow(), contact()));
   const now = () => contact().to;
   const step = createMemo(() => axisStep(visible().to - visible().from));

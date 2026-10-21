@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  contactOf,
   DEFAULT_WINDOW,
+  goLive,
+  holdWindow,
   type Interval,
   type LanesWindow,
   MIN_WINDOW_SEC,
@@ -113,5 +116,47 @@ describe('readsPast', () => {
 
     // Assert
     expect(past).toEqual([false, true, true, true]);
+  });
+});
+
+describe('holdWindow', () => {
+  it('holds the window where it stands', () => {
+    // Arrange
+    const visible: Interval = { from: 1300, to: 1600 };
+
+    // Act
+    const w = holdWindow(visible);
+
+    // Assert
+    expect(w).toEqual({ kind: 'held', from: 1300, to: 1600 });
+  });
+});
+
+describe('goLive', () => {
+  it('goes live keeping the length', () => {
+    // Arrange
+    const visible: Interval = { from: 1000, to: 1200 };
+
+    // Act
+    const w = goLive(visible);
+
+    // Assert
+    expect(w).toEqual({ kind: 'live', sec: 200 });
+  });
+});
+
+describe('contactOf', () => {
+  it('runs from the first sample to now, and is empty at now without samples', () => {
+    // Arrange
+    const samples = [{ t: 1000 }, { t: 1100 }];
+
+    // Act
+    const contacts = [contactOf(samples, 1600), contactOf([], 1600)];
+
+    // Assert
+    expect(contacts).toEqual([
+      { from: 1000, to: 1600 },
+      { from: 1600, to: 1600 },
+    ]);
   });
 });

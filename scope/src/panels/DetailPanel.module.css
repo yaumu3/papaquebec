@@ -50,9 +50,11 @@
   letter-spacing: var(--tracking);
   white-space: nowrap;
 }
-/* Where part 2's live control stands. */
+/* The window control's slot, at the end of the airframe row. */
 .slot {
   margin-left: auto;
+  /* The control is taller than the row's text; it hangs over rather than grow the header. */
+  margin-block: -2px;
 }
 /* Copied by selecting it, which the page otherwise turns off. */
 .text {
