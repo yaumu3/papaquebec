@@ -246,6 +246,37 @@ describe('laneTraces on the ground', () => {
 });
 
 describe('atTicks', () => {
+  it('reads a sample under the lapse from the tick, none exactly the lapse or more', () => {
+    // Arrange
+    const rows = [29.9, 30, 30.1].map((d) => [sample(1000 + d, { windDir: 300, windSpeed: 12 })]);
+    const read = (s: (typeof rows)[number][number]) => ({
+      dir: s.windDir ?? 0,
+      speed: s.windSpeed ?? 0,
+    });
+
+    // Act
+    const barbs = rows.map((samples) => atTicks(samples, [1000], read).length);
+
+    // Assert
+    expect(barbs).toEqual([1, 0, 0]);
+  });
+
+  it('gives way from a preferred sample exactly a gap away to the nearest', () => {
+    // Arrange
+    const samples = [
+      sample(1000, { track: 90 }),
+      sample(1000 + LAPSE_SEC, { track: 92, heading: 85 }),
+    ];
+    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
+    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
+
+    // Act
+    const reads = atTicks(samples, [1000], read, { has, withinSec: 2 * LAPSE_SEC });
+
+    // Assert
+    expect(reads).toEqual([{ t: 1000, trk: 90, hdg: undefined }]);
+  });
+
   it('reads one value per tick from the sample nearest it, none when that is a gap away', () => {
     // Arrange
     const samples = [

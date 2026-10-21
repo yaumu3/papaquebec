@@ -49,8 +49,9 @@ export function airspaceColor(kind: string | undefined): string {
   return kind !== undefined && BRIGHT_AIRSPACE.has(kind) ? THEME.airspace : THEME.airspaceDim;
 }
 
+/** Whether the position is as old as the lapse, or older. */
 export function isStale(t: Track): boolean {
-  return (t.seenPos ?? 0) > LAPSE_SEC;
+  return (t.seenPos ?? 0) >= LAPSE_SEC;
 }
 
 export function isEmergency(t: Track): boolean {

@@ -16,13 +16,13 @@ export interface Range {
   hi: number;
 }
 
-/** The samples in stretches of reports no further apart than the gap. */
+/** The samples in stretches of reports less than the gap apart. */
 function stretches(samples: readonly Sample[]): Sample[][] {
   const out: Sample[][] = [];
   let stretch: Sample[] = [];
   for (const s of samples) {
     const last = stretch.at(-1);
-    if (last && s.t - last.t > LAPSE_SEC) {
+    if (last && s.t - last.t >= LAPSE_SEC) {
       out.push(stretch);
       stretch = [];
     }
@@ -47,17 +47,17 @@ export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefine
   return instants.length > 0 ? Math.min(...instants) : undefined;
 }
 
-/** Whether the reading made of `keys` was heard no further than the gap from `t`; always, without keys. */
+/** Whether the reading made of `keys` was heard less than the gap from `t`; always, without keys. */
 export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
   if (keys.length === 0) return true;
   const at = heardAt(s, keys);
-  return at !== undefined && Math.abs(t - at) <= LAPSE_SEC;
+  return at !== undefined && Math.abs(t - at) < LAPSE_SEC;
 }
 
 /**
  * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
  * the `heard` instants of the reading, only a sample with a new report of it, heard within the gap
- * of the sample, is a point, and a run breaks where the reading went unheard longer than the gap.
+ * of the sample, is a point, and a run breaks where the reading went unheard for the gap or longer.
  */
 export function runsOf(
   samples: readonly Sample[],
@@ -81,7 +81,7 @@ export function runsOf(
         continue;
       }
       if (at === undefined || at === last || !heardNear(s, heard, s.t)) continue;
-      if (last !== undefined && at - last > LAPSE_SEC) end();
+      if (last !== undefined && at - last >= LAPSE_SEC) end();
       run.push({ t: s.t, v });
       last = at;
     }
@@ -200,7 +200,8 @@ export interface Bar {
 /**
  * A bar per name reported, in order of first report: each stretch runs from the sample that
  * first reports the name to the last that does before one that does not, or a gap. With the
- * `heard` instants of the names, a sample whose names went unheard longer than the gap reports none.
+ * `heard` instants of the names, a sample whose names went unheard for the gap or longer reports
+ * none.
  */
 export function barsOf(
   samples: readonly Sample[],

@@ -23,6 +23,20 @@ const gs = (s: Sample) => s.gs;
 const ALL: Interval = { from: 0, to: 10_000 };
 
 describe('runsOf', () => {
+  it('breaks a run between samples exactly the lapse apart, not just under it', () => {
+    // Arrange
+    const rows = [29.9, 30, 30.1].map((d) => [
+      sample(1000, { gs: 250 }),
+      sample(1000 + d, { gs: 251 }),
+    ]);
+
+    // Act
+    const runs = rows.map((samples) => runsOf(samples, gs, ALL).length);
+
+    // Assert
+    expect(runs).toEqual([1, 2, 2]);
+  });
+
   it('joins consecutive samples that carry the reading', () => {
     // Arrange
     const samples = [sample(1, { gs: 250 }), sample(2, { gs: 251 }), sample(3, { gs: 252 })];
@@ -40,13 +54,13 @@ describe('runsOf', () => {
     ]);
   });
 
-  it('breaks at a sample without the reading and at a gap longer than the limit', () => {
+  it('breaks at a sample without the reading and at a gap of the lapse or more', () => {
     // Arrange
     const samples = [
       sample(1, { gs: 250 }),
       sample(2),
       sample(3, { gs: 252 }),
-      sample(3 + LAPSE_SEC, { gs: 253 }),
+      sample(2 + LAPSE_SEC, { gs: 253 }),
       sample(4 + 2 * LAPSE_SEC, { gs: 254 }),
     ];
 
@@ -58,7 +72,7 @@ describe('runsOf', () => {
       [{ t: 1, v: 250 }],
       [
         { t: 3, v: 252 },
-        { t: 3 + LAPSE_SEC, v: 253 },
+        { t: 2 + LAPSE_SEC, v: 253 },
       ],
       [{ t: 4 + 2 * LAPSE_SEC, v: 254 }],
     ]);
@@ -95,6 +109,20 @@ describe('heardAt', () => {
 });
 
 describe('runsOf with the instants a reading is heard at', () => {
+  it('breaks a run where the reading went unheard exactly the lapse, not just under it', () => {
+    // Arrange
+    const rows = [29.9, 30, 30.1].map((d) => [
+      sample(1000, { gs: 250, heard: { gs: 1000 } }),
+      sample(1001, { gs: 251, heard: { gs: 1000 + d } }),
+    ]);
+
+    // Act
+    const runs = rows.map((samples) => runsOf(samples, gs, ALL, ['gs']).length);
+
+    // Assert
+    expect(runs).toEqual([1, 2, 2]);
+  });
+
   it('takes a value repeated without a new report as no new point', () => {
     // Arrange
     const samples = [1, 1, 3, 3].map((heard, k) =>
@@ -235,6 +263,17 @@ describe('yOf', () => {
 });
 
 describe('gapsIn', () => {
+  it('leaves a gap between samples exactly the lapse apart, not ones just under it', () => {
+    // Arrange
+    const spacings = [29.9, 30, 30.1];
+
+    // Act
+    const gaps = spacings.map((d) => gapsIn([sample(1000), sample(1000 + d)], ALL));
+
+    // Assert
+    expect(gaps).toEqual([[], [{ from: 1000, to: 1030 }], [{ from: 1000, to: 1030.1 }]]);
+  });
+
   it('finds the stretches between samples further apart than the limit, cut to the interval', () => {
     // Arrange
     const samples = [sample(100), sample(101), sample(200), sample(201), sample(300)];
