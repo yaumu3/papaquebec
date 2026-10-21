@@ -133,6 +133,13 @@ export function readoutOf(keys: readonly ReadingKey[], at: Sample | null): LaneR
   };
 }
 
+/** What a lane's readout shows: the reading at `at`; without a sample, the dash of a gap while the panel reads the past, nothing at now. */
+export const shownReadout = (
+  keys: readonly ReadingKey[],
+  at: Sample | null,
+  past: boolean,
+): LaneReadout | null => (at || past ? readoutOf(keys, at) : null);
+
 /** Whether an intent has a value at a sample, as the lane plots it. */
 function hasValue(key: ReadingKey, s: Sample): boolean {
   const spec = PLOTS[key];

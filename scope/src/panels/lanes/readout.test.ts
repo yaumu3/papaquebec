@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../lib/reports';
 import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
-import { altTargets, heldIntents, readoutOf, readoutSlots } from './readout';
+import { altTargets, heldIntents, readoutOf, readoutSlots, shownReadout } from './readout';
 
 describe('altTargets', () => {
   it('puts first the target the aircraft levels at first: the lower in a climb, the higher in a descent', () => {
@@ -301,5 +301,26 @@ describe('readoutOf over a gap', () => {
 
     // Assert
     expect(readouts).toEqual([{ value: '---' }, { value: '---' }]);
+  });
+});
+
+describe('shownReadout', () => {
+  it('reads the dash of a gap while the panel reads the past, and nothing at now', () => {
+    // Arrange
+    const keys = ['alt', 'selAlt'] as const;
+    const s = sample(100);
+    const rows = [
+      { at: s, past: false },
+      { at: s, past: true },
+      { at: null, past: true },
+      { at: null, past: false },
+    ];
+    const expected = [readoutOf(keys, s), readoutOf(keys, s), { value: '---' }, null];
+
+    // Act
+    const shown = rows.map((r) => shownReadout(keys, r.at, r.past));
+
+    // Assert
+    expect(shown).toEqual(expected);
   });
 });

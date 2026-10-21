@@ -26,7 +26,7 @@ import {
   scaleLabels,
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
-import { heldIntents, type LaneReadout, readoutOf, readoutSlots, type Slot } from './readout';
+import { heldIntents, type LaneReadout, readoutSlots, shownReadout, type Slot } from './readout';
 import { barsOf, yOf } from './trace';
 
 import s from './Lanes.module.css';
@@ -160,9 +160,7 @@ export function Lane(props: {
       withinSec: step / 2,
     }).map((h) => headingGlyph(x(h.t), mid(), h));
   });
-  const readout = createMemo(() =>
-    props.at || props.cursor !== null ? readoutOf(props.keys, props.at) : null,
-  );
+  const readout = createMemo(() => shownReadout(props.keys, props.at, props.past));
   /** The intents the contact had, over all of it, so that panning moves no slot. */
   const held = createMemo(() => heldIntents(props.keys, props.samples));
   const slots = () => {
