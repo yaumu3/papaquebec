@@ -6,7 +6,7 @@ import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import { readoutOf } from '../../lanes/readout';
 import { nowAt } from '../moment';
-import { ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
+import { boxOf, ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
@@ -50,10 +50,13 @@ describe('ndFrame', () => {
     ];
 
     // Act
-    const frames = rows.map((t) => ndFrame(nowAt(t, NOW)));
+    const frames = rows.map((t) => {
+      const f = ndFrame(nowAt(t, NOW));
+      return [f.mode, boxOf(f.mode, f.orient), f.flags];
+    });
 
     // Assert
-    expect(frames.map((f) => [f.mode, f.box, f.flags])).toEqual([
+    expect(frames).toEqual([
       ['track', '289', []],
       ['track', '047', []],
       ['lost', '---', ['TRK']],
@@ -550,7 +553,7 @@ describe('the ND at a peeked sample', () => {
 
     // Assert
     expect(out).toEqual({
-      frame: { mode: 'empty', orient: 123, box: '---', flags: [], lastHeard: undefined },
+      frame: { mode: 'empty', orient: 123, flags: [], lastHeard: undefined },
       corners: ['---', '---', '---', '---°', '---°', '---', '---'],
       symbols: {},
     });

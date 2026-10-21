@@ -20,7 +20,6 @@ export interface NdFrame {
   mode: NdMode;
   /** The bearing at the top of the display, magnetic. */
   orient: number;
-  box: string;
   flags: readonly NdFlag[];
   lastHeard: string | undefined;
 }
@@ -60,7 +59,6 @@ export function ndFrame(m: Moment<Readout>, standing = 0): NdFrame {
   return {
     mode,
     orient,
-    box: boxOf(mode, orient),
     flags: FLAGS[mode],
     lastHeard:
       mode === 'lost' && m.kind !== 'empty' ? `LAST HEARD ${Math.round(m.r.seen)} s` : undefined,
