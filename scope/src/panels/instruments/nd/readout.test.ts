@@ -5,12 +5,16 @@ import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import { readoutOf } from '../../lanes/readout';
+import { nowAt } from '../moment';
 import { ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
 const STALE = NOW - LAPSE_SEC;
 const AT = { lat: 35.5, lon: 139.8 };
+
+/** The three readings of the selected heading, all known or all not. */
+const held = (known: boolean) => ({ nd: known, bug: known, lane: known });
 
 afterEach(() => {
   setDeclinationAt(() => () => 0);
@@ -46,7 +50,7 @@ describe('ndFrame', () => {
     ];
 
     // Act
-    const frames = rows.map((t) => ndFrame(t, NOW));
+    const frames = rows.map((t) => ndFrame(nowAt(t, NOW)));
 
     // Assert
     expect(frames.map((f) => [f.mode, f.box, f.flags])).toEqual([
@@ -70,7 +74,7 @@ describe('ndFrame', () => {
     ];
 
     // Act
-    const orients = rows.map((t) => ndFrame(t, NOW).orient);
+    const orients = rows.map((t) => ndFrame(nowAt(t, NOW)).orient);
 
     // Assert
     expect(orients).toEqual([289, 47, 198, 201, 0]);
@@ -82,7 +86,7 @@ describe('ndFrame', () => {
     const t = makeSample(NOW, { seen: 40, track: 205, at: AT, heard: { track: 900 } });
 
     // Act
-    const frame = ndFrame(t, NOW);
+    const frame = ndFrame(nowAt(t, NOW));
 
     // Assert
     expect(frame.orient).toBe(198);
@@ -93,7 +97,7 @@ describe('ndFrame', () => {
     const rows = [makeSample(NOW, { seen: 34.4 }), makeSample(NOW, { seen: 14.9 })];
 
     // Act
-    const lines = rows.map((t) => ndFrame(t, NOW).lastHeard);
+    const lines = rows.map((t) => ndFrame(nowAt(t, NOW)).lastHeard);
 
     // Assert
     expect(lines).toEqual(['LAST HEARD 34 s', undefined]);
@@ -128,7 +132,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['462', '438', '269°/64', '310°', '284°', '-4°C', '-56°C']);
@@ -141,7 +145,7 @@ describe('ndReadouts', () => {
     );
 
     // Act
-    const readouts = rows.map((t) => ndReadouts(t, NOW));
+    const readouts = rows.map((t) => ndReadouts(nowAt(t, NOW)));
 
     // Assert
     expect(readouts.map((r) => [r.tat.text, r.sat.text])).toEqual([
@@ -155,7 +159,7 @@ describe('ndReadouts', () => {
     const t = makeSample(NOW, { seen: 1 });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
@@ -172,7 +176,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect([readouts.gs.text, readouts.tas.text]).toEqual(['---', '438']);
@@ -190,7 +194,7 @@ describe('ndReadouts', () => {
     const rows = [wind(NOW - LAPSE_SEC - 1), wind(NOW - LAPSE_SEC + 1), wind(FRESH)];
 
     // Act
-    const readouts = rows.map((t) => ndReadouts(t, NOW));
+    const readouts = rows.map((t) => ndReadouts(nowAt(t, NOW)));
 
     // Assert
     expect(readouts.map((r) => r.wind.text)).toEqual(['---', '276°/40', '276°/40']);
@@ -210,12 +214,11 @@ describe('ndReadouts', () => {
         }),
       ),
     );
-    const held = (known: boolean) => ({ nd: known, bug: known, lane: known });
 
     // Act
     const out = rows.map((t) => ({
-      nd: ndReadouts(t, NOW).sel.known,
-      bug: ndSymbols(t, NOW, STANDARD_ALTIMETER).sel !== undefined,
+      nd: ndReadouts(nowAt(t, NOW)).sel.known,
+      bug: ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).sel !== undefined,
       lane: readoutOf(['trk', 'selHdg'], t).first !== undefined,
     }));
 
@@ -234,7 +237,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
@@ -251,7 +254,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['462', '---', '---', '---°', '---°', '---', '-56°C']);
@@ -270,7 +273,7 @@ describe('ndSymbols', () => {
     const t = makeSample(NOW, { seen: 1, ...fields, at: AT, heard: heardAll(KEYS, FRESH) });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols).toEqual({ track: 282, heading: 284, sel: 310 });
@@ -282,7 +285,7 @@ describe('ndSymbols', () => {
     const t = makeSample(NOW, { seen: 1, ...fields, heard });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols).toEqual({ track: 289, sel: 310 });
@@ -298,7 +301,7 @@ describe('ndSymbols', () => {
     const lost = makeSample(NOW, { seen: 34, ...fields, heard: heardAll(KEYS, FRESH) });
 
     // Act
-    const symbols = [blank, lost].map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER));
+    const symbols = [blank, lost].map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER));
 
     // Assert
     expect(symbols).toEqual([{}, {}]);
@@ -322,7 +325,7 @@ describe('ndSymbols trend', () => {
     const t = turningSample({});
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.trend).toEqual({ rateDegS: 1, gsKt: 360 });
@@ -339,7 +342,7 @@ describe('ndSymbols trend', () => {
     ];
 
     // Act
-    const trends = quiet.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).trend);
+    const trends = quiet.map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).trend);
 
     // Assert
     expect(trends).toEqual(Array(5).fill(undefined));
@@ -350,7 +353,7 @@ describe('ndSymbols trend', () => {
     const turning = [0.3, -0.3].map((trackRate) => turningSample({ trackRate }));
 
     // Act
-    const trends = turning.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).trend?.rateDegS);
+    const trends = turning.map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).trend?.rateDegS);
 
     // Assert
     expect(trends).toEqual([0.3, -0.3]);
@@ -384,7 +387,7 @@ describe('ndSymbols level-off', () => {
     const t = climbingSample({});
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.levelOffNm).toBeCloseTo(11.667, 3);
@@ -395,7 +398,7 @@ describe('ndSymbols level-off', () => {
     const t = climbingSample({ selAlt: 25000, verticalRate: -1800 });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.levelOffNm).toBeCloseTo(15.556, 3);
@@ -413,7 +416,7 @@ describe('ndSymbols level-off', () => {
     ];
 
     // Act
-    const out = rows.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).levelOffNm);
+    const out = rows.map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).levelOffNm);
 
     // Assert
     expect(out).toEqual(Array(6).fill(undefined));
@@ -437,7 +440,7 @@ describe('ndSymbols wind', () => {
     const t = windy({});
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.windFrom).toBe(269);
@@ -448,7 +451,7 @@ describe('ndSymbols wind', () => {
     const t = windy({ windSpeed: STALE });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.windFrom).toBeUndefined();

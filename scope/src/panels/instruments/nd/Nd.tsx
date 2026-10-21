@@ -10,6 +10,7 @@ import { trackStore } from '../../../state/tracks';
 import { hoverPlace } from '../../../ui/hoverPlace';
 import { trackWidth } from '../../../ui/size';
 import { glided, glidedPoints } from '../glide';
+import { nowAt } from '../moment';
 import {
   aircraftPath,
   arcPath,
@@ -71,8 +72,9 @@ export function Nd(props: { t: Track }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
   const width = trackWidth(root);
   const g = createMemo(() => ndGeometry(width()));
-  const frame = createMemo(() => ndFrame(props.t, trackStore.stats.now));
-  const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
+  const moment = createMemo(() => nowAt(props.t, trackStore.stats.now));
+  const frame = createMemo(() => ndFrame(moment()));
+  const readouts = createMemo(() => ndReadouts(moment()));
   /**
    * The glides stand at once on another target, and when the frame changes mode: a target heard
    * again, or whose track lapses or comes back, is shown where it is, not on its way
@@ -82,7 +84,7 @@ export function Nd(props: { t: Track }) {
   const orient = glided(() => frame().orient, { wrap: 360, key });
   const marks = createMemo(() => compass(g(), orient()));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
-  const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
+  const symbols = createMemo(() => ndSymbols(moment(), settings.altimeter));
   const bearing = (of: (own: NdSymbols) => number | undefined) =>
     glided(() => of(symbols()), { wrap: 360, key });
   const trackDeg = bearing((own) => own.track);
@@ -126,7 +128,7 @@ export function Nd(props: { t: Track }) {
   });
   const traffic = createMemo(() => {
     snapshotVersion();
-    return ndTraffic(props.t, trackStore.tracks.values(), trackStore.stats.now, {
+    return ndTraffic(moment(), trackStore.tracks.values(), {
       frame: frame(),
       rangeNm: ndRangeNm(),
       g: g(),

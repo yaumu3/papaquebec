@@ -6,6 +6,7 @@ import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
+import { nowAt } from '../moment';
 import {
   feetOf,
   fmaColumns,
@@ -31,13 +32,13 @@ const targetOf = (first: Sample, ...rest: Sample[]) => ({
 });
 
 const selectedOf = (t: Sample) => {
-  const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER);
+  const out = pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER);
   return [out.selAlt, out.fmsAlt];
 };
 
-const baroOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).baro;
+const baroOf = (t: Sample) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).baro;
 
-const altitudeOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).altitude;
+const altitudeOf = (t: Sample) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).altitude;
 
 /** A sample at `t` reporting these modes, heard at `t`. */
 const reporting = (t: number, navModes: string[]) =>
@@ -76,7 +77,7 @@ describe('pfdFma', () => {
     );
 
     // Act
-    const out = pfdFma(t, NOW);
+    const out = pfdFma(nowAt(t, NOW), t.samples);
 
     // Assert
     expect(out).toEqual({
@@ -97,7 +98,7 @@ describe('pfdFma', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdFma(t, NOW));
+    const out = targets.map((t) => pfdFma(nowAt(t, NOW), t.samples));
 
     // Assert
     const empty = {
@@ -114,7 +115,7 @@ describe('pfdFma', () => {
     const t = targetOf(makeSample(NOW, { navModes: ['lnav'], heard: { navModes: FRESH } }));
 
     // Act
-    const out = pfdFma(t, NOW);
+    const out = pfdFma(nowAt(t, NOW), t.samples);
 
     // Assert
     expect(out).toEqual({
@@ -181,7 +182,11 @@ describe('pfdFma boxes', () => {
     );
 
     // Act
-    const out = [pfdFma(t, 105).boxed, pfdFma(t, 109.9).boxed, pfdFma(t, 110).boxed];
+    const out = [
+      pfdFma(nowAt(t, 105), t.samples).boxed,
+      pfdFma(nowAt(t, 109.9), t.samples).boxed,
+      pfdFma(nowAt(t, 110), t.samples).boxed,
+    ];
 
     // Assert
     expect(out).toEqual([
@@ -196,7 +201,7 @@ describe('pfdFma boxes', () => {
     const t = targetOf(reporting(100, ['lnav', 'vnav']), reporting(105, ['lnav']));
 
     // Act
-    const out = pfdFma(t, 105);
+    const out = pfdFma(nowAt(t, 105), t.samples);
 
     // Assert
     expect(out).toEqual({
@@ -214,7 +219,7 @@ describe('pfdReadouts speed', () => {
     const t = makeSample(NOW, { ias: 261.6, mach: 0.79, heard: { ias: FRESH, mach: FRESH } });
 
     // Act
-    const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER);
+    const out = pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(out).toEqual({
@@ -240,7 +245,7 @@ describe('pfdReadouts speed', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER));
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER));
 
     // Assert
     const blank: PfdReadouts = {
@@ -269,7 +274,7 @@ describe('pfdReadouts roll', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).roll);
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).roll);
 
     // Assert
     expect(out).toEqual([-12, undefined, undefined, undefined]);
@@ -285,7 +290,7 @@ describe('pfdReadouts flight path vector', () => {
     const t = makeSample(NOW, { ...live, heard });
 
     // Act
-    const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv;
+    const out = pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).fpv;
 
     // Assert
     expect(out?.fpaDeg).toBeCloseTo(2.203, 3);
@@ -306,8 +311,8 @@ describe('pfdReadouts flight path vector', () => {
 
     // Act
     const out = [
-      pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv?.driftDeg,
-      pfdReadouts(staleTrack, NOW, STANDARD_ALTIMETER).fpv?.driftDeg,
+      pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).fpv?.driftDeg,
+      pfdReadouts(nowAt(staleTrack, NOW), STANDARD_ALTIMETER).fpv?.driftDeg,
     ];
 
     // Assert
@@ -326,7 +331,7 @@ describe('pfdReadouts flight path vector', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv);
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).fpv);
 
     // Assert
     expect(out).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
@@ -536,7 +541,7 @@ describe('pfdReadouts vertical rate', () => {
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).vs);
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).vs);
 
     // Assert
     expect(out).toEqual([-2200, undefined, undefined, undefined]);

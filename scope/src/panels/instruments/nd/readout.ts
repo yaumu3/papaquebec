@@ -8,6 +8,7 @@ import type { Readout } from '../../../state/track';
 import { HEARD } from '../../lanes/plots';
 import { NONE, type Reading, READINGS } from '../../readings';
 import { holdsAll, isLost } from '../freshness';
+import type { Moment } from '../moment';
 import type { Trend } from './geometry';
 
 /** The state of the instrument: track-up, lost, or blank for want of a track that holds. */
@@ -27,9 +28,9 @@ export interface NdFrame {
 const BLANK_BOX = '---';
 
 /** The mode the instrument is in: track-up while the magnetic track holds. */
-function modeOf(t: Readout, now: number): NdMode {
+function modeOf({ r: t, instant }: Moment<Readout>): NdMode {
   if (isLost(t)) return 'lost';
-  if (holds(t.heard.track, now, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
+  if (holds(t.heard.track, instant, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
 }
 
@@ -47,8 +48,9 @@ export const boxOf = (mode: NdMode, orient: number): string =>
   mode === 'track' ? padBearing(orient) : BLANK_BOX;
 
 /** What the top of the ND reads, and the flags beside it, from the freshness of the target's readings. */
-export function ndFrame(t: Readout, now: number): NdFrame {
-  const mode = modeOf(t, now);
+export function ndFrame(m: Moment<Readout>): NdFrame {
+  const t = m.r;
+  const mode = modeOf(m);
   const orient = orientOf(t);
   return {
     mode,
@@ -83,10 +85,10 @@ const shown = (r: Reading, withUnit = false): string | undefined =>
   r === NONE ? undefined : `${r.v}${withUnit ? (r.unit ?? '') : ''}`;
 
 /** The corners of the ND: each value on its own freshness, all blank once the target is lost. */
-export function ndReadouts(t: Readout, now: number): NdReadouts {
+export function ndReadouts({ r: t, instant }: Moment<Readout>): NdReadouts {
   const lost = isLost(t);
   const read = (keys: readonly HeardKey[], text: () => string | undefined, degree = false) => {
-    const fresh = !lost && holdsAll(t, keys, now);
+    const fresh = !lost && holdsAll(t, keys, instant);
     const value = fresh ? text() : undefined;
     if (value !== undefined) return { text: value, known: true };
     return { text: degree ? '---°' : '---', known: false };
@@ -125,25 +127,26 @@ export interface NdSymbols {
 const TREND_MIN_RATE_DEG_S = 0.3;
 
 /** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
-export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymbols {
-  if (modeOf(t, now) !== 'track') return {};
+export function ndSymbols(m: Moment<Readout>, altimeter: Altimeter): NdSymbols {
+  if (modeOf(m) !== 'track') return {};
+  const { r: t, instant } = m;
   const live = (keys: readonly HeardKey[], v: number | undefined) =>
-    holdsAll(t, keys, now) ? v : undefined;
+    holdsAll(t, keys, instant) ? v : undefined;
   return {
     track: live(['track'], magneticTrack(t)),
     heading: live(['heading'], t.heading),
     sel: live(HEARD.selHdg, steeringHeading(t)),
-    trend: trendOf(t, now),
-    levelOffNm: levelOffOf(t, now, altimeter),
+    trend: trendOf(t, instant),
+    levelOffNm: levelOffOf(t, instant, altimeter),
     windFrom: live(['windDir', 'windSpeed'], windFromOf(t)),
   };
 }
 
 /** The turn rate and ground speed, while both hold, the aircraft is under way and the track turns. */
-function trendOf(t: Readout, now: number): Trend | undefined {
+function trendOf(t: Readout, instant: number): Trend | undefined {
   const { trackRate: rateDegS, gs: gsKt } = t;
   if (rateDegS === undefined || gsKt === undefined) return undefined;
-  if (!holdsAll(t, ['trackRate', 'gs'], now)) return undefined;
+  if (!holdsAll(t, ['trackRate', 'gs'], instant)) return undefined;
   if (Math.abs(rateDegS) < TREND_MIN_RATE_DEG_S || gsKt <= 0) return undefined;
   return { rateDegS, gsKt };
 }
@@ -153,10 +156,10 @@ function trendOf(t: Readout, now: number): Trend | undefined {
  * as the crew reads it, the reference `holdsSelected` compares on: the altitude still to go at the
  * rate of climb, flown at the ground speed.
  */
-function levelOffOf(t: Readout, now: number, altimeter: Altimeter): number | undefined {
+function levelOffOf(t: Readout, instant: number, altimeter: Altimeter): number | undefined {
   const { selAlt, verticalRate: vs, gs } = t;
   if (selAlt === undefined || vs === undefined || gs === undefined) return undefined;
-  if (!holdsAll(t, ['alt', 'selAlt', 'verticalRate', 'gs'], now)) return undefined;
+  if (!holdsAll(t, ['alt', 'selAlt', 'verticalRate', 'gs'], instant)) return undefined;
   const crew = crewAltitudeFt(t, altimeter);
   if (crew === undefined || vs === 0 || Math.sign(selAlt - crew) !== Math.sign(vs))
     return undefined;
