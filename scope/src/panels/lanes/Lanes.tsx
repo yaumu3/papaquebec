@@ -306,14 +306,7 @@ export function Lanes(props: { track: Track }) {
   /** How far the axis stands off its place: while a lane is dragged it stays where it was. */
   const axisOffset = () => {
     const d = drag();
-    return d
-      ? axisShift(
-          heights(),
-          d.from,
-          slotShown(d.from, d.slot, d.overBin),
-          lastHistoryIndex(plotted()),
-        )
-      : 0;
+    return d ? axisShift(heights(), d.from, slotShown(d), lastHistoryIndex(plotted())) : 0;
   };
   const restoreScroll = () => {
     const el = scroller();
@@ -371,7 +364,7 @@ export function Lanes(props: { track: Track }) {
                 onCleanup(() => lanes.delete(lane));
                 const placed = () => {
                   const d = drag();
-                  return d ? placeOf(i(), d.from, slotShown(d.from, d.slot, d.overBin)) : i();
+                  return d ? placeOf(i(), d.from, slotShown(d)) : i();
                 };
                 return isInstrumentLane(lane) ? (
                   <InstrumentLane

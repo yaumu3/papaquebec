@@ -2,8 +2,8 @@ import { clamp } from '../../lib/math';
 import { placeOf } from '../../ui/reorder';
 
 /** The slot a dragged lane from `from` shows while over `slot`: over the bin, the place it left. */
-export const slotShown = (from: number, slot: number, overBin: boolean): number =>
-  overBin ? from : slot;
+export const slotShown = (d: { from: number; slot: number; overBin: boolean }): number =>
+  d.overBin ? d.from : d.slot;
 
 /** What a dragged lane released does: removed over the bin, else moved from its place to the slot. */
 export const dropOf = (
