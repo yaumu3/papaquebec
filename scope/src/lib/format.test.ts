@@ -5,6 +5,7 @@ import {
   climbState,
   emergencyCode,
   formatAge,
+  formatAgo,
   formatBoundM,
   formatDistance,
   formatGsWake,
@@ -345,5 +346,29 @@ describe('formatRoll', () => {
 
     // Assert
     expect(out).toEqual(['R15°', 'L5°', '0°', '0°', '0°', '0°', 'R15°', 'L10°', 'R35°']);
+  });
+});
+
+describe('formatAgo', () => {
+  it('reads seconds before now as a true minus and mm:ss, minutes not wrapping into hours', () => {
+    // Arrange
+    const secs = [0, 59.6, 200, 3600, 3725, -5];
+
+    // Act
+    const labels = secs.map(formatAgo);
+
+    // Assert
+    expect(labels).toEqual(['−00:00', '−01:00', '−03:20', '−60:00', '−62:05', '−00:00']);
+  });
+
+  it('starts with U+2212, not a hyphen', () => {
+    // Arrange
+    const sec = 200;
+
+    // Act
+    const code = formatAgo(sec).codePointAt(0);
+
+    // Assert
+    expect(code).toBe(0x2212);
   });
 });

@@ -56,12 +56,11 @@ describe('chipName', () => {
 });
 
 describe('laneName', () => {
-  it('names a lane with its place among the lanes and how to move it', () => {
+  it('names a history lane with its place, how to move it and the window keys', () => {
     // Arrange
     const rows: [LaneKey, number, number][] = [
-      ['alt', 0, 3],
-      ['gs', 2, 3],
-      ['pfd', 0, 3],
+      ['alt', 0, 4],
+      ['gs', 2, 4],
     ];
 
     // Act
@@ -69,10 +68,22 @@ describe('laneName', () => {
 
     // Assert
     expect(names).toEqual([
-      'ALT lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
-      'GS lane, 3 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
-      'PFD lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
+      'ALT lane, 1 of 4. Drag it up or down, or press Alt and an arrow key, to move it; drag it sideways to select a span; Delete removes it; Shift+F10 opens its menu. The left and right arrows pan the window, the up and down arrows narrow and widen it, Home resets it.',
+      'GS lane, 3 of 4. Drag it up or down, or press Alt and an arrow key, to move it; drag it sideways to select a span; Delete removes it; Shift+F10 opens its menu. The left and right arrows pan the window, the up and down arrows narrow and widen it, Home resets it.',
     ]);
+  });
+
+  it('names an instrument lane as it always was', () => {
+    // Arrange
+    const lane: LaneKey = 'pfd';
+
+    // Act
+    const name = laneName(lane, 0, 3);
+
+    // Assert
+    expect(name).toBe(
+      'PFD lane, 1 of 3. Drag it, or press Alt and an arrow key, to move it; Delete removes it; Shift+F10 opens its menu.',
+    );
   });
 });
 

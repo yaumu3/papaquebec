@@ -18,37 +18,25 @@
   min-height: 0;
 }
 /*
- * A lane cut by an edge fades into the panel ground there. The time cursor's column fades only at
- * the bottom, so that the cursor runs on unbroken from the chip's notch.
+ * A lane cut by an edge fades into the panel ground there, the cursor and the axis with it.
  */
 .viewport {
   /* How deep the fade at a cut edge runs. */
   --fade: var(--space-6);
   --fade-top: 0px;
   --fade-bottom: 0px;
-  --cursor-left: -1px;
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   margin-left: calc(-1 * var(--lane-overhang));
-  mask-image:
-    linear-gradient(
-      to bottom,
-      transparent,
-      #000 var(--fade-top),
-      #000 calc(100% - var(--fade-bottom)),
-      transparent
-    ),
-    linear-gradient(to bottom, #000 calc(100% - var(--fade-bottom)), transparent);
-  mask-size:
-    100% 100%,
-    1px 100%;
-  mask-position:
-    0 0,
-    var(--cursor-left) 0;
-  mask-repeat: no-repeat;
-  mask-composite: add;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 var(--fade-top),
+    #000 calc(100% - var(--fade-bottom)),
+    transparent
+  );
 }
 .cutTop {
   --fade-top: var(--fade);
@@ -68,6 +56,8 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  /* A finger scrolls the lanes up or down only: sideways it peeks, swipes or pinches, and the page never zooms. */
+  touch-action: pan-y;
   /* A dragged lane reorders the lanes as it scrolls them, which no anchoring is to undo. */
   overflow-anchor: none;
   scrollbar-width: none;
@@ -173,7 +163,6 @@
 /* As tall as the instrument in it, which a finger held on it can pick up and a vertical move scrolls. */
 .instrument {
   display: flow-root;
-  touch-action: pan-y;
 }
 .lane:focus-visible {
   outline: none;
@@ -188,14 +177,15 @@
   pointer-events: none;
 }
 .plot {
+  --chip-height: 14px;
+  --chip-top: calc(var(--space-1) + (var(--lane-top) - var(--chip-height)) / 2);
   position: absolute;
   inset: 0 var(--plot-right) 0 var(--plot-left);
 }
-/* Sized by the lane; the width the plots are drawn to is read off the clock row. */
+/* Sized by the lane; the width the plots are drawn to is read off the axis row. */
 .svg {
   display: block;
   width: 100%;
-  touch-action: pan-y;
 }
 /* The lane's only value lines: the top and bottom of its scale. */
 .scale {
@@ -231,8 +221,6 @@
   align-items: center;
   gap: var(--space-2);
   height: var(--lane-top);
-  /* A finger on it scrolls the lanes, swipes the row or, held, drags the lane, as on the plot. */
-  touch-action: pan-y;
   /* A swipe short of removing the lane springs back. */
   transition: transform var(--sheet-ms) var(--sheet-ease);
 }
@@ -253,7 +241,7 @@
 }
 /*
  * What the lane reads at the cursor's instant, at the right on the panel's ground, a little short of
- * the edge; each intent in a slot of its own width, so that none moves another.
+ * the edge.
  */
 .readout {
   display: flex;
@@ -269,12 +257,9 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/* A value read at an earlier instant than the latest, hovered or with the window in the past. */
+/* A value read off now: while peeking, or with the window held. */
 .past {
   color: var(--color-selbox);
-}
-.slot {
-  display: inline-block;
 }
 .intentText {
   color: var(--plot-intent);
@@ -379,86 +364,84 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/*
- * Over the minimap: when the contact starts and ends at the left, while the window shows only part
- * of it, and the visible span at the right.
- */
-.span {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-4);
-  margin: var(--space-4) 0 var(--space-1);
-  color: var(--text);
-  font-size: var(--text-xs);
-  line-height: 1;
-  letter-spacing: var(--tracking);
-  white-space: nowrap;
-}
-.contactSpan {
-  color: var(--plot-label);
-}
-.visibleSpan {
-  margin-left: auto;
-}
-/* The clock over the lanes, a hairline under it. */
+/* The scale of ages under the last history lane, in line with the plots. */
 .axis {
-  margin-top: var(--space-4);
-  border-bottom: 1px solid var(--plot-rule);
+  position: relative;
+  height: 12px;
+  margin: var(--space-1) var(--plot-right) 0 var(--plot-left);
   color: var(--plot-label);
   font-size: var(--text-xs);
+  line-height: 12px;
   letter-spacing: var(--tracking);
   white-space: nowrap;
 }
-/*
- * Labels line up with the plots; the cursor's chip stands among them, its notch below reaching
- * down over the hairline to the first lane's top edge.
- */
-.labels {
-  --chip-height: 14px;
-  position: relative;
-  height: calc(var(--chip-height) + var(--notch-height) - 1px);
-  margin: 0 var(--plot-right) 0 var(--plot-left);
-}
-/* On the chip time's baseline: its box as tall, less the chip's border either side. */
+/* Centred on its tick. */
 .label {
   position: absolute;
-  top: 1px;
-  line-height: calc(var(--chip-height) - 2px);
+  top: 0;
   transform: translateX(-50%);
 }
-/* A clock label never shown, measured for the labels' width. */
+/* A label never shown, measured for the labels' width. */
 .ruler {
   visibility: hidden;
 }
-/*
- * The time cursor: a chip on the clock with a notch down to the lanes, and a line through each,
- * in front of its plot and behind its name and readout, over its hairline. At rest it stands at
- * the last sample in view, dim at the latest; it lights up away from it, hovered or with the window
- * in the past.
- */
-.chip {
+/* Right-aligned to the plot's edge: NOW, or how far back the window ends. */
+.endLabel {
   position: absolute;
   top: 0;
-  z-index: 1;
+  right: 0;
+}
+.endHeld {
+  color: var(--color-selbox);
+}
+/* The cursor's chip, in front of the lane's top row: what the lane reads at the cursor. */
+.chip {
+  position: absolute;
+  top: var(--chip-top);
+  z-index: 3;
+  pointer-events: none;
   box-sizing: border-box;
   height: var(--chip-height);
   font-size: var(--text-sm);
   line-height: calc(var(--chip-height) - 2px);
   border: 1px solid currentColor;
   background: var(--panel-bg);
-  color: var(--text-dim);
+  color: var(--color-selbox);
   white-space: nowrap;
 }
 /* Measured for the chip's width, which an inline box does not report. */
-.chipTime {
+.chipBody {
   display: inline-block;
+}
+.chip .readout {
+  height: auto;
+  margin: 0;
+  padding: 0;
 }
 .notch {
   position: absolute;
-  top: var(--chip-height);
-  z-index: 1;
+  top: calc(var(--chip-top) + var(--chip-height));
+  z-index: 3;
+  pointer-events: none;
   fill: currentColor;
-  color: var(--text-dim);
+  color: var(--color-selbox);
+}
+/* The span being selected: a light fill with an edge at each end, in front of the plot. */
+.band {
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  z-index: 1;
+  box-sizing: border-box;
+  border-inline: 1px solid var(--color-selbox);
+  pointer-events: none;
+}
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--color-selbox);
+  opacity: 0.18;
 }
 .timeCursor {
   position: absolute;
@@ -466,51 +449,10 @@
   bottom: -1px;
   z-index: 1;
   width: 1px;
-  background: var(--text-dim);
+  background: var(--color-selbox);
   pointer-events: none;
 }
-.chip.live,
-.notch.live {
-  color: var(--color-selbox);
-}
-.timeCursor.live {
-  background: var(--color-selbox);
-}
-/* The hovered instant on the minimap. */
-.cursor {
-  stroke: var(--color-selbox);
-}
-/* Sized by the panel; its own width is read back for the coordinates. */
-.timeline {
-  display: block;
-  width: 100%;
-  overflow: visible;
-  touch-action: none;
-}
-.timeline:focus-visible {
-  outline: 1px solid var(--text);
-  outline-offset: 2px;
-}
-/* The cursor tells what a press would take hold of. */
-.resize {
-  cursor: ew-resize;
-}
-.move {
-  cursor: grab;
-}
-.select {
-  cursor: crosshair;
-}
-.frame {
-  fill: none;
-  stroke: var(--control-hover);
-}
-.mini {
-  fill: none;
-  stroke: var(--text-dim);
-  stroke-width: 1;
-}
-/* What the aircraft is set to do, in the lanes and the minimap alike. */
+/* What the aircraft is set to do. */
 .intent {
   stroke: var(--plot-intent);
 }
@@ -523,21 +465,4 @@
 .unknown {
   color: var(--text-dim);
   stroke: var(--text-dim);
-}
-.dim {
-  fill: var(--panel-bg);
-  fill-opacity: 0.6;
-}
-.window {
-  fill: var(--text);
-  fill-opacity: 0.06;
-  stroke: var(--text);
-}
-.handle {
-  fill: var(--text);
-}
-.selection {
-  fill: var(--color-selbox);
-  fill-opacity: 0.18;
-  stroke: var(--color-selbox);
 }

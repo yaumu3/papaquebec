@@ -143,26 +143,22 @@ export function heldIntents(keys: readonly ReadingKey[], samples: readonly Sampl
   return keys.slice(1).filter((key) => samples.some((s) => hasValue(key, s)));
 }
 
-/**
- * A slot of a lane's readout: an intent's text; none, for one unknown at the instant; or blank,
- * for one that agrees with the other.
- */
+/** A slot of a lane's readout: an intent's text, or none, for one unknown at the instant. */
 export interface Slot {
   key: ReadingKey;
   text?: string;
-  blank?: true;
 }
 
 /**
  * The readout's slots, one per intent the contact had: the one the aircraft goes for first, then
- * the other; an intent without a value at the instant takes the slot the order leaves it.
+ * the other, unless it agrees with the first; an intent without a value at the instant takes the
+ * slot the order leaves it.
  */
 export function readoutSlots(r: LaneReadout, held: readonly ReadingKey[]): Slot[] {
   const [one, two] = held;
   if (one === undefined) return [];
   const first: Slot = r.first ?? { key: one };
-  if (two === undefined) return [first];
+  if (two === undefined || r.agreed) return [first];
   const rest = held.find((key) => key !== first.key) ?? two;
-  const second: Slot = r.other ?? (r.agreed ? { key: rest, blank: true } : { key: rest });
-  return [first, second];
+  return [first, r.other ?? { key: rest }];
 }

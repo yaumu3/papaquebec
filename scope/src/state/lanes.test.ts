@@ -8,7 +8,7 @@ import {
   movePlotLane,
   plotted,
   removePlotLane,
-  setLanesSpan,
+  setLanesWindow,
   setHoverInstant,
   setLaneScroll,
   setPlotted,
@@ -16,7 +16,7 @@ import {
 } from './lanes';
 import { DEFAULT_PLOTTED } from './plotted';
 import { persisted } from './settings';
-import { type Span, WHOLE } from './span';
+import { DEFAULT_WINDOW, type LanesWindow } from './window';
 
 describe('lanes state', () => {
   it('starts from the persisted plot, the default readings with nothing stored', () => {
@@ -85,16 +85,16 @@ describe('lanes state', () => {
     expect([before, hoverInstant()]).toEqual([null, 1234]);
   });
 
-  it('keeps the span set for a target', () => {
+  it('keeps the window set for a target', () => {
     // Arrange
-    const tail: Span = { kind: 'tail', sec: 120 };
-    setLanesSpan('a', tail);
+    const held: LanesWindow = { kind: 'held', from: 100, to: 220 };
+    setLanesWindow('a', held);
 
     // Act
     const view = lanesView('a');
 
     // Assert
-    expect(view.span).toEqual(tail);
+    expect(view.window).toEqual(held);
   });
 
   it('keeps the lane scroll set for a target', () => {
@@ -108,34 +108,34 @@ describe('lanes state', () => {
     expect(view.scrollTop).toBe(140);
   });
 
-  it('keeps the span by reference when the lanes scroll', () => {
+  it('keeps the window by reference when the lanes scroll', () => {
     // Arrange
-    const tail: Span = { kind: 'tail', sec: 120 };
-    setLanesSpan('a', tail);
+    const held: LanesWindow = { kind: 'held', from: 100, to: 220 };
+    setLanesWindow('a', held);
     setLaneScroll('a', 90);
 
     // Act
-    const { span } = lanesView('a');
+    const { window: kept } = lanesView('a');
 
     // Assert
-    expect(span).toBe(tail);
+    expect(kept).toBe(held);
   });
 
-  it('starts another target whole and at the top', () => {
+  it('starts another target on the default window and at the top', () => {
     // Arrange
-    setLanesSpan('a', { kind: 'tail', sec: 120 });
+    setLanesWindow('a', { kind: 'held', from: 100, to: 220 });
     setLaneScroll('a', 140);
 
     // Act
     const view = lanesView('b');
 
     // Assert
-    expect(view).toEqual({ hex: 'b', span: WHOLE, scrollTop: 0 });
+    expect(view).toEqual({ hex: 'b', window: DEFAULT_WINDOW, scrollTop: 0 });
   });
 
   it('forgets the view once another target is selected, back at the first too', () => {
     // Arrange
-    setLanesSpan('a', { kind: 'tail', sec: 120 });
+    setLanesWindow('a', { kind: 'held', from: 100, to: 220 });
     keepViewOf('b');
     keepViewOf('a');
 
@@ -143,6 +143,6 @@ describe('lanes state', () => {
     const view = lanesView('a');
 
     // Assert
-    expect(view).toEqual({ hex: 'a', span: WHOLE, scrollTop: 0 });
+    expect(view).toEqual({ hex: 'a', window: DEFAULT_WINDOW, scrollTop: 0 });
   });
 });

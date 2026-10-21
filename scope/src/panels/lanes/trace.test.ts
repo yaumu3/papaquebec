@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from '../../lib/aircraft';
 import { makeSample as sample } from '../../state/sampleFixture';
-import type { Interval } from '../../state/span';
 import type { Sample } from '../../state/track';
+import type { Interval } from '../../state/window';
 import {
   barbMarks,
   barsOf,
@@ -11,9 +11,8 @@ import {
   gapsIn,
   heardAt,
   nearestSample,
-  restSample,
+  newestSample,
   sampleAt,
-  seesAll,
   type Point,
   rangeOf,
   runsOf,
@@ -369,8 +368,8 @@ describe('barbMarks', () => {
   });
 });
 
-describe('restSample', () => {
-  it("rests on the last sample inside the window, current only when it is the contact's latest", () => {
+describe('newestSample', () => {
+  it('is the last sample inside the window, none when it holds none', () => {
     // Arrange
     const samples = [sample(100), sample(110), sample(120), sample(130)];
     const windows = [
@@ -380,34 +379,10 @@ describe('restSample', () => {
     ];
 
     // Act
-    const rests = windows.map((i) => restSample(samples, i));
+    const found = windows.map((i) => newestSample(samples, i));
 
     // Assert
-    expect(rests.map((r) => r && [r.sample.t, r.current])).toEqual([
-      [130, true],
-      [120, false],
-      null,
-    ]);
-  });
-});
-
-describe('seesAll', () => {
-  it('sees every sample when it reaches over the first and the last, and all of none', () => {
-    // Arrange
-    const contact = [sample(100), sample(150), sample(200)];
-    const rows = [
-      { i: { from: 90, to: 210 }, samples: contact },
-      { i: { from: 101, to: 210 }, samples: contact },
-      { i: { from: 90, to: 199 }, samples: contact },
-      { i: { from: 100, to: 200 }, samples: contact },
-      { i: { from: 90, to: 210 }, samples: [] },
-    ];
-
-    // Act
-    const seen = rows.map((r) => seesAll(r.i, r.samples));
-
-    // Assert
-    expect(seen).toEqual([true, false, false, true, true]);
+    expect(found.map((s) => s?.t)).toEqual([130, 120, undefined]);
   });
 });
 

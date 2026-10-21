@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { clipBox, dragKeyOf, dropOf, liftLeft, overBin, slotShown } from './drag';
+import { axisShift, clipBox, dragKeyOf, dropOf, liftLeft, overBin, slotShown } from './drag';
 
 describe('slotShown', () => {
   it('shows the slot under the pointer, or the place the lane left while over the bin', () => {
@@ -103,5 +103,29 @@ describe('clipBox', () => {
       { left: 10, top: 420, right: 290, bottom: 420 },
       { left: 320, top: 150, right: 320, bottom: 250 },
     ]);
+  });
+});
+
+describe('axisShift', () => {
+  it('moves the axis back by the height of the lanes that left or joined those above it', () => {
+    // Arrange
+    const ALT = 85;
+    const PFD = 239;
+    const SURV = 160;
+    const holds = [
+      { heights: [ALT, PFD], from: 1, slot: 0, under: 0 },
+      { heights: [ALT, PFD], from: 0, slot: 1, under: 0 },
+      { heights: [ALT, PFD], from: 1, slot: 1, under: 0 },
+      { heights: [ALT, PFD, ALT], from: 1, slot: 0, under: 2 },
+      { heights: [ALT, PFD, SURV], from: 2, slot: 0, under: 0 },
+    ];
+
+    // Act
+    const shifts = holds.map(({ heights, from, slot, under }) =>
+      axisShift(heights, from, slot, under),
+    );
+
+    // Assert
+    expect(shifts).toEqual([ALT - PFD, ALT - PFD, 0, 0, ALT - SURV]);
   });
 });

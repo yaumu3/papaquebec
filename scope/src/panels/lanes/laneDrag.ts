@@ -8,6 +8,8 @@ import {
   keepsTouch,
   laneGestureOf,
   MENU_HOLD_MS,
+  pinchesFrom,
+  type Tap,
   type TouchStage,
   touchHoldOf,
 } from './hold';
@@ -16,8 +18,8 @@ import { swipeRemoves } from './swipe';
 /** How far a pointer travels from where it took hold of a lane before it drags the lane. */
 const SLOP_PX = 4;
 
-/** Where on a lane a pointer took hold of it: its top row, or the plot under it. */
-export type LanePart = 'row' | 'plot';
+/** Where on a lane a pointer took hold of it: a history lane's top row or its plot, or an instrument. */
+export type LanePart = 'row' | 'plot' | 'instrument';
 
 /** A lane dragged: where it came from, the slot it is over, and the pointer. */
 export interface LaneDrag {
@@ -59,11 +61,28 @@ export function createLaneDrag(deps: {
     close: () => void;
   };
   onDrop: (lane: LaneKey, drop: ReturnType<typeof dropOf>) => void;
+  /** A finger's tap on a history lane: pressed and released with no gesture, in viewport px and ms. */
+  onTap: (tap: Tap) => void;
+  /** The cursor a finger moved sideways along a plot carries, in viewport x. */
+  peek: { move: (x: number) => void; end: () => void };
+  /** The span a mouse selects by dragging sideways on a history lane, in viewport x. */
+  select: {
+    start: (x: number) => void;
+    move: (x: number) => void;
+    end: () => void;
+    cancel: () => void;
+  };
 }): {
   drag: Accessor<LaneDrag | null>;
   swipe: Accessor<LaneSwipe | null>;
   /** Whether a finger rests on a lane, not yet holding it long enough to pick it up. */
   holding: Accessor<boolean>;
+  /** Whether a finger moved sideways along a plot is carrying the cursor. */
+  peeking: Accessor<boolean>;
+  /** Whether a second finger landing now pinches the window. */
+  pinchable: () => boolean;
+  /** Ends the gesture on the lane without effect: no drop, no removal. */
+  drop: () => void;
   grab: (e: PointerEvent, lane: LaneKey, part: LanePart) => void;
 } {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
@@ -71,9 +90,12 @@ export function createLaneDrag(deps: {
   const [holding, setHolding] = createSignal(false);
   /** Whether a finger's hold has opened the picker, which it still owns until it lifts. */
   const [picking, setPicking] = createSignal(false);
+  /** Whether a finger moved sideways along a plot is carrying the cursor. */
+  const [peeking, setPeeking] = createSignal(false);
   let end: (() => void) | null = null;
-  /** The lane a pointer has taken hold of, until it lets go. */
+  /** The lane a pointer has taken hold of, and where on it, until it lets go. */
   let held: LaneKey | null = null;
+  let heldPart: LanePart | null = null;
   onCleanup(() => end?.());
   // A lane removed some other way takes the gesture on it with it.
   createEffect(() => {
@@ -90,6 +112,7 @@ export function createLaneDrag(deps: {
       swipe: !!swipe(),
       holding: holding(),
       picking: picking(),
+      peek: peeking(),
     });
     if (kept.prevent) t.preventDefault();
     if (kept.stop) t.stopPropagation();
@@ -129,6 +152,7 @@ export function createLaneDrag(deps: {
     if (!e.isPrimary) return;
     end?.();
     held = lane;
+    heldPart = part;
     el.setPointerCapture(e.pointerId);
     const from = deps.lanes().indexOf(lane);
     const x0 = e.clientX;
@@ -150,6 +174,8 @@ export function createLaneDrag(deps: {
       }
       frame = requestAnimationFrame(scroll);
     };
+    /** Whether the pointer is selecting a span. */
+    let selecting = false;
     /** Where a finger's hold has got to. */
     let stage: TouchStage = 'pressed';
     /** Picks the lane up, the pointer at `x`, `y`: lit where it stands while a finger has not moved it. */
@@ -183,6 +209,10 @@ export function createLaneDrag(deps: {
         pickUp(m.clientX, m.clientY);
         return;
       }
+      if (selecting || peeking()) {
+        (selecting ? deps.select : deps.peek).move(m.clientX);
+        return;
+      }
       if (d) {
         if (d.still && touchHoldOf('lifted', part, dx, dy, m.timeStamp - e.timeStamp) !== 'drag')
           return;
@@ -201,12 +231,36 @@ export function createLaneDrag(deps: {
         setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
       }
       if (g === 'drag') pickUp(m.clientX, m.clientY);
+      if (g === 'peek') {
+        setHolding(false);
+        clearTimeout(lift);
+        clearTimeout(picker);
+        setPeeking(true);
+        deps.peek.move(m.clientX);
+      }
+      if (g === 'select') {
+        selecting = true;
+        deps.select.start(x0);
+        deps.select.move(m.clientX);
+      }
     };
     const onUp = (u: PointerEvent) => {
       if (!own(u)) return;
       const d = drag();
       const s = swipe();
+      const tap =
+        u.pointerType === 'touch' &&
+        part !== 'instrument' &&
+        stage === 'pressed' &&
+        !d &&
+        !s &&
+        !peeking();
+      if (selecting) {
+        selecting = false;
+        deps.select.end();
+      }
       end?.();
+      if (tap) deps.onTap({ x: u.clientX, y: u.clientY, at: u.timeStamp });
       if (stage === 'picker') return;
       if (d) deps.onDrop(d.lane, dropOf(d.from, d.slot, d.overBin));
       else if (s && swipeRemoves(s.dx, s.width)) deps.onDrop(s.lane, 'remove');
@@ -236,8 +290,12 @@ export function createLaneDrag(deps: {
     el.addEventListener('lostpointercapture', cancel);
     end = () => {
       end = null;
+      if (selecting) deps.select.cancel();
+      if (peeking()) deps.peek.end();
+      setPeeking(false);
       setPicking(false);
       held = null;
+      heldPart = null;
       clearTimeout(lift);
       clearTimeout(picker);
       cancelAnimationFrame(frame);
@@ -253,5 +311,16 @@ export function createLaneDrag(deps: {
     };
   };
 
-  return { drag, swipe, holding, grab };
+  const pinchable = () =>
+    pinchesFrom(
+      {
+        holding: holding(),
+        peeking: peeking(),
+        drag: !!drag(),
+        swipe: !!swipe(),
+        picking: picking(),
+      },
+      heldPart,
+    );
+  return { drag, swipe, holding, peeking, pinchable, drop: () => end?.(), grab };
 }

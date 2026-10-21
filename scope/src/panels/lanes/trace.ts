@@ -1,7 +1,7 @@
 import type { HeardKey } from '../../lib/aircraft';
 import { STALE_SECONDS } from '../../render/scene/rules';
-import { type Interval, timeAt } from '../../state/span';
 import type { Sample } from '../../state/track';
+import { type Interval, timeAt } from '../../state/window';
 
 /** As long without a report as makes a target stale on the scope breaks a trace too. */
 export const GAP_SEC = STALE_SECONDS;
@@ -188,24 +188,10 @@ export function sampleAt(
   return nearestSample(samples, timeAt(px, i, width), i);
 }
 
-/** Where the cursor rests: a sample, and whether it is the contact's latest. */
-export interface Rest {
-  sample: Sample;
-  current: boolean;
-}
-
-/** The last sample inside the interval, where the cursor rests; null without any. The samples are oldest first. */
-export function restSample(samples: readonly Sample[], i: Interval): Rest | null {
+/** The last sample inside the interval; null without any. The samples are oldest first. */
+export function newestSample(samples: readonly Sample[], i: Interval): Sample | null {
   const end = countBefore(samples, i.to, true);
-  const sample = end > countBefore(samples, i.from) ? samples[end - 1] : undefined;
-  return sample ? { sample, current: end === samples.length } : null;
-}
-
-/** Whether the interval holds every sample, oldest first; true of none. */
-export function seesAll(i: Interval, samples: readonly Sample[]): boolean {
-  const first = samples[0];
-  const last = samples.at(-1);
-  return !first || !last || (i.from <= first.t && i.to >= last.t);
+  return end > countBefore(samples, i.from) ? (samples[end - 1] ?? null) : null;
 }
 
 export interface Bar {

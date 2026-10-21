@@ -1,4 +1,5 @@
 import { clamp } from '../../lib/math';
+import { placeOf } from '../../ui/reorder';
 
 /** The slot a dragged lane from `from` shows while over `slot`: over the bin, the place it left. */
 export const slotShown = (from: number, slot: number, overBin: boolean): number =>
@@ -17,6 +18,21 @@ export const dropOf = (
  */
 export const liftLeft = (x: number, grabX: number, width: number, chipWidth: number): number =>
   clamp(x - grabX, 0, Math.max(0, width - chipWidth));
+
+/**
+ * How far the axis under the lane at `under` moves to stay where it was while the lane from
+ * `from` shows at `slot`: the lanes above it at rest less those above it now, `heights` tall.
+ */
+export const axisShift = (
+  heights: readonly number[],
+  from: number,
+  slot: number,
+  under: number,
+): number =>
+  heights.reduce(
+    (sum, h, i) => sum + (i <= under ? h : 0) - (placeOf(i, from, slot) <= under ? h : 0),
+    0,
+  );
 
 /** An element's box in the viewport, CSS px. */
 export type Box = Pick<DOMRect, 'left' | 'right' | 'top' | 'bottom'>;

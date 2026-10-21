@@ -102,3 +102,7 @@ export function laneAfter(plotted: readonly LaneKey[], lane: LaneKey): LaneKey |
   const at = plotted.indexOf(lane);
   return at < 0 ? null : (plotted[at + 1] ?? null);
 }
+
+/** The place of the last history lane in `plotted`, -1 with none. */
+export const lastHistoryIndex = (plotted: readonly LaneKey[]): number =>
+  plotted.findLastIndex((k) => !isInstrumentLane(k));

@@ -48,7 +48,7 @@ export function InstrumentLane(props: {
         else onMoveKey(props.moves, e);
       }}
       onContextMenu={props.onMenu}
-      onPointerDown={(e) => props.onGrab(e, 'plot')}
+      onPointerDown={(e) => props.onGrab(e, 'instrument')}
     >
       <Switch>
         <Match when={props.lane === 'pfd'}>

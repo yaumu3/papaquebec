@@ -1,0 +1,62 @@
+/* The two boxes are one height, 17 px, in every state. */
+.control {
+  position: relative;
+  display: inline-flex;
+  font-size: var(--text-sm);
+  line-height: 15px;
+}
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+  border: 1px solid var(--panel-border);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+}
+.dot {
+  box-sizing: border-box;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-level);
+}
+.held {
+  border-color: var(--color-selbox);
+  color: var(--text-dim);
+}
+.held .dot {
+  border: 1px solid currentColor;
+  background: none;
+}
+.lag {
+  margin-left: 2px;
+  color: var(--color-selbox);
+  letter-spacing: var(--tracking);
+}
+/* Hovering lights the text only: the dot and the lag keep their own colours. */
+.button:hover {
+  color: var(--text);
+}
+/* Under the peek readout, still there for the keyboard. */
+.covered {
+  opacity: 0;
+}
+.peek {
+  position: absolute;
+  top: 0;
+  right: 0;
+  box-sizing: border-box;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border: 1px solid var(--color-selbox);
+  background: var(--color-selbox);
+  color: var(--panel-bg);
+  letter-spacing: var(--tracking);
+  pointer-events: none;
+}

@@ -1,6 +1,6 @@
-import { clockTime } from '../../lib/format';
+import { formatAgo } from '../../lib/format';
 import { clamp } from '../../lib/math';
-import type { Interval } from '../../state/span';
+import type { Interval, LanesWindow } from '../../state/window';
 
 /** Steps along the clock, seconds: each a round part of it, up to the hour. */
 const STEPS_SEC = [10, 15, 30, 60, 120, 300, 600, 900, 1800];
@@ -16,10 +16,12 @@ export function clockStep(spanSec: number, most: number): number {
 /** The step between the labels of an axis over a span of `spanSec`. */
 export const axisStep = (spanSec: number): number => clockStep(spanSec, MAX_LABELS);
 
-/** The multiples of `step` inside the interval, its ends included. */
-export function ticks(i: Interval, step: number): number[] {
+/** The multiples of `step` inside the interval, its ends included; counted from `origin` when given. */
+export function ticks(i: Interval, step: number, origin = 0): number[] {
   const out: number[] = [];
-  for (let t = Math.ceil(i.from / step) * step; t <= i.to; t += step) out.push(t);
+  for (let t = origin + Math.ceil((i.from - origin) / step) * step; t <= i.to; t += step) {
+    out.push(t);
+  }
   return out;
 }
 
@@ -33,19 +35,9 @@ export function clearOfEnds(
   return at.filter((t) => x(t) >= reachPx && x(t) <= width - reachPx);
 }
 
-/** The clock time to the minute, or to the second when the step is shorter than a minute. */
-export function clockLabel(t: number, step: number): string {
-  const full = clockTime(t);
-  return step < 60 ? full : full.slice(0, 5);
-}
-
-/** The span's ends as its axis reads them, then how long it is: in seconds under a minute, else in whole minutes. */
-export function spanLabel(i: Interval): string {
-  const sec = i.to - i.from;
-  const step = axisStep(sec);
-  const long = sec < 60 ? `${Math.round(sec)} S` : `${Math.round(sec / 60)} MIN`;
-  return `${clockLabel(i.from, step)} – ${clockLabel(i.to, step)} · ${long}`;
-}
+/** What the axis reads at its right edge: NOW while live, else how far back the window ends. */
+export const endLabel = (w: LanesWindow, lagSec: number): { text: string; held: boolean } =>
+  w.kind === 'live' ? { text: 'NOW', held: false } : { text: `${formatAgo(lagSec)} ›`, held: true };
 
 /** The left of a chip `chipW` across centred on `x`, kept inside a plot `plotW` across. */
 export const chipAt = (x: number, chipW: number, plotW: number): number =>

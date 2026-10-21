@@ -126,6 +126,12 @@ export function clockTime(seconds: number): string {
   return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
 }
 
+/** How long before now, as a true minus and mm:ss to the nearest second; minutes do not wrap into hours. */
+export function formatAgo(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  return `−${pad(Math.floor(total / 60))}:${pad(total % 60)}`;
+}
+
 /** A position source as the panels name it. */
 export const sourceName = (source: PositionSource): string => source.toUpperCase();
 

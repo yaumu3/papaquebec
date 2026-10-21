@@ -4,12 +4,14 @@ import { cx } from '../design/cx';
 import { advisoryWord } from '../lib/acas';
 import { type EmergencyCode, type Priority, statusTags, wakeLetter } from '../lib/format';
 import { trackLabel } from '../render/scene/rules';
-import { keepViewOf } from '../state/lanes';
+import { keepViewOf, plotted } from '../state/lanes';
+import { lastHistoryIndex } from '../state/plotted';
 import { selected, snapshotVersion } from '../state/scope';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
 import { Window } from '../ui/Window';
 import { Lanes } from './lanes/Lanes';
+import { WindowControl } from './lanes/WindowControl';
 
 import s from './DetailPanel.module.css';
 
@@ -62,7 +64,11 @@ function Header(props: { t: Track }) {
           <span>{props.t.registration}</span>
         </Show>
         <span>{props.t.hex.toUpperCase()}</span>
-        <span class={s.slot} />
+        <span class={s.slot}>
+          <Show when={lastHistoryIndex(plotted()) >= 0}>
+            <WindowControl track={props.t} />
+          </Show>
+        </span>
       </div>
     </div>
   );
