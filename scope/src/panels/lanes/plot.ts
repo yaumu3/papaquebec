@@ -9,7 +9,7 @@ import type { Interval } from '../../state/window';
 import { HEARD, READINGS } from '../readings';
 import { fixed, offset, toward } from '../svg';
 import { heardNear, heardNearAt } from './heard';
-import { type Dash, type Heading, PLOTS } from './plots';
+import { type Dash, type Heading, PLOTS, type PlotSpec } from './plots';
 import { isLog, plotText } from './plots';
 import { barbMarks, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
 import { nearestSample } from './trace';
@@ -36,7 +36,7 @@ export function laneTraces(
 ): LaneTrace[] {
   const [lane, ...intents] = keys;
   if (lane === undefined) return [];
-  const own = PLOTS[lane];
+  const own: PlotSpec = PLOTS[lane];
   if (own.kind !== 'line' && own.kind !== 'pair') return [];
   const read = (y: Read, key: ReadingKey = lane) => runsOf(samples, y, visible, HEARD[key]);
   const floor = own.kind === 'line' ? own.floor : undefined;
@@ -45,7 +45,7 @@ export function laneTraces(
     floorRuns.length > 0 ? [{ key: lane, runs: floorRuns, floor: true }] : [];
   const second = own.kind === 'pair' ? [{ key: lane, runs: read(own.y2), dash: own.dash }] : [];
   const drawn = intents.flatMap((key) => {
-    const spec = PLOTS[key];
+    const spec: PlotSpec = PLOTS[key];
     if (spec.kind !== 'intent') return [];
     return [{ key, runs: read(spec.y, key), dash: spec.dash, intent: true as const }];
   });
@@ -90,7 +90,7 @@ const within = (m: number, round: number): boolean =>
  * would have none, a flat line on a step lying along the bottom.
  */
 export function snapped(r: Range, lane: ReadingKey): Range {
-  const spec = PLOTS[lane];
+  const spec: PlotSpec = PLOTS[lane];
   if (spec.kind !== 'line' && spec.kind !== 'pair') return r;
   if (spec.log) {
     const lo = BOUNDS_M.findLast((m) => m <= 10 ** r.lo * (1 + EPS)) ?? 10 ** r.lo;
@@ -119,7 +119,7 @@ const metresOf = (v: number): number => Number((10 ** v).toPrecision(6));
  * their unit, which changes along it; none for a lane without a scale.
  */
 export function scaleLabels(lane: ReadingKey, r: Range): ScaleLabel[] {
-  const spec = PLOTS[lane];
+  const spec: PlotSpec = PLOTS[lane];
   const value = READINGS[lane].value;
   if (!value || (spec.kind !== 'line' && spec.kind !== 'pair')) return [];
   return [r.hi, r.lo].map((v) => ({
@@ -252,10 +252,9 @@ interface HeadingMark extends Heading {
  * `t`, the intent `sel` among them; none when neither the track nor the heading was.
  */
 export function headingAt(s: Sample, t: number, sel?: ReadingKey): HeadingMark | undefined {
-  const spec = PLOTS.trk;
   const intent = sel === undefined ? undefined : PLOTS[sel];
   const heard = heardNearAt(['trk', 'selHdg'], s, t);
-  const h = spec.kind === 'heading' ? spec.heading(heard) : undefined;
+  const h = PLOTS.trk.heading(heard);
   return h && { ...h, sel: intent?.kind === 'intent' ? intent.y(heard) : undefined };
 }
 

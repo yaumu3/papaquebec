@@ -36,7 +36,7 @@ interface Logarithmic {
  * dotted, gantt bars, wind barbs or heading glyphs; or an intent, in its parent's lane: a line,
  * solid or with its dash, on that lane's scale, or on the lane's glyphs, where a dash goes unused.
  */
-type PlotSpec =
+export type PlotSpec =
   | ({
       kind: 'line';
       y: Read;
@@ -65,7 +65,7 @@ const logOf = (m: number | undefined): number | undefined =>
   m === undefined ? undefined : Math.log10(m);
 
 /** How each reading is drawn; `INTENTS` in `state/plotted.ts` says which lane an intent goes in. */
-export const PLOTS: Record<ReadingKey, PlotSpec> = {
+export const PLOTS = {
   // As the crew reads it, so that an aircraft holding its selected altitude sits on that line.
   alt: {
     kind: 'line',
@@ -104,11 +104,11 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
     dash: 'dashed',
     quantum: 1,
   },
-};
+} satisfies Record<ReadingKey, PlotSpec>;
 
 /** Whether a reading is drawn on a log scale, as a bound. */
 export const isLog = (key: ReadingKey): boolean => {
-  const spec = PLOTS[key];
+  const spec: PlotSpec = PLOTS[key];
   return spec.kind === 'line' && spec.log === true;
 };
 

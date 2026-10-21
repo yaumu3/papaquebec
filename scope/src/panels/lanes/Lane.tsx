@@ -25,7 +25,7 @@ import {
   pathOf,
   scaleLabels,
 } from './plot';
-import { type Dash, PLOTS } from './plots';
+import { type Dash, PLOTS, type PlotSpec } from './plots';
 import { heldIntents, type LaneReadout, readoutSlots, shownReadout, type Slot } from './readout';
 import { barsOf, yOf } from './trace';
 
@@ -60,7 +60,7 @@ const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash
 
 /** The dash an intent is drawn with, if any. */
 const dashOf = (key: ReadingKey): Dash | undefined => {
-  const p = PLOTS[key];
+  const p: PlotSpec = PLOTS[key];
   return p.kind === 'intent' ? p.dash : undefined;
 };
 

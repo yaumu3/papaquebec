@@ -98,10 +98,9 @@ function intentsOf(
 ): { keys: ReadingKey[]; agreed: boolean } {
   const [lane, ...intents] = keys;
   if (lane !== 'alt') return { keys: intents, agreed: false };
-  const alt = PLOTS.alt;
   const sel = intents.includes('selAlt') ? s.selAlt : undefined;
   const fms = intents.includes('fmsAlt') ? s.fmsAlt : undefined;
-  const targets = altTargets(alt.kind === 'line' ? alt.y(s) : undefined, s.verticalRate, sel, fms);
+  const targets = altTargets(PLOTS.alt.y(s), s.verticalRate, sel, fms);
   if (!targets) return { keys: [], agreed: false };
   const { first, other } = targets;
   return {
