@@ -10,8 +10,8 @@ export const HOLD_SLOP_PX = 10;
  * What a pointer `dx`, `dy` from where it pressed on a lane's `part`, `ms` after, does: a mouse or
  * pen, once past `slop`, selects a span of a history lane if it moved sideways first and drags the
  * lane otherwise (an instrument's any way); a finger drags it once held within HOLD_SLOP_PX for
- * HOLD_MS, by the row or the plot alike. A finger moved past that first swipes the row sideways,
- * and is otherwise left to the page. Nothing yet otherwise.
+ * HOLD_MS, by the row or the plot alike. A finger moved past that first swipes the row sideways
+ * or peeks along a plot, and is otherwise left to the page. Nothing yet otherwise.
  */
 export function laneGestureOf(
   part: LanePart,
@@ -20,13 +20,13 @@ export function laneGestureOf(
   dy: number,
   ms: number,
   slop: number,
-): 'drag' | 'select' | 'swipe' | 'pass' | null {
+): 'drag' | 'select' | 'peek' | 'swipe' | 'pass' | null {
   if (pointerType !== 'touch') {
     const axis = axisOf(dx, dy, slop);
     return axis === 'x' && part !== 'instrument' ? 'select' : axis === null ? null : 'drag';
   }
   const g = touchHoldOf('pressed', part, dx, dy, ms);
-  return g === 'lift' ? 'drag' : g === 'swipe' || g === 'pass' ? g : null;
+  return g === 'lift' ? 'drag' : g === 'swipe' || g === 'pass' || g === 'peek' ? g : null;
 }
 
 /** How long a finger holds a lifted lane, from its press, for its picker. */
@@ -38,8 +38,8 @@ export type TouchStage = 'pressed' | 'lifted' | 'picker';
 /**
  * What a finger `dx`, `dy` from its press on a lane's `part`, `ms` after, does at a `stage`. Resting,
  * it lifts the lane at HOLD_MS; lifted and held within HOLD_SLOP_PX it opens the picker at
- * MENU_HOLD_MS; moved past that after the lift it drags the lane. Moved first, it swipes the row
- * sideways, or is left to the page.
+ * MENU_HOLD_MS; moved past that after the lift it drags the lane. Moved sideways first, it swipes
+ * the row or peeks along a plot; moved otherwise, it is left to the page.
  */
 export function touchHoldOf(
   stage: TouchStage,
@@ -47,29 +47,31 @@ export function touchHoldOf(
   dx: number,
   dy: number,
   ms: number,
-): 'lift' | 'picker' | 'drag' | 'swipe' | 'pass' | null {
+): 'lift' | 'picker' | 'drag' | 'peek' | 'swipe' | 'pass' | null {
   const axis = axisOf(dx, dy, HOLD_SLOP_PX);
   if (stage !== 'pressed') {
     if (axis !== null) return 'drag';
     return stage === 'lifted' && ms >= MENU_HOLD_MS ? 'picker' : null;
   }
   if (axis === null) return ms >= HOLD_MS ? 'lift' : null;
-  return part === 'row' && axis === 'x' ? 'swipe' : 'pass';
+  if (axis !== 'x') return 'pass';
+  return part === 'row' ? 'swipe' : part === 'plot' ? 'peek' : 'pass';
 }
 
 /**
- * What a finger's move over the lanes is kept from: scrolling, once it drags, swipes or picks a
- * lane; the sheet, from the press on a lane until the finger lifts.
+ * What a finger's move over the lanes is kept from: scrolling, once it drags, swipes, peeks or
+ * picks; the sheet, from the press on a lane until the finger lifts.
  */
 export function keepsTouch(g: {
   drag: boolean;
   swipe: boolean;
   holding: boolean;
   picking: boolean;
+  peek: boolean;
 }): {
   prevent: boolean;
   stop: boolean;
 } {
-  const prevent = g.drag || g.swipe || g.picking;
+  const prevent = g.drag || g.swipe || g.picking || g.peek;
   return { prevent, stop: prevent || g.holding };
 }

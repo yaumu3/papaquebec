@@ -123,7 +123,7 @@ export function Lanes(props: { track: Track }) {
   const past = () => readsPast(hover() !== null, lanesWindow());
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is held, dragged or swiped. */
   const pointerAt = (e: PointerEvent) => {
-    if (pressedAt() !== null) return;
+    if (pressedAt() !== null || peeking()) return;
     const target = e.target instanceof Element ? e.target : null;
     const px = e.clientX - plotLeft();
     setHoverPx(
@@ -223,7 +223,7 @@ export function Lanes(props: { track: Track }) {
     const a = at();
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
-  const { drag, swipe, holding, grab } = createLaneDrag({
+  const { drag, swipe, holding, peeking, grab } = createLaneDrag({
     scroller,
     picker: {
       open: (lane, el, fx, fy) =>
@@ -233,6 +233,7 @@ export function Lanes(props: { track: Track }) {
     bin: () => add,
     heights: () => plotted().map((k) => lanes.get(k)?.offsetHeight ?? 0),
     lanes: plotted,
+    peek: { move: (clientX) => setHoverPx(plotPx(clientX)), end: () => setHoverPx(null) },
     select: {
       start: (clientX) => setPressedAt(timeAt(plotPx(clientX), visible(), plotWidth())),
       move: (clientX) => setHoverPx(plotPx(clientX)),

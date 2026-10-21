@@ -82,7 +82,7 @@ describe('laneGestureOf', () => {
     expect(gestures).toEqual([null, 'drag', null, 'drag', 'drag']);
   });
 
-  it('swipes the row with a finger moved sideways first, and leaves any other first move to the page', () => {
+  it('swipes the row or peeks on a plot with a finger moved sideways first, and leaves any other first move to the page', () => {
     // Arrange
     const moves = [
       ['row', -(HOLD_SLOP_PX + 1), 0, 0],
@@ -97,7 +97,7 @@ describe('laneGestureOf', () => {
     const gestures = moves.map(([part, dx, dy, ms]) => laneGestureOf(part, 'touch', dx, dy, ms, 4));
 
     // Assert
-    expect(gestures).toEqual(['swipe', 'pass', 'swipe', 'pass', 'pass', 'pass']);
+    expect(gestures).toEqual(['swipe', 'pass', 'swipe', 'peek', 'pass', 'pass']);
   });
 });
 
@@ -148,34 +148,44 @@ describe('touchHoldOf', () => {
     expect(gestures).toEqual([null, null]);
   });
 
-  it('swipes the row or passes to the page when moved first, before the lane is lifted', () => {
+  it('peeks on a plot, swipes the row and leaves an instrument to the page when moved sideways first', () => {
     // Arrange
-    const moves = [
-      ['row', HOLD_SLOP_PX + 1, 0],
-      ['plot', HOLD_SLOP_PX + 1, 0],
-      ['row', 0, HOLD_SLOP_PX + 1],
-    ] as const;
+    const parts = ['plot', 'row', 'instrument'] as const;
 
     // Act
-    const gestures = moves.map(([part, dx, dy]) =>
-      touchHoldOf('pressed', part, dx, dy, HOLD_MS - 1),
+    const gestures = parts.map((part) =>
+      touchHoldOf('pressed', part, HOLD_SLOP_PX + 1, 0, HOLD_MS - 1),
     );
 
     // Assert
-    expect(gestures).toEqual(['swipe', 'pass', 'pass']);
+    expect(gestures).toEqual(['peek', 'swipe', 'pass']);
+  });
+
+  it('passes to the page when moved vertically first, before the lane is lifted', () => {
+    // Arrange
+    const parts = ['plot', 'row', 'instrument'] as const;
+
+    // Act
+    const gestures = parts.map((part) =>
+      touchHoldOf('pressed', part, 0, HOLD_SLOP_PX + 1, HOLD_MS - 1),
+    );
+
+    // Assert
+    expect(gestures).toEqual(['pass', 'pass', 'pass']);
   });
 });
 
 describe('keepsTouch', () => {
-  it("keeps a finger's moves from the sheet at every stage of a gesture on a lane, and from scrolling once it drags, swipes or picks", () => {
+  it("keeps a finger's moves from the sheet at every stage of a gesture on a lane, and from scrolling once it drags, swipes, peeks or picks", () => {
     // Arrange
-    const rest = { drag: false, swipe: false, holding: false, picking: false };
+    const rest = { drag: false, swipe: false, holding: false, picking: false, peek: false };
     const stages = [
       rest,
       { ...rest, holding: true },
       { ...rest, drag: true },
       { ...rest, swipe: true },
       { ...rest, picking: true },
+      { ...rest, peek: true },
     ];
 
     // Act
@@ -185,6 +195,7 @@ describe('keepsTouch', () => {
     expect(kept).toEqual([
       { prevent: false, stop: false },
       { prevent: false, stop: true },
+      { prevent: true, stop: true },
       { prevent: true, stop: true },
       { prevent: true, stop: true },
       { prevent: true, stop: true },

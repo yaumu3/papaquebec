@@ -59,6 +59,8 @@ export function createLaneDrag(deps: {
     close: () => void;
   };
   onDrop: (lane: LaneKey, drop: ReturnType<typeof dropOf>) => void;
+  /** The cursor a finger moved sideways along a plot carries, in viewport x. */
+  peek: { move: (x: number) => void; end: () => void };
   /** The span a mouse selects by dragging sideways on a history lane, in viewport x. */
   select: {
     start: (x: number) => void;
@@ -71,6 +73,8 @@ export function createLaneDrag(deps: {
   swipe: Accessor<LaneSwipe | null>;
   /** Whether a finger rests on a lane, not yet holding it long enough to pick it up. */
   holding: Accessor<boolean>;
+  /** Whether a finger moved sideways along a plot is carrying the cursor. */
+  peeking: Accessor<boolean>;
   grab: (e: PointerEvent, lane: LaneKey, part: LanePart) => void;
 } {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
@@ -78,6 +82,8 @@ export function createLaneDrag(deps: {
   const [holding, setHolding] = createSignal(false);
   /** Whether a finger's hold has opened the picker, which it still owns until it lifts. */
   const [picking, setPicking] = createSignal(false);
+  /** Whether a finger moved sideways along a plot is carrying the cursor. */
+  const [peeking, setPeeking] = createSignal(false);
   let end: (() => void) | null = null;
   /** The lane a pointer has taken hold of, until it lets go. */
   let held: LaneKey | null = null;
@@ -97,6 +103,7 @@ export function createLaneDrag(deps: {
       swipe: !!swipe(),
       holding: holding(),
       picking: picking(),
+      peek: peeking(),
     });
     if (kept.prevent) t.preventDefault();
     if (kept.stop) t.stopPropagation();
@@ -192,8 +199,8 @@ export function createLaneDrag(deps: {
         pickUp(m.clientX, m.clientY);
         return;
       }
-      if (selecting) {
-        deps.select.move(m.clientX);
+      if (selecting || peeking()) {
+        (selecting ? deps.select : deps.peek).move(m.clientX);
         return;
       }
       if (d) {
@@ -214,6 +221,13 @@ export function createLaneDrag(deps: {
         setSwipe({ lane, dx, width: el.getBoundingClientRect().width });
       }
       if (g === 'drag') pickUp(m.clientX, m.clientY);
+      if (g === 'peek') {
+        setHolding(false);
+        clearTimeout(lift);
+        clearTimeout(picker);
+        setPeeking(true);
+        deps.peek.move(m.clientX);
+      }
       if (g === 'select') {
         selecting = true;
         deps.select.start(x0);
@@ -259,6 +273,8 @@ export function createLaneDrag(deps: {
     end = () => {
       end = null;
       if (selecting) deps.select.cancel();
+      if (peeking()) deps.peek.end();
+      setPeeking(false);
       setPicking(false);
       held = null;
       clearTimeout(lift);
@@ -276,5 +292,5 @@ export function createLaneDrag(deps: {
     };
   };
 
-  return { drag, swipe, holding, grab };
+  return { drag, swipe, holding, peeking, grab };
 }
