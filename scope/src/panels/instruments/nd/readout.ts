@@ -1,7 +1,7 @@
 import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
 import { steeringHeading } from '../../../lib/autopilot';
-import { padBearing } from '../../../lib/format';
+import { degreesText, padBearing } from '../../../lib/format';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
 import { HEARD, NONE, type Reading, READINGS, windOf } from '../../readings';
@@ -80,7 +80,7 @@ export interface NdReadouts {
 }
 
 const degrees = (deg: number | undefined): string | undefined =>
-  deg === undefined ? undefined : `${padBearing(deg)}°`;
+  deg === undefined ? undefined : degreesText(deg);
 
 /** A reading's value, with its unit when `withUnit`; undefined for the reading of the unknown. */
 const shown = (r: Reading, withUnit = false): string | undefined =>
@@ -111,7 +111,7 @@ export function ndReadouts(m: Moment<Readout>): NdReadouts {
   };
   const wind = () => {
     const w = windOf(t);
-    return w && `${padBearing(magneticBearing(w.dir, t.at))}°/${Math.round(w.speed)}`;
+    return w && `${degreesText(magneticBearing(w.dir, t.at))}/${Math.round(w.speed)}`;
   };
   return {
     gs: read(HEARD.gs, shown(READINGS.gs.format(t))),

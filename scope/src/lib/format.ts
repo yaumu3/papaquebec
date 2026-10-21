@@ -149,6 +149,9 @@ export function padBearing(deg: number): string {
   return String(d === 0 ? 360 : d).padStart(3, '0');
 }
 
+/** A bearing as padBearing writes it, with its degree mark. */
+export const degreesText = (deg: number): string => `${padBearing(deg)}°`;
+
 export function padTrack(deg: number | undefined): string {
   return deg === undefined ? '---' : padBearing(deg);
 }

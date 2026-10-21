@@ -15,6 +15,7 @@ import {
   formatModes,
   formatRoll,
   modeNames,
+  degreesText,
   padBearing,
   sourceName,
   statusTags,
@@ -156,6 +157,19 @@ describe('formatMmSs / padBearing', () => {
     // Assert
     expect(t).toEqual(['0:00', '1:05', '59:59', '>1h', '--:--', '--:--']);
     expect(b).toEqual(['360', '360', '005', '359', '360', '360', '360']);
+  });
+});
+
+describe('degreesText', () => {
+  it('marks a padded bearing with the degree sign', () => {
+    // Arrange
+    const bearings = [0, 5.4, 359.6];
+
+    // Act
+    const texts = bearings.map(degreesText);
+
+    // Assert
+    expect(texts).toEqual(['360°', '005°', '360°']);
   });
 });
 

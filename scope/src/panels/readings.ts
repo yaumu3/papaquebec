@@ -8,7 +8,7 @@ import {
   formatMach,
   formatModes,
   formatRoll,
-  padBearing,
+  degreesText,
   sourceName,
 } from '../lib/format';
 import type { GeoPoint } from '../lib/geo';
@@ -53,8 +53,7 @@ const signed = (v: number | undefined, unit: string): Reading => {
 };
 
 /** A bearing with its degree mark, or the blank of the unknown. */
-const degrees = (deg: number | undefined): string =>
-  deg === undefined ? '---' : `${padBearing(deg)}°`;
+const degrees = (deg: number | undefined): string => (deg === undefined ? '---' : degreesText(deg));
 
 const bearing = (deg: number | undefined): Reading =>
   deg === undefined ? NONE : { v: degrees(deg) };
