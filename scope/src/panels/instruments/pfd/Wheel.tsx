@@ -1,7 +1,8 @@
 import { Index, type JSX } from 'solid-js';
 
 import { cx } from '../../../design/cx';
-import { type Wheel as WheelData, type WheelCell, columnTop } from './geometry';
+import { type WheelCell, columnTop } from './geometry';
+import type { Wheel as WheelData } from './wheels';
 
 import s from './Pfd.module.css';
 

@@ -2,10 +2,8 @@ import { createUniqueId, Index, type JSX, Show } from 'solid-js';
 
 import { Flag } from './Flag';
 import {
-  type AltitudeDigits,
   type AltitudeTape as AltitudeTapeMarks,
   altitudeBoxPath,
-  altitudeDigits,
   altitudeReadout,
   altitudeStripPath,
   ALTITUDE_THOUSANDS_PX,
@@ -16,10 +14,10 @@ import {
   selBugPath,
   selClipRect,
   selDigits,
-  type SlotRow,
 } from './geometry';
 import type { PfdAltitude } from './readout';
 import { Wheel } from './Wheel';
+import { type AltitudeDigits, altitudeDigits, type SlotRow } from './wheels';
 
 import s from './Pfd.module.css';
 
