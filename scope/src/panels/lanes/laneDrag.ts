@@ -10,6 +10,7 @@ import {
   PICKER_HOLD_MS,
   pinchesFrom,
   type Tap,
+  type TouchFlags,
   type TouchStage,
   touchHoldOf,
 } from './hold';
@@ -98,18 +99,20 @@ export function createLaneDrag(deps: {
     const lanes = deps.lanes();
     if (grabbed !== null && !lanes.includes(grabbed)) end?.();
   });
+  /** What the finger on the lanes is doing. */
+  const flags = (): TouchFlags => ({
+    drag: !!drag(),
+    swipe: !!swipe(),
+    holding: holding(),
+    picking: picking(),
+    peeking: peeking(),
+  });
   /**
    * Keeps a finger's moves over the lanes from the page: from scrolling them while it drags or
    * swipes one, and from the sheet while it also rests on one.
    */
   const keep = (t: TouchEvent) => {
-    const kept = keepsTouch({
-      drag: !!drag(),
-      swipe: !!swipe(),
-      holding: holding(),
-      picking: picking(),
-      peek: peeking(),
-    });
+    const kept = keepsTouch(flags());
     if (kept.prevent) t.preventDefault();
     if (kept.stop) t.stopPropagation();
   };
@@ -303,16 +306,6 @@ export function createLaneDrag(deps: {
     };
   };
 
-  const pinchable = () =>
-    pinchesFrom(
-      {
-        holding: holding(),
-        peeking: peeking(),
-        drag: !!drag(),
-        swipe: !!swipe(),
-        picking: picking(),
-      },
-      grabbedPart,
-    );
+  const pinchable = () => pinchesFrom(flags(), grabbedPart);
   return { drag, swipe, peeking, pinchable, abandon: () => end?.(), grab };
 }

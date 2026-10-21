@@ -182,14 +182,14 @@ describe('touchHoldOf', () => {
 describe('keepsTouch', () => {
   it("keeps a finger's moves from the sheet at every stage of a gesture on a lane, and from scrolling once it drags, swipes, peeks or picks", () => {
     // Arrange
-    const rest = { drag: false, swipe: false, holding: false, picking: false, peek: false };
+    const rest = { drag: false, swipe: false, holding: false, picking: false, peeking: false };
     const stages = [
       rest,
       { ...rest, holding: true },
       { ...rest, drag: true },
       { ...rest, swipe: true },
       { ...rest, picking: true },
-      { ...rest, peek: true },
+      { ...rest, peeking: true },
     ];
 
     // Act
