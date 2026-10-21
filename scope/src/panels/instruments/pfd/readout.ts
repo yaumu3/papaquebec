@@ -7,7 +7,7 @@ import type { Readout, Sample } from '../../../state/track';
 import { READINGS } from '../../readings';
 import { eachHolds, holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
-import type { Fpv } from './geometry';
+import type { Fpv } from './attitudeGeometry';
 
 /** The labels the PFD gives the modes, in the order a column shows them when two are engaged. */
 const LATERAL_MODES: readonly (readonly [string, string])[] = [
