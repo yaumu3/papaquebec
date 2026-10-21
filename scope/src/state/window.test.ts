@@ -384,15 +384,18 @@ describe('selectWindow', () => {
     expect(w).toEqual({ kind: 'live', sec: MIN_WINDOW_SEC });
   });
 
-  it('keeps the band inside the visible window', () => {
+  it('keeps the band inside the visible window, at either end', () => {
     // Arrange
-    const early = 900;
+    const bands = [
+      { t0: 900, t1: 1100 },
+      { t0: 1400, t1: 1600 },
+    ];
 
     // Act
-    const w = selectWindow(early, 1100, visible, contact);
+    const windows = bands.map(({ t0, t1 }) => selectWindow(t0, t1, visible, contact));
 
     // Assert
-    expect(w).toEqual(heldWindow(1000, 1100));
+    expect(windows).toEqual([heldWindow(1000, 1100), heldWindow(1400, 1500)]);
   });
 });
 
