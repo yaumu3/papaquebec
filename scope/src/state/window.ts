@@ -121,3 +121,32 @@ export function selectWindow(
   const to = clamp(Math.max(t0, t1), visible.from, visible.to);
   return settle(from, Math.max(MIN_WINDOW_SEC, to - from), contact);
 }
+
+/**
+ * The window two fingers make of the one they began on (`start`), when they stand at `a`, `b`
+ * across plots `width` wide where they began at `a0`, `b0`: the content follows them and their
+ * spread scales it, about the fingers when held and about now when live.
+ */
+export function pinchWindow(
+  start: { w: LanesWindow; visible: Interval },
+  a0: number,
+  b0: number,
+  a: number,
+  b: number,
+  width: number,
+  contact: Interval,
+): LanesWindow {
+  const { w, visible } = start;
+  const length = visible.to - visible.from;
+  const spread = Math.max(1, Math.abs(b0 - a0)) / Math.max(1, Math.abs(b - a));
+  const sec = clamp(
+    length * spread,
+    MIN_WINDOW_SEC,
+    Math.max(MIN_WINDOW_SEC, contact.to - contact.from),
+  );
+  const mid = (a + b) / 2 / width;
+  if (w.kind === 'live')
+    return settle(contact.to - (mid - (a0 + b0) / 2 / width) * sec - sec, sec, contact);
+  const pinned = visible.from + ((a0 + b0) / 2 / width) * length;
+  return settle(pinned - mid * sec, sec, contact);
+}

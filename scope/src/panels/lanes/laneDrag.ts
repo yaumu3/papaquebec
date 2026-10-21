@@ -8,6 +8,7 @@ import {
   keepsTouch,
   laneGestureOf,
   MENU_HOLD_MS,
+  pinchesFrom,
   type TouchStage,
   touchHoldOf,
 } from './hold';
@@ -75,6 +76,10 @@ export function createLaneDrag(deps: {
   holding: Accessor<boolean>;
   /** Whether a finger moved sideways along a plot is carrying the cursor. */
   peeking: Accessor<boolean>;
+  /** Whether a second finger landing now pinches the window. */
+  pinchable: () => boolean;
+  /** Ends the gesture on the lane without effect: no drop, no removal. */
+  drop: () => void;
   grab: (e: PointerEvent, lane: LaneKey, part: LanePart) => void;
 } {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
@@ -85,8 +90,9 @@ export function createLaneDrag(deps: {
   /** Whether a finger moved sideways along a plot is carrying the cursor. */
   const [peeking, setPeeking] = createSignal(false);
   let end: (() => void) | null = null;
-  /** The lane a pointer has taken hold of, until it lets go. */
+  /** The lane a pointer has taken hold of, and where on it, until it lets go. */
   let held: LaneKey | null = null;
+  let heldPart: LanePart | null = null;
   onCleanup(() => end?.());
   // A lane removed some other way takes the gesture on it with it.
   createEffect(() => {
@@ -143,6 +149,7 @@ export function createLaneDrag(deps: {
     if (!e.isPrimary) return;
     end?.();
     held = lane;
+    heldPart = part;
     el.setPointerCapture(e.pointerId);
     const from = deps.lanes().indexOf(lane);
     const x0 = e.clientX;
@@ -277,6 +284,7 @@ export function createLaneDrag(deps: {
       setPeeking(false);
       setPicking(false);
       held = null;
+      heldPart = null;
       clearTimeout(lift);
       clearTimeout(picker);
       cancelAnimationFrame(frame);
@@ -292,5 +300,16 @@ export function createLaneDrag(deps: {
     };
   };
 
-  return { drag, swipe, holding, peeking, grab };
+  const pinchable = () =>
+    pinchesFrom(
+      {
+        holding: holding(),
+        peeking: peeking(),
+        drag: !!drag(),
+        swipe: !!swipe(),
+        picking: picking(),
+      },
+      heldPart,
+    );
+  return { drag, swipe, holding, peeking, pinchable, drop: () => end?.(), grab };
 }

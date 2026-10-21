@@ -59,6 +59,21 @@ export function touchHoldOf(
 }
 
 /**
+ * Whether a second finger landing now pinches the window: while the first rests or peeks on a
+ * history lane's `part`, not once it has dragged, swiped or opened the picker.
+ */
+export const pinchesFrom = (
+  g: { holding: boolean; peeking: boolean; drag: boolean; swipe: boolean; picking: boolean },
+  part: LanePart | null,
+): boolean =>
+  (g.holding || g.peeking) &&
+  !g.drag &&
+  !g.swipe &&
+  !g.picking &&
+  part !== null &&
+  part !== 'instrument';
+
+/**
  * What a finger's move over the lanes is kept from: scrolling, once it drags, swipes, peeks or
  * picks; the sheet, from the press on a lane until the finger lifts.
  */

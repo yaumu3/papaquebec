@@ -1,7 +1,14 @@
 import { type Accessor, createEffect, onCleanup } from 'solid-js';
 
 import { clamp } from '../../lib/math';
-import { type Interval, type LanesWindow, panWindow, timeAt, zoomWindow } from '../../state/window';
+import {
+  type Interval,
+  type LanesWindow,
+  panWindow,
+  pinchWindow,
+  timeAt,
+  zoomWindow,
+} from '../../state/window';
 import {
   type Area,
   consumes,
@@ -28,6 +35,9 @@ interface WindowInputDeps {
   visible: () => Interval;
   contact: () => Interval;
   setWindow: (w: LanesWindow) => void;
+  /** Whether a second finger landing now pinches, and ending the first finger's gesture when it does. */
+  pinchable: () => boolean;
+  drop: () => void;
 }
 
 /** Where on the lanes `target` is. */
@@ -54,6 +64,13 @@ export function createWindowInput(deps: WindowInputDeps): void {
   let gesture: WheelGesture | null = null;
   /** Safari's pinch, from its start over a plot or the axis: the last scale seen. */
   let pinch: { scale: number } | null = null;
+  /** The touch pointers down, at their x across the page, and the two pinching with the window they began on. */
+  const touches = new Map<number, number>();
+  let fingers: {
+    ids: [number, number];
+    x0: [number, number];
+    start: { w: LanesWindow; visible: Interval };
+  } | null = null;
   const move = (to: (w: LanesWindow, visible: Interval) => LanesWindow) => {
     const w = deps.window();
     const next = to(w, deps.visible());
@@ -92,7 +109,7 @@ export function createWindowInput(deps: WindowInputDeps): void {
       );
   };
   const onGestureStart = (e: Event) => {
-    pinch = ['plot', 'axis'].includes(areaOf(e.target)) ? { scale: 1 } : null;
+    pinch = ['plot', 'axis'].includes(areaOf(e.target)) && touches.size === 0 ? { scale: 1 } : null;
     if (pinch) e.preventDefault();
   };
   const onGestureChange = (e: Event) => {
@@ -102,6 +119,30 @@ export function createWindowInput(deps: WindowInputDeps): void {
     pinch.scale = e.scale;
   };
   const onGestureEnd = () => (pinch = null);
+  const onPointer = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch') return;
+    if (e.type !== 'pointerdown') {
+      touches.delete(e.pointerId);
+      if (fingers?.ids.includes(e.pointerId)) fingers = null;
+      return;
+    }
+    touches.set(e.pointerId, e.clientX);
+    const [one, two] = [...touches];
+    if (touches.size === 2 && one && two && deps.pinchable()) {
+      deps.drop();
+      const start = { w: deps.window(), visible: deps.visible() };
+      fingers = { ids: [one[0], two[0]], x0: [one[1], two[1]], start };
+    }
+  };
+  const onFingerMove = (e: PointerEvent) => {
+    if (touches.has(e.pointerId)) touches.set(e.pointerId, e.clientX);
+    if (!fingers?.ids.includes(e.pointerId)) return;
+    const [i, j] = fingers.ids;
+    const left = deps.plotLeft();
+    const [a, b] = [(touches.get(i) ?? 0) - left, (touches.get(j) ?? 0) - left];
+    const [a0, b0] = [fingers.x0[0] - left, fingers.x0[1] - left];
+    deps.setWindow(pinchWindow(fingers.start, a0, b0, a, b, deps.plotWidth(), deps.contact()));
+  };
   createEffect(() => {
     const el = deps.scroller();
     if (!el) return;
@@ -111,6 +152,11 @@ export function createWindowInput(deps: WindowInputDeps): void {
     el.addEventListener('gesturestart', onGestureStart, opts);
     el.addEventListener('gesturechange', onGestureChange, opts);
     el.addEventListener('gestureend', onGestureEnd, { signal: ac.signal });
+    el.addEventListener('pointerdown', onPointer, { signal: ac.signal });
+    el.addEventListener('touchmove', (t) => fingers && t.preventDefault(), opts);
+    document.addEventListener('pointerup', onPointer, { signal: ac.signal });
+    document.addEventListener('pointercancel', onPointer, { signal: ac.signal });
+    document.addEventListener('pointermove', onFingerMove, { signal: ac.signal });
     onCleanup(() => ac.abort());
   });
 }

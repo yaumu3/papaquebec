@@ -121,16 +121,12 @@ export function Lanes(props: { track: Track }) {
   const at = createMemo(() => hover() ?? newestSample(samples(), visible()));
   /** Whether the lanes read an instant other than now. */
   const past = () => readsPast(hover() !== null, lanesWindow());
-  /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is held, dragged or swiped. */
+  /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is dragged or swiped; a finger only peeks. */
   const pointerAt = (e: PointerEvent) => {
-    if (pressedAt() !== null || peeking()) return;
-    const target = e.target instanceof Element ? e.target : null;
+    const el = e.target instanceof Element ? e.target.closest('[data-lane="history"]') : null;
+    if (e.pointerType === 'touch' || pressedAt() !== null || peeking()) return;
     const px = e.clientX - plotLeft();
-    setHoverPx(
-      px < 0 || drag() || swipe() || holding() || !target?.closest('[data-lane="history"]')
-        ? null
-        : px,
-    );
+    setHoverPx(px < 0 || drag() || swipe() || !el ? null : px);
   };
 
   /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere unless hovering a history lane. */
@@ -223,7 +219,7 @@ export function Lanes(props: { track: Track }) {
     const a = at();
     return a ? readoutOf(readingsIn(lane), a).value : NONE.v;
   };
-  const { drag, swipe, holding, peeking, grab } = createLaneDrag({
+  const { drag, swipe, peeking, pinchable, drop, grab } = createLaneDrag({
     scroller,
     picker: {
       open: (lane, el, fx, fy) =>
@@ -248,18 +244,20 @@ export function Lanes(props: { track: Track }) {
       },
       cancel: stopSelecting,
     },
-    onDrop: (lane, drop) => {
-      if (drop === 'remove') {
+    onDrop: (lane, place) => {
+      if (place === 'remove') {
         movesOf(lane).onRemove();
         return;
       }
-      movePlotLane(drop.move, drop.to);
+      movePlotLane(place.move, place.to);
       reveal(lane);
     },
   });
   createWindowInput({
     scroller,
     plotLeft,
+    pinchable,
+    drop,
     plotWidth,
     window: lanesWindow,
     visible,

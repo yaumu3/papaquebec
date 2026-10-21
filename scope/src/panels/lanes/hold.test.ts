@@ -6,6 +6,7 @@ import {
   keepsTouch,
   laneGestureOf,
   MENU_HOLD_MS,
+  pinchesFrom,
   touchHoldOf,
 } from './hold';
 
@@ -200,5 +201,29 @@ describe('keepsTouch', () => {
       { prevent: true, stop: true },
       { prevent: true, stop: true },
     ]);
+  });
+});
+
+describe('pinchesFrom', () => {
+  it('lets a second finger pinch only while the first rests or peeks on a history lane', () => {
+    // Arrange
+    const none = { holding: false, peeking: false, drag: false, swipe: false, picking: false };
+    const rows = [
+      { g: { ...none, holding: true }, part: 'plot' },
+      { g: { ...none, holding: true }, part: 'row' },
+      { g: { ...none, peeking: true }, part: 'plot' },
+      { g: { ...none, holding: true }, part: 'instrument' },
+      { g: { ...none, peeking: true }, part: 'instrument' },
+      { g: { ...none, holding: true, drag: true }, part: 'plot' },
+      { g: { ...none, peeking: true, swipe: true }, part: 'row' },
+      { g: { ...none, holding: true, picking: true }, part: 'plot' },
+      { g: none, part: 'plot' },
+    ] as const;
+
+    // Act
+    const pinches = rows.map((r) => pinchesFrom(r.g, r.part));
+
+    // Assert
+    expect(pinches).toEqual([true, true, true, false, false, false, false, false, false]);
   });
 });

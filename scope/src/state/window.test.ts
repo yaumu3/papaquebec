@@ -10,6 +10,7 @@ import {
   MIN_WINDOW_SEC,
   readsPast,
   panWindow,
+  pinchWindow,
   resolveWindow,
   selectWindow,
   timeAt,
@@ -391,5 +392,73 @@ describe('selectWindow', () => {
 
     // Assert
     expect(w).toEqual(heldWindow(1000, 1100));
+  });
+});
+
+describe('pinchWindow', () => {
+  const contact: Interval = { from: 0, to: 3600 };
+  const width = 300;
+  const heldStart = { w: heldWindow(1000, 1300), visible: { from: 1000, to: 1300 } };
+  const liveStart = { w: live(300), visible: { from: 3300, to: 3600 } };
+
+  it('zooms a held window about the fingers, keeping the instants under them', () => {
+    // Arrange
+    const [a0, b0, a, b] = [100, 200, 50, 250];
+
+    // Act
+    const w = pinchWindow(heldStart, a0, b0, a, b, width, contact);
+
+    // Assert
+    expect(w).toEqual(heldWindow(1075, 1225));
+  });
+
+  it('zooms a live window about now', () => {
+    // Arrange
+    const [a0, b0, a, b] = [100, 200, 50, 250];
+
+    // Act
+    const w = pinchWindow(liveStart, a0, b0, a, b, width, contact);
+
+    // Assert
+    expect(w).toEqual(live(150));
+  });
+
+  it('pans with the fingers, the content following them', () => {
+    // Arrange
+    const [a0, b0, a, b] = [100, 200, 130, 230];
+
+    // Act
+    const windows = [
+      pinchWindow(heldStart, a0, b0, a, b, width, contact),
+      pinchWindow(liveStart, a0, b0, a, b, width, contact),
+    ];
+
+    // Assert
+    expect(windows).toEqual([heldWindow(970, 1270), heldWindow(3270, 3570)]);
+  });
+
+  it('goes live when the fingers bring a held window to now', () => {
+    // Arrange
+    const start = { w: heldWindow(3300, 3500), visible: { from: 3300, to: 3500 } };
+
+    // Act
+    const w = pinchWindow(start, 100, 200, -50, 50, width, contact);
+
+    // Assert
+    expect(w).toEqual(live(200));
+  });
+
+  it('stays within the minimum and the whole contact', () => {
+    // Arrange
+    const spread = [140, 160, 0, 300] as const;
+    const closed = [0, 300, 140, 160] as const;
+
+    // Act
+    const windows = [spread, closed].map(([a0, b0, a, b]) =>
+      pinchWindow(heldStart, a0, b0, a, b, width, contact),
+    );
+
+    // Assert
+    expect(windows).toEqual([heldWindow(1135, 1165), live(Infinity)]);
   });
 });

@@ -56,6 +56,8 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  /* A finger scrolls the lanes up or down only: sideways it peeks, swipes or pinches, and the page never zooms. */
+  touch-action: pan-y;
   /* A dragged lane reorders the lanes as it scrolls them, which no anchoring is to undo. */
   overflow-anchor: none;
   scrollbar-width: none;
@@ -161,7 +163,6 @@
 /* As tall as the instrument in it, which a finger held on it can pick up and a vertical move scrolls. */
 .instrument {
   display: flow-root;
-  touch-action: pan-y;
 }
 .lane:focus-visible {
   outline: none;
@@ -183,7 +184,6 @@
 .svg {
   display: block;
   width: 100%;
-  touch-action: pan-y;
 }
 /* The lane's only value lines: the top and bottom of its scale. */
 .scale {
@@ -219,8 +219,6 @@
   align-items: center;
   gap: var(--space-2);
   height: var(--lane-top);
-  /* A finger on it scrolls the lanes, swipes the row or, held, drags the lane, as on the plot. */
-  touch-action: pan-y;
   /* A swipe short of removing the lane springs back. */
   transition: transform var(--sheet-ms) var(--sheet-ease);
 }
