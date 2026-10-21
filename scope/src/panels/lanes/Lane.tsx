@@ -78,7 +78,7 @@ export function Lane(props: {
   ticks: readonly number[];
   width: number;
   height: number;
-  /** The sample the lane is read at, and whether it is an earlier one than the latest. */
+  /** The sample the lane is read at, and whether that is off now: peeking, or the window held. */
   at: Sample | null;
   past: boolean;
   /** Where the time cursor stands across the plot, if it does. */
@@ -269,12 +269,7 @@ export function Lane(props: {
           </Index>
         </Show>
         <Show when={props.cursor}>
-          {(px) => (
-            <div
-              class={cx(s.timeCursor, props.past && s.live)}
-              style={{ left: `${px() - 0.5}px` }}
-            />
-          )}
+          {(px) => <div class={s.timeCursor} style={{ left: `${px() - 0.5}px` }} />}
         </Show>
       </div>
       <div class={s.gutter}>

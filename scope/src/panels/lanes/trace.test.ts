@@ -11,7 +11,7 @@ import {
   gapsIn,
   heardAt,
   nearestSample,
-  restSample,
+  newestSample,
   sampleAt,
   type Point,
   rangeOf,
@@ -368,8 +368,8 @@ describe('barbMarks', () => {
   });
 });
 
-describe('restSample', () => {
-  it("rests on the last sample inside the window, current only when it is the contact's latest", () => {
+describe('newestSample', () => {
+  it('is the last sample inside the window, none when it holds none', () => {
     // Arrange
     const samples = [sample(100), sample(110), sample(120), sample(130)];
     const windows = [
@@ -379,14 +379,10 @@ describe('restSample', () => {
     ];
 
     // Act
-    const rests = windows.map((i) => restSample(samples, i));
+    const found = windows.map((i) => newestSample(samples, i));
 
     // Assert
-    expect(rests.map((r) => r && [r.sample.t, r.current])).toEqual([
-      [130, true],
-      [120, false],
-      null,
-    ]);
+    expect(found.map((s) => s?.t)).toEqual([130, 120, undefined]);
   });
 });
 

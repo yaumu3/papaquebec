@@ -36,3 +36,7 @@ export const xOf = (t: number, i: Interval, width: number): number =>
 /** The time at a point across `width`. */
 export const timeAt = (x: number, i: Interval, width: number): number =>
   i.from + (x / width) * (i.to - i.from);
+
+/** Whether the lanes read an instant other than now: while peeking, or with the window held. */
+export const readsPast = (peeking: boolean, w: LanesWindow): boolean =>
+  peeking || w.kind === 'held';

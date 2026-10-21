@@ -5,6 +5,7 @@ import {
   type Interval,
   type LanesWindow,
   MIN_WINDOW_SEC,
+  readsPast,
   resolveWindow,
   timeAt,
   xOf,
@@ -92,5 +93,25 @@ describe('xOf and timeAt', () => {
 
     // Assert
     expect([x, t]).toEqual([75, 1050]);
+  });
+});
+
+describe('readsPast', () => {
+  it('reads the past while peeking or held, the present only live and not peeking', () => {
+    // Arrange
+    const live: LanesWindow = { kind: 'live', sec: 300 };
+    const held: LanesWindow = { kind: 'held', from: 1000, to: 1300 };
+    const rows = [
+      { peeking: false, w: live },
+      { peeking: true, w: live },
+      { peeking: false, w: held },
+      { peeking: true, w: held },
+    ];
+
+    // Act
+    const past = rows.map((r) => readsPast(r.peeking, r.w));
+
+    // Assert
+    expect(past).toEqual([false, true, true, true]);
   });
 });

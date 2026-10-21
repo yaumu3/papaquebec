@@ -24,7 +24,7 @@ import {
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
-import { type Interval, resolveWindow, xOf } from '../../state/window';
+import { type Interval, readsPast, resolveWindow, xOf } from '../../state/window';
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { LANE_LABELS, NONE } from '../readings';
@@ -47,7 +47,7 @@ import { Palette } from './Palette';
 import { readoutOf } from './readout';
 import { type ScrollView, scrollView } from './scroll';
 import { swipeOffset } from './swipe';
-import { restSample, sampleAt } from './trace';
+import { newestSample, sampleAt } from './trace';
 
 import s from './Lanes.module.css';
 
@@ -115,12 +115,10 @@ export function Lanes(props: { track: Track }) {
   });
   // The scope rings the hovered sample on the trail.
   createEffect(on(hover, (h) => setHoverInstant(h?.t ?? null)));
-  /** Where the cursor rests: the last sample in view. */
-  const rest = createMemo(() => restSample(samples(), visible()));
-  /** The sample the lanes are read at: the hovered one, else the one the cursor rests at. */
-  const at = createMemo(() => hover() ?? rest()?.sample ?? null);
-  /** Whether the cursor stands away from the latest sample: hovered, or resting in the past. */
-  const past = () => hover() !== null || rest()?.current === false;
+  /** The sample the lanes are read at: the hovered one, else the newest in view. */
+  const at = createMemo(() => hover() ?? newestSample(samples(), visible()));
+  /** Whether the lanes read an instant other than now. */
+  const past = () => readsPast(hover() !== null, lanesWindow());
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is held, dragged or swiped. */
   const pointerAt = (e: PointerEvent) => {
     const target = e.target instanceof Element ? e.target : null;
@@ -136,9 +134,9 @@ export function Lanes(props: { track: Track }) {
   const chipTextWidth = trackWidth(chipText);
   const [ruler, setRuler] = createSignal<HTMLSpanElement>();
   const rulerWidth = trackWidth(ruler);
-  /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere without a history lane. */
+  /** Where the cursor stands across the plots, mid-pixel and kept whole inside them; nowhere unless hovering a history lane. */
   const cursorX = () => {
-    const a = at();
+    const a = hover();
     return a && historyLanesOf(plotted()).length > 0
       ? clamp(Math.floor(x(a.t)) + 0.5, 0.5, Math.floor(plotWidth()) - 0.5)
       : null;
@@ -326,7 +324,7 @@ export function Lanes(props: { track: Track }) {
             {(a) => (
               <>
                 <span
-                  class={cx(s.chip, past() && s.live)}
+                  class={s.chip}
                   style={{
                     left: `${chipLeft(cursorX() ?? 0)}px`,
                     padding: `0 ${CHIP_PAD_PX}px`,
@@ -337,7 +335,7 @@ export function Lanes(props: { track: Track }) {
                   </span>
                 </span>
                 <svg
-                  class={cx(s.notch, past() && s.live)}
+                  class={s.notch}
                   style={{ left: `${(cursorX() ?? 0) - NOTCH_W_PX / 2}px` }}
                   width={NOTCH_W_PX}
                   height={NOTCH_H_PX}

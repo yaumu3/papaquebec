@@ -269,7 +269,7 @@
   white-space: nowrap;
   pointer-events: none;
 }
-/* A value read at an earlier instant than the latest, hovered or with the window in the past. */
+/* A value read off now: while peeking, or with the window held. */
 .past {
   color: var(--color-selbox);
 }
@@ -411,9 +411,7 @@
 }
 /*
  * The time cursor: a chip on the clock with a notch down to the lanes, and a line through each,
- * in front of its plot and behind its name and readout, over its hairline. At rest it stands at
- * the last sample in view, dim at the latest; it lights up away from it, hovered or with the window
- * in the past.
+ * in front of its plot and behind its name and readout, over its hairline. Only while peeking.
  */
 .chip {
   position: absolute;
@@ -425,7 +423,7 @@
   line-height: calc(var(--chip-height) - 2px);
   border: 1px solid currentColor;
   background: var(--panel-bg);
-  color: var(--text-dim);
+  color: var(--color-selbox);
   white-space: nowrap;
 }
 /* Measured for the chip's width, which an inline box does not report. */
@@ -437,7 +435,7 @@
   top: var(--chip-height);
   z-index: 1;
   fill: currentColor;
-  color: var(--text-dim);
+  color: var(--color-selbox);
 }
 .timeCursor {
   position: absolute;
@@ -445,15 +443,8 @@
   bottom: -1px;
   z-index: 1;
   width: 1px;
-  background: var(--text-dim);
-  pointer-events: none;
-}
-.chip.live,
-.notch.live {
-  color: var(--color-selbox);
-}
-.timeCursor.live {
   background: var(--color-selbox);
+  pointer-events: none;
 }
 /* What the aircraft is set to do. */
 .intent {

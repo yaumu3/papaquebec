@@ -188,17 +188,10 @@ export function sampleAt(
   return nearestSample(samples, timeAt(px, i, width), i);
 }
 
-/** Where the cursor rests: a sample, and whether it is the contact's latest. */
-export interface Rest {
-  sample: Sample;
-  current: boolean;
-}
-
-/** The last sample inside the interval, where the cursor rests; null without any. The samples are oldest first. */
-export function restSample(samples: readonly Sample[], i: Interval): Rest | null {
+/** The last sample inside the interval; null without any. The samples are oldest first. */
+export function newestSample(samples: readonly Sample[], i: Interval): Sample | null {
   const end = countBefore(samples, i.to, true);
-  const sample = end > countBefore(samples, i.from) ? samples[end - 1] : undefined;
-  return sample ? { sample, current: end === samples.length } : null;
+  return end > countBefore(samples, i.from) ? (samples[end - 1] ?? null) : null;
 }
 
 export interface Bar {
