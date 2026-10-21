@@ -75,8 +75,6 @@ export function createLaneDrag(deps: {
 }): {
   drag: Accessor<LaneDrag | null>;
   swipe: Accessor<LaneSwipe | null>;
-  /** Whether a finger rests on a lane, not yet holding it long enough to pick it up. */
-  holding: Accessor<boolean>;
   /** Whether a finger moved sideways along a plot is carrying the cursor. */
   peeking: Accessor<boolean>;
   /** Whether a second finger landing now pinches the window. */
@@ -87,6 +85,7 @@ export function createLaneDrag(deps: {
 } {
   const [drag, setDrag] = createSignal<LaneDrag | null>(null);
   const [swipe, setSwipe] = createSignal<LaneSwipe | null>(null);
+  /** Whether a finger rests on a lane, not yet holding it long enough to pick it up. */
   const [holding, setHolding] = createSignal(false);
   /** Whether a finger's hold has opened the picker, which it still owns until it lifts. */
   const [picking, setPicking] = createSignal(false);
@@ -322,5 +321,5 @@ export function createLaneDrag(deps: {
       },
       heldPart,
     );
-  return { drag, swipe, holding, peeking, pinchable, drop: () => end?.(), grab };
+  return { drag, swipe, peeking, pinchable, drop: () => end?.(), grab };
 }
