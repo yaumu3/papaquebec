@@ -4,6 +4,7 @@ import { STANDARD_ALTIMETER } from '../../../lib/altitude';
 import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
 import {
+  agedBy,
   AROUND_LAPSE,
   FRESH,
   makeSample,
@@ -498,18 +499,14 @@ describe('the ND at a peeked sample', () => {
     makeSample(T, { ...base, heard: { ...heardEvery(T), trackRate: T - LAPSE_SEC } }),
     makeSample(T, { ...base, heard: { ...heardEvery(T), selAlt: T - LAPSE_SEC } }),
   ];
-  const liveOf = (s: (typeof rows)[number]) =>
-    makeSample(T + AGE, {
-      ...s,
-      heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
-    });
-
   it('reads a sample at its own time as a live target whose data has exactly that age', () => {
     // Arrange
-    const expected = rows.map(liveOf).map((r) => {
-      const m = nowAt(r, T + AGE);
-      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
-    });
+    const expected = rows
+      .map((s) => agedBy(s, AGE))
+      .map((r) => {
+        const m = nowAt(r, T + AGE);
+        return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
+      });
 
     // Act
     const peeked = rows.map((r) => {

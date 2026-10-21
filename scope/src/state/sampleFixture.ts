@@ -61,3 +61,9 @@ export const STALE = NOW - LAPSE_SEC;
 
 /** Puts the declination back to none. */
 export const resetDeclination = () => setDeclinationAt(() => () => 0);
+
+/** The sample `s` with every report heard `by` seconds later. */
+export const agedBy = (s: Sample, by: number): Sample => ({
+  ...s,
+  heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + by])),
+});

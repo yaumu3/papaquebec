@@ -5,6 +5,7 @@ import { LAPSE_SEC } from '../../../lib/reports';
 import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
 import {
+  agedBy,
   AROUND_LAPSE,
   FRESH,
   makeSample,
@@ -617,16 +618,12 @@ describe('the instrument at a peeked sample', () => {
         heard: { heading: 1 - LAPSE_SEC + 0.1, track: 1, roll: 1, verticalRate: 1, gs: 1 },
       },
     ].map((over) => makeSample(1, over));
-    const shifted = rows.map((s) =>
-      makeSample(1 + AGE, {
-        ...s,
-        heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
-      }),
-    );
-    const expected = shifted.map((r) => {
-      const m = nowAt(r, 1 + AGE);
-      return { readouts: pfdReadouts(m, STANDARD_ALTIMETER), fma: pfdFma(m, [r]) };
-    });
+    const expected = rows
+      .map((s) => agedBy(s, AGE))
+      .map((r) => {
+        const m = nowAt(r, 1 + AGE);
+        return { readouts: pfdReadouts(m, STANDARD_ALTIMETER), fma: pfdFma(m, [r]) };
+      });
 
     // Act
     const peeked = rows.map((r) => {

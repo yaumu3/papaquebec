@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../../lib/reports';
 import { makeTrack } from '../../../render/scene/trackFixture';
-import { AROUND_LAPSE, makeSample, NOW } from '../../../state/sampleFixture';
+import { agedBy, AROUND_LAPSE, makeSample, NOW } from '../../../state/sampleFixture';
 import { NONE, READINGS } from '../../readings';
 import { nowAt } from '../moment';
 import { survCells } from './cells';
@@ -154,9 +154,7 @@ describe('survCells at a peeked sample', () => {
 
   it('reads a sample at its own time as a live target whose data has exactly that age', () => {
     // Arrange
-    const expected = sampleRows
-      .map((s) => makeSample(T + AGE, { ...s, heard: heardAt((s.heard.nic ?? 0) + AGE) }))
-      .map((r) => survCells(nowAt(r, T + AGE)));
+    const expected = sampleRows.map((s) => agedBy(s, AGE)).map((r) => survCells(nowAt(r, T + AGE)));
 
     // Act
     const peeked = sampleRows.map((r) => survCells({ kind: 'sample', r, instant: r.t }));
