@@ -92,14 +92,14 @@ export function createLaneDrag(deps: {
   /** Whether a finger moved sideways along a plot is carrying the cursor. */
   const [peeking, setPeeking] = createSignal(false);
   let end: (() => void) | null = null;
-  /** The lane a pointer has taken hold of, and where on it, until it lets go. */
-  let held: LaneKey | null = null;
-  let heldPart: LanePart | null = null;
+  /** The lane a pointer has grabbed, and where on it, until it lets go. */
+  let grabbed: LaneKey | null = null;
+  let grabbedPart: LanePart | null = null;
   onCleanup(() => end?.());
   // A lane removed some other way takes the gesture on it with it.
   createEffect(() => {
     const lanes = deps.lanes();
-    if (held !== null && !lanes.includes(held)) end?.();
+    if (grabbed !== null && !lanes.includes(grabbed)) end?.();
   });
   /**
    * Keeps a finger's moves over the lanes from the page: from scrolling them while it drags or
@@ -150,8 +150,8 @@ export function createLaneDrag(deps: {
     // A lane is the first pointer's: another finger's press is left alone.
     if (!e.isPrimary) return;
     end?.();
-    held = lane;
-    heldPart = part;
+    grabbed = lane;
+    grabbedPart = part;
     el.setPointerCapture(e.pointerId);
     const from = deps.lanes().indexOf(lane);
     const x0 = e.clientX;
@@ -293,8 +293,8 @@ export function createLaneDrag(deps: {
       if (peeking()) deps.peek.end();
       setPeeking(false);
       setPicking(false);
-      held = null;
-      heldPart = null;
+      grabbed = null;
+      grabbedPart = null;
       clearTimeout(lift);
       clearTimeout(picker);
       cancelAnimationFrame(frame);
@@ -319,7 +319,7 @@ export function createLaneDrag(deps: {
         swipe: !!swipe(),
         picking: picking(),
       },
-      heldPart,
+      grabbedPart,
     );
   return { drag, swipe, peeking, pinchable, abandon: () => end?.(), grab };
 }
