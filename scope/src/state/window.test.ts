@@ -5,6 +5,7 @@ import {
   DEFAULT_WINDOW,
   goLive,
   holdWindow,
+  keyWindow,
   type Interval,
   type LanesWindow,
   MIN_WINDOW_SEC,
@@ -460,5 +461,76 @@ describe('pinchWindow', () => {
 
     // Assert
     expect(windows).toEqual([heldWindow(1135, 1165), live(Infinity)]);
+  });
+});
+
+describe('keyWindow', () => {
+  const contact: Interval = { from: 0, to: 3600 };
+  const heldStart = heldWindow(1000, 1300);
+  const heldVisible: Interval = { from: 1000, to: 1300 };
+  const liveVisible: Interval = { from: 3300, to: 3600 };
+
+  it('pans a tenth of the window, held back by the left arrow and forward by the right', () => {
+    // Arrange
+    const keys = ['ArrowLeft', 'ArrowRight'] as const;
+
+    // Act
+    const windows = keys.map((k) => keyWindow(k, heldStart, heldVisible, contact));
+
+    // Assert
+    expect(windows).toEqual([heldWindow(970, 1270), heldWindow(1030, 1330)]);
+  });
+
+  it('holds a live window with the left arrow, and leaves it as it is for the right', () => {
+    // Arrange
+    const w = live(300);
+
+    // Act
+    const windows = [
+      keyWindow('ArrowLeft', w, liveVisible, contact),
+      keyWindow('ArrowRight', w, liveVisible, contact),
+    ];
+
+    // Assert
+    expect(windows[0]).toEqual(heldWindow(3270, 3570));
+    expect(windows[1]).toBe(w);
+  });
+
+  it('narrows and widens by a tenth, about the middle when held and about now when live', () => {
+    // Arrange
+    const rows = [
+      { key: 'ArrowUp', w: heldStart, visible: heldVisible },
+      { key: 'ArrowDown', w: heldStart, visible: heldVisible },
+      { key: 'ArrowUp', w: live(300), visible: liveVisible },
+      { key: 'ArrowDown', w: live(300), visible: liveVisible },
+    ] as const;
+
+    // Act
+    const windows = rows.map((r) => keyWindow(r.key, r.w, r.visible, contact));
+
+    // Assert
+    expect(windows).toEqual([heldWindow(1015, 1285), heldWindow(985, 1315), live(270), live(330)]);
+  });
+
+  it('widens a live window to the whole contact at the limit', () => {
+    // Arrange
+    const w = live(3500);
+
+    // Act
+    const next = keyWindow('ArrowDown', w, { from: 100, to: 3600 }, contact);
+
+    // Assert
+    expect(next).toEqual(live(Infinity));
+  });
+
+  it('resets with Home', () => {
+    // Arrange
+    const w = heldStart;
+
+    // Act
+    const next = keyWindow('Home', w, heldVisible, contact);
+
+    // Assert
+    expect(next).toBe(DEFAULT_WINDOW);
   });
 });

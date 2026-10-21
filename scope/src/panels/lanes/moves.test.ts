@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type LaneMoves, onMoveKey, perform } from './moves';
+import { type LaneMoves, onMoveKey, perform, windowKeyOf } from './moves';
 
 /** The moves of a lane at the given end, if any, recording each one made. */
 function moves(end: { first?: boolean; last?: boolean } = {}) {
@@ -65,5 +65,43 @@ describe('onMoveKey', () => {
     // Assert
     expect(made).toEqual(['down']);
     expect(kept).toEqual(['ArrowDown default', 'ArrowDown propagation']);
+  });
+});
+
+describe('windowKeyOf', () => {
+  it('names the arrows and Home without modifiers, and no other key', () => {
+    // Arrange
+    const none = { altKey: false, ctrlKey: false, metaKey: false, shiftKey: false };
+    const rows = [
+      { ...none, key: 'ArrowLeft' },
+      { ...none, key: 'ArrowRight' },
+      { ...none, key: 'ArrowUp' },
+      { ...none, key: 'ArrowDown' },
+      { ...none, key: 'Home' },
+      { ...none, key: 'End' },
+      { ...none, key: 'Delete' },
+      { ...none, key: 'ArrowLeft', altKey: true },
+      { ...none, key: 'ArrowUp', ctrlKey: true },
+      { ...none, key: 'Home', metaKey: true },
+      { ...none, key: 'ArrowRight', shiftKey: true },
+    ];
+
+    // Act
+    const keys = rows.map(windowKeyOf);
+
+    // Assert
+    expect(keys).toEqual([
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowUp',
+      'ArrowDown',
+      'Home',
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
   });
 });

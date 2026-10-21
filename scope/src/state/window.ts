@@ -150,3 +150,29 @@ export function pinchWindow(
   const pinned = visible.from + ((a0 + b0) / 2 / width) * length;
   return settle(pinned - mid * sec, sec, contact);
 }
+
+/** The keys that pan, narrow, widen or reset the window. */
+export type WindowKey = 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Home';
+
+/** The window an arrow key or Home asks for: a tenth of the window to pan or to narrow or widen by, Home the default. */
+export function keyWindow(
+  key: WindowKey,
+  w: LanesWindow,
+  visible: Interval,
+  contact: Interval,
+): LanesWindow {
+  const length = visible.to - visible.from;
+  const middle = (visible.from + visible.to) / 2;
+  switch (key) {
+    case 'ArrowLeft':
+      return panWindow(w, visible, -length / 10, contact);
+    case 'ArrowRight':
+      return panWindow(w, visible, length / 10, contact);
+    case 'ArrowUp':
+      return zoomWindow(w, visible, 0.9, middle, contact);
+    case 'ArrowDown':
+      return zoomWindow(w, visible, 1.1, middle, contact);
+    default:
+      return DEFAULT_WINDOW;
+  }
+}

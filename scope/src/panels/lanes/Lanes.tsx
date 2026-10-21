@@ -28,6 +28,7 @@ import { trackStore } from '../../state/tracks';
 import {
   contactOf,
   DEFAULT_WINDOW,
+  keyWindow,
   readsPast,
   resolveWindow,
   selectWindow,
@@ -374,6 +375,11 @@ export function Lanes(props: { track: Track }) {
                     cursor={cursorX()}
                     band={band()}
                     onReset={reset}
+                    onWindowKey={(key) => {
+                      const w = lanesWindow();
+                      const next = keyWindow(key, w, visible(), contact());
+                      if (next !== w) setLanesWindow(hex(), next);
+                    }}
                     laneRef={(el) => lanes.set(lane, el)}
                     moves={movesOf(lane)}
                     onMenu={(e) => openLaneMenu(lane, e)}

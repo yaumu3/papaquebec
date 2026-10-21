@@ -1,3 +1,4 @@
+import type { WindowKey } from '../../state/window';
 import { reorderKey } from '../../ui/reorder';
 
 /** What can be done to a lane where it stands: moved a place up unless first, down unless last, or removed. */
@@ -26,4 +27,21 @@ export function onMoveKey(
   e.preventDefault();
   e.stopPropagation();
   perform(m, ask);
+}
+
+/** The window key `e` is, if it is pressed without a modifier. */
+export function windowKeyOf(
+  e: Pick<KeyboardEvent, 'key' | 'altKey' | 'ctrlKey' | 'metaKey' | 'shiftKey'>,
+): WindowKey | null {
+  if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return null;
+  switch (e.key) {
+    case 'ArrowLeft':
+    case 'ArrowRight':
+    case 'ArrowUp':
+    case 'ArrowDown':
+    case 'Home':
+      return e.key;
+    default:
+      return null;
+  }
 }

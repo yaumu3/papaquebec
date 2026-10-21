@@ -3,14 +3,14 @@ import { createMemo, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { HistoryLane, ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Interval, xOf } from '../../state/window';
+import { type Interval, type WindowKey, xOf } from '../../state/window';
 import { LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
 import { laneName } from './chips';
 import type { LanePart } from './laneDrag';
 import { isMenuKey } from './menu';
-import { type LaneMoves, onMoveKey } from './moves';
+import { type LaneMoves, onMoveKey, windowKeyOf } from './moves';
 import {
   atTicks,
   barbPath,
@@ -87,6 +87,8 @@ export function Lane(props: {
   band: { from: number; to: number } | null;
   /** Resets the window, as a double click on the lane does. */
   onReset: () => void;
+  /** Pans, narrows, widens or resets the window, as a key on the lane asks. */
+  onWindowKey: (key: WindowKey) => void;
   /** The lane itself, which keeps the focus for it. */
   laneRef: (el: HTMLDivElement) => void;
   moves: LaneMoves;
@@ -180,8 +182,13 @@ export function Lane(props: {
       aria-label={laneName(props.lane, props.index, props.count)}
       onKeyDown={(e) => {
         if (e.target !== e.currentTarget) return;
+        const key = windowKeyOf(e);
         if (isMenuKey(e)) props.onMenu(e);
-        else onMoveKey(props.moves, e);
+        else if (key) {
+          e.preventDefault();
+          e.stopPropagation();
+          props.onWindowKey(key);
+        } else onMoveKey(props.moves, e);
       }}
       onContextMenu={props.onMenu}
       onDblClick={props.onReset}
