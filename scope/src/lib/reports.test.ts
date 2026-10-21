@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import { AROUND_LAPSE } from '../state/sampleFixture';
 import type { HeardKey } from './aircraft';
-import { holds, LAPSE_SEC, oldestHeard, withinLapse } from './reports';
+import { holds, oldestHeard, withinLapse } from './reports';
 
 describe('holds', () => {
   it('holds while the report is younger than the lapse, and never without one', () => {
@@ -44,7 +45,7 @@ describe('oldestHeard', () => {
 describe('withinLapse', () => {
   it('is true under the lapse apart, either way round, and false at it or beyond', () => {
     // Arrange
-    const gaps = [LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const gaps = AROUND_LAPSE;
 
     // Act
     const out = gaps.flatMap((gap) => [withinLapse(100, 100 + gap), withinLapse(100 + gap, 100)]);

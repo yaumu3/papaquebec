@@ -1,5 +1,13 @@
 import type { Heard } from '../lib/aircraft';
+import { LAPSE_SEC } from '../lib/reports';
 import type { Sample } from './track';
+import type { Interval } from './window';
+
+/** The ages a lapse's edge is tested at: just under it, exactly at it and just over it. */
+export const AROUND_LAPSE = [LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+
+/** A window holding every test sample. */
+export const ALL: Interval = { from: 0, to: 10_000 };
 
 /** A sample at `t` with no reading but those given. */
 export function makeSample(t: number, over: Partial<Sample> = {}): Sample {

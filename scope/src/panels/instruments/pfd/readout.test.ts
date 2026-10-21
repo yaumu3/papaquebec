@@ -4,7 +4,7 @@ import { STANDARD_ALTIMETER, qnhAltitudeFt } from '../../../lib/altitude';
 import { LAPSE_SEC } from '../../../lib/reports';
 import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
-import { makeSample } from '../../../state/sampleFixture';
+import { AROUND_LAPSE, makeSample } from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
 import { nowAt } from '../moment';
 import {
@@ -387,7 +387,7 @@ describe('pfdReadouts altitude', () => {
 
   it('flags the altitude from the lapse on, not before', () => {
     // Arrange
-    const ages = [20, LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const ages = [20, ...AROUND_LAPSE];
     const targets = ages.map((age) => makeSample(NOW, { alt: 37000, heard: { alt: NOW - age } }));
 
     // Act

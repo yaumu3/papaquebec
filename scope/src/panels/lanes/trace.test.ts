@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../lib/reports';
-import { makeSample as sample } from '../../state/sampleFixture';
+import { ALL, AROUND_LAPSE, makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
-import type { Interval } from '../../state/window';
 import {
   barbMarks,
   barsOf,
@@ -18,12 +17,11 @@ import {
 } from './trace';
 
 const gs = (s: Sample) => s.gs;
-const ALL: Interval = { from: 0, to: 10_000 };
 
 describe('runsOf', () => {
   it('breaks a run between samples exactly the lapse apart, not just under it', () => {
     // Arrange
-    const rows = [29.9, 30, 30.1].map((d) => [
+    const rows = AROUND_LAPSE.map((d) => [
       sample(1000, { gs: 250 }),
       sample(1000 + d, { gs: 251 }),
     ]);
@@ -91,7 +89,7 @@ describe('runsOf', () => {
 describe('runsOf with the instants a reading is heard at', () => {
   it('breaks a run where the reading went unheard exactly the lapse, not just under it', () => {
     // Arrange
-    const rows = [29.9, 30, 30.1].map((d) => [
+    const rows = AROUND_LAPSE.map((d) => [
       sample(1000, { gs: 250, heard: { gs: 1000 } }),
       sample(1001, { gs: 251, heard: { gs: 1000 + d } }),
     ]);
@@ -263,7 +261,7 @@ describe('gapsIn', () => {
 
   it('leaves a gap between samples exactly the lapse apart, not ones just under it', () => {
     // Arrange
-    const spacings = [29.9, 30, 30.1];
+    const spacings = AROUND_LAPSE;
 
     // Act
     const gaps = spacings.map((d) => gapsIn([sample(1000), sample(1000 + d)], ALL));

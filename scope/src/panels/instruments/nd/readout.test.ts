@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { STANDARD_ALTIMETER } from '../../../lib/altitude';
 import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
-import { makeSample } from '../../../state/sampleFixture';
+import { AROUND_LAPSE, makeSample } from '../../../state/sampleFixture';
 import { readoutOf } from '../../lanes/readout';
 import { nowAt } from '../moment';
 import { boxOf, ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
@@ -205,7 +205,7 @@ describe('ndReadouts', () => {
 
   it('holds the selected heading exactly where the SEL HDG lane reads it', () => {
     // Arrange
-    const rows = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].flatMap((age) =>
+    const rows = AROUND_LAPSE.flatMap((age) =>
       [5, 45].map((modesAge) =>
         makeSample(NOW, {
           seen: 1,
@@ -521,7 +521,7 @@ describe('the ND at a peeked sample', () => {
 
   it('drops the heading pointer exactly where the HDG lane reads a dash', () => {
     // Arrange
-    const samples = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].map((age) =>
+    const samples = AROUND_LAPSE.map((age) =>
       makeSample(T, { ...base, heard: { ...heardEvery(T), heading: T - age } }),
     );
 

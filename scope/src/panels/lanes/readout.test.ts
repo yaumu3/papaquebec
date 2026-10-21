@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../lib/reports';
-import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
+import {
+  AROUND_LAPSE,
+  makeHeardSample as heardSample,
+  makeSample as sample,
+} from '../../state/sampleFixture';
 import { altTargets, heldIntents, readoutOf, readoutSlots, shownReadout } from './readout';
 
 describe('altTargets', () => {
@@ -164,7 +168,7 @@ describe('readoutOf', () => {
 describe('readoutOf, for readings heard a gap before the cursor', () => {
   it('reads a reading heard exactly the lapse before the cursor as unknown, not one just under it', () => {
     // Arrange
-    const rows = [29.9, 30, 30.1].map((d) => sample(1000, { gs: 290, heard: { gs: 1000 - d } }));
+    const rows = AROUND_LAPSE.map((d) => sample(1000, { gs: 290, heard: { gs: 1000 - d } }));
 
     // Act
     const readouts = rows.map((s) => readoutOf(['gs'], s));

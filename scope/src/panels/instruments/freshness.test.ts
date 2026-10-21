@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from '../../lib/aircraft';
 import { LAPSE_SEC } from '../../lib/reports';
+import { AROUND_LAPSE } from '../../state/sampleFixture';
 import { eachHolds, holdsAll, ifHolds, isLost } from './freshness';
 
 const NOW = 1000;
@@ -9,7 +10,7 @@ const NOW = 1000;
 describe('holdsAll', () => {
   it('holds a key heard under the lapse ago, not at it or beyond', () => {
     // Arrange
-    const ages = [20, LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const ages = [20, ...AROUND_LAPSE];
 
     // Act
     const out = ages.map((age) => holdsAll({ heard: { gs: NOW - age } }, ['gs'], NOW));
@@ -81,7 +82,7 @@ describe('ifHolds', () => {
 describe('isLost', () => {
   it('is lost from LAPSE_SEC since the last message', () => {
     // Arrange
-    const seen = [LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const seen = AROUND_LAPSE;
 
     // Act
     const out = seen.map((s) => isLost({ seen: s }));

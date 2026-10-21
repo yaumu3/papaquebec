@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../../lib/reports';
 import { makeTrack } from '../../../render/scene/trackFixture';
-import { makeSample } from '../../../state/sampleFixture';
+import { AROUND_LAPSE, makeSample } from '../../../state/sampleFixture';
 import { NONE, READINGS } from '../../readings';
 import { nowAt } from '../moment';
 import { survCells } from './cells';
@@ -65,7 +65,7 @@ describe('survCells', () => {
 
   it('lapses NIC and NACP from the lapse on, as their lanes do', () => {
     // Arrange
-    const ages = [29.9, 30, 30.1];
+    const ages = AROUND_LAPSE;
 
     // Act
     const out = ages.map((age) =>
@@ -93,7 +93,7 @@ describe('survCells', () => {
 
   it('dims the position once it is as old as the lapse', () => {
     // Arrange
-    const ages = [29.9, 30, 30.1];
+    const ages = AROUND_LAPSE;
 
     // Act
     const dims = ages.map((seenPos) => cellsOf({ seenPos }).find((c) => c.key === 'pos')?.dim);

@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
 import { LAPSE_SEC } from '../../lib/reports';
-import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
-import type { Interval } from '../../state/window';
+import {
+  ALL,
+  AROUND_LAPSE,
+  makeHeardSample as heardSample,
+  makeSample as sample,
+} from '../../state/sampleFixture';
 import {
   atTicks,
   barbPath,
@@ -17,8 +21,6 @@ import {
   snapped,
 } from './plot';
 import type { Point, Range } from './trace';
-
-const ALL: Interval = { from: 0, to: 10_000 };
 
 /** The metres a power of ten stands for, to six figures. */
 const metres = (v: number) => Number((10 ** v).toPrecision(6));
@@ -248,7 +250,7 @@ describe('laneTraces on the ground', () => {
 describe('atTicks', () => {
   it('reads a sample under the lapse from the tick, none exactly the lapse or more', () => {
     // Arrange
-    const rows = [29.9, 30, 30.1].map((d) => [sample(1000 + d, { windDir: 300, windSpeed: 12 })]);
+    const rows = AROUND_LAPSE.map((d) => [sample(1000 + d, { windDir: 300, windSpeed: 12 })]);
     const read = (s: (typeof rows)[number][number]) => ({
       dir: s.windDir ?? 0,
       speed: s.windSpeed ?? 0,
