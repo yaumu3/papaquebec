@@ -138,7 +138,7 @@ describe('modeChangedAt', () => {
     ];
 
     // Act
-    const out = modeChangedAt(samples, 'vertical');
+    const out = modeChangedAt(samples, 'vertical', Infinity);
 
     // Assert
     expect(out).toBe(100);
@@ -149,7 +149,10 @@ describe('modeChangedAt', () => {
     const samples = [reporting(90, ['vnav']), reporting(100, ['vnav'])];
 
     // Act
-    const out = [modeChangedAt(samples, 'vertical'), modeChangedAt(samples, 'lateral')];
+    const out = [
+      modeChangedAt(samples, 'vertical', Infinity),
+      modeChangedAt(samples, 'lateral', Infinity),
+    ];
 
     // Assert
     expect(out).toEqual([undefined, undefined]);
@@ -164,7 +167,7 @@ describe('modeChangedAt', () => {
     ];
 
     // Act
-    const out = modeChangedAt(samples, 'vertical');
+    const out = modeChangedAt(samples, 'vertical', Infinity);
 
     // Assert
     expect(out).toBeUndefined();
@@ -172,6 +175,23 @@ describe('modeChangedAt', () => {
 });
 
 describe('pfdFma boxes', () => {
+  it('boxes only by the changes up to the peeked sample', () => {
+    // Arrange
+    const samples = [90, 100, 105, 109.9, 110, 110.1, 120].map((t) =>
+      reporting(t, t < 120 ? ['lnav', 'vnav'] : ['lnav', 'althold']),
+    );
+    samples[0] = reporting(90, ['lnav', 'althold']);
+    const peeked = samples.slice(2, 6);
+
+    // Act
+    const out = peeked.map(
+      (r) => pfdFma({ kind: 'sample', r, instant: r.t }, samples).boxed.vertical,
+    );
+
+    // Assert
+    expect(out).toEqual([true, true, false, false]);
+  });
+
   it('boxes a column for 10 s after its text changed, and only that column', () => {
     // Arrange
     const t = targetOf(
@@ -545,5 +565,99 @@ describe('pfdReadouts vertical rate', () => {
 
     // Assert
     expect(out).toEqual([-2200, undefined, undefined, undefined]);
+  });
+});
+
+describe('the instrument at a peeked sample', () => {
+  it('reads a sample at its own time as a live target whose data has exactly that age', () => {
+    // Arrange
+    const AGE = 200;
+    const rows = [
+      {
+        ias: 250,
+        roll: -5,
+        alt: 12000,
+        verticalRate: 500,
+        gs: 300,
+        heard: { ias: 1, roll: 1, alt: 1, verticalRate: 1, gs: 1, navModes: 1 },
+      },
+      {
+        ias: 250,
+        roll: -5,
+        alt: 12000,
+        verticalRate: 500,
+        gs: 300,
+        heard: {
+          ias: 1 - LAPSE_SEC,
+          roll: 1,
+          alt: 1 - LAPSE_SEC,
+          verticalRate: 1,
+          gs: 1,
+          navModes: 1 - LAPSE_SEC,
+        },
+      },
+      {
+        ias: 250,
+        roll: -5,
+        alt: 12000,
+        verticalRate: 500,
+        gs: 300,
+        navModes: ['lnav'],
+        heard: { ias: 1, roll: 1, alt: 1, verticalRate: 1, gs: 1, navModes: 1 },
+      },
+      {
+        ias: 250,
+        heading: 90,
+        track: 100,
+        roll: -5,
+        verticalRate: 500,
+        gs: 300,
+        heard: { heading: 1 - LAPSE_SEC + 0.1, track: 1, roll: 1, verticalRate: 1, gs: 1 },
+      },
+    ].map((over) => makeSample(1, over));
+    const shifted = rows.map((s) =>
+      makeSample(1 + AGE, {
+        ...s,
+        heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
+      }),
+    );
+
+    // Act
+    const peeked = rows.map((r) =>
+      pfdReadouts({ kind: 'sample', r, instant: r.t }, STANDARD_ALTIMETER),
+    );
+    const live = shifted.map((r) => pfdReadouts(nowAt(r, 1 + AGE), STANDARD_ALTIMETER));
+
+    // Assert
+    expect(peeked).toEqual(live);
+  });
+
+  it('shows nothing, and no annunciator, for the empty moment', () => {
+    // Arrange
+    const empty = { kind: 'empty' } as const;
+
+    // Act
+    const out = { readouts: pfdReadouts(empty, STANDARD_ALTIMETER), fma: pfdFma(empty, []) };
+
+    // Assert
+    expect(out).toEqual({
+      readouts: {
+        ias: undefined,
+        mach: '',
+        roll: undefined,
+        fpv: undefined,
+        altitude: { kind: 'flag' },
+        selAlt: undefined,
+        fmsAlt: undefined,
+        baro: '',
+        vs: undefined,
+      },
+      fma: {
+        lateral: undefined,
+        vertical: undefined,
+        ap: false,
+        boxed: { lateral: false, vertical: false },
+      },
+    });
   });
 });

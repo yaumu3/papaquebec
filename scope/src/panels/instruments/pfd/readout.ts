@@ -46,9 +46,13 @@ export const fmaColumns = (modes: readonly string[]): FmaColumns => ({
  * none for a text present since the first sample, or none at all. Only the samples whose modes
  * were fresh at their own time count: a gap in the reports is not a change.
  */
-export function modeChangedAt(samples: readonly Sample[], column: FmaColumn): number | undefined {
+export function modeChangedAt(
+  samples: readonly Sample[],
+  column: FmaColumn,
+  instant: number,
+): number | undefined {
   const counted = samples.filter(
-    (s) => s.navModes !== undefined && holds(s.heard.navModes, s.t, LAPSE_SEC),
+    (s) => s.t <= instant && s.navModes !== undefined && holds(s.heard.navModes, s.t, LAPSE_SEC),
   );
   const text = (s: Sample | undefined) => fmaColumns(s?.navModes ?? [])[column];
   const current = text(counted.at(-1));
@@ -72,13 +76,15 @@ const EMPTY_FMA: PfdFma = {
 };
 
 /** What the annunciator shows: nothing once the target is lost or while its modes do not hold. */
-export function pfdFma({ r: t, instant }: Moment<Readout>, samples: readonly Sample[]): PfdFma {
+export function pfdFma(m: Moment<Readout>, samples: readonly Sample[]): PfdFma {
+  if (m.kind === 'empty') return EMPTY_FMA;
+  const { r: t, instant } = m;
   const modes = t.navModes;
   if (isLost(t) || modes === undefined || !holdsAll(t, ['navModes'], instant)) return EMPTY_FMA;
   const columns = fmaColumns(modes);
   const boxed = (column: FmaColumn) =>
     columns[column] !== undefined &&
-    holds(modeChangedAt(samples, column), instant, MODE_CHANGE_SEC);
+    holds(modeChangedAt(samples, column, instant), instant, MODE_CHANGE_SEC);
   return {
     ...columns,
     ap: modes.includes('autopilot'),
@@ -164,8 +170,22 @@ const liveValue = (
 const asSet = (ft: number | undefined): number | undefined =>
   ft === undefined ? undefined : selectedFt(ft);
 
-/** The values of the instrument, each while its keys hold and the target is not lost. */
-export function pfdReadouts({ r: t, instant }: Moment<Readout>, altimeter: Altimeter): PfdReadouts {
+const EMPTY_READOUTS: PfdReadouts = {
+  ias: undefined,
+  mach: '',
+  roll: undefined,
+  fpv: undefined,
+  altitude: { kind: 'flag' },
+  selAlt: undefined,
+  fmsAlt: undefined,
+  baro: '',
+  vs: undefined,
+};
+
+/** The values of the instrument, each while its keys hold and the target is not lost; none over a gap. */
+export function pfdReadouts(m: Moment<Readout>, altimeter: Altimeter): PfdReadouts {
+  if (m.kind === 'empty') return EMPTY_READOUTS;
+  const { r: t, instant } = m;
   const ias = liveValue(t, 'ias', instant);
   const mach = liveValue(t, 'mach', instant);
   const roll = liveValue(t, 'roll', instant);

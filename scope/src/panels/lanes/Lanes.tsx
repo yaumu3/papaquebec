@@ -39,6 +39,7 @@ import {
 import { placeOf } from '../../ui/reorder';
 import { trackWidth } from '../../ui/size';
 import { isLost } from '../instruments/freshness';
+import { momentOf } from '../instruments/moment';
 import { LANE_LABELS, NONE } from '../readings';
 import { axisStep, ticks } from './axis';
 import { pickOf } from './chips';
@@ -148,6 +149,10 @@ export function Lanes(props: { track: Track }) {
   });
   /** Whether the lanes read an instant other than now. */
   const past = () => readsPast(peek() !== null, lanesWindow());
+  /** What the instruments draw at the cursor. */
+  const moment = createMemo(() =>
+    momentOf(props.track, peek() !== null, at(), trackStore.stats.now),
+  );
   /** Hovers the instant under the pointer, none off the history lanes, over the gutter or while a lane is dragged or swiped; a finger only peeks. */
   const pointerAt = (e: PointerEvent) => {
     const el = e.target instanceof Element ? e.target.closest('[data-lane="history"]') : null;
@@ -374,6 +379,7 @@ export function Lanes(props: { track: Track }) {
                   <InstrumentLane
                     lane={lane}
                     track={props.track}
+                    moment={moment()}
                     index={i()}
                     count={plotted().length}
                     laneRef={(el) => lanes.set(lane, el)}

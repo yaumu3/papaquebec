@@ -3,13 +3,12 @@ import { createMemo, createSignal, Show } from 'solid-js';
 import { cx } from '../../../design/cx';
 import { settings } from '../../../state/settings';
 import type { Track } from '../../../state/track';
-import { trackStore } from '../../../state/tracks';
 import { trackWidth } from '../../../ui/size';
-import { isLost } from '../freshness';
 import { glided } from '../glide';
-import { nowAt } from '../moment';
+import { lostAt, type Moment, momentKey } from '../moment';
 import { AltitudeMarks, AltitudeText, altitudeView, targetOf } from './AltitudeTape';
 import { AttitudeMarks, AttitudeText, attitudeView } from './Attitude';
+import { FlagsShown } from './Flag';
 import { FmaMarks, FmaText } from './Fma';
 import { pfdGeometry, vsiScale } from './geometry';
 import { feetOf, pfdFma, pfdReadouts } from './readout';
@@ -19,15 +18,14 @@ import { needleView, VsiMarks, VsiText } from './Vsi';
 import s from './Pfd.module.css';
 
 /** The primary flight display of a target: its modes, speed, attitude, altitude and vertical speed. */
-export function Pfd(props: { t: Track }) {
+export function Pfd(props: { t: Track; moment: Moment }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
   const width = trackWidth(root);
   const g = createMemo(() => pfdGeometry(width()));
-  const lost = createMemo(() => isLost(props.t));
-  const moment = createMemo(() => nowAt(props.t, trackStore.stats.now));
-  const r = createMemo(() => pfdReadouts(moment(), settings.altimeter));
-  const fma = createMemo(() => pfdFma(moment(), props.t.samples));
-  const key = () => props.t.hex;
+  const lost = createMemo(() => lostAt(props.moment));
+  const r = createMemo(() => pfdReadouts(props.moment, settings.altimeter));
+  const fma = createMemo(() => pfdFma(props.moment, props.t.samples));
+  const key = () => `${props.t.hex}/${momentKey(props.moment)}`;
   const ias = glided(() => r().ias, { key });
   const feet = glided(() => feetOf(r().altitude), { key });
   const vs = glided(() => r().vs, { key });
@@ -53,16 +51,18 @@ export function Pfd(props: { t: Track }) {
           <VsiMarks g={g()} scale={scale()} needle={needle()} />
           <FmaMarks g={g()} />
         </svg>
-        <AttitudeText g={g()} view={attitude()} />
-        <SpeedText g={g()} view={speed()} mach={r().mach} />
-        <AltitudeText
-          g={g()}
-          read={r().altitude}
-          view={altitude()}
-          sel={sel()}
-          fms={fms()}
-          baro={r().baro}
-        />
+        <FlagsShown when={props.moment.kind !== 'empty'}>
+          <AttitudeText g={g()} view={attitude()} />
+          <SpeedText g={g()} view={speed()} mach={r().mach} />
+          <AltitudeText
+            g={g()}
+            read={r().altitude}
+            view={altitude()}
+            sel={sel()}
+            fms={fms()}
+            baro={r().baro}
+          />
+        </FlagsShown>
         <VsiText scale={scale()} needle={needle()} />
         <FmaText g={g()} fma={fma()} />
       </Show>

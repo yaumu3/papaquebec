@@ -8,7 +8,7 @@ import type { Readout } from '../../../state/track';
 import { HEARD } from '../../lanes/plots';
 import { NONE, type Reading, READINGS } from '../../readings';
 import { holdsAll, isLost } from '../freshness';
-import type { Moment } from '../moment';
+import type { Present } from '../moment';
 import type { Trend } from './geometry';
 
 /** The state of the instrument: track-up, lost, or blank for want of a track that holds. */
@@ -28,7 +28,7 @@ export interface NdFrame {
 const BLANK_BOX = '---';
 
 /** The mode the instrument is in: track-up while the magnetic track holds. */
-function modeOf({ r: t, instant }: Moment<Readout>): NdMode {
+function modeOf({ r: t, instant }: Present<Readout>): NdMode {
   if (isLost(t)) return 'lost';
   if (holds(t.heard.track, instant, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
@@ -48,7 +48,7 @@ export const boxOf = (mode: NdMode, orient: number): string =>
   mode === 'track' ? padBearing(orient) : BLANK_BOX;
 
 /** What the top of the ND reads, and the flags beside it, from the freshness of the target's readings. */
-export function ndFrame(m: Moment<Readout>): NdFrame {
+export function ndFrame(m: Present<Readout>): NdFrame {
   const t = m.r;
   const mode = modeOf(m);
   const orient = orientOf(t);
@@ -85,7 +85,7 @@ const shown = (r: Reading, withUnit = false): string | undefined =>
   r === NONE ? undefined : `${r.v}${withUnit ? (r.unit ?? '') : ''}`;
 
 /** The corners of the ND: each value on its own freshness, all blank once the target is lost. */
-export function ndReadouts({ r: t, instant }: Moment<Readout>): NdReadouts {
+export function ndReadouts({ r: t, instant }: Present<Readout>): NdReadouts {
   const lost = isLost(t);
   const read = (keys: readonly HeardKey[], text: () => string | undefined, degree = false) => {
     const fresh = !lost && holdsAll(t, keys, instant);
@@ -127,7 +127,7 @@ export interface NdSymbols {
 const TREND_MIN_RATE_DEG_S = 0.3;
 
 /** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
-export function ndSymbols(m: Moment<Readout>, altimeter: Altimeter): NdSymbols {
+export function ndSymbols(m: Present<Readout>, altimeter: Altimeter): NdSymbols {
   if (modeOf(m) !== 'track') return {};
   const { r: t, instant } = m;
   const live = (keys: readonly HeardKey[], v: number | undefined) =>

@@ -1,15 +1,43 @@
-import type { Readout, Track } from '../../state/track';
+import type { Readout, Sample, Track } from '../../state/track';
+import { isLost } from './freshness';
 
-/** What the instruments draw: a target's readings and the instant their freshness is judged at. */
-export interface Moment<R extends Readout = Track> {
+/** The target as it is now. */
+export interface Now<R extends Readout = Track> {
   kind: 'now';
   r: R;
+  /** When freshness is judged: the snapshot's time. */
   instant: number;
 }
 
+/** A sample drawn at its own time. */
+export interface Then {
+  kind: 'sample';
+  r: Sample;
+  instant: number;
+}
+
+/** What the instruments draw: the target now, a sample while peeking, or nothing over a gap. */
+export type Moment<R extends Readout = Track> = Now<R> | Then | { kind: 'empty' };
+
+/** A moment with a target to read, for the instruments that do not yet draw the empty one. */
+export type Present<R extends Readout = Track> = Now<R> | Then;
+
 /** The target as it is `now`. */
-export const nowAt = <R extends Readout>(r: R, now: number): Moment<R> => ({
+export const nowAt = <R extends Readout>(r: R, now: number): Now<R> => ({
   kind: 'now',
   r,
   instant: now,
 });
+
+/** What the target draws: now unless the panel reads the past; then the sample the lanes read, at its own time, or nothing without one. */
+export function momentOf(t: Track, past: boolean, at: Sample | null, now: number): Moment {
+  if (!past) return nowAt(t, now);
+  return at ? { kind: 'sample', r: at, instant: at.t } : { kind: 'empty' };
+}
+
+/** Which moment is drawn, apart from its values: the same for every update of now, one per sample. */
+export const momentKey = (m: Moment<Readout>): string =>
+  m.kind === 'now' ? 'now' : m.kind === 'sample' ? String(m.r.t) : 'empty';
+
+/** Whether the instrument has lost the target at this moment; the empty moment shows no target to lose. */
+export const lostAt = (m: Moment<Readout>): boolean => m.kind !== 'empty' && isLost(m.r);

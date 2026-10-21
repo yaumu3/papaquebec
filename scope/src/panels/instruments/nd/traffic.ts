@@ -6,7 +6,7 @@ import { magneticBearing } from '../../../state/magnetic';
 import type { Position, Track } from '../../../state/track';
 import { holdsAll } from '../freshness';
 import type { Point } from '../glide';
-import type { Moment } from '../moment';
+import type { Now } from '../moment';
 import { type NdGeometry, ndPoint, onArc, pxOf } from './geometry';
 import { type NdFrame } from './readout';
 
@@ -350,7 +350,7 @@ function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol 
 
 /** The traffic the display draws around own ship, none on a lost or blank display. */
 export function ndTraffic(
-  { r: own, instant: now }: Moment,
+  { r: own, instant: now }: Now,
   others: Iterable<Track>,
   view: NdView,
 ): NdTraffic {
