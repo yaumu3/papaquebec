@@ -4,7 +4,7 @@ import { cx } from '../../design/cx';
 import type { HistoryLane, ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import { type Interval, type WindowKey, xOf } from '../../state/window';
-import { LANE_LABELS, NONE } from '../readings';
+import { HEARD, LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
 import { laneName } from './chips';
@@ -25,7 +25,7 @@ import {
   pathOf,
   scaleLabels,
 } from './plot';
-import { type Dash, HEARD, PLOTS } from './plots';
+import { type Dash, PLOTS } from './plots';
 import { heldIntents, type LaneReadout, readoutSlots, shownReadout, type Slot } from './readout';
 import { barsOf, yOf } from './trace';
 

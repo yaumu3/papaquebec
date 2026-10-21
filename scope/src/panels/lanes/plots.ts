@@ -1,5 +1,4 @@
 import { epuM } from '../../lib/accuracy';
-import type { HeardKey } from '../../lib/aircraft';
 import { crewAltitudeFt } from '../../lib/altitude';
 import { steeringHeading } from '../../lib/autopilot';
 import { modeNames, sourceName } from '../../lib/format';
@@ -114,30 +113,4 @@ export const PLOTS: Record<ReadingKey, PlotSpec> = {
     dash: 'dashed',
     quantum: 1,
   },
-};
-
-/** The values each reading is made of, by the instants they are heard at; none for the reception's own. */
-export const HEARD: Record<ReadingKey, readonly HeardKey[]> = {
-  alt: ['alt'],
-  selAlt: ['selAlt'],
-  fmsAlt: ['fmsAlt'],
-  vs: ['verticalRate'],
-  trk: ['track', 'heading'],
-  selHdg: ['selHeading'],
-  roll: ['roll'],
-  gs: ['gs'],
-  qnh: ['navQnh'],
-  modes: ['navModes'],
-  ias: ['ias'],
-  tas: ['tas'],
-  mach: ['mach'],
-  wind: ['windSpeed', 'windDir'],
-  oat: ['oat'],
-  tat: ['tat'],
-  nic: ['nic', 'rc'],
-  nacp: ['nacP'],
-  src: [],
-  rssi: [],
-  msgs: [],
-  age: [],
 };

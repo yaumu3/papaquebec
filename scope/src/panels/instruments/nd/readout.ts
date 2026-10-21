@@ -4,8 +4,7 @@ import { steeringHeading } from '../../../lib/autopilot';
 import { padBearing } from '../../../lib/format';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
-import { HEARD } from '../../lanes/plots';
-import { NONE, type Reading, READINGS } from '../../readings';
+import { HEARD, NONE, type Reading, READINGS } from '../../readings';
 import { holdsAll, ifHolds, isLost } from '../freshness';
 import type { Moment } from '../moment';
 import type { Trend } from './geometry';
@@ -117,13 +116,13 @@ export function ndReadouts(m: Moment<Readout>): NdReadouts {
       : `${padBearing(from)}°/${Math.round(t.windSpeed)}`;
   };
   return {
-    gs: read(['gs'], shown(READINGS.gs.format(t))),
-    tas: read(['tas'], shown(READINGS.tas.format(t))),
-    wind: read(['windDir', 'windSpeed'], wind()),
+    gs: read(HEARD.gs, shown(READINGS.gs.format(t))),
+    tas: read(HEARD.tas, shown(READINGS.tas.format(t))),
+    wind: read(HEARD.wind, wind()),
     sel: read(HEARD.selHdg, degrees(steeringHeading(t)), true),
     hdg: read(['heading'], degrees(t.heading), true),
-    tat: read(['tat'], shown(READINGS.tat.format(t), true)),
-    sat: read(['oat'], shown(READINGS.oat.format(t), true)),
+    tat: read(HEARD.tat, shown(READINGS.tat.format(t), true)),
+    sat: read(HEARD.oat, shown(READINGS.oat.format(t), true)),
   };
 }
 
@@ -156,7 +155,7 @@ export function ndSymbols(m: Moment<Readout>, altimeter: Altimeter): NdSymbols {
     sel: ifHolds(t, HEARD.selHdg, instant, steeringHeading(t)),
     trend: trendOf(t, instant),
     levelOffNm: levelOffOf(t, instant, altimeter),
-    windFrom: ifHolds(t, ['windDir', 'windSpeed'], instant, windFromOf(t)),
+    windFrom: ifHolds(t, HEARD.wind, instant, windFromOf(t)),
   };
 }
 

@@ -1,4 +1,5 @@
 import { epuM } from '../lib/accuracy';
+import type { HeardKey } from '../lib/aircraft';
 import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
 import { steeringHeading } from '../lib/autopilot';
 import {
@@ -159,6 +160,32 @@ export const READINGS: Record<ReadingKey, ReadingSpec> = {
   rssi: { label: 'RSSI', format: (r) => dB(r.rssi), value: dB },
   msgs: { label: 'MSGS', format: (r) => perSecond(r.messageRate), value: perSecond },
   age: { label: 'SEEN / POS', format: ageReading, value: (v) => ({ v: formatAge(v), unit: 's' }) },
+};
+
+/** The values each reading is made of, by the instants they are heard at; none for the reception's own. */
+export const HEARD: Record<ReadingKey, readonly HeardKey[]> = {
+  alt: ['alt'],
+  selAlt: ['selAlt'],
+  fmsAlt: ['fmsAlt'],
+  vs: ['verticalRate'],
+  trk: ['track', 'heading'],
+  selHdg: ['selHeading'],
+  roll: ['roll'],
+  gs: ['gs'],
+  qnh: ['navQnh'],
+  modes: ['navModes'],
+  ias: ['ias'],
+  tas: ['tas'],
+  mach: ['mach'],
+  wind: ['windSpeed', 'windDir'],
+  oat: ['oat'],
+  tat: ['tat'],
+  nic: ['nic', 'rc'],
+  nacp: ['nacP'],
+  src: [],
+  rssi: [],
+  msgs: [],
+  age: [],
 };
 
 /** What each lane of an instrument is called. */

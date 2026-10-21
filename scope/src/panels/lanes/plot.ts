@@ -7,9 +7,9 @@ import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
 import type { Interval } from '../../state/window';
-import { type Reading, READINGS } from '../readings';
+import { HEARD, type Reading, READINGS } from '../readings';
 import { fixed, offset, toward } from '../svg';
-import { type Dash, HEARD, type Heading, PLOTS } from './plots';
+import { type Dash, type Heading, PLOTS } from './plots';
 import { barbMarks, heardNear, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
 
 export interface LaneTrace {

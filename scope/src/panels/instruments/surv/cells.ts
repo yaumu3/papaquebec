@@ -1,7 +1,7 @@
 import { isStale } from '../../../render/scene/rules';
 import type { Readout } from '../../../state/track';
-import { HEARD } from '../../lanes/plots';
-import { NONE, POSITION_LABEL, positionReading, type Reading, READINGS } from '../../readings';
+import { HEARD, NONE, POSITION_LABEL, positionReading, READINGS } from '../../readings';
+import type { Reading } from '../../readings';
 import { holdsAll } from '../freshness';
 import type { Moment } from '../moment';
 
