@@ -198,8 +198,9 @@ export function createLaneDrag(deps: {
       const s = swipe();
       const dx = m.clientX - x0;
       const dy = m.clientY - y0;
+      const ms = m.timeStamp - e.timeStamp;
       if (stage === 'picker') {
-        if (touchHoldOf(stage, part, dx, dy, m.timeStamp - e.timeStamp) !== 'drag') return;
+        if (touchHoldOf(stage, part, dx, dy, ms) !== 'drag') return;
         deps.picker.close();
         setPicking(false);
         stage = 'lifted';
@@ -211,8 +212,7 @@ export function createLaneDrag(deps: {
         return;
       }
       if (d) {
-        if (d.still && touchHoldOf('lifted', part, dx, dy, m.timeStamp - e.timeStamp) !== 'drag')
-          return;
+        if (d.still && touchHoldOf('lifted', part, dx, dy, ms) !== 'drag') return;
         setDrag({ ...at(d, m.clientX, m.clientY), still: false });
         return;
       }
@@ -221,7 +221,7 @@ export function createLaneDrag(deps: {
         return;
       }
       last = { x: m.clientX, y: m.clientY };
-      const g = laneGestureOf(part, m.pointerType, dx, dy, m.timeStamp - e.timeStamp, SLOP_PX);
+      const g = laneGestureOf(part, m.pointerType, dx, dy, ms, SLOP_PX);
       if (g === 'pass') end?.();
       if (g === 'swipe') {
         setHolding(false);
