@@ -111,11 +111,13 @@ describe('axisShift', () => {
     // Arrange
     const ALT = 85;
     const PFD = 239;
+    const SURV = 160;
     const holds = [
       { heights: [ALT, PFD], from: 1, slot: 0, under: 0 },
       { heights: [ALT, PFD], from: 0, slot: 1, under: 0 },
       { heights: [ALT, PFD], from: 1, slot: 1, under: 0 },
       { heights: [ALT, PFD, ALT], from: 1, slot: 0, under: 2 },
+      { heights: [ALT, PFD, SURV], from: 2, slot: 0, under: 0 },
     ];
 
     // Act
@@ -124,6 +126,6 @@ describe('axisShift', () => {
     );
 
     // Assert
-    expect(shifts).toEqual([ALT - PFD, ALT - PFD, 0, 0]);
+    expect(shifts).toEqual([ALT - PFD, ALT - PFD, 0, 0, ALT - SURV]);
   });
 });
