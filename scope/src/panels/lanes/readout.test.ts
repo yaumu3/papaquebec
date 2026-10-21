@@ -243,7 +243,7 @@ describe('heldIntents', () => {
 });
 
 describe('readoutSlots', () => {
-  it('gives each intent the contact had a slot, the one levelled at first leading, one unknown now a placeholder, one that agrees blank', () => {
+  it('gives each intent the contact had a slot, the one levelled at first leading, one unknown now a placeholder, one that agrees with the first none of its own', () => {
     // Arrange
     const both = ['selAlt', 'fmsAlt'] as const;
     const sel = { key: 'selAlt', text: 'FL320' } as const;
@@ -266,7 +266,7 @@ describe('readoutSlots', () => {
     expect(slots).toEqual([
       [fms, sel],
       [sel, { key: 'fmsAlt' }],
-      [sel, { key: 'fmsAlt', blank: true }],
+      [sel],
       [fms, { key: 'selAlt' }],
       [{ key: 'selAlt' }, { key: 'fmsAlt' }],
       [sel],

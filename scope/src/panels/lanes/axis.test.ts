@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { LanesWindow } from '../../state/window';
-import { axisStep, clearOf, clearOfEnds, clockStep, endLabel, ticks } from './axis';
+import { axisStep, chipAt, clearOf, clearOfEnds, clockStep, endLabel, ticks } from './axis';
 
 describe('axisStep', () => {
   it('takes the shortest step that labels a span a few times over', () => {
@@ -100,6 +100,19 @@ describe('clearOfEnds', () => {
 
     // Assert
     expect(kept).toEqual([10, 50, 90]);
+  });
+});
+
+describe('chipAt', () => {
+  it('centres the chip on the cursor, kept inside the plot', () => {
+    // Arrange
+    const xs = [150, 10, 295];
+
+    // Act
+    const lefts = xs.map((x) => chipAt(x, 60, 300));
+
+    // Assert
+    expect(lefts).toEqual([120, 0, 240]);
   });
 });
 

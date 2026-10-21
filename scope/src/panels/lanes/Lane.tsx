@@ -1,4 +1,4 @@
-import { createMemo, Index, Show } from 'solid-js';
+import { type Accessor, createMemo, Index, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import type { HistoryLane, ReadingKey } from '../../state/plotted';
@@ -8,6 +8,7 @@ import { LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
 import { laneName } from './chips';
+import { CursorChip } from './CursorChip';
 import type { LanePart } from './laneDrag';
 import { isMenuKey } from './menu';
 import { type LaneMoves, onMoveKey, windowKeyOf } from './moves';
@@ -25,7 +26,7 @@ import {
   scaleLabels,
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
-import { heldIntents, readoutOf, readoutSlots, type Slot } from './readout';
+import { heldIntents, type LaneReadout, readoutOf, readoutSlots, type Slot } from './readout';
 import { barsOf, gapsIn, yOf } from './trace';
 
 import s from './Lanes.module.css';
@@ -45,16 +46,14 @@ const BARB_PITCH_PX = 32;
 /** The same for heading glyphs, which are wider: about 30 px across at the most. */
 const GLYPH_PITCH_PX = 36;
 
-/** The most characters each intent reads in. */
-const INTENT_CH: Partial<Record<ReadingKey, number>> = { selAlt: 5, fmsAlt: 5, selHdg: 4 };
 /** The sample of the second slot's line in the readout. */
 const SAMPLE_PX = 12;
 const SAMPLE_H_PX = 8;
 
-/** What a readout slot reads: its intent, the blank of the unknown, or nothing when it agrees with the other. */
-const slotText = (slot: Slot): string => (slot.blank ? '' : (slot.text ?? NONE.v));
+/** What a readout slot reads: its intent, or the blank of the unknown. */
+const slotText = (slot: Slot): string => slot.text ?? NONE.v;
 /** Whether a readout slot holds an intent unknown at the instant. */
-const unknown = (slot: Slot): boolean => slot.text === undefined && !slot.blank;
+const unknown = (slot: Slot): boolean => slot.text === undefined;
 
 /** The class that dashes a trace, if any. */
 const dashClass = (dash: Dash | undefined): string | undefined => dash && s[dash];
@@ -166,9 +165,38 @@ export function Lane(props: {
     const r = readout();
     return r ? readoutSlots(r, held()) : [];
   };
-  /** How wide the intents' slots are: as wide as the widest of them. */
-  const slotCh = () => Math.max(0, ...held().map((key) => INTENT_CH[key] ?? 0));
   let top: HTMLDivElement | undefined;
+  /** What the lane reads at the cursor, in its top row or, while a cursor stands, in the chip. */
+  const readoutView = (r: Accessor<LaneReadout>) => (
+    <div class={s.readout}>
+      <span class={cx(r().unknown ? s.unknown : props.past && s.past)}>{r().value}</span>
+      <Index each={slots()}>
+        {(slot, i) => (
+          <>
+            <Show when={i === 1}>
+              <svg class={s.sample} width={SAMPLE_PX} height={SAMPLE_H_PX}>
+                <line
+                  class={cx(
+                    s.trace,
+                    dashClass(dashOf(slot().key)),
+                    s.intentDim,
+                    unknown(slot()) && s.unknown,
+                  )}
+                  x1="0"
+                  x2={SAMPLE_PX}
+                  y1={SAMPLE_H_PX / 2}
+                  y2={SAMPLE_H_PX / 2}
+                />
+              </svg>
+            </Show>
+            <span class={cx(i === 0 ? s.intentText : s.intentDim, unknown(slot()) && s.unknown)}>
+              {slotText(slot())}
+            </span>
+          </>
+        )}
+      </Index>
+    </div>
+  );
 
   return (
     <div
@@ -292,7 +320,18 @@ export function Lane(props: {
           )}
         </Show>
         <Show when={props.cursor}>
-          {(px) => <div class={s.timeCursor} style={{ left: `${px() - 0.5}px` }} />}
+          {(px) => (
+            <>
+              <div class={s.timeCursor} style={{ left: `${px() - 0.5}px` }} />
+              <Show when={readout()}>
+                {(r) => (
+                  <CursorChip px={px()} width={props.width}>
+                    {readoutView(r)}
+                  </CursorChip>
+                )}
+              </Show>
+            </>
+          )}
         </Show>
       </div>
       <div class={s.gutter}>
@@ -313,47 +352,7 @@ export function Lane(props: {
         style={props.swipeX === null ? {} : { transform: `translateX(${props.swipeX}px)` }}
       >
         <span class={s.name}>{label}</span>
-        <Show when={readout()}>
-          {(r) => (
-            <div class={s.readout}>
-              <span class={cx(r().unknown ? s.unknown : props.past && s.past)}>{r().value}</span>
-              <Index each={slots()}>
-                {(slot, i) => (
-                  <>
-                    <Show when={i === 1}>
-                      <svg class={s.sample} width={SAMPLE_PX} height={SAMPLE_H_PX}>
-                        <Show when={!slot().blank}>
-                          <line
-                            class={cx(
-                              s.trace,
-                              dashClass(dashOf(slot().key)),
-                              s.intentDim,
-                              unknown(slot()) && s.unknown,
-                            )}
-                            x1="0"
-                            x2={SAMPLE_PX}
-                            y1={SAMPLE_H_PX / 2}
-                            y2={SAMPLE_H_PX / 2}
-                          />
-                        </Show>
-                      </svg>
-                    </Show>
-                    <span
-                      class={cx(
-                        s.slot,
-                        i === 0 ? s.intentText : s.intentDim,
-                        unknown(slot()) && s.unknown,
-                      )}
-                      style={{ width: `${slotCh()}ch` }}
-                    >
-                      {slotText(slot())}
-                    </span>
-                  </>
-                )}
-              </Index>
-            </div>
-          )}
-        </Show>
+        <Show when={props.cursor === null ? readout() : null}>{readoutView}</Show>
       </div>
     </div>
   );

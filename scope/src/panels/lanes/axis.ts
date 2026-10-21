@@ -1,4 +1,5 @@
 import { formatAgo } from '../../lib/format';
+import { clamp } from '../../lib/math';
 import type { Interval, LanesWindow } from '../../state/window';
 
 /** Steps along the clock, seconds: each a round part of it, up to the hour. */
@@ -37,6 +38,10 @@ export function clearOfEnds(
 /** What the axis reads at its right edge: NOW while live, else how far back the window ends. */
 export const endLabel = (w: LanesWindow, lagSec: number): { text: string; held: boolean } =>
   w.kind === 'live' ? { text: 'NOW', held: false } : { text: `${formatAgo(lagSec)} ›`, held: true };
+
+/** The left of a chip `chipW` across centred on `x`, kept inside a plot `plotW` across. */
+export const chipAt = (x: number, chipW: number, plotW: number): number =>
+  clamp(x - chipW / 2, 0, Math.max(0, plotW - chipW));
 
 /** Whether each label at `xs`, `halfPx` either side, misses the stretch from `from` to `to`. */
 export const clearOf = (

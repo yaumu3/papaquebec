@@ -177,6 +177,9 @@
   pointer-events: none;
 }
 .plot {
+  --chip-height: 14px;
+  --notch-height: 4px;
+  --chip-top: calc(var(--space-1) + (var(--lane-top) - var(--chip-height)) / 2);
   position: absolute;
   inset: 0 var(--plot-right) 0 var(--plot-left);
 }
@@ -258,9 +261,6 @@
 /* A value read off now: while peeking, or with the window held. */
 .past {
   color: var(--color-selbox);
-}
-.slot {
-  display: inline-block;
 }
 .intentText {
   color: var(--plot-intent);
@@ -393,6 +393,38 @@
   right: 0;
 }
 .endHeld {
+  color: var(--color-selbox);
+}
+/* The cursor's chip, in front of the lane's top row: what the lane reads at the cursor. */
+.chip {
+  position: absolute;
+  top: var(--chip-top);
+  z-index: 3;
+  pointer-events: none;
+  box-sizing: border-box;
+  height: var(--chip-height);
+  font-size: var(--text-sm);
+  line-height: calc(var(--chip-height) - 2px);
+  border: 1px solid currentColor;
+  background: var(--panel-bg);
+  color: var(--color-selbox);
+  white-space: nowrap;
+}
+/* Measured for the chip's width, which an inline box does not report. */
+.chipBody {
+  display: inline-block;
+}
+.chip .readout {
+  height: auto;
+  margin: 0;
+  padding: 0;
+}
+.notch {
+  position: absolute;
+  top: calc(var(--chip-top) + var(--chip-height));
+  z-index: 3;
+  pointer-events: none;
+  fill: currentColor;
   color: var(--color-selbox);
 }
 /* The span being selected: a light fill with an edge at each end, in front of the plot. */
