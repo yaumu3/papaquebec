@@ -19,12 +19,13 @@ export const ADVISORY_SEC = 18;
 export const EMERGENCY_SEC = 10;
 
 /**
- * How long a value on the detail panel's instruments, the ND and the PFD, holds after it was last
- * heard. An SSR scans an en-route sector every 10 to 12 s, and the Comm-B registers that carry the
- * heading and the air data are read once a scan at best: a value read every scan must not blink
- * out between two of them.
+ * How long a report holds after it was last heard, for the scope, the lanes and the instruments
+ * alike. An SSR scans an en-route sector every 10 to 12 s and the Comm-B registers are read once a
+ * scan at best, so a value read only every other scan must not blink out between two. A value this
+ * old has lapsed, a position this old is stale, a target unheard this long is lost, and samples this
+ * far apart leave a gap.
  */
-export const INSTRUMENT_SEC = 15;
+export const LAPSE_SEC = 30;
 
 /** Whether a report heard at `heardAt` still holds at `now`: heard less than `lapseSec` before. */
 export function holds(heardAt: number | undefined, now: number, lapseSec: number): boolean {

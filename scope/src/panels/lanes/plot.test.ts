@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { LAPSE_SEC } from '../../lib/reports';
 import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
 import type { Interval } from '../../state/window';
 import {
@@ -15,7 +16,7 @@ import {
   scaleLabels,
   snapped,
 } from './plot';
-import { GAP_SEC, type Point, type Range } from './trace';
+import type { Point, Range } from './trace';
 
 const ALL: Interval = { from: 0, to: 10_000 };
 
@@ -182,7 +183,7 @@ describe('headingGlyph with a selected heading', () => {
 describe('laneTraces with the instants each reading is heard at', () => {
   it('breaks a line where its reading went unheard, while the target kept being heard', () => {
     // Arrange
-    const again = 2 + GAP_SEC;
+    const again = 2 + LAPSE_SEC;
     const samples = Array.from({ length: 40 }, (_, k) =>
       sample(k + 1, {
         alt: 11000,
@@ -200,7 +201,7 @@ describe('laneTraces with the instants each reading is heard at', () => {
 
   it('breaks the bank where its replies stop', () => {
     // Arrange
-    const again = 2 + GAP_SEC;
+    const again = 2 + LAPSE_SEC;
     const samples = Array.from({ length: 40 }, (_, k) =>
       sample(k + 1, { roll: 20, heard: { roll: k + 1 < again ? 1 : again } }),
     );
@@ -245,13 +246,44 @@ describe('laneTraces on the ground', () => {
 });
 
 describe('atTicks', () => {
+  it('reads a sample under the lapse from the tick, none exactly the lapse or more', () => {
+    // Arrange
+    const rows = [29.9, 30, 30.1].map((d) => [sample(1000 + d, { windDir: 300, windSpeed: 12 })]);
+    const read = (s: (typeof rows)[number][number]) => ({
+      dir: s.windDir ?? 0,
+      speed: s.windSpeed ?? 0,
+    });
+
+    // Act
+    const barbs = rows.map((samples) => atTicks(samples, [1000], read).length);
+
+    // Assert
+    expect(barbs).toEqual([1, 0, 0]);
+  });
+
+  it('gives way from a preferred sample exactly a gap away to the nearest', () => {
+    // Arrange
+    const samples = [
+      sample(1000, { track: 90 }),
+      sample(1000 + LAPSE_SEC, { track: 92, heading: 85 }),
+    ];
+    const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
+    const has = (s: (typeof samples)[number]) => s.heading !== undefined;
+
+    // Act
+    const reads = atTicks(samples, [1000], read, { has, withinSec: 2 * LAPSE_SEC });
+
+    // Assert
+    expect(reads).toEqual([{ t: 1000, trk: 90, hdg: undefined }]);
+  });
+
   it('reads one value per tick from the sample nearest it, none when that is a gap away', () => {
     // Arrange
     const samples = [
       sample(98, { windDir: 300, windSpeed: 12 }),
       sample(150, { windDir: 310, windSpeed: 15 }),
     ];
-    const ticks = [100, 150 + GAP_SEC + 1];
+    const ticks = [100, 150 + LAPSE_SEC + 1];
 
     // Act
     const barbs = atTicks(samples, ticks, (s) =>
@@ -281,13 +313,13 @@ describe('atTicks', () => {
     // Arrange
     const samples = [
       sample(100, { track: 90 }),
-      sample(100 + GAP_SEC + 5, { track: 92, heading: 85 }),
+      sample(100 + LAPSE_SEC + 5, { track: 92, heading: 85 }),
     ];
     const read = (s: (typeof samples)[number]) => ({ trk: s.track, hdg: s.heading });
     const has = (s: (typeof samples)[number]) => s.heading !== undefined;
 
     // Act
-    const reads = atTicks(samples, [100], read, { has, withinSec: 10 * GAP_SEC });
+    const reads = atTicks(samples, [100], read, { has, withinSec: 10 * LAPSE_SEC });
 
     // Assert
     expect(reads).toEqual([{ t: 100, trk: 90, hdg: undefined }]);
@@ -518,7 +550,7 @@ describe('headingAt', () => {
   it('reads each of the track, heading and selected heading only while heard within the gap of the tick', () => {
     // Arrange
     const steering = { track: 90, heading: 85, selHeading: 120, navModes: ['autopilot'] };
-    const stale = 100 - GAP_SEC - 11;
+    const stale = 100 - LAPSE_SEC - 11;
     const rows = [
       { track: 100, heading: stale, selHeading: 100 },
       { track: 100, heading: 100, selHeading: 100 },

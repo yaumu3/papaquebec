@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from '../../lib/aircraft';
+import { LAPSE_SEC } from '../../lib/reports';
 import { makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
 import type { Interval } from '../../state/window';
 import {
   barbMarks,
   barsOf,
-  GAP_SEC,
   gapsIn,
   heardAt,
   nearestSample,
   newestSample,
-  sampleAt,
+  peekAt,
   type Point,
   rangeOf,
   runsOf,
@@ -23,6 +23,20 @@ const gs = (s: Sample) => s.gs;
 const ALL: Interval = { from: 0, to: 10_000 };
 
 describe('runsOf', () => {
+  it('breaks a run between samples exactly the lapse apart, not just under it', () => {
+    // Arrange
+    const rows = [29.9, 30, 30.1].map((d) => [
+      sample(1000, { gs: 250 }),
+      sample(1000 + d, { gs: 251 }),
+    ]);
+
+    // Act
+    const runs = rows.map((samples) => runsOf(samples, gs, ALL).length);
+
+    // Assert
+    expect(runs).toEqual([1, 2, 2]);
+  });
+
   it('joins consecutive samples that carry the reading', () => {
     // Arrange
     const samples = [sample(1, { gs: 250 }), sample(2, { gs: 251 }), sample(3, { gs: 252 })];
@@ -40,14 +54,14 @@ describe('runsOf', () => {
     ]);
   });
 
-  it('breaks at a sample without the reading and at a gap longer than the limit', () => {
+  it('breaks at a sample without the reading and at a gap of the lapse or more', () => {
     // Arrange
     const samples = [
       sample(1, { gs: 250 }),
       sample(2),
       sample(3, { gs: 252 }),
-      sample(3 + GAP_SEC, { gs: 253 }),
-      sample(4 + 2 * GAP_SEC, { gs: 254 }),
+      sample(2 + LAPSE_SEC, { gs: 253 }),
+      sample(4 + 2 * LAPSE_SEC, { gs: 254 }),
     ];
 
     // Act
@@ -58,9 +72,9 @@ describe('runsOf', () => {
       [{ t: 1, v: 250 }],
       [
         { t: 3, v: 252 },
-        { t: 3 + GAP_SEC, v: 253 },
+        { t: 2 + LAPSE_SEC, v: 253 },
       ],
-      [{ t: 4 + 2 * GAP_SEC, v: 254 }],
+      [{ t: 4 + 2 * LAPSE_SEC, v: 254 }],
     ]);
   });
 
@@ -95,6 +109,20 @@ describe('heardAt', () => {
 });
 
 describe('runsOf with the instants a reading is heard at', () => {
+  it('breaks a run where the reading went unheard exactly the lapse, not just under it', () => {
+    // Arrange
+    const rows = [29.9, 30, 30.1].map((d) => [
+      sample(1000, { gs: 250, heard: { gs: 1000 } }),
+      sample(1001, { gs: 251, heard: { gs: 1000 + d } }),
+    ]);
+
+    // Act
+    const runs = rows.map((samples) => runsOf(samples, gs, ALL, ['gs']).length);
+
+    // Assert
+    expect(runs).toEqual([1, 2, 2]);
+  });
+
   it('takes a value repeated without a new report as no new point', () => {
     // Arrange
     const samples = [1, 1, 3, 3].map((heard, k) =>
@@ -115,7 +143,7 @@ describe('runsOf with the instants a reading is heard at', () => {
 
   it('breaks where the reading went unheard longer than the gap, though the samples kept coming', () => {
     // Arrange
-    const again = 2 + GAP_SEC;
+    const again = 2 + LAPSE_SEC;
     const samples = Array.from({ length: 40 }, (_, k) =>
       sample(k + 1, { gs: 250, heard: { gs: k + 1 < again ? 1 : again } }),
     );
@@ -235,6 +263,35 @@ describe('yOf', () => {
 });
 
 describe('gapsIn', () => {
+  it('adds the silence after the last sample while the target is lost, cut to the interval', () => {
+    // Arrange
+    const samples = [sample(100), sample(101)];
+    const rows = [
+      { lost: true, i: { from: 0, to: 200 } },
+      { lost: false, i: { from: 0, to: 200 } },
+      { lost: true, i: { from: 150, to: 200 } },
+      { lost: true, i: { from: 0, to: 100.5 } },
+      { lost: true, i: { from: 0, to: 101 } },
+    ];
+
+    // Act
+    const gaps = rows.map((r) => gapsIn(samples, r.i, r.lost));
+
+    // Assert
+    expect(gaps).toEqual([[{ from: 101, to: 200 }], [], [{ from: 150, to: 200 }], [], []]);
+  });
+
+  it('leaves a gap between samples exactly the lapse apart, not ones just under it', () => {
+    // Arrange
+    const spacings = [29.9, 30, 30.1];
+
+    // Act
+    const gaps = spacings.map((d) => gapsIn([sample(1000), sample(1000 + d)], ALL));
+
+    // Assert
+    expect(gaps).toEqual([[], [{ from: 1000, to: 1030 }], [{ from: 1000, to: 1030.1 }]]);
+  });
+
   it('finds the stretches between samples further apart than the limit, cut to the interval', () => {
     // Arrange
     const samples = [sample(100), sample(101), sample(200), sample(201), sample(300)];
@@ -316,7 +373,7 @@ describe('barsOf', () => {
 
   it('ends a bar at a gap in the samples', () => {
     // Arrange
-    const samples = [sample(1, { navModes: ['AP'] }), sample(2 + GAP_SEC, { navModes: ['AP'] })];
+    const samples = [sample(1, { navModes: ['AP'] }), sample(2 + LAPSE_SEC, { navModes: ['AP'] })];
 
     // Act
     const bars = barsOf(samples, modes);
@@ -327,7 +384,7 @@ describe('barsOf', () => {
         name: 'AP',
         on: [
           { from: 1, to: 1 },
-          { from: 2 + GAP_SEC, to: 2 + GAP_SEC },
+          { from: 2 + LAPSE_SEC, to: 2 + LAPSE_SEC },
         ],
       },
     ]);
@@ -335,7 +392,7 @@ describe('barsOf', () => {
 
   it('ends a bar where its reading went unheard longer than the gap, though the samples kept coming', () => {
     // Arrange
-    const samples = [1, 2, 2 + GAP_SEC, 3 + GAP_SEC].map((t) =>
+    const samples = [1, 2, 2 + LAPSE_SEC, 3 + LAPSE_SEC].map((t) =>
       sample(t, { navModes: ['AP'], heard: { navModes: 1 } }),
     );
 
@@ -386,7 +443,7 @@ describe('newestSample', () => {
   });
 });
 
-describe('sampleAt', () => {
+describe('peekAt', () => {
   it('takes the sample nearest the time a point across the plot stands for, inside the window', () => {
     // Arrange
     const samples = [sample(100), sample(110), sample(120), sample(130)];
@@ -400,9 +457,82 @@ describe('sampleAt', () => {
     ];
 
     // Act
-    const found = rows.map((r) => sampleAt(samples, r.px, r.i, 300));
+    const found = rows.map((r) => peekAt(samples, r.px, r.i, 300, false));
 
     // Assert
-    expect(found.map((s) => s?.t)).toEqual([100, 110, 130, 120, undefined]);
+    expect(found.map((p) => p?.sample?.t)).toEqual([100, 110, 130, 120, undefined]);
+  });
+
+  it('stands at the pointer with no sample over a gap, at the nearest one at its edges and outside', () => {
+    // Arrange
+    const samples = [sample(100), sample(131), sample(140)];
+    const window = { from: 100, to: 140 };
+    const times = [100, 100.1, 115, 130.9, 131, 135, 140];
+
+    // Act
+    const found = times.map((t) => peekAt(samples, (t - 100) * 10, window, 400, false));
+
+    // Assert
+    expect(found.map((p) => [p?.t, p?.sample?.t])).toEqual([
+      [100, 100],
+      [100.1, undefined],
+      [115, undefined],
+      [130.9, undefined],
+      [131, 131],
+      [131, 131],
+      [140, 140],
+    ]);
+  });
+
+  it('snaps to the nearest sample over a silence shorter than a gap', () => {
+    // Arrange
+    const samples = [sample(100), sample(129.9)];
+    const window = { from: 100, to: 130 };
+    const times = [110, 115];
+
+    // Act
+    const found = times.map((t) => peekAt(samples, (t - 100) * 10, window, 300, false));
+
+    // Assert
+    expect(found.map((p) => [p?.t, p?.sample?.t])).toEqual([
+      [100, 100],
+      [129.9, 129.9],
+    ]);
+  });
+
+  it('stands at the pointer after the last sample while the target is lost, not otherwise', () => {
+    // Arrange
+    const samples = [sample(100), sample(110)];
+    const window = { from: 100, to: 200 };
+    const rows = [
+      { lost: true, t: 150 },
+      { lost: false, t: 150 },
+      { lost: true, t: 110 },
+    ];
+
+    // Act
+    const found = rows.map((r) => peekAt(samples, r.t - 100, window, 100, r.lost));
+
+    // Assert
+    expect(found.map((p) => [p?.t, p?.sample?.t])).toEqual([
+      [150, undefined],
+      [110, 110],
+      [110, 110],
+    ]);
+  });
+
+  it('has no sample exactly where gapsIn shades', () => {
+    // Arrange
+    const samples = [sample(100), sample(131), sample(140), sample(200)];
+    const window = { from: 0, to: 300 };
+    const times = [99, 100, 100.5, 115, 130.9, 131, 135, 140, 150, 199.9, 200, 250];
+    const gaps = gapsIn(samples, window, true);
+
+    // Act
+    const found = times.map((t) => peekAt(samples, t, window, 300, true)?.sample === null);
+
+    // Assert
+    const shaded = times.map((t) => gaps.some((g) => t > g.from && t < g.to));
+    expect(found).toEqual(shaded);
   });
 });

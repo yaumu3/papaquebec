@@ -2,7 +2,7 @@ import { createMemo, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
 import { formatAgo } from '../../lib/format';
-import { hoverInstant, lanesView, setLanesWindow } from '../../state/lanes';
+import { cursorInstant, lanesView, setLanesWindow } from '../../state/lanes';
 import { snapshotVersion } from '../../state/scope';
 import type { Track } from '../../state/track';
 import { trackStore } from '../../state/tracks';
@@ -31,7 +31,7 @@ export function WindowControl(props: { track: Track }) {
     <span class={s.control}>
       <button
         type="button"
-        class={cx(s.button, held() && s.held, hoverInstant() !== null && s.covered)}
+        class={cx(s.button, held() && s.held, cursorInstant() !== null && s.covered)}
         aria-label={controlLabel(lanesWindow(), lag())}
         onClick={toggle}
       >
@@ -41,7 +41,7 @@ export function WindowControl(props: { track: Track }) {
           <span class={s.lag}>{formatAgo(lag())}</span>
         </Show>
       </button>
-      <Show when={hoverInstant()}>
+      <Show when={cursorInstant()}>
         {(t) => (
           <span class={s.peek} aria-hidden="true">
             {formatAgo(now() - t())}

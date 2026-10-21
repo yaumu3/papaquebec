@@ -1,15 +1,20 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER } from '../../../lib/altitude';
-import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { LAPSE_SEC } from '../../../lib/reports';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
+import { readoutOf } from '../../lanes/readout';
+import { nowAt } from '../moment';
 import { ndFrame, type NdReadouts, ndReadouts, ndSymbols } from './readout';
 
 const NOW = 1000;
 const FRESH = NOW - 1;
-const STALE = NOW - INSTRUMENT_SEC;
+const STALE = NOW - LAPSE_SEC;
 const AT = { lat: 35.5, lon: 139.8 };
+
+/** The three readings of the selected heading, all known or all not. */
+const held = (known: boolean) => ({ nd: known, bug: known, lane: known });
 
 afterEach(() => {
   setDeclinationAt(() => () => 0);
@@ -23,7 +28,7 @@ describe('ndFrame', () => {
     heard: { heading: FRESH, track: STALE },
   });
 
-  it('sets the mode, the box and the flags by what holds, a track heard INSTRUMENT_SEC ago lapsed', () => {
+  it('sets the mode, the box and the flags by what holds, a track heard LAPSE_SEC ago lapsed', () => {
     // Arrange
     const rows = [
       makeSample(NOW, {
@@ -36,10 +41,16 @@ describe('ndFrame', () => {
       makeSample(NOW, { seen: 34, heading: 201, track: 198, heard: { heading: 966, track: 966 } }),
       lapsedTrack,
       makeSample(NOW, { seen: 1 }),
+      makeSample(NOW, {
+        seen: 1,
+        heading: 284,
+        track: 289,
+        heard: { heading: NOW - 20, track: NOW - 20 },
+      }),
     ];
 
     // Act
-    const frames = rows.map((t) => ndFrame(t, NOW));
+    const frames = rows.map((t) => ndFrame(nowAt(t, NOW)));
 
     // Assert
     expect(frames.map((f) => [f.mode, f.box, f.flags])).toEqual([
@@ -48,6 +59,7 @@ describe('ndFrame', () => {
       ['lost', '---', ['TRK']],
       ['blank', '---', ['TRK']],
       ['blank', '---', ['TRK']],
+      ['track', '289', []],
     ]);
   });
 
@@ -62,7 +74,7 @@ describe('ndFrame', () => {
     ];
 
     // Act
-    const orients = rows.map((t) => ndFrame(t, NOW).orient);
+    const orients = rows.map((t) => ndFrame(nowAt(t, NOW)).orient);
 
     // Assert
     expect(orients).toEqual([289, 47, 198, 201, 0]);
@@ -74,7 +86,7 @@ describe('ndFrame', () => {
     const t = makeSample(NOW, { seen: 40, track: 205, at: AT, heard: { track: 900 } });
 
     // Act
-    const frame = ndFrame(t, NOW);
+    const frame = ndFrame(nowAt(t, NOW));
 
     // Assert
     expect(frame.orient).toBe(198);
@@ -85,7 +97,7 @@ describe('ndFrame', () => {
     const rows = [makeSample(NOW, { seen: 34.4 }), makeSample(NOW, { seen: 14.9 })];
 
     // Act
-    const lines = rows.map((t) => ndFrame(t, NOW).lastHeard);
+    const lines = rows.map((t) => ndFrame(nowAt(t, NOW)).lastHeard);
 
     // Assert
     expect(lines).toEqual(['LAST HEARD 34 s', undefined]);
@@ -120,7 +132,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['462', '438', '269°/64', '310°', '284°', '-4°C', '-56°C']);
@@ -133,7 +145,7 @@ describe('ndReadouts', () => {
     );
 
     // Act
-    const readouts = rows.map((t) => ndReadouts(t, NOW));
+    const readouts = rows.map((t) => ndReadouts(nowAt(t, NOW)));
 
     // Assert
     expect(readouts.map((r) => [r.tat.text, r.sat.text])).toEqual([
@@ -147,14 +159,14 @@ describe('ndReadouts', () => {
     const t = makeSample(NOW, { seen: 1 });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
     expect(Object.values(readouts).map((r) => r.known)).toEqual(Array(7).fill(false));
   });
 
-  it('lets a value lapse at exactly INSTRUMENT_SEC', () => {
+  it('lets a value lapse at exactly LAPSE_SEC', () => {
     // Arrange
     const t = makeSample(NOW, {
       seen: 1,
@@ -164,7 +176,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect([readouts.gs.text, readouts.tas.text]).toEqual(['---', '438']);
@@ -172,34 +184,49 @@ describe('ndReadouts', () => {
 
   it('is as old as the oldest of the inputs of a derived value', () => {
     // Arrange
-    const sel = (modesAt: number | undefined) =>
+    const wind = (speedAt: number) =>
       makeSample(NOW, {
         seen: 1,
-        selHeading: 310,
-        navModes: modesAt === undefined ? undefined : ['autopilot'],
         windDir: 276,
         windSpeed: 40,
-        heard: {
-          selHeading: FRESH,
-          ...(modesAt === undefined ? {} : { navModes: modesAt }),
-          windDir: FRESH,
-          windSpeed: modesAt ?? FRESH,
-        },
+        heard: { windDir: FRESH, windSpeed: speedAt },
       });
-    const rows = [sel(NOW - 16), sel(NOW - 14), sel(undefined)];
+    const rows = [wind(NOW - LAPSE_SEC - 1), wind(NOW - LAPSE_SEC + 1), wind(FRESH)];
 
     // Act
-    const readouts = rows.map((t) => ndReadouts(t, NOW));
+    const readouts = rows.map((t) => ndReadouts(nowAt(t, NOW)));
 
     // Assert
-    expect(readouts.map((r) => [r.sel.text, r.wind.text])).toEqual([
-      ['---°', '---'],
-      ['310°', '276°/40'],
-      ['310°', '276°/40'],
-    ]);
+    expect(readouts.map((r) => r.wind.text)).toEqual(['---', '276°/40', '276°/40']);
   });
 
-  it('blanks every value of a target not heard for INSTRUMENT_SEC', () => {
+  it('holds the selected heading exactly where the SEL HDG lane reads it', () => {
+    // Arrange
+    const rows = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].flatMap((age) =>
+      [5, 45].map((modesAge) =>
+        makeSample(NOW, {
+          seen: 1,
+          track: 289,
+          at: AT,
+          selHeading: 310,
+          navModes: ['autopilot'],
+          heard: { track: FRESH, selHeading: NOW - age, navModes: NOW - modesAge },
+        }),
+      ),
+    );
+
+    // Act
+    const out = rows.map((t) => ({
+      nd: ndReadouts(nowAt(t, NOW)).sel.known,
+      bug: ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).sel !== undefined,
+      lane: readoutOf(['trk', 'selHdg'], t).first !== undefined,
+    }));
+
+    // Assert
+    expect(out).toEqual([true, true, false, false, false, false].map(held));
+  });
+
+  it('blanks every value of a target not heard for LAPSE_SEC', () => {
     // Arrange
     const t = makeSample(NOW, {
       seen: 34,
@@ -210,7 +237,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['---', '---', '---', '---°', '---°', '---', '---']);
@@ -227,7 +254,7 @@ describe('ndReadouts', () => {
     });
 
     // Act
-    const readouts = ndReadouts(t, NOW);
+    const readouts = ndReadouts(nowAt(t, NOW));
 
     // Assert
     expect(texts(readouts)).toEqual(['462', '---', '---', '---°', '---°', '---', '-56°C']);
@@ -246,7 +273,7 @@ describe('ndSymbols', () => {
     const t = makeSample(NOW, { seen: 1, ...fields, at: AT, heard: heardAll(KEYS, FRESH) });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols).toEqual({ track: 282, heading: 284, sel: 310 });
@@ -258,7 +285,7 @@ describe('ndSymbols', () => {
     const t = makeSample(NOW, { seen: 1, ...fields, heard });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols).toEqual({ track: 289, sel: 310 });
@@ -274,7 +301,7 @@ describe('ndSymbols', () => {
     const lost = makeSample(NOW, { seen: 34, ...fields, heard: heardAll(KEYS, FRESH) });
 
     // Act
-    const symbols = [blank, lost].map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER));
+    const symbols = [blank, lost].map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER));
 
     // Assert
     expect(symbols).toEqual([{}, {}]);
@@ -298,7 +325,7 @@ describe('ndSymbols trend', () => {
     const t = turningSample({});
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.trend).toEqual({ rateDegS: 1, gsKt: 360 });
@@ -315,7 +342,7 @@ describe('ndSymbols trend', () => {
     ];
 
     // Act
-    const trends = quiet.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).trend);
+    const trends = quiet.map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).trend);
 
     // Assert
     expect(trends).toEqual(Array(5).fill(undefined));
@@ -326,7 +353,7 @@ describe('ndSymbols trend', () => {
     const turning = [0.3, -0.3].map((trackRate) => turningSample({ trackRate }));
 
     // Act
-    const trends = turning.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).trend?.rateDegS);
+    const trends = turning.map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).trend?.rateDegS);
 
     // Assert
     expect(trends).toEqual([0.3, -0.3]);
@@ -360,7 +387,7 @@ describe('ndSymbols level-off', () => {
     const t = climbingSample({});
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.levelOffNm).toBeCloseTo(11.667, 3);
@@ -371,7 +398,7 @@ describe('ndSymbols level-off', () => {
     const t = climbingSample({ selAlt: 25000, verticalRate: -1800 });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.levelOffNm).toBeCloseTo(15.556, 3);
@@ -389,7 +416,7 @@ describe('ndSymbols level-off', () => {
     ];
 
     // Act
-    const out = rows.map((t) => ndSymbols(t, NOW, STANDARD_ALTIMETER).levelOffNm);
+    const out = rows.map((t) => ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER).levelOffNm);
 
     // Assert
     expect(out).toEqual(Array(6).fill(undefined));
@@ -413,7 +440,7 @@ describe('ndSymbols wind', () => {
     const t = windy({});
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.windFrom).toBe(269);
@@ -424,9 +451,108 @@ describe('ndSymbols wind', () => {
     const t = windy({ windSpeed: STALE });
 
     // Act
-    const symbols = ndSymbols(t, NOW, STANDARD_ALTIMETER);
+    const symbols = ndSymbols(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(symbols.windFrom).toBeUndefined();
+  });
+});
+
+const heardEvery = (at: number) => ({
+  heading: at,
+  track: at,
+  gs: at,
+  trackRate: at,
+  selHeading: at,
+  selAlt: at,
+  alt: at,
+  verticalRate: at,
+});
+
+describe('the ND at a peeked sample', () => {
+  const AGE = 200;
+  const T = 1;
+  const base = {
+    seen: 1,
+    heading: 284,
+    track: 289,
+    gs: 460,
+    trackRate: 1.5,
+    selHeading: 310,
+    navModes: ['autopilot'],
+    selAlt: 30_000,
+    alt: 20_000,
+    verticalRate: 1000,
+    at: AT,
+  };
+  const rows = [
+    makeSample(T, { ...base, heard: heardEvery(T) }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), heading: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), track: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), selHeading: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), trackRate: T - LAPSE_SEC } }),
+    makeSample(T, { ...base, heard: { ...heardEvery(T), selAlt: T - LAPSE_SEC } }),
+  ];
+  const liveOf = (s: (typeof rows)[number]) =>
+    makeSample(T + AGE, {
+      ...s,
+      heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
+    });
+
+  it('reads a sample at its own time as a live target whose data has exactly that age', () => {
+    // Arrange
+    const expected = rows.map(liveOf).map((r) => {
+      const m = nowAt(r, T + AGE);
+      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
+    });
+
+    // Act
+    const peeked = rows.map((r) => {
+      const m = { kind: 'sample', r, instant: r.t } as const;
+      return [ndFrame(m), ndReadouts(m), ndSymbols(m, STANDARD_ALTIMETER)];
+    });
+
+    // Assert
+    expect(peeked).toEqual(expected);
+  });
+
+  it('drops the heading pointer exactly where the HDG lane reads a dash', () => {
+    // Arrange
+    const samples = [29.9, LAPSE_SEC, LAPSE_SEC + 0.1].map((age) =>
+      makeSample(T, { ...base, heard: { ...heardEvery(T), heading: T - age } }),
+    );
+
+    // Act
+    const out = samples.map((s) => ({
+      pointer:
+        ndSymbols({ kind: 'sample', r: s, instant: s.t }, STANDARD_ALTIMETER).heading !== undefined,
+      lane: !readoutOf(['trk'], s).value.endsWith('---'),
+    }));
+
+    // Assert
+    expect(out).toEqual([
+      { pointer: true, lane: true },
+      { pointer: false, lane: false },
+      { pointer: false, lane: false },
+    ]);
+  });
+
+  it('stands the compass where it last stood, with a dash, no flags and no symbols, over a gap', () => {
+    // Arrange
+    const empty = { kind: 'empty' } as const;
+
+    // Act
+    const out = {
+      frame: ndFrame(empty, 123),
+      corners: texts(ndReadouts(empty)),
+      symbols: ndSymbols(empty, STANDARD_ALTIMETER),
+    };
+
+    // Assert
+    expect(out).toEqual({
+      frame: { mode: 'empty', orient: 123, box: '---', flags: [], lastHeard: undefined },
+      corners: ['---', '---', '---', '---°', '---°', '---', '---'],
+      symbols: {},
+    });
   });
 });

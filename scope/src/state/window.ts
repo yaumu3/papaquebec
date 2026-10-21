@@ -37,9 +37,9 @@ export const xOf = (t: number, i: Interval, width: number): number =>
 export const timeAt = (x: number, i: Interval, width: number): number =>
   i.from + (x / width) * (i.to - i.from);
 
-/** Whether the lanes read an instant other than now: while peeking, or with the window held. */
-export const readsPast = (peeking: boolean, w: LanesWindow): boolean =>
-  peeking || w.kind === 'held';
+/** Whether the panel reads an instant other than now: while peeking, or with the window held; never without a history lane to show it. */
+export const readsPast = (peeking: boolean, w: LanesWindow, shown: boolean): boolean =>
+  shown && (peeking || w.kind === 'held');
 
 /** The window held where it stands, `visible` being what it shows. */
 export const holdWindow = (visible: Interval): LanesWindow => ({

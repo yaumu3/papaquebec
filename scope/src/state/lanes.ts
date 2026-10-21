@@ -55,5 +55,8 @@ export function keepViewOf(hex: string | null): void {
   setView((v) => viewOf(v, hex));
 }
 
-/** The sample time under the pointer on the lanes, which the scope rings on the trail; null off them. */
+/** The time of the sample under the pointer on the lanes, which the scope rings on the trail; null off them and over a gap. */
 export const [hoverInstant, setHoverInstant] = createSignal<number | null>(null);
+
+/** The instant the cursor stands at on the lanes: the sample's, or the pointer's over a gap; null off them. */
+export const [cursorInstant, setCursorInstant] = createSignal<number | null>(null);

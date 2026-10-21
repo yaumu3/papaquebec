@@ -3,6 +3,7 @@ import { Match, Switch } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { InstrumentLane as InstrumentKey } from '../../state/plotted';
 import type { Track } from '../../state/track';
+import type { Moment } from '../instruments/moment';
 import { Nd } from '../instruments/nd/Nd';
 import { Pfd } from '../instruments/pfd/Pfd';
 import { Surv } from '../instruments/surv/Surv';
@@ -17,6 +18,8 @@ import s from './Lanes.module.css';
 export function InstrumentLane(props: {
   lane: InstrumentKey;
   track: Track;
+  /** What the instruments draw: now, the sample the lanes read, or nothing where they read none. */
+  moment: Moment;
   /** Its place among the lanes, and how many there are. */
   index: number;
   count: number;
@@ -52,13 +55,13 @@ export function InstrumentLane(props: {
     >
       <Switch>
         <Match when={props.lane === 'pfd'}>
-          <Pfd t={props.track} />
+          <Pfd t={props.track} moment={props.moment} />
         </Match>
         <Match when={props.lane === 'nd'}>
-          <Nd t={props.track} />
+          <Nd t={props.track} moment={props.moment} />
         </Match>
         <Match when={props.lane === 'surv'}>
-          <Surv t={props.track} />
+          <Surv t={props.track} moment={props.moment} />
         </Match>
       </Switch>
     </div>

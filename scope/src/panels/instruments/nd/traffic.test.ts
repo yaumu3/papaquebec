@@ -3,12 +3,14 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import type { ResolutionAdvisory, Threat } from '../../../lib/acas';
 import { turn } from '../../../lib/geo';
 import { direct } from '../../../lib/geodesic';
-import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { LAPSE_SEC } from '../../../lib/reports';
 import { RAD } from '../../../lib/units';
 import { makeTrack } from '../../../render/scene/trackFixture';
 import { setDeclinationAt } from '../../../state/magnetic';
+import { makeSample } from '../../../state/sampleFixture';
 import { hexAt } from '../../../state/scope';
 import type { Track } from '../../../state/track';
+import { nowAt } from '../moment';
 import { ndGeometry, ndPoint, pxOf } from './geometry';
 import type { NdFrame } from './readout';
 import {
@@ -63,7 +65,7 @@ describe('verticalArrow', () => {
       makeTrack({ verticalRate: 500, heard: held }),
       makeTrack({ verticalRate: -499, heard: held }),
       makeTrack({ verticalRate: -500, heard: held }),
-      makeTrack({ verticalRate: 2000, heard: { verticalRate: NOW - INSTRUMENT_SEC } }),
+      makeTrack({ verticalRate: 2000, heard: { verticalRate: NOW - LAPSE_SEC } }),
       makeTrack({ verticalRate: undefined, heard: held }),
     ];
 
@@ -161,12 +163,25 @@ describe('trafficAround', () => {
     expect(hexes(placed)).toEqual(['up', 'down']);
   });
 
+  it('keeps traffic whose position was heard under the lapse ago, drops it at the lapse', () => {
+    // Arrange
+    const others = [29.9, LAPSE_SEC].map((age) =>
+      traffic(`at-${age}`, 0, 5, { heard: { position: NOW - age, alt: FRESH } }),
+    );
+
+    // Act
+    const placed = trafficAround(ownShip(), others, NOW, view());
+
+    // Assert
+    expect(hexes(placed)).toEqual(['at-29.9']);
+  });
+
   it('drops ground traffic, an altitude not held, a stale or absent position, and own ship', () => {
     // Arrange
     const others = [
       traffic('ground', 0, 5, { alt: 'ground' }),
-      traffic('noalt', 0, 5, { heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
-      traffic('stale', 0, 5, { heard: { position: NOW - INSTRUMENT_SEC, alt: FRESH } }),
+      traffic('noalt', 0, 5, { heard: { position: FRESH, alt: NOW - LAPSE_SEC } }),
+      traffic('stale', 0, 5, { heard: { position: NOW - LAPSE_SEC, alt: FRESH } }),
       traffic('nowhere', 0, 5, { position: { kind: 'none' } }),
       traffic('own', 0, 5),
       traffic('kept', 0, 5),
@@ -200,9 +215,9 @@ describe('trafficAround', () => {
     // Arrange
     const owns = [
       ownShip({ position: { kind: 'none' } }),
-      ownShip({ heard: { position: NOW - INSTRUMENT_SEC, alt: FRESH } }),
+      ownShip({ heard: { position: NOW - LAPSE_SEC, alt: FRESH } }),
       ownShip({ alt: 'ground' }),
-      ownShip({ heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
+      ownShip({ heard: { position: FRESH, alt: NOW - LAPSE_SEC } }),
     ];
     const others = [traffic('a', 0, 5)];
 
@@ -289,7 +304,7 @@ describe('ndTraffic', () => {
     const others = [traffic('near', 10, 3), traffic('far', 20, 10)];
 
     // Act
-    const result = ndTraffic(ownShip(), others, NOW, view());
+    const result = ndTraffic(nowAt(ownShip(), NOW), others, view());
 
     // Assert
     expect(result.symbols.map((s) => s.kind)).toEqual(['other', 'proximate']);
@@ -304,7 +319,7 @@ describe('ndTraffic', () => {
     ];
 
     // Act
-    const result = ndTraffic(ownShip(), others, NOW, view());
+    const result = ndTraffic(nowAt(ownShip(), NOW), others, view());
 
     // Assert
     expect(result.symbols.map((s) => [s.label?.text, (s.label?.y ?? 0) - s.y])).toEqual([
@@ -324,7 +339,7 @@ describe('ndTraffic', () => {
     ];
 
     // Act
-    const result = ndTraffic(ownShip(), others, NOW, view());
+    const result = ndTraffic(nowAt(ownShip(), NOW), others, view());
 
     // Assert
     const arrows = result.symbols.map(
@@ -344,10 +359,29 @@ describe('ndTraffic', () => {
     const none = { symbols: [], traffic: false, offscale: false };
 
     // Act
-    const results = frames.flatMap((v) => rows.map((others) => ndTraffic(own, others, NOW, v)));
+    const results = frames.flatMap((v) =>
+      rows.map((others) => ndTraffic(nowAt(own, NOW), others, v)),
+    );
 
     // Assert
     expect(results).toEqual(Array.from({ length: 4 }, () => none));
+  });
+
+  it('draws no traffic, no advisory and no annunciation at a sample or over a gap', () => {
+    // Arrange
+    const own = ownShip({ ra: advisory({ address: 'thr' }) });
+    const others = [traffic('thr', 10, 4), traffic('a', 0, 5)];
+    const moments = [
+      { kind: 'sample', r: makeSample(NOW - 5, own), instant: NOW - 5 } as const,
+      { kind: 'empty' } as const,
+    ];
+    const none = { symbols: [], traffic: false, offscale: false };
+
+    // Act
+    const results = moments.map((m) => ndTraffic(m, others, view()));
+
+    // Assert
+    expect(results).toEqual([none, none]);
   });
 });
 
@@ -364,7 +398,7 @@ describe('ndTraffic threat by address', () => {
     const others = [traffic('thr', 10, 4), traffic('other', 20, 10)];
 
     // Act
-    const result = ndTraffic(own, others, NOW, view());
+    const result = ndTraffic(nowAt(own, NOW), others, view());
 
     // Assert
     expect(result.symbols.map((s) => s.kind)).toEqual(['other', 'threat']);
@@ -377,7 +411,7 @@ describe('ndTraffic threat by address', () => {
     const others = [traffic('thr', 10, 4, { alt: 33100 })];
 
     // Act
-    const result = ndTraffic(own, others, NOW, view());
+    const result = ndTraffic(nowAt(own, NOW), others, view());
 
     // Assert
     expect(result.symbols.map((s) => [s.kind, s.label?.text])).toEqual([['threat', '+31']]);
@@ -389,7 +423,7 @@ describe('ndTraffic threat by address', () => {
     const others = [traffic('a', 10, 4)];
 
     // Act
-    const result = ndTraffic(own, others, NOW, view());
+    const result = ndTraffic(nowAt(own, NOW), others, view());
 
     // Assert
     expect(result.symbols.map((s) => s.kind)).toEqual(['proximate']);
@@ -402,7 +436,7 @@ describe('ndTraffic threat by address', () => {
     const others = [traffic('thr', 10, 4)];
 
     // Act
-    const results = rows.map((ra) => ndTraffic(ownShip({ ra }), others, NOW, view()));
+    const results = rows.map((ra) => ndTraffic(nowAt(ownShip({ ra }), NOW), others, view()));
 
     // Assert
     expect(results.map((r) => [r.symbols.map((s) => s.kind), r.traffic])).toEqual([
@@ -414,12 +448,10 @@ describe('ndTraffic threat by address', () => {
   it('draws no symbol for a threat whose altitude is not held, but still TRAFFIC', () => {
     // Arrange
     const own = ownShip({ ra: advisory({ address: 'thr' }) });
-    const others = [
-      traffic('thr', 10, 4, { heard: { position: FRESH, alt: NOW - INSTRUMENT_SEC } }),
-    ];
+    const others = [traffic('thr', 10, 4, { heard: { position: FRESH, alt: NOW - LAPSE_SEC } })];
 
     // Act
-    const result = ndTraffic(own, others, NOW, view());
+    const result = ndTraffic(nowAt(own, NOW), others, view());
 
     // Assert
     expect(result.symbols).toEqual([]);
@@ -438,7 +470,7 @@ describe('ndTraffic threat by position', () => {
     const others = [traffic('near', 150, 3)];
 
     // Act
-    const result = ndTraffic(own, others, NOW, view(150));
+    const result = ndTraffic(nowAt(own, NOW), others, view(150));
 
     // Assert
     expect(result.symbols.map((s) => s.key)).toEqual(['near', 'estimate']);
@@ -451,7 +483,7 @@ describe('ndTraffic threat by position', () => {
     const [east, north] = [3 * Math.sin(172 * RAD), 3 * Math.cos(172 * RAD)];
 
     // Act
-    const result = ndTraffic(own, others, NOW, view(150));
+    const result = ndTraffic(nowAt(own, NOW), others, view(150));
 
     // Assert
     expect(result.symbols[0]?.at[0]).toBeCloseTo(5 * Math.sin(150 * RAD), 2);
@@ -466,7 +498,7 @@ describe('ndTraffic threat by position', () => {
     const [x, y] = ndPoint(G, turn(150, 152 + 20), pxOf(G, 3, 20));
 
     // Act
-    const result = ndTraffic(own, [], NOW, view(150));
+    const result = ndTraffic(nowAt(own, NOW), [], view(150));
 
     // Assert
     expect(result.symbols.map((s) => [s.kind, s.x, s.y, s.label?.text])).toEqual([
@@ -478,7 +510,7 @@ describe('ndTraffic threat by position', () => {
   it('places nothing without a held heading, nor without a range or a bearing, but still TRAFFIC', () => {
     // Arrange
     const owns = [
-      byPosition({ range: 3, bearing: 20 }, { heard: { ...HELD, heading: NOW - INSTRUMENT_SEC } }),
+      byPosition({ range: 3, bearing: 20 }, { heard: { ...HELD, heading: NOW - LAPSE_SEC } }),
       byPosition(
         { range: 3, bearing: 20 },
         { heading: undefined, heard: { position: FRESH, alt: FRESH } },
@@ -488,7 +520,7 @@ describe('ndTraffic threat by position', () => {
     ];
 
     // Act
-    const results = owns.map((own) => ndTraffic(own, [], NOW, view(150)));
+    const results = owns.map((own) => ndTraffic(nowAt(own, NOW), [], view(150)));
 
     // Assert
     expect(results.map((r) => [r.symbols, r.traffic])).toEqual([
@@ -504,7 +536,7 @@ describe('ndTraffic threat by position', () => {
     const own = byPosition({ range: 3, bearing: 20 }, { position: { kind: 'none' } });
 
     // Act
-    const result = ndTraffic(own, [], NOW, view(150));
+    const result = ndTraffic(nowAt(own, NOW), [], view(150));
 
     // Assert
     expect(result.symbols.map((s) => s.kind)).toEqual(['threat']);
@@ -516,12 +548,12 @@ describe('ndTraffic threat by position', () => {
       byPosition({ range: 3, bearing: 20 }),
       byPosition(
         { range: 3, bearing: 20, altitude: 29600 },
-        { heard: { ...HELD, alt: NOW - INSTRUMENT_SEC } },
+        { heard: { ...HELD, alt: NOW - LAPSE_SEC } },
       ),
     ];
 
     // Act
-    const results = owns.map((own) => ndTraffic(own, [], NOW, view(150)));
+    const results = owns.map((own) => ndTraffic(nowAt(own, NOW), [], view(150)));
 
     // Assert
     expect(results.map((r) => r.symbols.map((s) => s.label))).toEqual([[undefined], [undefined]]);
@@ -544,7 +576,7 @@ describe('ndTraffic offscale', () => {
     ];
 
     // Act
-    const results = rows.map(([o, others, v]) => ndTraffic(o, others, NOW, v).offscale);
+    const results = rows.map(([o, others, v]) => ndTraffic(nowAt(o, NOW), others, v).offscale);
 
     // Assert
     expect(results).toEqual([true, true, true, true, true]);
@@ -558,7 +590,7 @@ describe('ndTraffic offscale', () => {
       [own({ address: 'ghost' }), [traffic('t', 0, 12.5)], view(0, 10)],
       [own({ range: 15, bearing: 20 }, { heading: undefined }), [], view(0, 10)],
       [
-        own({ range: 15, bearing: 20 }, { heard: { ...HELD, heading: NOW - INSTRUMENT_SEC } }),
+        own({ range: 15, bearing: 20 }, { heard: { ...HELD, heading: NOW - LAPSE_SEC } }),
         [],
         view(0, 10),
       ],
@@ -569,7 +601,7 @@ describe('ndTraffic offscale', () => {
     ];
 
     // Act
-    const results = rows.map(([o, others, v]) => ndTraffic(o, others, NOW, v).offscale);
+    const results = rows.map(([o, others, v]) => ndTraffic(nowAt(o, NOW), others, v).offscale);
 
     // Assert
     expect(results).toEqual(rows.map(() => false));
@@ -640,7 +672,7 @@ describe('the symbols a pointer can hover', () => {
   it('leave out the threat placed by range and bearing, and keep the paint order', () => {
     // Arrange
     const own = estimated({ ra: advisory({ range: 3, bearing: 20, altitude: 29600 }) });
-    const symbols = ndTraffic(own, [traffic('near', 150, 3)], NOW, view(150)).symbols;
+    const symbols = ndTraffic(nowAt(own, NOW), [traffic('near', 150, 3)], view(150)).symbols;
     // Precondition: the fixture draws the estimate
     expect(symbols.map((s) => s.key)).toEqual(['near', 'estimate']);
 
@@ -654,7 +686,7 @@ describe('the symbols a pointer can hover', () => {
   it('find a threat named by its address, and nothing for an aircraft not drawn', () => {
     // Arrange
     const own = ownShip({ ra: advisory({ address: 'thr' }) });
-    const symbols = ndTraffic(own, [traffic('thr', 10, 4)], NOW, view()).symbols;
+    const symbols = ndTraffic(nowAt(own, NOW), [traffic('thr', 10, 4)], view()).symbols;
     const asked = ['thr', 'gone', null];
 
     // Act
@@ -667,7 +699,7 @@ describe('the symbols a pointer can hover', () => {
   it('never find the estimate by its key', () => {
     // Arrange
     const own = estimated({ ra: advisory({ range: 3, bearing: 20, altitude: 29600 }) });
-    const symbols = ndTraffic(own, [], NOW, view(150)).symbols;
+    const symbols = ndTraffic(nowAt(own, NOW), [], view(150)).symbols;
 
     // Act
     const found = peekedSymbol(symbols, 'estimate');
@@ -680,7 +712,7 @@ describe('the symbols a pointer can hover', () => {
     // Arrange
     const own = ownShip({ ra: advisory({ address: 'thr' }) });
     const others = [traffic('thr', 30, 4), traffic('near', 10, 3), traffic('far', 20, 10)];
-    const keys = peekable(ndTraffic(own, others, NOW, view()).symbols).map((s) => s.key);
+    const keys = peekable(ndTraffic(nowAt(own, NOW), others, view()).symbols).map((s) => s.key);
     const places = [0, 1, 2, 3];
 
     // Act

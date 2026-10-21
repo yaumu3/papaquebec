@@ -1,10 +1,7 @@
 import type { HeardKey } from '../../lib/aircraft';
-import { STALE_SECONDS } from '../../render/scene/rules';
+import { LAPSE_SEC } from '../../lib/reports';
 import type { Sample } from '../../state/track';
 import { type Interval, timeAt } from '../../state/window';
-
-/** As long without a report as makes a target stale on the scope breaks a trace too. */
-export const GAP_SEC = STALE_SECONDS;
 
 export interface Point {
   t: number;
@@ -19,13 +16,16 @@ export interface Range {
   hi: number;
 }
 
-/** The samples in stretches of reports no further apart than the gap. */
+/** Whether two reports, oldest first, are a gap apart: the lapse or more. */
+const apart = (a: Sample, b: Sample): boolean => b.t - a.t >= LAPSE_SEC;
+
+/** The samples in stretches of reports less than the gap apart. */
 function stretches(samples: readonly Sample[]): Sample[][] {
   const out: Sample[][] = [];
   let stretch: Sample[] = [];
   for (const s of samples) {
     const last = stretch.at(-1);
-    if (last && s.t - last.t > GAP_SEC) {
+    if (last && apart(last, s)) {
       out.push(stretch);
       stretch = [];
     }
@@ -50,17 +50,17 @@ export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefine
   return instants.length > 0 ? Math.min(...instants) : undefined;
 }
 
-/** Whether the reading made of `keys` was heard no further than the gap from `t`; always, without keys. */
+/** Whether the reading made of `keys` was heard less than the gap from `t`; always, without keys. */
 export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
   if (keys.length === 0) return true;
   const at = heardAt(s, keys);
-  return at !== undefined && Math.abs(t - at) <= GAP_SEC;
+  return at !== undefined && Math.abs(t - at) < LAPSE_SEC;
 }
 
 /**
  * The runs of points a trace joins: consecutive samples of a stretch that carry the reading. With
  * the `heard` instants of the reading, only a sample with a new report of it, heard within the gap
- * of the sample, is a point, and a run breaks where the reading went unheard longer than the gap.
+ * of the sample, is a point, and a run breaks where the reading went unheard for the gap or longer.
  */
 export function runsOf(
   samples: readonly Sample[],
@@ -84,7 +84,7 @@ export function runsOf(
         continue;
       }
       if (at === undefined || at === last || !heardNear(s, heard, s.t)) continue;
-      if (last !== undefined && at - last > GAP_SEC) end();
+      if (last !== undefined && at - last >= LAPSE_SEC) end();
       run.push({ t: s.t, v });
       last = at;
     }
@@ -135,8 +135,11 @@ export function yOf(
   return height - padBottom - ((v - r.lo) / (r.hi - r.lo)) * span;
 }
 
-/** The gaps between the stretches of reports, cut to the interval. */
-export function gapsIn(samples: readonly Sample[], i: Interval): Interval[] {
+/**
+ * The gaps between the stretches of reports, cut to the interval; and, while the target is lost,
+ * the silence after the last report.
+ */
+export function gapsIn(samples: readonly Sample[], i: Interval, lost = false): Interval[] {
   const out: Interval[] = [];
   let previous: Sample | undefined;
   for (const stretch of stretches(samples)) {
@@ -147,6 +150,10 @@ export function gapsIn(samples: readonly Sample[], i: Interval): Interval[] {
       if (from < to) out.push({ from, to });
     }
     previous = stretch.at(-1);
+  }
+  const last = samples.at(-1);
+  if (lost && last && Math.max(last.t, i.from) < i.to) {
+    out.push({ from: Math.max(last.t, i.from), to: i.to });
   }
   return out;
 }
@@ -178,14 +185,37 @@ export function nearestSample(samples: readonly Sample[], t: number, i: Interval
   return t - before.t <= after.t - t ? before : after;
 }
 
-/** The sample inside the interval nearest the time a point `px` across a plot `width` wide stands for; null without any. */
-export function sampleAt(
+/** What a point across a plot stands for: its instant, and the sample there; none over a gap. */
+export interface Peek {
+  t: number;
+  sample: Sample | null;
+}
+
+/** Whether `t` lies inside a gap: between two samples a gap apart, or after the last while lost. */
+function overGap(samples: readonly Sample[], t: number, lost: boolean): boolean {
+  const k = countBefore(samples, t);
+  const before = samples[k - 1];
+  const after = samples[k];
+  if (!before || t === after?.t) return false;
+  return after ? apart(before, after) : lost;
+}
+
+/**
+ * What the point `px` across a plot `width` wide stands for: the sample inside the interval
+ * nearest its time, at that sample's time; over a gap, no sample, at the pointer's own time; null
+ * without any.
+ */
+export function peekAt(
   samples: readonly Sample[],
   px: number,
   i: Interval,
   width: number,
-): Sample | null {
-  return nearestSample(samples, timeAt(px, i, width), i);
+  lost: boolean,
+): Peek | null {
+  const t = timeAt(px, i, width);
+  if (overGap(samples, t, lost)) return { t, sample: null };
+  const sample = nearestSample(samples, t, i);
+  return sample && { t: sample.t, sample };
 }
 
 /** The last sample inside the interval; null without any. The samples are oldest first. */
@@ -203,7 +233,8 @@ export interface Bar {
 /**
  * A bar per name reported, in order of first report: each stretch runs from the sample that
  * first reports the name to the last that does before one that does not, or a gap. With the
- * `heard` instants of the names, a sample whose names went unheard longer than the gap reports none.
+ * `heard` instants of the names, a sample whose names went unheard for the gap or longer reports
+ * none.
  */
 export function barsOf(
   samples: readonly Sample[],

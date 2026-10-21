@@ -6,6 +6,7 @@ import { magneticBearing } from '../../../state/magnetic';
 import type { Position, Track } from '../../../state/track';
 import { holdsAll } from '../freshness';
 import type { Point } from '../glide';
+import type { Moment } from '../moment';
 import { type NdGeometry, ndPoint, onArc, pxOf } from './geometry';
 import { type NdFrame } from './readout';
 
@@ -347,14 +348,13 @@ function threatByPosition(own: Track, now: number, view: NdView): TrafficSymbol 
   return { kind: 'threat', key: ESTIMATE_KEY, at: estimate.at, x, y, label };
 }
 
-/** The traffic the display draws around own ship, none on a lost or blank display. */
-export function ndTraffic(
-  own: Track,
-  others: Iterable<Track>,
-  now: number,
-  view: NdView,
-): NdTraffic {
-  if (view.frame.mode === 'lost' || view.frame.mode === 'blank') return NONE;
+/**
+ * The traffic the display draws around own ship; none on a lost or blank display, nor at a
+ * sample, as the panel keeps no past of the other aircraft.
+ */
+export function ndTraffic(m: Moment, others: Iterable<Track>, view: NdView): NdTraffic {
+  if (m.kind !== 'now' || view.frame.mode === 'lost' || view.frame.mode === 'blank') return NONE;
+  const { r: own, instant: now } = m;
   const address = threatAddress(own.ra);
   const all = [...others];
   const placed = trafficAround(

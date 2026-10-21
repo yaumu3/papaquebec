@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
 import { STANDARD_ALTIMETER, qnhAltitudeFt } from '../../../lib/altitude';
-import { INSTRUMENT_SEC } from '../../../lib/reports';
+import { LAPSE_SEC } from '../../../lib/reports';
 import { HPA_PER_INHG } from '../../../lib/units';
 import { setDeclinationAt } from '../../../state/magnetic';
 import { makeSample } from '../../../state/sampleFixture';
 import type { Sample } from '../../../state/track';
+import { nowAt } from '../moment';
 import {
   feetOf,
   fmaColumns,
@@ -22,7 +23,7 @@ afterEach(() => {
   setDeclinationAt(() => () => 0);
 });
 const FRESH = NOW - 1;
-const STALE = NOW - INSTRUMENT_SEC;
+const STALE = NOW - LAPSE_SEC;
 
 /** A target whose samples are these, the last being what it reads now. */
 const targetOf = (first: Sample, ...rest: Sample[]) => ({
@@ -31,13 +32,13 @@ const targetOf = (first: Sample, ...rest: Sample[]) => ({
 });
 
 const selectedOf = (t: Sample) => {
-  const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER);
+  const out = pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER);
   return [out.selAlt, out.fmsAlt];
 };
 
-const baroOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).baro;
+const baroOf = (t: Sample) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).baro;
 
-const altitudeOf = (t: Sample) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).altitude;
+const altitudeOf = (t: Sample) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).altitude;
 
 /** A sample at `t` reporting these modes, heard at `t`. */
 const reporting = (t: number, navModes: string[]) =>
@@ -76,7 +77,7 @@ describe('pfdFma', () => {
     );
 
     // Act
-    const out = pfdFma(t, NOW);
+    const out = pfdFma(nowAt(t, NOW), t.samples);
 
     // Assert
     expect(out).toEqual({
@@ -93,13 +94,11 @@ describe('pfdFma', () => {
     const targets = [
       targetOf(makeSample(NOW, { heard: {} })),
       targetOf(makeSample(NOW, { navModes: modes, heard: { navModes: STALE } })),
-      targetOf(
-        makeSample(NOW, { navModes: modes, heard: { navModes: FRESH }, seen: INSTRUMENT_SEC }),
-      ),
+      targetOf(makeSample(NOW, { navModes: modes, heard: { navModes: FRESH }, seen: LAPSE_SEC })),
     ];
 
     // Act
-    const out = targets.map((t) => pfdFma(t, NOW));
+    const out = targets.map((t) => pfdFma(nowAt(t, NOW), t.samples));
 
     // Assert
     const empty = {
@@ -116,7 +115,7 @@ describe('pfdFma', () => {
     const t = targetOf(makeSample(NOW, { navModes: ['lnav'], heard: { navModes: FRESH } }));
 
     // Act
-    const out = pfdFma(t, NOW);
+    const out = pfdFma(nowAt(t, NOW), t.samples);
 
     // Assert
     expect(out).toEqual({
@@ -139,7 +138,7 @@ describe('modeChangedAt', () => {
     ];
 
     // Act
-    const out = modeChangedAt(samples, 'vertical');
+    const out = modeChangedAt(samples, 'vertical', Infinity);
 
     // Assert
     expect(out).toBe(100);
@@ -150,7 +149,10 @@ describe('modeChangedAt', () => {
     const samples = [reporting(90, ['vnav']), reporting(100, ['vnav'])];
 
     // Act
-    const out = [modeChangedAt(samples, 'vertical'), modeChangedAt(samples, 'lateral')];
+    const out = [
+      modeChangedAt(samples, 'vertical', Infinity),
+      modeChangedAt(samples, 'lateral', Infinity),
+    ];
 
     // Assert
     expect(out).toEqual([undefined, undefined]);
@@ -160,12 +162,12 @@ describe('modeChangedAt', () => {
     // Arrange
     const samples = [
       reporting(90, ['vnav']),
-      makeSample(100, { navModes: ['althold'], heard: { navModes: 80 } }),
+      makeSample(100, { navModes: ['althold'], heard: { navModes: 100 - LAPSE_SEC } }),
       reporting(110, ['vnav']),
     ];
 
     // Act
-    const out = modeChangedAt(samples, 'vertical');
+    const out = modeChangedAt(samples, 'vertical', Infinity);
 
     // Assert
     expect(out).toBeUndefined();
@@ -173,6 +175,23 @@ describe('modeChangedAt', () => {
 });
 
 describe('pfdFma boxes', () => {
+  it('boxes only by the changes up to the peeked sample', () => {
+    // Arrange
+    const samples = [90, 100, 105, 109.9, 110, 110.1, 120].map((t) =>
+      reporting(t, t < 120 ? ['lnav', 'vnav'] : ['lnav', 'althold']),
+    );
+    samples[0] = reporting(90, ['lnav', 'althold']);
+    const peeked = samples.slice(2, 6);
+
+    // Act
+    const out = peeked.map(
+      (r) => pfdFma({ kind: 'sample', r, instant: r.t }, samples).boxed.vertical,
+    );
+
+    // Assert
+    expect(out).toEqual([true, true, false, false]);
+  });
+
   it('boxes a column for 10 s after its text changed, and only that column', () => {
     // Arrange
     const t = targetOf(
@@ -183,7 +202,11 @@ describe('pfdFma boxes', () => {
     );
 
     // Act
-    const out = [pfdFma(t, 105).boxed, pfdFma(t, 109.9).boxed, pfdFma(t, 110).boxed];
+    const out = [
+      pfdFma(nowAt(t, 105), t.samples).boxed,
+      pfdFma(nowAt(t, 109.9), t.samples).boxed,
+      pfdFma(nowAt(t, 110), t.samples).boxed,
+    ];
 
     // Assert
     expect(out).toEqual([
@@ -198,7 +221,7 @@ describe('pfdFma boxes', () => {
     const t = targetOf(reporting(100, ['lnav', 'vnav']), reporting(105, ['lnav']));
 
     // Act
-    const out = pfdFma(t, 105);
+    const out = pfdFma(nowAt(t, 105), t.samples);
 
     // Assert
     expect(out).toEqual({
@@ -216,7 +239,7 @@ describe('pfdReadouts speed', () => {
     const t = makeSample(NOW, { ias: 261.6, mach: 0.79, heard: { ias: FRESH, mach: FRESH } });
 
     // Act
-    const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER);
+    const out = pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER);
 
     // Assert
     expect(out).toEqual({
@@ -238,11 +261,11 @@ describe('pfdReadouts speed', () => {
     const targets = [
       makeSample(NOW, { ...reported, heard: { ias: STALE, mach: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { ...reported, heard: { ias: FRESH, mach: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { ...reported, heard: { ias: FRESH, mach: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER));
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER));
 
     // Assert
     const blank: PfdReadouts = {
@@ -267,11 +290,11 @@ describe('pfdReadouts roll', () => {
       makeSample(NOW, { roll: -12, heard: { roll: FRESH } }),
       makeSample(NOW, { roll: -12, heard: { roll: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { roll: -12, heard: { roll: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { roll: -12, heard: { roll: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).roll);
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).roll);
 
     // Assert
     expect(out).toEqual([-12, undefined, undefined, undefined]);
@@ -287,7 +310,7 @@ describe('pfdReadouts flight path vector', () => {
     const t = makeSample(NOW, { ...live, heard });
 
     // Act
-    const out = pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv;
+    const out = pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).fpv;
 
     // Assert
     expect(out?.fpaDeg).toBeCloseTo(2.203, 3);
@@ -308,8 +331,8 @@ describe('pfdReadouts flight path vector', () => {
 
     // Act
     const out = [
-      pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv?.driftDeg,
-      pfdReadouts(staleTrack, NOW, STANDARD_ALTIMETER).fpv?.driftDeg,
+      pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).fpv?.driftDeg,
+      pfdReadouts(nowAt(staleTrack, NOW), STANDARD_ALTIMETER).fpv?.driftDeg,
     ];
 
     // Assert
@@ -324,11 +347,11 @@ describe('pfdReadouts flight path vector', () => {
       makeSample(NOW, { ...live, heard: { ...heard, verticalRate: STALE } }),
       makeSample(NOW, { ...live, gs: undefined, heard: { verticalRate: FRESH, roll: FRESH } }),
       makeSample(NOW, { ...live, gs: 0, heard }),
-      makeSample(NOW, { ...live, heard, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { ...live, heard, seen: LAPSE_SEC }),
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).fpv);
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).fpv);
 
     // Assert
     expect(out).toEqual([undefined, undefined, undefined, undefined, undefined, undefined]);
@@ -352,7 +375,7 @@ describe('pfdReadouts altitude', () => {
     const targets = [
       makeSample(NOW, { alt: 37000, heard: { alt: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { alt: 37000, heard: { alt: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { alt: 37000, heard: { alt: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
@@ -360,6 +383,18 @@ describe('pfdReadouts altitude', () => {
 
     // Assert
     expect(out).toEqual([{ kind: 'flag' }, { kind: 'flag' }, { kind: 'flag' }]);
+  });
+
+  it('flags the altitude from the lapse on, not before', () => {
+    // Arrange
+    const ages = [20, LAPSE_SEC - 0.1, LAPSE_SEC, LAPSE_SEC + 0.1];
+    const targets = ages.map((age) => makeSample(NOW, { alt: 37000, heard: { alt: NOW - age } }));
+
+    // Act
+    const out = targets.map((t) => altitudeOf(t).kind);
+
+    // Assert
+    expect(out).toEqual(['feet', 'feet', 'flag', 'flag']);
   });
 
   it('reads the altitude as the crew does, on their setting even when it has gone stale', () => {
@@ -464,7 +499,7 @@ describe('pfdReadouts selected altitudes', () => {
       makeSample(NOW, {
         ...reported,
         heard: { selAlt: FRESH, fmsAlt: FRESH },
-        seen: INSTRUMENT_SEC,
+        seen: LAPSE_SEC,
       }),
     ];
 
@@ -500,7 +535,7 @@ describe('pfdReadouts baro', () => {
     const targets = [
       makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: STALE } }),
       makeSample(NOW, { heard: {} }),
-      makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: FRESH }, seen: INSTRUMENT_SEC }),
+      makeSample(NOW, { navQnh: 1013.25, heard: { navQnh: FRESH }, seen: LAPSE_SEC }),
     ];
 
     // Act
@@ -521,14 +556,113 @@ describe('pfdReadouts vertical rate', () => {
       makeSample(NOW, {
         verticalRate: -2200,
         heard: { verticalRate: FRESH },
-        seen: INSTRUMENT_SEC,
+        seen: LAPSE_SEC,
       }),
     ];
 
     // Act
-    const out = targets.map((t) => pfdReadouts(t, NOW, STANDARD_ALTIMETER).vs);
+    const out = targets.map((t) => pfdReadouts(nowAt(t, NOW), STANDARD_ALTIMETER).vs);
 
     // Assert
     expect(out).toEqual([-2200, undefined, undefined, undefined]);
+  });
+});
+
+describe('the instrument at a peeked sample', () => {
+  it('reads a sample at its own time as a live target whose data has exactly that age', () => {
+    // Arrange
+    const AGE = 200;
+    const rows = [
+      {
+        ias: 250,
+        roll: -5,
+        alt: 12000,
+        verticalRate: 500,
+        gs: 300,
+        heard: { ias: 1, roll: 1, alt: 1, verticalRate: 1, gs: 1, navModes: 1 },
+      },
+      {
+        ias: 250,
+        roll: -5,
+        alt: 12000,
+        verticalRate: 500,
+        gs: 300,
+        navModes: ['lnav'],
+        heard: {
+          ias: 1 - LAPSE_SEC,
+          roll: 1,
+          alt: 1 - LAPSE_SEC,
+          verticalRate: 1,
+          gs: 1,
+          navModes: 1 - LAPSE_SEC,
+        },
+      },
+      {
+        ias: 250,
+        roll: -5,
+        alt: 12000,
+        verticalRate: 500,
+        gs: 300,
+        navModes: ['lnav'],
+        heard: { ias: 1, roll: 1, alt: 1, verticalRate: 1, gs: 1, navModes: 1 },
+      },
+      {
+        ias: 250,
+        heading: 90,
+        track: 100,
+        roll: -5,
+        verticalRate: 500,
+        gs: 300,
+        heard: { heading: 1 - LAPSE_SEC + 0.1, track: 1, roll: 1, verticalRate: 1, gs: 1 },
+      },
+    ].map((over) => makeSample(1, over));
+    const shifted = rows.map((s) =>
+      makeSample(1 + AGE, {
+        ...s,
+        heard: Object.fromEntries(Object.entries(s.heard).map(([k, v]) => [k, (v ?? 0) + AGE])),
+      }),
+    );
+    const expected = shifted.map((r) => {
+      const m = nowAt(r, 1 + AGE);
+      return { readouts: pfdReadouts(m, STANDARD_ALTIMETER), fma: pfdFma(m, [r]) };
+    });
+
+    // Act
+    const peeked = rows.map((r) => {
+      const m = { kind: 'sample', r, instant: r.t } as const;
+      return { readouts: pfdReadouts(m, STANDARD_ALTIMETER), fma: pfdFma(m, [r]) };
+    });
+
+    // Assert
+    expect(peeked).toEqual(expected);
+  });
+
+  it('shows nothing, and no annunciator, for the empty moment', () => {
+    // Arrange
+    const empty = { kind: 'empty' } as const;
+
+    // Act
+    const out = { readouts: pfdReadouts(empty, STANDARD_ALTIMETER), fma: pfdFma(empty, []) };
+
+    // Assert
+    expect(out).toEqual({
+      readouts: {
+        ias: undefined,
+        mach: '',
+        roll: undefined,
+        fpv: undefined,
+        altitude: { kind: 'flag' },
+        selAlt: undefined,
+        fmsAlt: undefined,
+        baro: '',
+        vs: undefined,
+      },
+      fma: {
+        lateral: undefined,
+        vertical: undefined,
+        ap: false,
+        boxed: { lateral: false, vertical: false },
+      },
+    });
   });
 });

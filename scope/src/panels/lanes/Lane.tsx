@@ -26,8 +26,8 @@ import {
   scaleLabels,
 } from './plot';
 import { type Dash, HEARD, PLOTS } from './plots';
-import { heldIntents, type LaneReadout, readoutOf, readoutSlots, type Slot } from './readout';
-import { barsOf, gapsIn, yOf } from './trace';
+import { heldIntents, type LaneReadout, readoutSlots, shownReadout, type Slot } from './readout';
+import { barsOf, yOf } from './trace';
 
 import s from './Lanes.module.css';
 
@@ -74,11 +74,14 @@ export function Lane(props: {
   keys: readonly ReadingKey[];
   samples: readonly Sample[];
   visible: Interval;
+  /** The stretches without a report, shaded. */
+  gaps: readonly Interval[];
   ticks: readonly number[];
   width: number;
   height: number;
-  /** The sample the lane is read at, and whether that is off now: peeking, or the window held. */
+  /** The sample the lane is read at; none over a gap or without samples. */
   at: Sample | null;
+  /** Whether the lane reads an instant other than now: peeking, or the window held. */
   past: boolean;
   /** Where the time cursor stands across the plot, if it does. */
   cursor: number | null;
@@ -122,7 +125,6 @@ export function Lane(props: {
   });
   /** A value line on a whole pixel row, so it reads one pixel thin. */
   const lineY = (v: number) => Math.floor(y(v)) + 0.5;
-  const gaps = createMemo(() => gapsIn(props.samples, props.visible));
   const bars = createMemo(() =>
     spec.kind === 'gantt' ? barsOf(props.samples, spec.names, HEARD[props.lane]) : [],
   );
@@ -158,7 +160,7 @@ export function Lane(props: {
       withinSec: step / 2,
     }).map((h) => headingGlyph(x(h.t), mid(), h));
   });
-  const readout = createMemo(() => (props.at ? readoutOf(props.keys, props.at) : null));
+  const readout = createMemo(() => shownReadout(props.keys, props.at, props.past));
   /** The intents the contact had, over all of it, so that panning moves no slot. */
   const held = createMemo(() => heldIntents(props.keys, props.samples));
   const slots = () => {
@@ -226,7 +228,7 @@ export function Lane(props: {
     >
       <div class={s.plot} data-plot>
         <svg class={s.svg} height={props.height}>
-          <Index each={gaps()}>
+          <Index each={props.gaps}>
             {(g) => (
               <rect
                 class={s.gap}

@@ -1,5 +1,5 @@
 import type { Heard, HeardKey } from '../../lib/aircraft';
-import { holds, INSTRUMENT_SEC } from '../../lib/reports';
+import { holds, LAPSE_SEC } from '../../lib/reports';
 import type { Readout } from '../../state/track';
 
 /**
@@ -11,12 +11,12 @@ export function oldestHeard(heard: Heard, keys: readonly HeardKey[]): number | u
   return times.length === 0 ? undefined : Math.min(...times);
 }
 
-/** Whether a value read from these keys still holds: it is as old as the oldest of them. */
+/** Whether a value read from these keys still holds at `instant`: it is as old as the oldest of them. */
 export const holdsAll = (
   t: Pick<Readout, 'heard'>,
   keys: readonly HeardKey[],
-  now: number,
-): boolean => holds(oldestHeard(t.heard, keys), now, INSTRUMENT_SEC);
+  instant: number,
+): boolean => holds(oldestHeard(t.heard, keys), instant, LAPSE_SEC);
 
-/** Whether the target's last message is `INSTRUMENT_SEC` old or older: the instrument has lost it. */
-export const isLost = (t: Pick<Readout, 'seen'>): boolean => t.seen >= INSTRUMENT_SEC;
+/** Whether the target's last message is `LAPSE_SEC` old or older: the instrument has lost it. */
+export const isLost = (t: Pick<Readout, 'seen'>): boolean => t.seen >= LAPSE_SEC;

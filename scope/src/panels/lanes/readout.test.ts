@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import { LAPSE_SEC } from '../../lib/reports';
 import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
-import { altTargets, heldIntents, readoutOf, readoutSlots } from './readout';
-import { GAP_SEC } from './trace';
+import { altTargets, heldIntents, readoutOf, readoutSlots, shownReadout } from './readout';
 
 describe('altTargets', () => {
   it('puts first the target the aircraft levels at first: the lower in a climb, the higher in a descent', () => {
@@ -162,9 +162,24 @@ describe('readoutOf', () => {
 });
 
 describe('readoutOf, for readings heard a gap before the cursor', () => {
+  it('reads a reading heard exactly the lapse before the cursor as unknown, not one just under it', () => {
+    // Arrange
+    const rows = [29.9, 30, 30.1].map((d) => sample(1000, { gs: 290, heard: { gs: 1000 - d } }));
+
+    // Act
+    const readouts = rows.map((s) => readoutOf(['gs'], s));
+
+    // Assert
+    expect(readouts).toEqual([
+      { value: '290' },
+      { value: '---', unknown: true },
+      { value: '---', unknown: true },
+    ]);
+  });
+
   it("reads each lane's reading only while heard within the gap, a reading of reception always", () => {
     // Arrange
-    const stale = 100 - GAP_SEC - 1;
+    const stale = 100 - LAPSE_SEC - 1;
     const rows = [
       { keys: ['gs'], s: sample(100, { gs: 290, heard: { gs: 100 } }) },
       { keys: ['gs'], s: sample(100, { gs: 290, heard: { gs: stale } }) },
@@ -194,7 +209,7 @@ describe('readoutOf, for readings heard a gap before the cursor', () => {
       verticalRate: 1800,
       selAlt: 32_000,
       fmsAlt: 34_000,
-      heard: { alt: 100, verticalRate: 100, selAlt: 100 - GAP_SEC - 1, fmsAlt: 100 },
+      heard: { alt: 100, verticalRate: 100, selAlt: 100 - LAPSE_SEC - 1, fmsAlt: 100 },
     });
 
     // Act
@@ -273,5 +288,39 @@ describe('readoutSlots', () => {
       [{ key: 'selAlt' }],
       [],
     ]);
+  });
+});
+
+describe('readoutOf over a gap', () => {
+  it('reads the dash of no sample, not as an unknown reading', () => {
+    // Arrange
+    const lanes = [['alt'], ['trk', 'selHdg']] as const;
+
+    // Act
+    const readouts = lanes.map((keys) => readoutOf(keys, null));
+
+    // Assert
+    expect(readouts).toEqual([{ value: '---' }, { value: '---' }]);
+  });
+});
+
+describe('shownReadout', () => {
+  it('reads the dash of a gap while the panel reads the past, and nothing at now', () => {
+    // Arrange
+    const keys = ['alt', 'selAlt'] as const;
+    const s = sample(100);
+    const rows = [
+      { at: s, past: false },
+      { at: s, past: true },
+      { at: null, past: true },
+      { at: null, past: false },
+    ];
+    const expected = [readoutOf(keys, s), readoutOf(keys, s), { value: '---' }, null];
+
+    // Act
+    const shown = rows.map((r) => shownReadout(keys, r.at, r.past));
+
+    // Assert
+    expect(shown).toEqual(expected);
   });
 });

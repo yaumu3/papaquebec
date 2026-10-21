@@ -10,6 +10,7 @@ import { trackStore } from '../../../state/tracks';
 import { hoverPlace } from '../../../ui/hoverPlace';
 import { trackWidth } from '../../../ui/size';
 import { glided, glidedPoints } from '../glide';
+import { type Moment, momentKey } from '../moment';
 import {
   aircraftPath,
   arcPath,
@@ -31,7 +32,15 @@ import {
   trendPoints,
   windArrowPath,
 } from './geometry';
-import { boxOf, ndFrame, type NdSymbols, type NdText, ndReadouts, ndSymbols } from './readout';
+import {
+  boxOf,
+  ndFrame,
+  type NdFrame,
+  type NdSymbols,
+  type NdText,
+  ndReadouts,
+  ndSymbols,
+} from './readout';
 import { ndTraffic, peekable, peekedSymbol, symbolDrawn, type TrafficKind } from './traffic';
 
 import flags from '../flag.module.css';
@@ -67,22 +76,23 @@ function ZoomButton(props: { label: string; step: 1 | -1; glyph: string }) {
 }
 
 /** The navigation display of a target: its compass, track-up, with the heading as a pointer. */
-export function Nd(props: { t: Track }) {
+export function Nd(props: { t: Track; moment: Moment }) {
   const [root, setRoot] = createSignal<HTMLDivElement>();
   const width = trackWidth(root);
   const g = createMemo(() => ndGeometry(width()));
-  const frame = createMemo(() => ndFrame(props.t, trackStore.stats.now));
-  const readouts = createMemo(() => ndReadouts(props.t, trackStore.stats.now));
+  /** Over a gap the compass stays on the orientation of the frame before. */
+  const frame = createMemo<NdFrame>((last) => ndFrame(props.moment, last?.orient));
+  const readouts = createMemo(() => ndReadouts(props.moment));
   /**
    * The glides stand at once on another target, and when the frame changes mode: a target heard
    * again, or whose track lapses or comes back, is shown where it is, not on its way
-   * from where the last frame left it.
+   * from where the last frame left it; so does each sample drawn, and the return to now.
    */
-  const key = () => `${props.t.hex}/${frame().mode}`;
+  const key = () => `${props.t.hex}/${frame().mode}/${momentKey(props.moment)}`;
   const orient = glided(() => frame().orient, { wrap: 360, key });
   const marks = createMemo(() => compass(g(), orient()));
   const lastFrame = () => frame().mode === 'lost' || frame().mode === 'blank';
-  const symbols = createMemo(() => ndSymbols(props.t, trackStore.stats.now, settings.altimeter));
+  const symbols = createMemo(() => ndSymbols(props.moment, settings.altimeter));
   const bearing = (of: (own: NdSymbols) => number | undefined) =>
     glided(() => of(symbols()), { wrap: 360, key });
   const trackDeg = bearing((own) => own.track);
@@ -126,7 +136,7 @@ export function Nd(props: { t: Track }) {
   });
   const traffic = createMemo(() => {
     snapshotVersion();
-    return ndTraffic(props.t, trackStore.tracks.values(), trackStore.stats.now, {
+    return ndTraffic(props.moment, trackStore.tracks.values(), {
       frame: frame(),
       rangeNm: ndRangeNm(),
       g: g(),

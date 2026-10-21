@@ -2,15 +2,17 @@ import type { HeardKey } from '../../../lib/aircraft';
 import { type Altimeter, crewAltitudeFt } from '../../../lib/altitude';
 import { steeringHeading } from '../../../lib/autopilot';
 import { padBearing } from '../../../lib/format';
-import { holds, INSTRUMENT_SEC } from '../../../lib/reports';
+import { holds, LAPSE_SEC } from '../../../lib/reports';
 import { magneticBearing, magneticTrack } from '../../../state/magnetic';
 import type { Readout } from '../../../state/track';
+import { HEARD } from '../../lanes/plots';
 import { NONE, type Reading, READINGS } from '../../readings';
 import { holdsAll, isLost } from '../freshness';
+import type { Moment } from '../moment';
 import type { Trend } from './geometry';
 
-/** The state of the instrument: track-up, lost, or blank for want of a track that holds. */
-export type NdMode = 'track' | 'lost' | 'blank';
+/** The state of the instrument: track-up, lost, blank for want of a track that holds, or empty over a gap. */
+export type NdMode = 'track' | 'lost' | 'blank' | 'empty';
 
 export type NdFlag = 'TRK';
 
@@ -26,9 +28,11 @@ export interface NdFrame {
 const BLANK_BOX = '---';
 
 /** The mode the instrument is in: track-up while the magnetic track holds. */
-function modeOf(t: Readout, now: number): NdMode {
+function modeOf(m: Moment<Readout>): NdMode {
+  if (m.kind === 'empty') return 'empty';
+  const { r: t, instant } = m;
   if (isLost(t)) return 'lost';
-  if (holds(t.heard.track, now, INSTRUMENT_SEC) && magneticTrack(t) !== undefined) return 'track';
+  if (holds(t.heard.track, instant, LAPSE_SEC) && magneticTrack(t) !== undefined) return 'track';
   return 'blank';
 }
 
@@ -39,22 +43,27 @@ const FLAGS: Record<NdMode, readonly NdFlag[]> = {
   track: [],
   lost: ['TRK'],
   blank: ['TRK'],
+  empty: [],
 };
 
 /** What the box at the top reads: the bearing at the top of a live display, else the blank. */
 export const boxOf = (mode: NdMode, orient: number): string =>
   mode === 'track' ? padBearing(orient) : BLANK_BOX;
 
-/** What the top of the ND reads, and the flags beside it, from the freshness of the target's readings. */
-export function ndFrame(t: Readout, now: number): NdFrame {
-  const mode = modeOf(t, now);
-  const orient = orientOf(t);
+/**
+ * What the top of the ND reads, and the flags beside it, from the freshness of the target's
+ * readings; over a gap, the compass stays on the orientation `standing` and nothing is flagged.
+ */
+export function ndFrame(m: Moment<Readout>, standing = 0): NdFrame {
+  const mode = modeOf(m);
+  const orient = m.kind === 'empty' ? standing : orientOf(m.r);
   return {
     mode,
     orient,
     box: boxOf(mode, orient),
     flags: FLAGS[mode],
-    lastHeard: mode === 'lost' ? `LAST HEARD ${Math.round(t.seen)} s` : undefined,
+    lastHeard:
+      mode === 'lost' && m.kind !== 'empty' ? `LAST HEARD ${Math.round(m.r.seen)} s` : undefined,
   };
 }
 
@@ -81,14 +90,28 @@ const degrees = (deg: number | undefined): string | undefined =>
 const shown = (r: Reading, withUnit = false): string | undefined =>
   r === NONE ? undefined : `${r.v}${withUnit ? (r.unit ?? '') : ''}`;
 
-/** The corners of the ND: each value on its own freshness, all blank once the target is lost. */
-export function ndReadouts(t: Readout, now: number): NdReadouts {
-  const lost = isLost(t);
+const blank = (degree = false): NdText => ({ text: degree ? '---°' : '---', known: false });
+
+const BLANK_READOUTS: NdReadouts = {
+  gs: blank(),
+  tas: blank(),
+  wind: blank(),
+  sel: blank(true),
+  hdg: blank(true),
+  tat: blank(),
+  sat: blank(),
+};
+
+/**
+ * The corners of the ND: each value on its own freshness, all blank once the target is lost and
+ * over a gap.
+ */
+export function ndReadouts(m: Moment<Readout>): NdReadouts {
+  if (m.kind === 'empty' || isLost(m.r)) return BLANK_READOUTS;
+  const { r: t, instant } = m;
   const read = (keys: readonly HeardKey[], text: () => string | undefined, degree = false) => {
-    const fresh = !lost && holdsAll(t, keys, now);
-    const value = fresh ? text() : undefined;
-    if (value !== undefined) return { text: value, known: true };
-    return { text: degree ? '---°' : '---', known: false };
+    const value = holdsAll(t, keys, instant) ? text() : undefined;
+    return value === undefined ? blank(degree) : { text: value, known: true };
   };
   const wind = () => {
     const from = windFromOf(t);
@@ -100,7 +123,7 @@ export function ndReadouts(t: Readout, now: number): NdReadouts {
     gs: read(['gs'], () => shown(READINGS.gs.format(t))),
     tas: read(['tas'], () => shown(READINGS.tas.format(t))),
     wind: read(['windDir', 'windSpeed'], wind),
-    sel: read(['selHeading', 'navModes'], () => degrees(steeringHeading(t)), true),
+    sel: read(HEARD.selHdg, () => degrees(steeringHeading(t)), true),
     hdg: read(['heading'], () => degrees(t.heading), true),
     tat: read(['tat'], () => shown(READINGS.tat.format(t), true)),
     sat: read(['oat'], () => shown(READINGS.oat.format(t), true)),
@@ -123,26 +146,30 @@ export interface NdSymbols {
 /** A turn slower than this, in degrees per second, is flight in a straight line: no trend is drawn. */
 const TREND_MIN_RATE_DEG_S = 0.3;
 
-/** The symbols of a live frame; none in a blank or a lost one, where the compass stands on a last orientation. */
-export function ndSymbols(t: Readout, now: number, altimeter: Altimeter): NdSymbols {
-  if (modeOf(t, now) !== 'track') return {};
+/**
+ * The symbols of a live frame; none in a blank, lost or empty one, where the compass stands on a
+ * last orientation.
+ */
+export function ndSymbols(m: Moment<Readout>, altimeter: Altimeter): NdSymbols {
+  if (m.kind === 'empty' || modeOf(m) !== 'track') return {};
+  const { r: t, instant } = m;
   const live = (keys: readonly HeardKey[], v: number | undefined) =>
-    holdsAll(t, keys, now) ? v : undefined;
+    holdsAll(t, keys, instant) ? v : undefined;
   return {
     track: live(['track'], magneticTrack(t)),
     heading: live(['heading'], t.heading),
-    sel: live(['selHeading', 'navModes'], steeringHeading(t)),
-    trend: trendOf(t, now),
-    levelOffNm: levelOffOf(t, now, altimeter),
+    sel: live(HEARD.selHdg, steeringHeading(t)),
+    trend: trendOf(t, instant),
+    levelOffNm: levelOffOf(t, instant, altimeter),
     windFrom: live(['windDir', 'windSpeed'], windFromOf(t)),
   };
 }
 
 /** The turn rate and ground speed, while both hold, the aircraft is under way and the track turns. */
-function trendOf(t: Readout, now: number): Trend | undefined {
+function trendOf(t: Readout, instant: number): Trend | undefined {
   const { trackRate: rateDegS, gs: gsKt } = t;
   if (rateDegS === undefined || gsKt === undefined) return undefined;
-  if (!holdsAll(t, ['trackRate', 'gs'], now)) return undefined;
+  if (!holdsAll(t, ['trackRate', 'gs'], instant)) return undefined;
   if (Math.abs(rateDegS) < TREND_MIN_RATE_DEG_S || gsKt <= 0) return undefined;
   return { rateDegS, gsKt };
 }
@@ -152,10 +179,10 @@ function trendOf(t: Readout, now: number): Trend | undefined {
  * as the crew reads it, the reference `holdsSelected` compares on: the altitude still to go at the
  * rate of climb, flown at the ground speed.
  */
-function levelOffOf(t: Readout, now: number, altimeter: Altimeter): number | undefined {
+function levelOffOf(t: Readout, instant: number, altimeter: Altimeter): number | undefined {
   const { selAlt, verticalRate: vs, gs } = t;
   if (selAlt === undefined || vs === undefined || gs === undefined) return undefined;
-  if (!holdsAll(t, ['alt', 'selAlt', 'verticalRate', 'gs'], now)) return undefined;
+  if (!holdsAll(t, ['alt', 'selAlt', 'verticalRate', 'gs'], instant)) return undefined;
   const crew = crewAltitudeFt(t, altimeter);
   if (crew === undefined || vs === 0 || Math.sign(selAlt - crew) !== Math.sign(vs))
     return undefined;
