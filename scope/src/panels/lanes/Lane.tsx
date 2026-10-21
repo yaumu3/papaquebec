@@ -3,15 +3,11 @@ import { type Accessor, createMemo, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { HistoryLane, ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Interval, lengthOf, type WindowKey, xOf } from '../../state/window';
+import { type Interval, lengthOf, xOf } from '../../state/window';
 import { HEARD, LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
-import { laneName } from './chips';
 import { CursorChip } from './CursorChip';
-import type { LanePart } from './laneDrag';
-import { type LaneMoves, onMoveKey, windowKeyOf } from './moves';
-import { isPickerKey } from './pickerPlace';
 import {
   atTicks,
   barbPath,
@@ -28,7 +24,6 @@ import {
 import { type Dash, PLOTS, type PlotSpec } from './plots';
 import { heldIntents, type LaneReadout, readoutSlots, shownReadout, type Slot } from './readout';
 import { barsOf, yOf } from './trace';
-import { areaOf } from './windowInput';
 
 import s from './Lanes.module.css';
 
@@ -68,9 +63,6 @@ const dashOf = (key: ReadingKey): Dash | undefined => {
 /** One lane of the bay: a top row with its name and readout, then its scale and its plot over the window. */
 export function Lane(props: {
   lane: HistoryLane;
-  /** Its place among the lanes, and how many there are. */
-  index: number;
-  count: number;
   /** The lane's own reading, then the intents drawn in it. */
   keys: readonly ReadingKey[];
   samples: readonly Sample[];
@@ -88,24 +80,8 @@ export function Lane(props: {
   cursor: number | null;
   /** The span being selected, between two points across the plot, if one is. */
   span: { from: number; to: number } | null;
-  /** Resets the window, as a double click on the lane does. */
-  onReset: () => void;
-  /** Pans, narrows, widens or resets the window, as a key on the lane asks. */
-  onWindowKey: (key: WindowKey) => void;
-  /** The lane itself, which keeps the focus for it. */
-  laneRef: (el: HTMLDivElement) => void;
-  moves: LaneMoves;
-  /** What asks for the lane's picker. */
-  onPicker: (e: MouseEvent | KeyboardEvent) => void;
-  onGrab: (e: PointerEvent, part: LanePart) => void;
-  /** Where it stands among the lanes while one is dragged. */
-  place: number;
-  /** Whether it is the lane dragged, shown as a hole where it will land. */
-  hole: boolean;
   /** How far a finger has swiped the top row left, while one does. */
   swipeX: number | null;
-  /** Whether a finger has lifted it and not moved it yet: lit where it stands. */
-  lifted: boolean;
 }) {
   const spec = PLOTS[props.lane];
   const label = LANE_LABELS[props.lane];
@@ -202,29 +178,7 @@ export function Lane(props: {
   );
 
   return (
-    <div
-      ref={props.laneRef}
-      data-lane="history"
-      class={cx(s.lane, props.hole && s.hole, props.lifted && s.lifted)}
-      style={{ height: `${props.height}px`, order: props.place }}
-      tabindex="0"
-      role="group"
-      aria-roledescription="lane"
-      aria-label={laneName(props.lane, props.index, props.count)}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        const key = windowKeyOf(e);
-        if (isPickerKey(e)) props.onPicker(e);
-        else if (key) {
-          e.preventDefault();
-          e.stopPropagation();
-          props.onWindowKey(key);
-        } else onMoveKey(props.moves, e);
-      }}
-      onContextMenu={props.onPicker}
-      onDblClick={props.onReset}
-      onPointerDown={(e) => props.onGrab(e, areaOf(e.target) === 'row' ? 'row' : 'plot')}
-    >
+    <>
       <div class={s.plot} data-plot>
         <svg class={s.svg} height={props.height}>
           <Index each={props.gaps}>
@@ -352,6 +306,6 @@ export function Lane(props: {
         <span class={s.name}>{label}</span>
         <Show when={props.cursor === null ? readout() : null}>{readoutView}</Show>
       </div>
-    </div>
+    </>
   );
 }

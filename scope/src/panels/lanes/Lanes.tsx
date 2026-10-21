@@ -34,6 +34,7 @@ import {
   readsPast,
   resolveWindow,
   selectWindow,
+  type WindowKey,
   timeAt,
   xOf,
 } from '../../state/window';
@@ -49,6 +50,7 @@ import { HOLD_MS, isDoubleTap, PICKER_HOLD_MS, type Tap } from './hold';
 import { InstrumentLane } from './InstrumentLane';
 import { Lane } from './Lane';
 import { createLaneDrag } from './laneDrag';
+import { LaneFrame } from './LaneFrame';
 import type { LaneMoves } from './moves';
 import { Picker } from './Picker';
 import {
@@ -112,6 +114,11 @@ export function Lanes(props: { track: Track }) {
   const plotWidth = trackWidth(axisRow);
   const x = (t: number) => xOf(t, visible(), Math.max(1, plotWidth()));
   const reset = () => setLanesWindow(hex(), DEFAULT_WINDOW);
+  const onWindowKey = (key: WindowKey) => {
+    const w = lanesWindow();
+    const next = keyWindow(key, w, visible(), contact());
+    if (next !== w) setLanesWindow(hex(), next);
+  };
   /** The last finger tap on a history lane, which a second one soon after and near makes a double. */
   let lastTap: Tap | null = null;
   const plotLeft = () => axisRow()?.getBoundingClientRect().left ?? 0;
@@ -366,11 +373,10 @@ export function Lanes(props: { track: Track }) {
                   const d = drag();
                   return d ? placeOf(i(), d.from, slotShown(d)) : i();
                 };
-                return isInstrumentLane(lane) ? (
-                  <InstrumentLane
+                const history = !isInstrumentLane(lane);
+                return (
+                  <LaneFrame
                     lane={lane}
-                    track={props.track}
-                    moment={moment()}
                     index={i()}
                     count={plotted().length}
                     laneRef={(el) => lanes.set(lane, el)}
@@ -380,41 +386,33 @@ export function Lanes(props: { track: Track }) {
                     place={placed()}
                     hole={moving()?.lane === lane}
                     lifted={drag()?.lane === lane && drag()?.still === true}
-                  />
-                ) : (
-                  <Lane
-                    lane={lane}
-                    index={i()}
-                    count={plotted().length}
-                    keys={readingsIn(lane)}
-                    samples={samples()}
-                    visible={visible()}
-                    gaps={gaps()}
-                    ticks={tickTimes()}
-                    width={plotWidth()}
                     height={LANE_PX}
-                    at={at()}
-                    past={past()}
-                    cursor={cursorX()}
-                    span={span()}
-                    onReset={reset}
-                    onWindowKey={(key) => {
-                      const w = lanesWindow();
-                      const next = keyWindow(key, w, visible(), contact());
-                      if (next !== w) setLanesWindow(hex(), next);
-                    }}
-                    laneRef={(el) => lanes.set(lane, el)}
-                    moves={movesOf(lane)}
-                    onPicker={(e) => openLanePicker(lane, e)}
-                    onGrab={(e, part) => grab(e, lane, part)}
-                    place={placed()}
-                    hole={moving()?.lane === lane}
-                    lifted={drag()?.lane === lane && drag()?.still === true}
-                    swipeX={(() => {
-                      const sw = swipe();
-                      return sw?.lane === lane ? swipeOffset(sw.dx) : null;
-                    })()}
-                  />
+                    onReset={history ? reset : undefined}
+                    onWindowKey={history ? onWindowKey : undefined}
+                  >
+                    {isInstrumentLane(lane) ? (
+                      <InstrumentLane lane={lane} track={props.track} moment={moment()} />
+                    ) : (
+                      <Lane
+                        lane={lane}
+                        keys={readingsIn(lane)}
+                        samples={samples()}
+                        visible={visible()}
+                        gaps={gaps()}
+                        ticks={tickTimes()}
+                        width={plotWidth()}
+                        height={LANE_PX}
+                        at={at()}
+                        past={past()}
+                        cursor={cursorX()}
+                        span={span()}
+                        swipeX={(() => {
+                          const sw = swipe();
+                          return sw?.lane === lane ? swipeOffset(sw.dx) : null;
+                        })()}
+                      />
+                    )}
+                  </LaneFrame>
                 );
               }}
             </For>
