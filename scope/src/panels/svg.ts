@@ -30,3 +30,10 @@ export interface TextLabel {
   x: number;
   y: number;
 }
+
+/** The subpath through `points`: a move to the first, a line to each next. */
+export const polylinePath = (points: readonly Point[]): string =>
+  points.map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`).join('');
+
+/** The closed subpath through `points`. */
+export const polygonPath = (points: readonly Point[]): string => `${polylinePath(points)}Z`;

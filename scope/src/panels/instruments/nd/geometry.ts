@@ -1,5 +1,6 @@
 import { RAD } from '../../../lib/units';
-import { fixed, offset, type Point, tenth, type TextLabel, toward } from '../../svg';
+import { fixed, offset, polygonPath, polylinePath, tenth, toward } from '../../svg';
+import type { Point, TextLabel } from '../../svg';
 import { instrumentHeight } from '../height';
 
 /** The compass arc spans this far either side of the top. */
@@ -167,12 +168,10 @@ const BUG_INBOARD_HALF: readonly Point[] = [
   [5, 0],
 ];
 
-/** The path through `outline` about the bug's own bearing `a`, its across offsets turned to `side`. */
-function bugOutline(g: NdGeometry, a: number, outline: readonly Point[], side = 1): string {
-  const p = toward(g.cx, g.cy, a);
-  return outline
-    .map(([out, across], i) => `${i ? 'L' : 'M'}${p(g.r + out, across * side)}`)
-    .join('');
+/** The points of `outline` about the bug's own bearing `a`, its across offsets turned to `side`. */
+function bugOutline(g: NdGeometry, a: number, outline: readonly Point[], side = 1): Point[] {
+  const p = offset(g.cx, g.cy, a);
+  return outline.map(([out, across]) => p(g.r + out, across * side));
 }
 
 /**
@@ -181,9 +180,9 @@ function bugOutline(g: NdGeometry, a: number, outline: readonly Point[], side = 
  * which draws as an open path so that no stroke runs along the cut.
  */
 export function bugPath(g: NdGeometry, rel: number): string {
-  if (onArc(rel)) return `${bugOutline(g, rel, BUG_OUTLINE)}Z`;
+  if (onArc(rel)) return polygonPath(bugOutline(g, rel, BUG_OUTLINE));
   const side = Math.sign(rel);
-  return bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side);
+  return polylinePath(bugOutline(g, side * SPAN_DEG, BUG_INBOARD_HALF, side));
 }
 
 /** The heading pointer as (outward from the arc's radius, across): tip on the arc, base outside it. */
@@ -195,7 +194,7 @@ const POINTER_OUTLINE: readonly Point[] = [
 
 /** The heading pointer, an open triangle pointing in at the arc; empty off the arc. */
 export const headingPointerPath = (g: NdGeometry, rel: number): string =>
-  onArc(rel) ? `${bugOutline(g, rel, POINTER_OUTLINE)}Z` : '';
+  onArc(rel) ? polygonPath(bugOutline(g, rel, POINTER_OUTLINE)) : '';
 
 /** How the track turns and how fast the aircraft goes: what the trend vector extends. */
 export interface Trend {
@@ -234,12 +233,7 @@ export function trendPoints(
 
 /** The trend as three dashes, one for each 30 s. */
 export function trendPath(points: readonly Point[]): string {
-  return TREND_DASHES.map(([from, to]) =>
-    points
-      .slice(from, to + 1)
-      .map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`)
-      .join(''),
-  ).join('');
+  return TREND_DASHES.map(([from, to]) => polylinePath(points.slice(from, to + 1))).join('');
 }
 
 /** The level-off arc is drawn only this far from the aircraft symbol, and short of the compass arc. */
@@ -280,14 +274,10 @@ export const THREAT_SIDE_PX = 9;
 /** The square marking the hovered aircraft. */
 export const PEEK_SIDE_PX = 19;
 
-/** The closed outline through `corners`, as a subpath. */
-const outline = (corners: readonly Point[]): string =>
-  `${corners.map(([x, y], i) => `${i ? 'L' : 'M'}${fixed(x)} ${fixed(y)}`).join('')}Z`;
-
 /** The diamond of other and proximate traffic, centred at (x, y). */
 export function trafficDiamondPath(x: number, y: number): string {
   const d = TRAFFIC_HALF_DIAGONAL_PX;
-  return outline([
+  return polygonPath([
     [x, y - d],
     [x + d, y],
     [x, y + d],
@@ -298,7 +288,7 @@ export function trafficDiamondPath(x: number, y: number): string {
 /** The square of side `side`, centred at (x, y). */
 export function squarePath(x: number, y: number, side: number): string {
   const h = side / 2;
-  return outline([
+  return polygonPath([
     [x - h, y - h],
     [x + h, y - h],
     [x + h, y + h],

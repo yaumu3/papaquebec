@@ -1,5 +1,5 @@
 import { RAD } from '../../../lib/units';
-import { fixed, type Point, tenth, type TextLabel, toward } from '../../svg';
+import { fixed, type Point, polygonPath, tenth, type TextLabel, toward } from '../../svg';
 import { instrumentHeight } from '../height';
 
 const SPEED_LEFT_PX = 8;
@@ -375,10 +375,7 @@ function clipSide(
     points.push(cut);
     if (keepSky) cuts.push(cut);
   });
-  const path = points.length
-    ? `M${points.map(([x, y]) => `${fixed(x)} ${fixed(y)}`).join('L')}Z`
-    : '';
-  return { path, cuts };
+  return { path: points.length ? polygonPath(points) : '', cuts };
 }
 
 /** The directions along the horizon and up from it, in window coordinates, at `rollDeg` of roll. */
