@@ -11,14 +11,3 @@
   font-weight: 400;
   letter-spacing: var(--tracking);
 }
-.tail {
-  margin-left: var(--space-2);
-}
-/* Set tight: the dot's own width is room enough between two values. */
-.sep {
-  margin: 0 1px;
-  color: var(--value-quiet, var(--text-muted));
-}
-.also {
-  color: var(--value-quiet, var(--text));
-}

@@ -2,7 +2,6 @@ import { epuM } from '../lib/accuracy';
 import { type DisplayAltitude, displayAltitude, uncorrected } from '../lib/altitude';
 import { steeringHeading } from '../lib/autopilot';
 import {
-  climbArrow,
   formatAge,
   formatBoundM,
   formatMach,
@@ -28,12 +27,6 @@ import type { Readout } from '../state/track';
 export interface Reading {
   v: string;
   unit?: string;
-  /** A lit marker after the unit, such as the climb arrow. */
-  tail?: string;
-  /** A second value after a dot, in the plain text tone whatever the cell's own. */
-  also?: string;
-  /** A unit after the second value. */
-  alsoUnit?: string;
 }
 
 /** The one reading of anything unknown; a cell dims when it holds this. */
@@ -63,12 +56,12 @@ const degrees = (deg: number | undefined): string =>
 const bearing = (deg: number | undefined): Reading =>
   deg === undefined ? NONE : { v: degrees(deg) };
 
-function levelReading(d: DisplayAltitude, tail = ''): Reading {
+function levelReading(d: DisplayAltitude): Reading {
   switch (d.kind) {
     case 'altitude':
-      return { v: String(d.feet), unit: 'ft', tail };
+      return { v: String(d.feet), unit: 'ft' };
     case 'level':
-      return { v: `FL${String(Math.round(d.feet / 100)).padStart(3, '0')}`, tail };
+      return { v: `FL${String(Math.round(d.feet / 100)).padStart(3, '0')}` };
     case 'ground':
       return { v: 'GND' };
     default:
@@ -77,7 +70,7 @@ function levelReading(d: DisplayAltitude, tail = ''): Reading {
 }
 
 const altitudeReading = (r: Readout): Reading =>
-  levelReading(displayAltitude(r.alt, settings.altimeter), climbArrow(r.verticalRate).trim());
+  levelReading(displayAltitude(r.alt, settings.altimeter));
 
 const selectedReading = (ft: number | undefined): Reading =>
   levelReading(displayAltitude(ft, uncorrected(settings.altimeter)));
