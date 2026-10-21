@@ -6,7 +6,6 @@ import {
   INTENTS,
   LANE_GROUPS,
   type HistoryLane,
-  historyLanesOf,
   isInstrumentLane,
   laneAfter,
   lastHistoryIndex,
@@ -64,30 +63,6 @@ describe('isInstrumentLane', () => {
 
     // Assert
     expect(flags).toEqual([true, true, true, false, false]);
-  });
-});
-
-describe('historyLanesOf', () => {
-  it('keeps the lanes of readings, in their order', () => {
-    // Arrange
-    const plotted: LaneKey[] = ['pfd', 'alt', 'nd', 'gs', 'surv'];
-
-    // Act
-    const lanes = historyLanesOf(plotted);
-
-    // Assert
-    expect(lanes).toEqual(['alt', 'gs']);
-  });
-
-  it('is empty for a column of instruments alone', () => {
-    // Arrange
-    const plotted: LaneKey[] = ['pfd', 'nd'];
-
-    // Act
-    const lanes = historyLanesOf(plotted);
-
-    // Assert
-    expect(lanes).toEqual([]);
   });
 });
 

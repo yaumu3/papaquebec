@@ -12,9 +12,10 @@ import {
   setHoverInstant,
   setLaneScroll,
   setPlotted,
+  showsHistory,
   switchPlotLane,
 } from './lanes';
-import { DEFAULT_PLOTTED } from './plotted';
+import { DEFAULT_PLOTTED, type LaneKey } from './plotted';
 import { persisted } from './settings';
 import { DEFAULT_WINDOW, type LanesWindow } from './window';
 
@@ -144,5 +145,21 @@ describe('lanes state', () => {
 
     // Assert
     expect(view).toEqual({ hex: 'a', window: DEFAULT_WINDOW, scrollTop: 0 });
+  });
+});
+
+describe('showsHistory', () => {
+  it('holds while a lane of readings is plotted, not for instruments alone or none', () => {
+    // Arrange
+    const columns: LaneKey[][] = [['pfd', 'alt', 'nd'], ['pfd', 'nd'], []];
+
+    // Act
+    const shown = columns.map((column) => {
+      setPlotted(column);
+      return showsHistory();
+    });
+
+    // Assert
+    expect(shown).toEqual([true, false, false]);
   });
 });

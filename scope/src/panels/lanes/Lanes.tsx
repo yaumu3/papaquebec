@@ -13,10 +13,10 @@ import {
   setHoverInstant,
   setLaneScroll,
   setLanesWindow,
+  showsHistory,
   switchPlotLane,
 } from '../../state/lanes';
 import {
-  historyLanesOf,
   isInstrumentLane,
   laneAfter,
   lastHistoryIndex,
@@ -78,9 +78,6 @@ function take(own: LaneKey | null, lane: LaneKey): void {
   if (what === 'switch' && own) switchPlotLane(own, lane);
   else if (what === 'add') addPlotLane(lane);
 }
-
-/** Whether the column shows a history lane, which the cursor and a held window need. */
-const showsHistory = () => historyLanesOf(plotted()).length > 0;
 
 /** What the lanes plot of the selected target over the visible window, each read at the hovered sample or the last in view. */
 export function Lanes(props: { track: Track }) {
@@ -427,7 +424,7 @@ export function Lanes(props: { track: Track }) {
                 );
               }}
             </For>
-            <Show when={lastHistoryIndex(plotted()) >= 0}>
+            <Show when={showsHistory()}>
               <TimeAxis
                 ticks={tickTimes()}
                 x={x}
