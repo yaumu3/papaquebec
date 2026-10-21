@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
+import { LAPSE_SEC } from '../../lib/reports';
 import { makeTrack } from '../../render/scene/trackFixture';
 import { makeSample } from '../../state/sampleFixture';
-import { momentKey, momentOf } from './moment';
+import { lostAt, momentKey, momentOf, nowAt } from './moment';
 
 const NOW = 1000;
 
@@ -47,5 +48,23 @@ describe('momentKey', () => {
     // Assert
     expect(keys[0]).toBe(keys[1]);
     expect(new Set(keys).size).toBe(4);
+  });
+});
+
+describe('lostAt', () => {
+  it('loses a target unheard for the lapse, never over a gap', () => {
+    // Arrange
+    const moments = [
+      nowAt(makeTrack({ seen: LAPSE_SEC - 0.1 }), NOW),
+      nowAt(makeTrack({ seen: LAPSE_SEC }), NOW),
+      { kind: 'sample', r: makeSample(900, { seen: 1 }), instant: 900 } as const,
+      { kind: 'empty' } as const,
+    ];
+
+    // Act
+    const lost = moments.map((m) => lostAt(m));
+
+    // Assert
+    expect(lost).toEqual([false, true, false, false]);
   });
 });
