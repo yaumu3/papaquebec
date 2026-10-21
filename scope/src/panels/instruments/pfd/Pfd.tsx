@@ -10,10 +10,11 @@ import { AltitudeMarks, AltitudeText, altitudeView, targetOf } from './AltitudeT
 import { AttitudeMarks, AttitudeText, attitudeView } from './Attitude';
 import { FlagsShown } from './Flag';
 import { FmaMarks, FmaText } from './Fma';
-import { pfdGeometry, vsiScale } from './geometry';
+import { pfdGeometry } from './geometry';
 import { feetOf, pfdFma, pfdReadouts } from './readout';
 import { SpeedMarks, SpeedText, speedView } from './SpeedTape';
 import { needleView, VsiMarks, VsiText } from './Vsi';
+import { vsiScale } from './vsiGeometry';
 
 import inst from '../instrument.module.css';
 import s from './Pfd.module.css';

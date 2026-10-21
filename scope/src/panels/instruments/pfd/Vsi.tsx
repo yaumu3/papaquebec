@@ -1,13 +1,8 @@
 import { Index, Show } from 'solid-js';
 
 import type { TextLabel } from '../../svg';
-import {
-  type PfdGeometry,
-  vsiDigits,
-  vsiNeedlePath,
-  type VsiScale,
-  vsiStripPath,
-} from './geometry';
+import type { PfdGeometry } from './geometry';
+import { vsiDigits, vsiNeedlePath, type VsiScale, vsiStripPath } from './vsiGeometry';
 
 import s from './Pfd.module.css';
 
