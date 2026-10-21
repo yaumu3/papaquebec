@@ -3,7 +3,7 @@ import { type Accessor, createMemo, Index, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import type { HistoryLane, ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
-import { type Interval, type WindowKey, xOf } from '../../state/window';
+import { type Interval, lengthOf, type WindowKey, xOf } from '../../state/window';
 import { HEARD, LANE_LABELS, NONE } from '../readings';
 import { fixed } from '../svg';
 import { clearOfEnds, clockStep, ticks } from './axis';
@@ -132,7 +132,7 @@ export function Lane(props: {
   const rowHeight = () => (props.height - PAD_TOP_PX - PAD_BOTTOM_PX) / Math.max(1, bars().length);
   /** The shortest round clock step that keeps glyphs at least `pitch` apart across the window. */
   const stepEvery = (pitch: number) =>
-    clockStep(props.visible.to - props.visible.from, Math.max(1, Math.floor(props.width / pitch)));
+    clockStep(lengthOf(props.visible), Math.max(1, Math.floor(props.width / pitch)));
   /** The ticks of `step` at which a mark reaching `reach` round each fits whole in the plot. */
   const ticksAt = (step: number, reach: number) =>
     clearOfEnds(ticks(props.visible, step), x, props.width, reach);

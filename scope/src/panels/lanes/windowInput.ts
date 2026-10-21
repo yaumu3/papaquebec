@@ -4,6 +4,7 @@ import { clamp } from '../../lib/math';
 import {
   type Interval,
   type LanesWindow,
+  lengthOf,
   panWindow,
   pinchWindow,
   timeAt,
@@ -103,7 +104,7 @@ export function createWindowInput(deps: WindowInputDeps): void {
         panWindow(
           w,
           v,
-          (panDelta(evt) * (v.to - v.from)) / Math.max(1, deps.plotWidth()),
+          (panDelta(evt) * lengthOf(v)) / Math.max(1, deps.plotWidth()),
           deps.contact(),
         ),
       );

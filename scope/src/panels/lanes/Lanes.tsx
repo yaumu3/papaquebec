@@ -30,6 +30,7 @@ import {
   contactOf,
   DEFAULT_WINDOW,
   keyWindow,
+  lengthOf,
   readsPast,
   resolveWindow,
   selectWindow,
@@ -106,7 +107,7 @@ export function Lanes(props: { track: Track }) {
   const visible = createMemo(() => resolveWindow(lanesWindow(), contact()));
   const gaps = createMemo(() => gapsIn(samples(), visible(), isLost(props.track)));
   const now = () => contact().to;
-  const step = createMemo(() => axisStep(visible().to - visible().from));
+  const step = createMemo(() => axisStep(lengthOf(visible())));
   const tickTimes = createMemo(() => ticks(visible(), step(), now()));
 
   const [axisRow, setAxisRow] = createSignal<HTMLDivElement>();
