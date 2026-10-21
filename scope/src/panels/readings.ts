@@ -32,7 +32,7 @@ export interface Reading {
 /** The one reading of anything unknown; a cell dims when it holds this. */
 export const NONE: Reading = { v: '---' };
 
-export const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
+const plain = (v: string | undefined): Reading => (v === undefined ? NONE : { v });
 
 /** What SURV labels the position. */
 export const POSITION_LABEL = 'POSITION';
@@ -128,7 +128,7 @@ const bank = (deg: number | undefined): Reading =>
 const machReading = (v: number | undefined): Reading =>
   v === undefined ? NONE : { v: formatMach(v) };
 
-export interface ReadingSpec {
+interface ReadingSpec {
   label: string;
   format: (r: Readout) => Reading;
   /** A number of the reading, in its own unit, as it reads. */

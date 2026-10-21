@@ -24,7 +24,7 @@ import { Wheel } from './Wheel';
 import s from './Pfd.module.css';
 
 /** The tape and the readout's digits, for an altitude in feet. */
-export interface AltitudeView {
+interface AltitudeView {
   ft: number;
   tape: AltitudeTapeMarks;
   digits: AltitudeDigits;

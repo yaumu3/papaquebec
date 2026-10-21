@@ -12,9 +12,9 @@ import type { Moment } from '../moment';
 import type { Trend } from './geometry';
 
 /** The state of the instrument: track-up, lost, blank for want of a track that holds, or empty over a gap. */
-export type NdMode = 'track' | 'lost' | 'blank' | 'empty';
+type NdMode = 'track' | 'lost' | 'blank' | 'empty';
 
-export type NdFlag = 'TRK';
+type NdFlag = 'TRK';
 
 export interface NdFrame {
   mode: NdMode;

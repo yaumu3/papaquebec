@@ -64,7 +64,7 @@ function fmsFirst(
 }
 
 /** An intent as a lane's readout prints it. */
-export interface IntentText {
+interface IntentText {
   key: ReadingKey;
   text: string;
 }

@@ -52,7 +52,7 @@ const EDGE_PX = 4;
 const PLANE_MARGIN = 1.1;
 
 /** What the ND is showing: its mode and orientation, its range and its geometry. */
-export interface NdView {
+interface NdView {
   frame: Pick<NdFrame, 'mode' | 'orient'>;
   rangeNm: number;
   g: NdGeometry;
@@ -239,7 +239,7 @@ export function symbolDrawn(
 }
 
 /** What the ND draws of the traffic: the symbols in paint order, and the annunciations. */
-export interface NdTraffic {
+interface NdTraffic {
   symbols: TrafficSymbol[];
   traffic: boolean;
   offscale: boolean;

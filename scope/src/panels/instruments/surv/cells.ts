@@ -5,7 +5,7 @@ import { NONE, POSITION_LABEL, positionReading, type Reading, READINGS } from '.
 import { holdsAll } from '../freshness';
 import type { Moment } from '../moment';
 
-export type SurvKey = 'pos' | 'nic' | 'nacp' | 'src' | 'rssi' | 'msgs' | 'age';
+type SurvKey = 'pos' | 'nic' | 'nacp' | 'src' | 'rssi' | 'msgs' | 'age';
 
 /** One cell of SURV: its label and reading, dimmed when the reading is unknown or does not hold. */
 export interface SurvCell {

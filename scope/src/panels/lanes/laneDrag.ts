@@ -22,7 +22,7 @@ const SLOP_PX = 4;
 export type LanePart = 'row' | 'plot' | 'instrument';
 
 /** A lane dragged: where it came from, the slot it is over, and the pointer. */
-export interface LaneDrag {
+interface LaneDrag {
   lane: LaneKey;
   from: number;
   slot: number;
@@ -36,7 +36,7 @@ export interface LaneDrag {
 }
 
 /** A lane's top row swiped by a finger `dx` across, the lane `width` wide. */
-export interface LaneSwipe {
+interface LaneSwipe {
   lane: LaneKey;
   dx: number;
   width: number;

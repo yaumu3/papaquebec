@@ -70,7 +70,7 @@ export interface CompassLabel {
   big: boolean;
 }
 
-export interface Compass {
+interface Compass {
   /** The ticks of every 5°, one path, and of every 10°, another. */
   minor: string;
   major: string;

@@ -16,7 +16,7 @@ import type { PfdReadouts } from './readout';
 import s from './Pfd.module.css';
 
 /** The sky, ground, ladder and bank scale for a roll that holds, with the flight path vector. */
-export interface AttitudeView extends AttitudeMarks {
+interface AttitudeView extends AttitudeMarks {
   roll: number;
   fpv: string | undefined;
 }

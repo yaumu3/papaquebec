@@ -186,7 +186,7 @@ export function nearestSample(samples: readonly Sample[], t: number, i: Interval
 }
 
 /** What a point across a plot stands for: its instant, and the sample there; none over a gap. */
-export interface Peek {
+interface Peek {
   t: number;
   sample: Sample | null;
 }
@@ -224,7 +224,7 @@ export function newestSample(samples: readonly Sample[], i: Interval): Sample | 
   return end > countBefore(samples, i.from) ? (samples[end - 1] ?? null) : null;
 }
 
-export interface Bar {
+interface Bar {
   name: string;
   /** The stretches during which the name was reported. */
   on: Interval[];
@@ -259,7 +259,7 @@ export function barsOf(
   return [...bars.values()];
 }
 
-export type BarbMark = 'pennant' | 'full' | 'half';
+type BarbMark = 'pennant' | 'full' | 'half';
 
 /** The marks of a wind barb, as the station plot draws them: a pennant per 50 kt, a barb per 10, a half barb for 5. */
 export function barbMarks(speedKt: number): BarbMark[] {

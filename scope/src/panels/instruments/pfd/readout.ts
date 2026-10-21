@@ -24,11 +24,11 @@ const VERTICAL_MODES: readonly (readonly [string, string])[] = [
  * How long a column's box stands after its text changed, as Boeing's PFDs box a mode change for
  * 10 seconds.
  */
-export const MODE_CHANGE_SEC = 10;
+const MODE_CHANGE_SEC = 10;
 
-export type FmaColumn = 'lateral' | 'vertical';
+type FmaColumn = 'lateral' | 'vertical';
 
-export type FmaColumns = Record<FmaColumn, string | undefined>;
+type FmaColumns = Record<FmaColumn, string | undefined>;
 
 const labelOf = (
   modes: readonly string[],

@@ -16,7 +16,7 @@ import { Wheel } from './Wheel';
 import s from './Pfd.module.css';
 
 /** The speed tape and its readout's digits, for a speed that holds. */
-export interface SpeedView {
+interface SpeedView {
   tape: SpeedTapeMarks;
   digits: SpeedDigits;
 }

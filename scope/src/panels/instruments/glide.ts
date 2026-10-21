@@ -98,7 +98,7 @@ function frameUntil(now: number): void {
 /** Whether a glide begun at `now` has somewhere to go: one standing on its value draws no frame. */
 const setOff = (g: Glide, now: number): boolean => g.startedAt === now && g.from !== g.to;
 
-export interface GlideOptions {
+interface GlideOptions {
   /** The circle an angle is on, 360 for degrees. */
   wrap?: number | undefined;
   /**

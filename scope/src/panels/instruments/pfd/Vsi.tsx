@@ -12,7 +12,7 @@ import {
 import s from './Pfd.module.css';
 
 /** The needle and digits of a vertical rate that holds. */
-export interface NeedleView {
+interface NeedleView {
   path: string;
   digits: VsiDigits | undefined;
 }

@@ -41,7 +41,7 @@ interface Logarithmic {
  * dotted, gantt bars, wind barbs or heading glyphs; or an intent, in its parent's lane: a line,
  * solid or with its dash, on that lane's scale, or on the lane's glyphs, where a dash goes unused.
  */
-export type PlotSpec =
+type PlotSpec =
   | ({
       kind: 'line';
       y: Read;

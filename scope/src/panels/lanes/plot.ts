@@ -104,7 +104,7 @@ export function snapped(r: Range, lane: ReadingKey): Range {
 }
 
 /** A value on a lane's scale, and how it reads. */
-export interface ScaleLabel {
+interface ScaleLabel {
   v: number;
   text: string;
 }
@@ -148,7 +148,7 @@ export function pathOf(
 }
 
 /** Samples to read a tick from rather than the nearest, while one lies within reach of it. */
-export interface Preference {
+interface Preference {
   has: (s: Sample) => boolean;
   withinSec: number;
 }
@@ -249,7 +249,7 @@ export const GLYPH_REACH_PX = Math.max(VECTOR_PX, TICK_TO_PX) + STROKE_HALF_PX;
 const tenth = (n: number): number => Math.round(n * 10) / 10;
 
 /** The heading glyph's readings: the track and heading, and the selected heading while it steers. */
-export interface HeadingMark extends Heading {
+interface HeadingMark extends Heading {
   sel?: number | undefined;
 }
 
@@ -287,7 +287,7 @@ export function headingAt(s: Sample, t: number, sel?: ReadingKey): HeadingMark |
   return h && { ...h, sel: intent?.kind === 'intent' ? intent.y(heard) : undefined };
 }
 
-export interface HeadingGlyph {
+interface HeadingGlyph {
   /** The aircraft along its heading, when known. */
   aircraft?: string;
   /** The track out of the aircraft's centre. */

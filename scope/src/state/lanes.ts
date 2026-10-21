@@ -24,7 +24,7 @@ export function addPlotLane(lane: LaneKey): void {
 }
 
 /** What the column shows of one target: its window, and how far down its lanes are scrolled. */
-export interface LanesView {
+interface LanesView {
   hex: string | null;
   window: LanesWindow;
   scrollTop: number;

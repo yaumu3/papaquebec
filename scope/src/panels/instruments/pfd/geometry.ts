@@ -310,7 +310,7 @@ const SPEED_DIGIT_PX = 16;
 const SPEED_DRUM_GAP_PX = 12;
 const SPEED_DRUM_LINE_PX = 18;
 
-export interface SpeedReadout {
+interface SpeedReadout {
   /** The tape's centre, where its flag and its Mach stand. */
   midX: number;
   hundreds: WheelCell;
@@ -556,7 +556,7 @@ const MINUS = '−';
 const signedThousands = (ft: number): string =>
   `${ft < 0 ? MINUS : ''}${Math.floor(Math.abs(ft) / ALTITUDE_THOUSAND_FT)}`;
 
-export interface AltitudeLabel {
+interface AltitudeLabel {
   /** The thousands, large, and the hundreds, in three small digits. */
   hi: string;
   lo: string;
@@ -688,7 +688,7 @@ const HATCH_INK = 0.68;
 /** The hatch block's width as a part of the digit advance. */
 const HATCH_WIDTH_ADVANCE = 0.85;
 
-export interface HatchStyle {
+interface HatchStyle {
   /** Where the block starts in its cell, and how wide it is. */
   left: number;
   width: number;
@@ -712,7 +712,7 @@ export function hatchStyle(px: number): HatchStyle {
   };
 }
 
-export interface AltitudeReadout {
+interface AltitudeReadout {
   /** The middle of the tape, where its flag stands. */
   tapeX: number;
   /** The middle of the box, where GND stands. */
