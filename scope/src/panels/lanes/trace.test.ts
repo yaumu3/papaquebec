@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { HeardKey } from '../../lib/aircraft';
+import { LAPSE_SEC } from '../../lib/reports';
 import { makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
 import type { Interval } from '../../state/window';
 import {
   barbMarks,
   barsOf,
-  GAP_SEC,
   gapsIn,
   heardAt,
   nearestSample,
@@ -46,8 +46,8 @@ describe('runsOf', () => {
       sample(1, { gs: 250 }),
       sample(2),
       sample(3, { gs: 252 }),
-      sample(3 + GAP_SEC, { gs: 253 }),
-      sample(4 + 2 * GAP_SEC, { gs: 254 }),
+      sample(3 + LAPSE_SEC, { gs: 253 }),
+      sample(4 + 2 * LAPSE_SEC, { gs: 254 }),
     ];
 
     // Act
@@ -58,9 +58,9 @@ describe('runsOf', () => {
       [{ t: 1, v: 250 }],
       [
         { t: 3, v: 252 },
-        { t: 3 + GAP_SEC, v: 253 },
+        { t: 3 + LAPSE_SEC, v: 253 },
       ],
-      [{ t: 4 + 2 * GAP_SEC, v: 254 }],
+      [{ t: 4 + 2 * LAPSE_SEC, v: 254 }],
     ]);
   });
 
@@ -115,7 +115,7 @@ describe('runsOf with the instants a reading is heard at', () => {
 
   it('breaks where the reading went unheard longer than the gap, though the samples kept coming', () => {
     // Arrange
-    const again = 2 + GAP_SEC;
+    const again = 2 + LAPSE_SEC;
     const samples = Array.from({ length: 40 }, (_, k) =>
       sample(k + 1, { gs: 250, heard: { gs: k + 1 < again ? 1 : again } }),
     );
@@ -316,7 +316,7 @@ describe('barsOf', () => {
 
   it('ends a bar at a gap in the samples', () => {
     // Arrange
-    const samples = [sample(1, { navModes: ['AP'] }), sample(2 + GAP_SEC, { navModes: ['AP'] })];
+    const samples = [sample(1, { navModes: ['AP'] }), sample(2 + LAPSE_SEC, { navModes: ['AP'] })];
 
     // Act
     const bars = barsOf(samples, modes);
@@ -327,7 +327,7 @@ describe('barsOf', () => {
         name: 'AP',
         on: [
           { from: 1, to: 1 },
-          { from: 2 + GAP_SEC, to: 2 + GAP_SEC },
+          { from: 2 + LAPSE_SEC, to: 2 + LAPSE_SEC },
         ],
       },
     ]);
@@ -335,7 +335,7 @@ describe('barsOf', () => {
 
   it('ends a bar where its reading went unheard longer than the gap, though the samples kept coming', () => {
     // Arrange
-    const samples = [1, 2, 2 + GAP_SEC, 3 + GAP_SEC].map((t) =>
+    const samples = [1, 2, 2 + LAPSE_SEC, 3 + LAPSE_SEC].map((t) =>
       sample(t, { navModes: ['AP'], heard: { navModes: 1 } }),
     );
 

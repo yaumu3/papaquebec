@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import { LAPSE_SEC } from '../../lib/reports';
 import { makeHeardSample as heardSample, makeSample as sample } from '../../state/sampleFixture';
 import { altTargets, heldIntents, readoutOf, readoutSlots } from './readout';
-import { GAP_SEC } from './trace';
 
 describe('altTargets', () => {
   it('puts first the target the aircraft levels at first: the lower in a climb, the higher in a descent', () => {
@@ -164,7 +164,7 @@ describe('readoutOf', () => {
 describe('readoutOf, for readings heard a gap before the cursor', () => {
   it("reads each lane's reading only while heard within the gap, a reading of reception always", () => {
     // Arrange
-    const stale = 100 - GAP_SEC - 1;
+    const stale = 100 - LAPSE_SEC - 1;
     const rows = [
       { keys: ['gs'], s: sample(100, { gs: 290, heard: { gs: 100 } }) },
       { keys: ['gs'], s: sample(100, { gs: 290, heard: { gs: stale } }) },
@@ -194,7 +194,7 @@ describe('readoutOf, for readings heard a gap before the cursor', () => {
       verticalRate: 1800,
       selAlt: 32_000,
       fmsAlt: 34_000,
-      heard: { alt: 100, verticalRate: 100, selAlt: 100 - GAP_SEC - 1, fmsAlt: 100 },
+      heard: { alt: 100, verticalRate: 100, selAlt: 100 - LAPSE_SEC - 1, fmsAlt: 100 },
     });
 
     // Act

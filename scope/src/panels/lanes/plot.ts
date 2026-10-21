@@ -2,6 +2,7 @@ import type { HeardKey } from '../../lib/aircraft';
 import { BOUND_NM_FROM_M, BOUND_ROUNDED_UP_BY_M } from '../../lib/format';
 import { NM_IN_METERS, turn } from '../../lib/geo';
 import { nearestInTime } from '../../lib/nearest';
+import { LAPSE_SEC } from '../../lib/reports';
 import { RAD } from '../../lib/units';
 import type { ReadingKey } from '../../state/plotted';
 import type { Sample } from '../../state/track';
@@ -9,16 +10,7 @@ import type { Interval } from '../../state/window';
 import { type Reading, READINGS } from '../readings';
 import { fixed, offset, toward } from '../svg';
 import { type Dash, HEARD, type Heading, PLOTS } from './plots';
-import {
-  barbMarks,
-  GAP_SEC,
-  heardNear,
-  type Point,
-  type Range,
-  rangeOf,
-  type Read,
-  runsOf,
-} from './trace';
+import { barbMarks, heardNear, type Point, type Range, rangeOf, type Read, runsOf } from './trace';
 
 export interface LaneTrace {
   key: ReadingKey;
@@ -175,12 +167,12 @@ export function atTicks<T extends object>(
   heard: readonly HeardKey[] = [],
 ): (T & { t: number })[] {
   const preferred = prefer ? samples.filter(prefer.has) : [];
-  const reach = Math.min(prefer?.withinSec ?? 0, GAP_SEC);
+  const reach = Math.min(prefer?.withinSec ?? 0, LAPSE_SEC);
   return ticks.flatMap((t) => {
     const near = nearestInTime(preferred, t);
     const s = near && Math.abs(near.t - t) <= reach ? near : nearestInTime(samples, t);
     const value =
-      s && Math.abs(s.t - t) <= GAP_SEC && heardNear(s, heard, t) ? read(s, t) : undefined;
+      s && Math.abs(s.t - t) <= LAPSE_SEC && heardNear(s, heard, t) ? read(s, t) : undefined;
     return value ? [{ ...value, t }] : [];
   });
 }

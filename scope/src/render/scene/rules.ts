@@ -1,5 +1,6 @@
 import { PALETTE } from '../../design/palette';
 import { climbState, emergencyCode } from '../../lib/format';
+import { LAPSE_SEC } from '../../lib/reports';
 import type { Visibility } from '../../state/filter';
 import type { Track } from '../../state/track';
 import { Shape } from '../protocol';
@@ -48,11 +49,8 @@ export function airspaceColor(kind: string | undefined): string {
   return kind !== undefined && BRIGHT_AIRSPACE.has(kind) ? THEME.airspace : THEME.airspaceDim;
 }
 
-/** A position this old makes the target stale. */
-export const STALE_SECONDS = 30;
-
 export function isStale(t: Track): boolean {
-  return (t.seenPos ?? 0) > STALE_SECONDS;
+  return (t.seenPos ?? 0) > LAPSE_SEC;
 }
 
 export function isEmergency(t: Track): boolean {

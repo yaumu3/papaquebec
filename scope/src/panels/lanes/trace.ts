@@ -1,10 +1,7 @@
 import type { HeardKey } from '../../lib/aircraft';
-import { STALE_SECONDS } from '../../render/scene/rules';
+import { LAPSE_SEC } from '../../lib/reports';
 import type { Sample } from '../../state/track';
 import { type Interval, timeAt } from '../../state/window';
-
-/** As long without a report as makes a target stale on the scope breaks a trace too. */
-export const GAP_SEC = STALE_SECONDS;
 
 export interface Point {
   t: number;
@@ -25,7 +22,7 @@ function stretches(samples: readonly Sample[]): Sample[][] {
   let stretch: Sample[] = [];
   for (const s of samples) {
     const last = stretch.at(-1);
-    if (last && s.t - last.t > GAP_SEC) {
+    if (last && s.t - last.t > LAPSE_SEC) {
       out.push(stretch);
       stretch = [];
     }
@@ -54,7 +51,7 @@ export function heardAt(s: Sample, keys: readonly HeardKey[]): number | undefine
 export function heardNear(s: Sample, keys: readonly HeardKey[], t: number): boolean {
   if (keys.length === 0) return true;
   const at = heardAt(s, keys);
-  return at !== undefined && Math.abs(t - at) <= GAP_SEC;
+  return at !== undefined && Math.abs(t - at) <= LAPSE_SEC;
 }
 
 /**
@@ -84,7 +81,7 @@ export function runsOf(
         continue;
       }
       if (at === undefined || at === last || !heardNear(s, heard, s.t)) continue;
-      if (last !== undefined && at - last > GAP_SEC) end();
+      if (last !== undefined && at - last > LAPSE_SEC) end();
       run.push({ t: s.t, v });
       last = at;
     }

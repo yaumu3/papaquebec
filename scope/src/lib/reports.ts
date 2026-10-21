@@ -26,6 +26,9 @@ export const EMERGENCY_SEC = 10;
  */
 export const INSTRUMENT_SEC = 15;
 
+/** A report this old no longer holds: a position this old is stale, and reports this far apart leave a gap. */
+export const LAPSE_SEC = 30;
+
 /** Whether a report heard at `heardAt` still holds at `now`: heard less than `lapseSec` before. */
 export function holds(heardAt: number | undefined, now: number, lapseSec: number): boolean {
   return heardAt !== undefined && now - heardAt < lapseSec;
