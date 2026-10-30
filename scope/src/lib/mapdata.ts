@@ -7,6 +7,7 @@ import * as z from 'zod/mini';
 import { _default as orDefault } from 'zod/mini';
 
 import { isRecord } from './guards';
+import { describeIssues } from './issues';
 
 z.config(z.locales.en());
 
@@ -128,22 +129,9 @@ export function parseAero(raw: unknown): AeroData {
 
 export type AeroValidation = { ok: true; data: AeroData } | { ok: false; message: string };
 
-const SHOWN_ISSUES = 3;
-
-const pathOf = (path: readonly PropertyKey[]): string =>
-  path.reduce<string>(
-    (acc, k) => (typeof k === 'number' ? `${acc}[${k}]` : acc ? `${acc}.${String(k)}` : String(k)),
-    '',
-  );
-
 /** Strict: the whole file must match the schema, and the answer says where it does not. */
 export function validateAero(raw: unknown): AeroValidation {
   const r = AeroSchema.safeParse(raw);
   if (r.success) return { ok: true, data: r.data };
-  const issues = r.error.issues;
-  const lines = issues
-    .slice(0, SHOWN_ISSUES)
-    .map((i) => (i.path.length ? `${pathOf(i.path)}: ${i.message}` : i.message));
-  const more = issues.length - lines.length;
-  return { ok: false, message: lines.join('; ') + (more > 0 ? `; and ${more} more` : '') };
+  return { ok: false, message: describeIssues(r.error.issues) };
 }
