@@ -1,13 +1,12 @@
 /**
- * Static geography the scope draws, as shipped in `public/map/*.json`. All positions are
- * lat/lon degrees. The aero schema is the one source of truth: the types are inferred from
- * it, imports are validated against it, and `aero.schema.json` is generated from it.
+ * What the scope draws of the static geography: the coastline as shipped in
+ * `public/map/coast.json`, and the lists a chart is drawn from. All positions are lat/lon
+ * degrees unless a type says otherwise.
  */
 import * as z from 'zod/mini';
 import { _default as orDefault } from 'zod/mini';
 
 import { isRecord } from './guards';
-import { describeIssues } from './issues';
 
 z.config(z.locales.en());
 
@@ -50,9 +49,6 @@ const LISTS = {
   airports: AirportSchema,
 };
 
-/** The title a lenient parse gives a file that names none. */
-export const UNTITLED_AERO = 'aero.json';
-
 /** The drawn lists alone; what several map sets merge into. */
 export const AeroLayersSchema = z.object({
   waypoints: orDefault(z.array(LISTS.waypoints), []),
@@ -78,60 +74,12 @@ export type Route = z.infer<typeof RouteSchema>;
 export type Airspace = z.infer<typeof AirspaceSchema>;
 export type Airport = z.infer<typeof AirportSchema>;
 export type DrawnLayers = z.infer<typeof AeroLayersSchema>;
-export type AeroData = z.infer<typeof AeroSchema>;
-
-export const EMPTY_AERO: AeroData = {
-  title: UNTITLED_AERO,
-  waypoints: [],
-  navaids: [],
-  airways: [],
-  airspace: [],
-  sectors: [],
-  airports: [],
-};
-
-/** The enabled map sets as one chart: every list concatenated in set order. */
-export function mergeAero(sets: readonly DrawnLayers[]): DrawnLayers {
-  return {
-    waypoints: sets.flatMap((s) => s.waypoints),
-    navaids: sets.flatMap((s) => s.navaids),
-    airways: sets.flatMap((s) => s.airways),
-    airspace: sets.flatMap((s) => s.airspace),
-    sectors: sets.flatMap((s) => s.sectors),
-    airports: sets.flatMap((s) => s.airports),
-  };
-}
 
 const isPairList = (v: unknown): v is LonLat[] => PairList.safeParse(v).success;
-
-/** The entries of a list that fit their schema, in order; anything else is dropped. */
-function wellFormed(v: unknown, schema: z.ZodMiniType): unknown[] {
-  return Array.isArray(v) ? v.filter((item) => schema.safeParse(item).success) : [];
-}
 
 export function parseCoast(raw: unknown): CoastData {
   if (isRecord(raw) && Array.isArray(raw.lines)) {
     return { lines: raw.lines.filter(isPairList) };
   }
   throw new Error('coast.json: unexpected shape');
-}
-
-/** Lenient: a malformed entry is dropped, not fatal, so a partial chart still draws. */
-export function parseAero(raw: unknown): AeroData {
-  if (!isRecord(raw)) throw new Error('aero.json: unexpected shape');
-  const kept = Object.entries(LISTS).map(([k, schema]) => [k, wellFormed(raw[k], schema)]);
-  return AeroSchema.parse({
-    ...Object.fromEntries(kept),
-    title: typeof raw.title === 'string' && raw.title ? raw.title : UNTITLED_AERO,
-    ...(typeof raw.note === 'string' ? { note: raw.note } : {}),
-  });
-}
-
-export type AeroValidation = { ok: true; data: AeroData } | { ok: false; message: string };
-
-/** Strict: the whole file must match the schema, and the answer says where it does not. */
-export function validateAero(raw: unknown): AeroValidation {
-  const r = AeroSchema.safeParse(raw);
-  if (r.success) return { ok: true, data: r.data };
-  return { ok: false, message: describeIssues(r.error.issues) };
 }

@@ -1,13 +1,13 @@
 import { isRecord } from '../lib/guards';
-import { type AeroData, validateAero } from '../lib/mapdata';
+import { type MapSetData, validateMapSet } from '../lib/mapset';
 import { readJson, writeJson } from './storageJson';
 
 export const MAPSETS_KEY = 'papaquebec.mapsets';
 
 export interface ImportedMapSet {
-  id: string;
+  identity: string;
   enabled: boolean;
-  data: AeroData;
+  data: MapSetData;
 }
 
 /** Imported map sets and the enabled flags, as kept in this browser. */
@@ -19,9 +19,11 @@ export interface MapSetsPersisted {
 export const DEFAULT_MAPSETS: MapSetsPersisted = { builtinEnabled: true, imported: [] };
 
 function importedFrom(raw: unknown): ImportedMapSet | null {
-  if (!isRecord(raw) || typeof raw.id !== 'string' || typeof raw.enabled !== 'boolean') return null;
-  const data = validateAero(raw.data);
-  return data.ok ? { id: raw.id, enabled: raw.enabled, data: data.data } : null;
+  if (!isRecord(raw) || typeof raw.identity !== 'string' || typeof raw.enabled !== 'boolean') {
+    return null;
+  }
+  const data = validateMapSet(raw.data);
+  return data.ok ? { identity: raw.identity, enabled: raw.enabled, data: data.data } : null;
 }
 
 /** Every stored set is validated again; one that no longer fits the schema is dropped. */

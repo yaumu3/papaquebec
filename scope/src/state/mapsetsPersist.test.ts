@@ -1,14 +1,22 @@
 import { describe, expect, it } from 'bun:test';
 
-import { EMPTY_AERO } from '../lib/mapdata';
+import type { MapSetData } from '../lib/mapset';
 import { loadMapSets, MAPSETS_KEY, saveMapSets } from './mapsetsPersist';
 import { fullStorage, memoryStorage } from './memoryStorage';
 
-const fixes = {
-  ...EMPTY_AERO,
+const fixes: MapSetData = {
+  type: 'FeatureCollection',
+  version: 2,
+  id: 'my-fixes',
   title: 'My fixes',
-  waypoints: [{ id: 'CHIBA', lat: 35.6, lon: 140.1 }],
-}; // Chiba
+  features: [
+    {
+      type: 'Feature',
+      properties: { layer: 'fix', id: 'TAVRO' },
+      geometry: { type: 'Point', coordinates: [130.9, 33.9] },
+    },
+  ],
+};
 
 describe('loadMapSets', () => {
   it('starts with the built-in set on and nothing imported', () => {
@@ -31,9 +39,9 @@ describe('loadMapSets', () => {
     const stored = {
       builtinEnabled: false,
       imported: [
-        { id: 'a', enabled: false, data: fixes },
-        { id: 'b', enabled: true, data: { waypoints: [] } },
-        { id: 7, enabled: true, data: fixes },
+        { identity: 'my-fixes', enabled: false, data: fixes },
+        { identity: 'b', enabled: true, data: { waypoints: [] } },
+        { identity: 7, enabled: true, data: fixes },
         'junk',
       ],
     };
@@ -45,7 +53,7 @@ describe('loadMapSets', () => {
     // Assert
     expect(out).toEqual({
       builtinEnabled: false,
-      imported: [{ id: 'a', enabled: false, data: fixes }],
+      imported: [{ identity: 'my-fixes', enabled: false, data: fixes }],
     });
   });
 });
@@ -54,15 +62,17 @@ describe('saveMapSets', () => {
   it('round-trips through storage and reports success', () => {
     // Arrange
     const storage = memoryStorage();
-    const state = { builtinEnabled: true, imported: [{ id: 'a', enabled: true, data: fixes }] };
+    const state = {
+      builtinEnabled: true,
+      imported: [{ identity: 'my-fixes', enabled: true, data: fixes }],
+    };
 
     // Act
     const saved = saveMapSets(storage, state);
-    const back = loadMapSets(storage);
 
     // Assert
     expect(saved).toBe(true);
-    expect(back).toEqual(state);
+    expect(loadMapSets(storage)).toEqual(state);
   });
 
   it('reports a storage that refuses the write', () => {

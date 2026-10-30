@@ -1,20 +1,17 @@
 import type { Accessor } from 'solid-js';
 import { createStore } from 'solid-js/store';
 
-import {
-  type AeroData,
-  type DrawnLayers,
-  EMPTY_AERO,
-  mergeAero,
-  validateAero,
-} from '../lib/mapdata';
-import { BUILTIN_ID } from '../lib/mapsetFormat';
+import { type Chart, chartOf, setIdentity } from '../lib/chart';
+import { drawnOf } from '../lib/drawn';
+import type { DrawnLayers } from '../lib/mapdata';
+import { type MapSetData, validateMapSet } from '../lib/mapset';
+import { BUILTIN_ID, MAPSET_VERSION } from '../lib/mapsetFormat';
 import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
 import { versioned } from './versioned';
 
 export interface MapSet {
-  id: string;
-  data: AeroData;
+  identity: string;
+  data: MapSetData;
   enabled: boolean;
   builtin: boolean;
 }
@@ -24,35 +21,42 @@ export type ImportResult = { ok: true; kept: boolean } | { ok: false; message: s
 
 export interface MapSets {
   mapSets: Accessor<MapSet[]>;
-  /** The enabled sets merged; what the scope draws. */
+  /** The enabled sets merged into items. */
+  chart: Accessor<Chart>;
+  /** The chart as the lists the scope draws. */
   drawn: Accessor<DrawnLayers>;
-  setBuiltinAero: (data: AeroData) => void;
-  importMapSet: (text: string, id?: string) => ImportResult;
-  toggleMapSet: (id: string) => void;
-  removeMapSet: (id: string) => void;
-}
-
-/** A set id: a UUID where the page is a secure context, else time and chance. */
-export function freshId(source: { randomUUID?: () => string } = crypto): string {
-  return (
-    source.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-  );
+  setBuiltinMapSet: (data: MapSetData) => void;
+  importMapSet: (text: string) => ImportResult;
+  toggleMapSet: (identity: string) => void;
+  removeMapSet: (identity: string) => void;
 }
 
 export function createMapSets(storage: Storage | null): MapSets {
   const persisted = storage ? loadMapSets(storage) : DEFAULT_MAPSETS;
-  const placeholder: AeroData = { ...EMPTY_AERO, title: 'openAIP' };
+  const placeholder: MapSetData = {
+    type: 'FeatureCollection',
+    version: MAPSET_VERSION,
+    title: 'openAIP',
+    features: [],
+  };
   const [store, setStore] = createStore<{ sets: MapSet[] }>({
     sets: [
-      { id: BUILTIN_ID, data: placeholder, enabled: persisted.builtinEnabled, builtin: true },
-      ...persisted.imported.map(({ id, enabled, data }) => ({ id, enabled, data, builtin: false })),
+      { identity: BUILTIN_ID, data: placeholder, enabled: persisted.builtinEnabled, builtin: true },
+      ...persisted.imported.map(({ identity, enabled, data }) => ({
+        identity,
+        enabled,
+        data,
+        builtin: false,
+      })),
     ],
   });
 
-  const drawn = versioned(() => mergeAero(store.sets.filter((s) => s.enabled).map((s) => s.data)));
+  const chart = versioned(() => chartOf(store.sets.filter((s) => s.enabled).map((s) => s.data)));
+  const drawn = versioned(() => drawnOf(chart.get()));
 
   /** After every change: the merge is stale, and the sets go back to storage. */
   const commit = (): boolean => {
+    chart.invalidate();
     drawn.invalidate();
     if (!storage) return true;
     const builtin = store.sets.find((s) => s.builtin);
@@ -60,54 +64,48 @@ export function createMapSets(storage: Storage | null): MapSets {
       builtinEnabled: builtin?.enabled ?? true,
       imported: store.sets
         .filter((s) => !s.builtin)
-        .map(({ id, enabled, data }) => ({ id, enabled, data })),
+        .map(({ identity, enabled, data }) => ({ identity, enabled, data })),
     });
   };
 
   return {
     mapSets: () => store.sets,
+    chart: chart.get,
     drawn: drawn.get,
-    setBuiltinAero(data) {
-      // The built-in set is assigned whole, since a value set at its `data` path would merge
-      // into the placeholder. An import titled like it, made while it had another title, goes.
-      setStore('sets', (sets) =>
-        sets
-          .map((set) => (set.builtin ? { ...set, data } : set))
-          .filter((set) => set.builtin || set.data.title !== data.title),
-      );
+    setBuiltinMapSet(data) {
+      // Assigned whole, since a value set at its `data` path would merge into the placeholder.
+      setStore('sets', (sets) => sets.map((set) => (set.builtin ? { ...set, data } : set)));
       commit();
     },
-    importMapSet(text, id = freshId()) {
+    importMapSet(text) {
       let raw: unknown;
       try {
         raw = JSON.parse(text);
       } catch {
         return { ok: false, message: 'not JSON' };
       }
-      const valid = validateAero(raw);
+      const valid = validateMapSet(raw);
       if (!valid.ok) return valid;
-      const title = valid.data.title;
-      if (store.sets.some((s) => s.builtin && s.data.title === title)) {
-        return { ok: false, message: `already built in: ${title}` };
-      }
-      const set: MapSet = { id, data: valid.data, enabled: true, builtin: false };
+      const identity = setIdentity(valid.data);
+      if (identity === BUILTIN_ID) return { ok: false, message: `already built in: ${identity}` };
+      const set: MapSet = { identity, data: valid.data, enabled: true, builtin: false };
       setStore('sets', (sets) => {
-        const at = sets.findIndex((s) => !s.builtin && s.data.title === title);
+        const at = sets.findIndex((s) => s.identity === identity);
         return at >= 0 ? sets.with(at, set) : [...sets, set];
       });
       return { ok: true, kept: commit() };
     },
-    toggleMapSet(id) {
+    toggleMapSet(identity) {
       setStore(
         'sets',
-        (s) => s.id === id,
+        (s) => s.identity === identity,
         'enabled',
         (v) => !v,
       );
       commit();
     },
-    removeMapSet(id) {
-      setStore('sets', (sets) => sets.filter((s) => s.id !== id || s.builtin));
+    removeMapSet(identity) {
+      setStore('sets', (sets) => sets.filter((s) => s.identity !== identity || s.builtin));
       commit();
     },
   };
@@ -128,4 +126,5 @@ export function armRemoval(
 }
 
 const sets = createMapSets(typeof localStorage === 'undefined' ? null : localStorage);
-export const { mapSets, drawn, setBuiltinAero, importMapSet, toggleMapSet, removeMapSet } = sets;
+export const { mapSets, chart, drawn, setBuiltinMapSet, importMapSet, toggleMapSet, removeMapSet } =
+  sets;

@@ -63,7 +63,7 @@ function MapSetImport() {
           input = node;
         }}
         type="file"
-        accept=".json,application/json"
+        accept=".geojson,.json,application/geo+json,application/json"
         class={s.file}
         onChange={(e) => void onFile(e)}
       />
@@ -83,7 +83,11 @@ function MapSetRow(props: {
 }) {
   return (
     <div class={s.set}>
-      <Button class={s.setToggle} on={props.set.enabled} onClick={() => toggleMapSet(props.set.id)}>
+      <Button
+        class={s.setToggle}
+        on={props.set.enabled}
+        onClick={() => toggleMapSet(props.set.identity)}
+      >
         {props.set.data.title}
       </Button>
       <Show when={!props.set.builtin}>
@@ -114,8 +118,8 @@ function MapSetRow(props: {
 /** The sources list with its import control. Removal is armed on one set at a time. */
 function MapSetList() {
   const [armed, setArmed] = createSignal<string | null>(null);
-  const clickRemove = (id: string) => {
-    const next = armRemoval(armed(), id);
+  const clickRemove = (identity: string) => {
+    const next = armRemoval(armed(), identity);
     setArmed(next.armed);
     if (next.remove) removeMapSet(next.remove);
   };
@@ -125,8 +129,8 @@ function MapSetList() {
         {(set) => (
           <MapSetRow
             set={set}
-            armed={armed() === set.id}
-            onRemoveClick={() => clickRemove(set.id)}
+            armed={armed() === set.identity}
+            onRemoveClick={() => clickRemove(set.identity)}
             onDisarm={() => setArmed(null)}
           />
         )}

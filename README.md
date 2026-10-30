@@ -162,8 +162,8 @@ script to override it.
 openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
 brought in through the Maps panel.
 
-- `IMPORT JSON…` takes a file in the `aero.json` format, checked against `/aero.schema.json`
-  (served by the scope, generated from the code) before it is accepted.
+- `IMPORT JSON…` takes a `.mapset.geojson` (or `.json`) file, checked against the map set schema
+  before it is accepted.
 - Each set lists under `SOURCES` by its title and can be toggled or removed; the openAIP set
   generated at start is the one that stays.
 - Imported sets live in the browser's storage, so they are per device.
