@@ -77,7 +77,7 @@ export type Navaid = z.infer<typeof NavaidSchema>;
 export type Route = z.infer<typeof RouteSchema>;
 export type Airspace = z.infer<typeof AirspaceSchema>;
 export type Airport = z.infer<typeof AirportSchema>;
-export type AeroLayers = z.infer<typeof AeroLayersSchema>;
+export type DrawnLayers = z.infer<typeof AeroLayersSchema>;
 export type AeroData = z.infer<typeof AeroSchema>;
 
 export const EMPTY_AERO: AeroData = {
@@ -91,7 +91,7 @@ export const EMPTY_AERO: AeroData = {
 };
 
 /** The enabled map sets as one chart: every list concatenated in set order. */
-export function mergeAero(sets: readonly AeroLayers[]): AeroLayers {
+export function mergeAero(sets: readonly DrawnLayers[]): DrawnLayers {
   return {
     waypoints: sets.flatMap((s) => s.waypoints),
     navaids: sets.flatMap((s) => s.navaids),

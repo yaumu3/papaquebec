@@ -3,7 +3,7 @@ import { createStore } from 'solid-js/store';
 
 import {
   type AeroData,
-  type AeroLayers,
+  type DrawnLayers,
   EMPTY_AERO,
   mergeAero,
   validateAero,
@@ -27,7 +27,7 @@ export type ImportResult = { ok: true; kept: boolean } | { ok: false; message: s
 export interface MapSets {
   mapSets: Accessor<MapSet[]>;
   /** The enabled sets merged; what the scope draws. */
-  aero: Accessor<AeroLayers>;
+  drawn: Accessor<DrawnLayers>;
   setBuiltinAero: (data: AeroData) => void;
   importMapSet: (text: string, id?: string) => ImportResult;
   toggleMapSet: (id: string) => void;
@@ -51,11 +51,11 @@ export function createMapSets(storage: Storage | null): MapSets {
     ],
   });
 
-  const aero = versioned(() => mergeAero(store.sets.filter((s) => s.enabled).map((s) => s.data)));
+  const drawn = versioned(() => mergeAero(store.sets.filter((s) => s.enabled).map((s) => s.data)));
 
   /** After every change: the merge is stale, and the sets go back to storage. */
   const commit = (): boolean => {
-    aero.invalidate();
+    drawn.invalidate();
     if (!storage) return true;
     const builtin = store.sets.find((s) => s.builtin);
     return saveMapSets(storage, {
@@ -68,7 +68,7 @@ export function createMapSets(storage: Storage | null): MapSets {
 
   return {
     mapSets: () => store.sets,
-    aero: aero.get,
+    drawn: drawn.get,
     setBuiltinAero(data) {
       // The built-in set is assigned whole, since a value set at its `data` path would merge
       // into the placeholder. An import titled like it, made while it had another title, goes.
@@ -130,4 +130,4 @@ export function armRemoval(
 }
 
 const sets = createMapSets(typeof localStorage === 'undefined' ? null : localStorage);
-export const { mapSets, aero, setBuiltinAero, importMapSet, toggleMapSet, removeMapSet } = sets;
+export const { mapSets, drawn, setBuiltinAero, importMapSet, toggleMapSet, removeMapSet } = sets;

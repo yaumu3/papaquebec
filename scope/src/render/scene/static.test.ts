@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { inverse } from '../../lib/geodesic';
-import type { AeroLayers } from '../../lib/mapdata';
+import type { DrawnLayers } from '../../lib/mapdata';
 import type { Layers } from '../../state/settingsDefaults';
 import { MAP_LAYERS } from '../layers';
 import type { Batch } from '../protocol';
@@ -19,7 +19,7 @@ const allLayers: Layers = {
   airports: true,
 };
 
-const aero: AeroLayers = {
+const drawn: DrawnLayers = {
   waypoints: [],
   navaids: [{ id: 'HME', lat: 35.5, lon: 139.8 }],
   airways: [],
@@ -31,7 +31,7 @@ const aero: AeroLayers = {
 function mapInput(over: Partial<MapInput> = {}): MapInput {
   return {
     coast: { lines: [] },
-    aero,
+    drawn,
     project: (lat, lon) => ({ x: lon, y: lat }),
     layers: allLayers,
     labelDensity: 'normal',
@@ -84,13 +84,13 @@ describe('buildMap', () => {
     const cases = [true, false];
 
     // Act
-    const drawn = cases.map((navaidsInRange) => {
+    const counts = cases.map((navaidsInRange) => {
       const { fixes } = buildMap(mapInput({ navaidsInRange }));
       return count(fixes, 'markers');
     });
 
     // Assert
-    expect(drawn).toEqual([1, 0]);
+    expect(counts).toEqual([1, 0]);
   });
 });
 
@@ -103,7 +103,7 @@ describe('buildMap airspace', () => {
       center: [center.lat, center.lon] as [number, number],
       radiusNm: 5,
     };
-    const input = mapInput({ aero: { ...aero, airspace: [circle] } });
+    const input = mapInput({ drawn: { ...drawn, airspace: [circle] } });
 
     // Act
     const { airspace } = buildMap(input);
@@ -129,7 +129,7 @@ describe('buildMap edges', () => {
       [40, 140],
     ];
     const input = mapInput({
-      aero: { ...aero, sectors: [{ name: 'S', points: outline }] },
+      drawn: { ...drawn, sectors: [{ name: 'S', points: outline }] },
       coast: { lines: [outline.map(([lat, lon]) => [lon, lat] as [number, number])] },
     });
 

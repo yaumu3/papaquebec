@@ -3,7 +3,7 @@
  * `build-aero.ts`. Type codes follow the openAIP core API documentation.
  */
 import type {
-  AeroLayers,
+  DrawnLayers,
   Airport,
   Airspace,
   LatLon,
@@ -145,7 +145,7 @@ export function toAero(
   input: OpenAipInput,
   site: { lat: number; lon: number },
   radiusNm: number,
-): AeroLayers {
+): DrawnLayers {
   const near = (p: LatLon) => withinRadius(site, radiusNm, p[0], p[1]);
   const relevant = (pts: LatLon[]) => pts.some(near) || containsPoint(pts, site.lat, site.lon);
 

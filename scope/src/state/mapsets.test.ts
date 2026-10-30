@@ -18,7 +18,7 @@ describe('createMapSets', () => {
     const sets = fresh();
 
     // Act
-    const [list, drawn] = [sets.mapSets(), sets.aero()];
+    const [list, drawn] = [sets.mapSets(), sets.drawn()];
 
     // Assert
     expect(list.map((s) => [s.id, s.builtin, s.enabled])).toEqual([[BUILTIN_ID, true, true]]);
@@ -35,7 +35,7 @@ describe('createMapSets', () => {
 
     // Assert
     expect(sets.mapSets()[0]?.data.title).toBe('openAIP JP');
-    expect(sets.aero().waypoints.map((w) => w.id)).toEqual(['CHIBA']);
+    expect(sets.drawn().waypoints.map((w) => w.id)).toEqual(['CHIBA']);
   });
 
   it('drops an import titled like the built-in set once that set loads', () => {
@@ -49,7 +49,7 @@ describe('createMapSets', () => {
 
     // Assert
     expect(sets.mapSets().map((s) => s.id)).toEqual([BUILTIN_ID]);
-    expect(sets.aero().waypoints).toEqual([]);
+    expect(sets.drawn().waypoints).toEqual([]);
     expect(loadMapSets(storage).imported).toEqual([]);
   });
 
@@ -64,7 +64,7 @@ describe('createMapSets', () => {
     // Assert
     expect(out).toEqual({ ok: true, kept: true });
     expect(sets.mapSets().map((s) => s.id)).toEqual([BUILTIN_ID, 'a']);
-    expect(sets.aero().waypoints.map((w) => w.id)).toEqual(['CHIBA']);
+    expect(sets.drawn().waypoints.map((w) => w.id)).toEqual(['CHIBA']);
     expect(loadMapSets(storage).imported.map((s) => s.id)).toEqual(['a']);
   });
 
@@ -79,7 +79,7 @@ describe('createMapSets', () => {
     // Assert
     expect(out).toEqual({ ok: true, kept: true });
     expect(sets.mapSets().map((s) => s.id)).toEqual([BUILTIN_ID, 'b']);
-    expect(sets.aero().waypoints).toEqual([]);
+    expect(sets.drawn().waypoints).toEqual([]);
   });
 
   it('refuses a set titled like the built-in one', () => {
@@ -134,8 +134,8 @@ describe('createMapSets', () => {
     for (const id of ['a', BUILTIN_ID]) sets.toggleMapSet(id);
 
     // Assert
-    expect(sets.aero().waypoints).toEqual([]);
-    expect(sets.aero().navaids.map((n) => n.id)).toEqual(['NRE']);
+    expect(sets.drawn().waypoints).toEqual([]);
+    expect(sets.drawn().navaids.map((n) => n.id)).toEqual(['NRE']);
     expect(loadMapSets(storage)).toMatchObject({
       builtinEnabled: false,
       imported: [
