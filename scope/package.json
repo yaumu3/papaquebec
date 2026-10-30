@@ -5,10 +5,10 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "dev": "bun run proto && bunx --bun vite",
+    "dev": "bun run proto && bun run schema && bunx --bun vite",
     "map": "bun scripts/build-coast.ts && bun scripts/build-mapset.ts",
     "proto": "bunx --bun buf generate ../proto --template buf.gen.yaml",
-    "schema": "bun scripts/build-schema.ts",
+    "schema": "cp schema/mapset.schema.json public/mapset.schema.json",
     "icons": "bun scripts/build-icons.ts",
     "build": "bun run proto && bun run schema && bun run icons && bunx --bun tsc --noEmit && bunx --bun vite build",
     "preview": "bunx --bun vite preview",

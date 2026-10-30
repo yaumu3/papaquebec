@@ -59,15 +59,6 @@ export const AeroLayersSchema = z.object({
   airports: orDefault(z.array(LISTS.airports), []),
 });
 
-export const AeroSchema = z.extend(AeroLayersSchema, {
-  title: z.string().check(z.minLength(1)).register(z.globalRegistry, {
-    description: 'Names the map set on the Maps panel; say where and when it is from.',
-  }),
-  note: z.optional(z.string()).register(z.globalRegistry, {
-    description: 'Attribution, license or provenance, free text.',
-  }),
-});
-
 export type Waypoint = z.infer<typeof Fix>;
 export type Navaid = z.infer<typeof NavaidSchema>;
 export type Route = z.infer<typeof RouteSchema>;
