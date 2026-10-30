@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Papa Quebec map set",
+  "description": "A GeoJSON FeatureCollection (RFC 7946; the official schema is applied first, this one adds the profile) of the static aeronautical geography the scope draws, with a fixed property vocabulary. Every Feature is one point, one stretch of route, one holding, or one airspace volume. Features sharing a `layer` and `name` are one item on the Maps panel, so an area filed in parts, stepped in its limits, or split by altitude is several Features under one name, each with its own limits. Coordinates are WGS-84 [lon, lat]. A boundary two areas share is written in full on each: the scope merges vertices within 1e-5° of one another and draws each edge once. A route's fixes are the points its vertices coincide with. An area is included whole or not at all.",
+  "$defs": {
+    "position": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        }
+      ],
+      "items": false,
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "[lon, lat] in degrees, exactly two numbers: GeoJSON allows a third, this profile does not."
+    },
+    "pointGeometry": {
+      "allOf": [
+        {
+          "$ref": "https://geojson.org/schema/Point.json"
+        },
+        {
+          "properties": {
+            "coordinates": {
+              "$ref": "#/$defs/position"
+            }
+          }
+        }
+      ]
+    },
+    "lineGeometry": {
+      "allOf": [
+        {
+          "$ref": "https://geojson.org/schema/LineString.json"
+        },
+        {
+          "properties": {
+            "coordinates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/position"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "polygonGeometry": {
+      "allOf": [
+        {
+          "$ref": "https://geojson.org/schema/Polygon.json"
+        },
+        {
+          "properties": {
+            "coordinates": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/position"
+                }
+              },
+              "description": "An exterior ring, then any holes; each closed by repeating its first position, as GeoJSON requires."
+            }
+          }
+        }
+      ]
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "The published designator or name, as the AIP writes it. With the layer, it identifies the item."
+    },
+    "kind": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 16,
+      "description": "The source's finer class. Known values refine the drawing; any other draws as the layer's default."
+    },
+    "limit": {
+      "type": "string",
+      "pattern": "^(SFC|GND|UNL|FL[0-9]{2,3}|[0-9]{1,5}FT( AGL)?)$",
+      "description": "A vertical limit as published, keeping its reference: a flight level (FL240), feet above mean sea level (12000FT), feet above ground (1500FT AGL), the surface (SFC, GND) or unlimited (UNL)."
+    },
+    "feature": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/pointFeature"
+        },
+        {
+          "$ref": "#/$defs/routeFeature"
+        },
+        {
+          "$ref": "#/$defs/holdFeature"
+        },
+        {
+          "$ref": "#/$defs/areaFeature"
+        }
+      ],
+      "allOf": [
+        {
+          "$ref": "https://geojson.org/schema/Feature.json"
+        },
+        {
+          "properties": {
+            "properties": {
+              "type": "object",
+              "required": [
+                "layer"
+              ],
+              "properties": {
+                "layer": {
+                  "$ref": "#/$defs/layer"
+                }
+              }
+            },
+            "geometry": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "layer": {
+      "enum": [
+        "ad",
+        "navaid",
+        "fix",
+        "vfr",
+        "conv",
+        "rnav",
+        "dct",
+        "sid",
+        "star",
+        "trans",
+        "hold",
+        "ctr",
+        "tma",
+        "cta",
+        "advisory",
+        "sector",
+        "fir",
+        "asr",
+        "pr",
+        "dng",
+        "tra",
+        "adiz",
+        "civt"
+      ],
+      "description": "Points: ad aerodrome (AD 2); navaid radio navigation aid (ENR 4.1); fix significant point (ENR 4.4); vfr VFR reporting point. Routes: conv conventional ATS route; rnav area navigation route; dct direct route; sid, star standard departure and arrival; trans a procedure's transition to or from the route structure. hold: a holding pattern at a point. Areas: ctr control zone, ATZ (AD 2.17); tma terminal/approach control area; cta control area, UTA, OCA; advisory other regulated airspace of ENR 2.2 (an advisory service area such as Japan's TCA, a TMZ or RMZ); sector an ACC sector; fir FIR/UIR; asr altimeter setting region (ENR 1.7); pr prohibited and restricted areas; dng danger areas and ranges (ENR 5.1); tra military exercise, training and reserved areas (ENR 5.2); adiz; civt civil training and testing areas."
+    },
+    "pointFeature": {
+      "properties": {
+        "geometry": {
+          "$ref": "#/$defs/pointGeometry"
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer",
+            "id"
+          ],
+          "properties": {
+            "layer": {
+              "enum": [
+                "ad",
+                "navaid",
+                "fix",
+                "vfr"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "description": "Ident or name-code; what the scope labels. Unique within the set among ad, navaid and fix together. A vfr id may repeat: the same name serves several aerodromes."
+            },
+            "kind": {
+              "$ref": "#/$defs/kind",
+              "description": "navaid: VOR, DME, VOR/DME, TACAN, VORTAC, NDB (others draw as a basic navaid); fix: e.g. CRP for a compulsory reporting point."
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 64,
+              "description": "Full name where the id is a code, e.g. an aerodrome's name."
+            },
+            "ad": {
+              "type": "string",
+              "minLength": 4,
+              "maxLength": 4,
+              "description": "vfr: the aerodrome the point serves, ICAO location indicator."
+            }
+          }
+        }
+      }
+    },
+    "routeFeature": {
+      "properties": {
+        "geometry": {
+          "$ref": "#/$defs/lineGeometry",
+          "description": "One stretch of the route through its points in order, as many vertices as it has. A route that leaves and re-enters the set, or changes its direction rule, is several Features under one name. A vertex coinciding with a point of the set makes that point the route's; a segment two routes share is drawn once."
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer",
+            "name"
+          ],
+          "properties": {
+            "layer": {
+              "enum": [
+                "conv",
+                "rnav",
+                "dct",
+                "sid",
+                "star",
+                "trans"
+              ]
+            },
+            "name": {
+              "$ref": "#/$defs/name"
+            },
+            "oneWay": {
+              "type": "boolean",
+              "default": false,
+              "description": "Flown in the order of the coordinates only; drawn with a chevron."
+            },
+            "kind": {
+              "$ref": "#/$defs/kind",
+              "description": "conv: OTR for an oceanic transition route."
+            }
+          }
+        }
+      }
+    },
+    "holdFeature": {
+      "properties": {
+        "geometry": {
+          "$ref": "#/$defs/pointGeometry",
+          "description": "The holding point. It coincides with a point of the set, which names it."
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer",
+            "turn"
+          ],
+          "anyOf": [
+            {
+              "required": [
+                "inboundMag"
+              ]
+            },
+            {
+              "required": [
+                "inboundTrue"
+              ]
+            }
+          ],
+          "properties": {
+            "layer": {
+              "const": "hold"
+            },
+            "inboundMag": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMaximum": 360,
+              "description": "Inbound track, degrees magnetic, as published."
+            },
+            "inboundTrue": {
+              "type": "number",
+              "minimum": 0,
+              "exclusiveMaximum": 360,
+              "description": "Inbound track, degrees true: what the pattern is drawn on. Give it when the variation at the fix is known; otherwise the scope applies its own."
+            },
+            "turn": {
+              "enum": [
+                "L",
+                "R"
+              ]
+            },
+            "kind": {
+              "$ref": "#/$defs/kind",
+              "description": "e.g. RNAV."
+            }
+          }
+        }
+      }
+    },
+    "areaFeature": {
+      "properties": {
+        "geometry": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/polygonGeometry"
+            },
+            {
+              "$ref": "#/$defs/lineGeometry"
+            }
+          ],
+          "description": "One volume of the area as a Polygon, or an open boundary as a LineString where the source publishes a border rather than an enclosed area."
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "layer",
+            "name"
+          ],
+          "properties": {
+            "layer": {
+              "enum": [
+                "ctr",
+                "tma",
+                "cta",
+                "advisory",
+                "sector",
+                "fir",
+                "asr",
+                "pr",
+                "dng",
+                "tra",
+                "adiz",
+                "civt"
+              ]
+            },
+            "name": {
+              "$ref": "#/$defs/name",
+              "description": "Features sharing a layer and name are one area: its parts, its steps in limits, or its strata. A stratum suffix the source puts in the name (Z55(375-)) belongs in the limits, not here."
+            },
+            "kind": {
+              "$ref": "#/$defs/kind",
+              "description": "pr: P or R; dng: D, ALERT, WARNING; tma: MIL, ACA; cta: PCA; advisory: TCA, TMZ, RMZ; tra: MIL, TSA, MTA, SST, CORR; ctr: CTR, ATZ, TIZ, TIA, INFO; fir: FIR or UIR."
+            },
+            "lower": {
+              "$ref": "#/$defs/limit",
+              "description": "This volume's lower limit. Absent: not published."
+            },
+            "upper": {
+              "$ref": "#/$defs/limit",
+              "description": "This volume's upper limit. Absent: not published."
+            },
+            "callsign": {
+              "type": "string",
+              "maxLength": 32,
+              "description": "The controlling unit's call sign for this volume, as published."
+            },
+            "freqs": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9]{1,3}\\.[0-9]{1,3}$"
+              },
+              "description": "The controlling frequencies for this volume, MHz, as published, primary first (no zeros added or dropped). Strata of one sector may differ."
+            }
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "https://geojson.org/schema/FeatureCollection.json"
+    },
+    {
+      "type": "object",
+      "required": [
+        "version",
+        "title",
+        "features"
+      ],
+      "properties": {
+        "version": {
+          "const": 2
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,31}$",
+          "description": "A stable identity for the set across imports, e.g. \"example-set\": what the scope keys its visibility choices by. A set without one is keyed by its title."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80,
+          "description": "Names the set on the Maps panel; say where and when it is from."
+        },
+        "effective": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "AIRAC effective date of the source, YYYY-MM-DD."
+        },
+        "note": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Attribution, license or provenance, free text."
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/feature"
+          }
+        }
+      }
+    }
+  ]
+}
