@@ -26,19 +26,19 @@ export const indexOf = (layer: string): number => {
   return at;
 };
 
-function variant(change: (copy: MapSetDocument) => void): MapSetDocument {
+export function variant(change: (copy: MapSetDocument) => void): MapSetDocument {
   const copy = structuredClone(EXAMPLE);
   change(copy);
   return copy;
 }
 
-const feature = (copy: MapSetDocument, layer: string) => {
+export const feature = (copy: MapSetDocument, layer: string) => {
   const found = copy.features[indexOf(layer)];
   if (!found) throw new Error(`the example has no ${layer} Feature`);
   return found;
 };
 
-const properties = (copy: MapSetDocument, layer: string) => {
+export const properties = (copy: MapSetDocument, layer: string) => {
   const found = feature(copy, layer).properties;
   if (!found) throw new Error(`the ${layer} Feature has no properties`);
   return found;
@@ -122,3 +122,9 @@ export const CORPUS: CorpusCase[] = [
     feature(c, 'ad').properties = null;
   }),
 ];
+
+/** The example's first ring of its first Feature on `layer`. */
+export const ringOf = (document: MapSetDocument, layer: string): unknown => {
+  const rings = feature(document, layer).geometry.coordinates;
+  return Array.isArray(rings) ? rings[0] : undefined;
+};

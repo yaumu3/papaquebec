@@ -107,13 +107,33 @@ const feature = <P extends z.ZodMiniType, G extends z.ZodMiniType>(properties: P
     geometry,
   });
 
-const PointFeature = feature(PointProperties, PointGeometry);
-const RouteFeature = feature(RouteProperties, LineGeometry);
-const HoldFeature = feature(HoldProperties, PointGeometry);
-const AreaFeature = feature(
+const AreaShape = feature(
   AreaProperties,
   z.discriminatedUnion('type', [PolygonGeometry, LineGeometry]),
 );
+const PointFeature = feature(PointProperties, PointGeometry);
+const RouteFeature = feature(RouteProperties, LineGeometry);
+const HoldFeature = feature(HoldProperties, PointGeometry);
+
+type Ring = [number, number][];
+
+/**
+ * RFC 7946 section 3.1.6 wants a ring to end where it starts; one that does not is closed by
+ * appending its first position.
+ */
+function closed(ring: Ring): Ring {
+  const first = ring[0];
+  const last = ring.at(-1);
+  return first && last && (first[0] !== last[0] || first[1] !== last[1]) ? [...ring, first] : ring;
+}
+
+function withClosedRings(area: z.infer<typeof AreaShape>) {
+  const { geometry } = area;
+  if (geometry.type !== 'Polygon') return area;
+  return { ...area, geometry: { ...geometry, coordinates: geometry.coordinates.map(closed) } };
+}
+
+const AreaFeature = z.pipe(AreaShape, z.transform(withClosedRings));
 
 export type MapSetFeature =
   | z.infer<typeof PointFeature>
@@ -167,6 +187,19 @@ function parseFeature(raw: unknown): Parsed<MapSetFeature> {
     : { ok: false, issues: parsed.error.issues };
 }
 
+const POINT_ID_LAYERS = new Set<string>(['ad', 'navaid', 'fix']);
+
+/** The Features repeating the id of an earlier ad, navaid or fix, each with that earlier index. */
+function repeatedIds(features: readonly MapSetFeature[]): { later: number; earlier: number }[] {
+  const seen = new Map<string, number>();
+  return features.flatMap((f, later) => {
+    if (!('id' in f.properties) || !POINT_ID_LAYERS.has(f.properties.layer)) return [];
+    const earlier = seen.get(f.properties.id);
+    seen.set(f.properties.id, earlier ?? later);
+    return earlier === undefined ? [] : [{ later, earlier }];
+  });
+}
+
 export type MapSetValidation = { ok: true; data: MapSetData } | { ok: false; message: string };
 
 /** Strict: the whole document must satisfy the schema, and the answer says where it does not. */
@@ -179,5 +212,10 @@ export function validateMapSet(raw: unknown): MapSetValidation {
   );
   if (issues.length) return { ok: false, message: describeIssues(issues) };
   const features = parsed.flatMap((p) => (p.ok ? [p.data] : []));
+  const repeats = repeatedIds(features).map(({ later, earlier }) => ({
+    path: ['features', later, 'properties', 'id'],
+    message: `repeats the id of features[${earlier}]`,
+  }));
+  if (repeats.length) return { ok: false, message: describeIssues(repeats) };
   return { ok: true, data: { ...root.data, features } };
 }
