@@ -160,13 +160,33 @@ The site comes from `PQ_SITE` (`lat,lon`); pass `<lat> <lon>` and optionally a r
 script to override it.
 
 openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
-brought in through the Maps panel.
+brought in through the Maps panel, as a map set.
+
+### Map sets
+
+A map set is a GeoJSON `FeatureCollection` with `version` 2, a `title`, and optionally an `id`,
+an `effective` date and a `note`. Each Feature names its `layer`:
+
+- points: `ad`, `navaid`, `fix`, `vfr`
+- routes: `conv`, `rnav`, `dct`, `sid`, `star`, `trans`
+- holds: `hold`
+- areas: `ctr`, `tma`, `cta`, `advisory`, `sector`, `fir`, `asr`, `pr`, `dng`, `tra`, `adiz`,
+  `civt`
+
+The Maps panel imports one:
 
 - `IMPORT JSON…` takes a `.mapset.geojson` (or `.json`) file, checked against
   `/mapset.schema.json` before it is accepted.
 - Each set lists under `SOURCES` by its title and can be toggled or removed; the openAIP set
   generated at start is the one that stays.
-- Imported sets live in the browser's storage, so they are per device.
+  - A set is known by its `id`, else its title; importing it again replaces it.
+- Imported sets live in the browser's IndexedDB, so they are per device.
+- An imported set carries its own license in `note`; the openAIP terms apply to the built-in set
+  only.
+
+The schema is [`scope/schema/mapset.schema.json`](scope/schema/mapset.schema.json), with a set that
+uses every layer in [`example.mapset.geojson`](scope/schema/example.mapset.geojson) and the rules
+for writing a converter in [`converters.md`](scope/schema/converters.md).
 
 ## Design
 
