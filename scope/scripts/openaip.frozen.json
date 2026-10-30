@@ -1,0 +1,67 @@
+{
+  "waypoints": [{ "id": "CHIBA", "lat": 35.6, "lon": 140.1 }],
+  "navaids": [{ "id": "NRE", "kind": "VOR-DME", "lat": 35.76, "lon": 140.38 }],
+  "airways": [],
+  "airspace": [
+    {
+      "name": "NARITA CTR",
+      "kind": "CTR",
+      "points": [
+        [35.9, 140.2],
+        [35.9, 140.6],
+        [35.6, 140.6],
+        [35.6, 140.2],
+        [35.9, 140.2]
+      ],
+      "dashed": false,
+      "lowerFt": 0,
+      "upperFt": 3000
+    },
+    {
+      "name": "R-134",
+      "kind": "R",
+      "points": [
+        [35.5, 140],
+        [35.5, 140.1],
+        [35.4, 140.1],
+        [35.5, 140]
+      ],
+      "dashed": true
+    },
+    {
+      "name": "TOKYO ACA-3",
+      "kind": "ACA",
+      "points": [
+        [35.7, 140.1],
+        [35.7, 140.2],
+        [35.6, 140.2],
+        [35.7, 140.1]
+      ],
+      "dashed": false
+    },
+    {
+      "name": "NARITA INFO ZONE-2",
+      "kind": "INFO",
+      "points": [
+        [35.7, 140.1],
+        [35.7, 140.2],
+        [35.6, 140.2],
+        [35.7, 140.1]
+      ],
+      "dashed": false
+    }
+  ],
+  "sectors": [
+    {
+      "name": "TOKYO FIR",
+      "points": [
+        [30, 130],
+        [30, 150],
+        [45, 150],
+        [45, 130],
+        [30, 130]
+      ]
+    }
+  ],
+  "airports": [{ "id": "RJAA", "name": "NARITA INTL", "lat": 35.765, "lon": 140.386 }]
+}

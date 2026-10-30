@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { readFileSync } from 'node:fs';
 
 import { toAero, withinRadius } from './openaip';
 
@@ -9,6 +10,105 @@ const poly = (pts: [number, number][]) => ({
 });
 
 const site = { lat: 35.765, lon: 140.386 }; // RJAA
+
+const FIXTURE = {
+  navaids: [
+    { identifier: 'NRE', name: 'NARITA', type: 4, geometry: point(35.76, 140.38) }, // RJAA
+    { identifier: 'FAR', name: 'FAR AWAY', type: 3, geometry: point(43.0, 141.0) }, // Sapporo
+  ],
+  airports: [
+    { icaoCode: 'RJAA', name: 'NARITA INTL', type: 0, geometry: point(35.765, 140.386) },
+    { name: 'NO CODE', type: 0, geometry: point(35.7, 140.3) }, // near RJAA
+  ],
+  reportingPoints: [{ name: 'CHIBA', compulsory: true, geometry: point(35.6, 140.1) }], // Chiba
+  airspaces: [
+    {
+      name: 'NARITA CTR',
+      type: 4,
+      icaoClass: 2,
+      lowerLimit: { value: 0, unit: 1, referenceDatum: 0 },
+      upperLimit: { value: 3000, unit: 1, referenceDatum: 1 },
+      geometry: poly([
+        [35.9, 140.2], // around RJAA
+        [35.9, 140.6],
+        [35.6, 140.6],
+        [35.6, 140.2],
+        [35.9, 140.2],
+      ]),
+    },
+    {
+      name: 'TOKYO FIR',
+      type: 10,
+      geometry: poly([
+        [30, 130], // all of Japan
+        [30, 150],
+        [45, 150],
+        [45, 130],
+        [30, 130],
+      ]),
+    },
+    {
+      name: 'R-134',
+      type: 1,
+      geometry: poly([
+        [35.5, 140.0], // Ichihara
+        [35.5, 140.1],
+        [35.4, 140.1],
+        [35.5, 140.0],
+      ]),
+    },
+    {
+      name: 'IGNORED SPORT',
+      type: 28,
+      geometry: poly([
+        [35.7, 140.1], // Chiba
+        [35.7, 140.2],
+        [35.6, 140.2],
+        [35.7, 140.1],
+      ]),
+    },
+    {
+      name: 'TOKYO ACA-3',
+      type: 0,
+      geometry: poly([
+        [35.7, 140.1], // Chiba
+        [35.7, 140.2],
+        [35.6, 140.2],
+        [35.7, 140.1],
+      ]),
+    },
+    {
+      name: 'NARITA INFO ZONE-2',
+      type: 0,
+      geometry: poly([
+        [35.7, 140.1], // Chiba
+        [35.7, 140.2],
+        [35.6, 140.2],
+        [35.7, 140.1],
+      ]),
+    },
+    {
+      name: 'AKASHI HELI',
+      type: 0,
+      geometry: poly([
+        [35.7, 140.1], // Chiba
+        [35.7, 140.2],
+        [35.6, 140.2],
+        [35.7, 140.1],
+      ]),
+    },
+    {
+      name: 'CHOFU AP APPROACH SURFACE-S',
+      type: 2,
+      geometry: poly([
+        [35.7, 140.1], // Chiba
+        [35.7, 140.2],
+        [35.6, 140.2],
+        [35.7, 140.1],
+      ]),
+    },
+  ],
+};
 
 describe('withinRadius', () => {
   it('keeps points inside the radius and drops the rest', () => {
@@ -27,104 +127,7 @@ describe('withinRadius', () => {
 describe('toAero', () => {
   it('maps navaids, airports, reporting points and airspace polygons into the scope format', () => {
     // Arrange
-    const input = {
-      navaids: [
-        { identifier: 'NRE', name: 'NARITA', type: 4, geometry: point(35.76, 140.38) }, // RJAA
-        { identifier: 'FAR', name: 'FAR AWAY', type: 3, geometry: point(43.0, 141.0) }, // Sapporo
-      ],
-      airports: [
-        { icaoCode: 'RJAA', name: 'NARITA INTL', type: 0, geometry: point(35.765, 140.386) },
-        { name: 'NO CODE', type: 0, geometry: point(35.7, 140.3) }, // near RJAA
-      ],
-      reportingPoints: [{ name: 'CHIBA', compulsory: true, geometry: point(35.6, 140.1) }], // Chiba
-      airspaces: [
-        {
-          name: 'NARITA CTR',
-          type: 4,
-          icaoClass: 2,
-          lowerLimit: { value: 0, unit: 1, referenceDatum: 0 },
-          upperLimit: { value: 3000, unit: 1, referenceDatum: 1 },
-          geometry: poly([
-            [35.9, 140.2], // around RJAA
-            [35.9, 140.6],
-            [35.6, 140.6],
-            [35.6, 140.2],
-            [35.9, 140.2],
-          ]),
-        },
-        {
-          name: 'TOKYO FIR',
-          type: 10,
-          geometry: poly([
-            [30, 130], // all of Japan
-            [30, 150],
-            [45, 150],
-            [45, 130],
-            [30, 130],
-          ]),
-        },
-        {
-          name: 'R-134',
-          type: 1,
-          geometry: poly([
-            [35.5, 140.0], // Ichihara
-            [35.5, 140.1],
-            [35.4, 140.1],
-            [35.5, 140.0],
-          ]),
-        },
-        {
-          name: 'IGNORED SPORT',
-          type: 28,
-          geometry: poly([
-            [35.7, 140.1], // Chiba
-            [35.7, 140.2],
-            [35.6, 140.2],
-            [35.7, 140.1],
-          ]),
-        },
-        {
-          name: 'TOKYO ACA-3',
-          type: 0,
-          geometry: poly([
-            [35.7, 140.1], // Chiba
-            [35.7, 140.2],
-            [35.6, 140.2],
-            [35.7, 140.1],
-          ]),
-        },
-        {
-          name: 'NARITA INFO ZONE-2',
-          type: 0,
-          geometry: poly([
-            [35.7, 140.1], // Chiba
-            [35.7, 140.2],
-            [35.6, 140.2],
-            [35.7, 140.1],
-          ]),
-        },
-        {
-          name: 'AKASHI HELI',
-          type: 0,
-          geometry: poly([
-            [35.7, 140.1], // Chiba
-            [35.7, 140.2],
-            [35.6, 140.2],
-            [35.7, 140.1],
-          ]),
-        },
-        {
-          name: 'CHOFU AP APPROACH SURFACE-S',
-          type: 2,
-          geometry: poly([
-            [35.7, 140.1], // Chiba
-            [35.7, 140.2],
-            [35.6, 140.2],
-            [35.7, 140.1],
-          ]),
-        },
-      ],
-    };
+    const input = FIXTURE;
 
     // Act
     const aero = toAero(input, site, 300);
@@ -143,6 +146,19 @@ describe('toAero', () => {
     expect(polygons[0]).toMatchObject({ lowerFt: 0, upperFt: 3000 });
     expect(polygons[0]?.points).toHaveLength(5);
     expect(aero.sectors.map((s) => s.name)).toEqual(['TOKYO FIR']);
+  });
+
+  it('matches the output frozen before the map set format', () => {
+    // Arrange
+    const frozen: ReturnType<typeof toAero> = JSON.parse(
+      readFileSync(new URL('./openaip.frozen.json', import.meta.url), 'utf8'),
+    );
+
+    // Act
+    const aero = toAero(FIXTURE, site, 300);
+
+    // Assert
+    expect(aero).toEqual(frozen);
   });
 
   it('converts flight-level and meter limits to feet', () => {
