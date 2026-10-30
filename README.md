@@ -151,22 +151,42 @@ and sends them to every scope over the feed:
 
 - `public/map/coast.json`: [Natural Earth](https://www.naturalearthdata.com) 10 m coastline (public
   domain) within 300 NM of the site; skipped while the file already covers the same site.
-- `public/map/aero.json`: airspace, navaids, airports and reporting points within 150 NM from
-  [openAIP](https://www.openaip.net)'s daily exports (anonymous download, CC BY-NC-SA 4.0), for
-  every country in range, titled with the fetch date. When the exports cannot be reached the
-  previous file is kept.
+- `public/map/openaip.mapset.geojson`: airspace, navaids, airports and reporting points within
+  150 NM from [openAIP](https://www.openaip.net)'s daily exports (anonymous download, CC BY-NC-SA
+  4.0), for every country in range, titled with the fetch date. When the exports cannot be
+  reached the previous file is kept.
 
 The site comes from `PQ_SITE` (`lat,lon`); pass `<lat> <lon>` and optionally a radius to either
 script to override it.
 
 openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
-brought in through the Maps panel.
+brought in through the Maps panel, as a map set.
 
-- `IMPORT JSON…` takes a file in the `aero.json` format, checked against `/aero.schema.json`
-  (served by the scope, generated from the code) before it is accepted.
+### Map sets
+
+A map set is a GeoJSON `FeatureCollection` with `version` 2, a `title`, and optionally an `id`,
+an `effective` date and a `note`. Each Feature names its `layer`:
+
+- points: `ad`, `navaid`, `fix`, `vfr`
+- routes: `conv`, `rnav`, `dct`, `sid`, `star`, `trans`
+- holds: `hold`
+- areas: `ctr`, `tma`, `cta`, `advisory`, `sector`, `fir`, `asr`, `pr`, `dng`, `tra`, `adiz`,
+  `civt`
+
+The Maps panel imports one:
+
+- `IMPORT JSON…` takes a `.mapset.geojson` (or `.json`) file, checked against
+  `/mapset.schema.json` before it is accepted.
 - Each set lists under `SOURCES` by its title and can be toggled or removed; the openAIP set
   generated at start is the one that stays.
-- Imported sets live in the browser's storage, so they are per device.
+  - A set is known by its `id`, else its title; importing it again replaces it.
+- Imported sets live in the browser's IndexedDB, so they are per device.
+- An imported set carries its own license in `note`; the openAIP terms apply to the built-in set
+  only.
+
+The schema is [`scope/schema/mapset.schema.json`](scope/schema/mapset.schema.json), with a set that
+uses every layer in [`example.mapset.geojson`](scope/schema/example.mapset.geojson) and the rules
+for writing a converter in [`converters.md`](scope/schema/converters.md).
 
 ## Design
 
@@ -333,9 +353,10 @@ crates:
 
 The code is MIT licensed. The generated aeronautical data is openAIP's, [CC BY-NC-SA
 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): it may not be used commercially, and a
-copy of `aero.json` passed on keeps that license. Registrations and types are from the [Mictronics
-aircraft database](https://github.com/Mictronics/aircraft-database), made available under the [Open
-Data Commons Attribution License](https://opendatacommons.org/licenses/by/1-0/); the server
-downloads it, and none of it is in this repository. METARs and the station list are public domain
-from NOAA's Aviation Weather Center, which the server reads. The coastline is public domain and JetBrains
-Mono is under the [SIL Open Font License](https://openfontlicense.org), shipped in `public/fonts`.
+copy of `openaip.mapset.geojson` passed on keeps that license. Registrations and types are from the
+[Mictronics aircraft database](https://github.com/Mictronics/aircraft-database), made available
+under the [Open Data Commons Attribution License](https://opendatacommons.org/licenses/by/1-0/); the
+server downloads it, and none of it is in this repository. METARs and the station list are public
+domain from NOAA's Aviation Weather Center, which the server reads. The coastline is public domain
+and JetBrains Mono is under the [SIL Open Font License](https://openfontlicense.org), shipped in
+`public/fonts`.

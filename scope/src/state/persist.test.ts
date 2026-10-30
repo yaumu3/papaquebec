@@ -1,15 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import { FL_MAX } from './filter';
 import type { ListSort } from './listSort';
 import { memoryStorage } from './memoryStorage';
-import {
-  LANES_VERSION,
-  loadPersisted,
-  PERSIST_KEY,
-  savePersisted,
-  type Persisted,
-} from './persist';
+import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
 import { DEFAULT_SETTINGS } from './settings';
 
 const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
@@ -19,7 +12,6 @@ const DEFAULTS: Persisted = {
   panels: DEFAULT_PANELS,
   listSort: DEFAULT_SORT,
   plotted: ['pfd', 'nd', 'alt'],
-  lanesVersion: LANES_VERSION,
   ndRangeNm: 20,
 };
 
@@ -80,7 +72,6 @@ describe('savePersisted', () => {
       panels: { ...DEFAULT_PANELS, maps: false },
       listSort: { key: 'alt', dir: 'desc' },
       plotted: ['trk', 'gs'],
-      lanesVersion: LANES_VERSION,
       ndRangeNm: 80,
     };
     savePersisted(storage, state);
@@ -142,18 +133,18 @@ describe('loadPersisted filter', () => {
 });
 
 describe('loadPersisted band', () => {
-  it('reads a saved upper edge past the top stop as UNL and keeps the lower edge', () => {
+  it('falls back to the default band when a saved upper edge is past the top stop', () => {
     // Arrange
     const storage = memoryStorage({
       [PERSIST_KEY]: JSON.stringify({ settings: { filter: { lowerFl: 100, upperFl: 600 } } }),
     });
+    const { lowerFl, upperFl } = DEFAULTS.settings.filter;
 
     // Act
     const { filter } = loadPersisted(storage, DEFAULTS).settings;
 
     // Assert
-    expect(filter.lowerFl).toBe(100);
-    expect(filter.upperFl).toBe(FL_MAX);
+    expect([filter.lowerFl, filter.upperFl]).toEqual([lowerFl, upperFl]);
   });
 });
 
@@ -161,7 +152,7 @@ describe('loadPersisted plotted', () => {
   it('keeps the lanes it knows, each once, and falls back when the entry is no list', () => {
     // Arrange
     const stores = [['gs', 'bogus', 'alt', 'gs'], [], 'alt'].map((plotted) =>
-      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted, lanesVersion: LANES_VERSION }) }),
+      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted }) }),
     );
 
     // Act
@@ -172,38 +163,11 @@ describe('loadPersisted plotted', () => {
   });
 });
 
-describe('loadPersisted plotted from before lanes stood alone', () => {
-  it('drops the intents a plot saved then lists, keeping its lanes in order', () => {
-    // Arrange
-    const saved = [
-      ['alt', 'selAlt', 'fmsAlt', 'gs'],
-      ['trk', 'selHdg', 'gs'],
-      ['selAlt', 'gs'],
-    ];
-    const stores = saved.map((plotted) =>
-      memoryStorage({ [PERSIST_KEY]: JSON.stringify({ plotted }) }),
-    );
-
-    // Act
-    const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
-
-    // Assert
-    expect(plotted).toEqual([
-      ['pfd', 'nd', 'alt', 'gs'],
-      ['pfd', 'nd', 'trk', 'gs'],
-      ['pfd', 'nd', 'gs'],
-    ]);
-  });
-});
-
 describe('loadPersisted plotted lanes', () => {
   it('keeps every lane of a stored plot, however many', () => {
     // Arrange
     const storage = memoryStorage({
-      [PERSIST_KEY]: JSON.stringify({
-        plotted: ['alt', 'gs', 'trk', 'ias', 'vs', 'roll'],
-        lanesVersion: LANES_VERSION,
-      }),
+      [PERSIST_KEY]: JSON.stringify({ plotted: ['alt', 'gs', 'trk', 'ias', 'vs', 'roll'] }),
     });
 
     // Act
@@ -214,81 +178,8 @@ describe('loadPersisted plotted lanes', () => {
   });
 });
 
-describe('loadPersisted lanes version', () => {
-  it('puts the PFD and ND first in lanes saved before there were instruments, and leaves the rest', () => {
-    // Arrange
-    const saved = [
-      { plotted: ['alt', 'gs'] },
-      { plotted: ['alt', 'gs'], detailTab: 'history' },
-      { plotted: [] },
-      { plotted: ['alt', 'nd', 'gs'] },
-      { plotted: ['surv'] },
-      { plotted: ['alt', 'gs'], lanesVersion: 2 },
-      { plotted: [], lanesVersion: 2 },
-      { plotted: ['gs', 'pfd'], lanesVersion: 2 },
-      {},
-      { lanesVersion: 2 },
-    ];
-    const stores = saved.map((s) => memoryStorage({ [PERSIST_KEY]: JSON.stringify(s) }));
-
-    // Act
-    const plotted = stores.map((s) => loadPersisted(s, DEFAULTS).plotted);
-
-    // Assert
-    expect(plotted).toEqual([
-      ['pfd', 'nd', 'alt', 'gs'],
-      ['pfd', 'nd', 'alt', 'gs'],
-      ['pfd', 'nd'],
-      ['alt', 'nd', 'gs'],
-      ['surv'],
-      ['alt', 'gs'],
-      [],
-      ['gs', 'pfd'],
-      ['pfd', 'nd', 'alt'],
-      ['pfd', 'nd', 'alt'],
-    ]);
-  });
-
-  it('reads as the current lanes version, whatever was saved', () => {
-    // Arrange
-    const storage = memoryStorage();
-
-    // Act
-    const loaded = loadPersisted(storage, DEFAULTS);
-
-    // Assert
-    expect(loaded.lanesVersion).toBe(2);
-  });
-});
-
-describe('loadPersisted history fold', () => {
-  it('ignores an old saved historyOpen', () => {
-    // Arrange
-    const storage = memoryStorage({ [PERSIST_KEY]: JSON.stringify({ historyOpen: false }) });
-
-    // Act
-    const loaded = loadPersisted(storage, DEFAULTS);
-
-    // Assert
-    expect('historyOpen' in loaded).toBe(false);
-  });
-});
-
-describe('loadPersisted detailTab', () => {
-  it('ignores a saved detail tab, which the panel no longer has', () => {
-    // Arrange
-    const storage = memoryStorage({ [PERSIST_KEY]: JSON.stringify({ detailTab: 'history' }) });
-
-    // Act
-    const loaded = loadPersisted(storage, DEFAULTS);
-
-    // Assert
-    expect('detailTab' in loaded).toBe(false);
-  });
-});
-
 describe('loadPersisted ndRangeNm', () => {
-  it('keeps a range of the scale, and falls back for any other value or an old entry', () => {
+  it('keeps a range of the scale, and falls back for any other value', () => {
     // Arrange
     const stores = [40, 30, '40', null, undefined].map((ndRangeNm) =>
       memoryStorage({ [PERSIST_KEY]: JSON.stringify({ ndRangeNm }) }),

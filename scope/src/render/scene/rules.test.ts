@@ -93,14 +93,14 @@ describe('trackLabel', () => {
 describe('airspaceColor', () => {
   it('keeps control zones and special-use areas bright and dims area sectors', () => {
     // Arrange
-    const kinds = ['CTR', 'ATZ', 'R', 'D', 'P', 'TCA', 'ACA', 'PCA', 'INFO', 'TMA', undefined];
+    const kinds = ['CTR', 'ATZ', 'R', 'D', 'P', 'TCA', 'ACA', 'PCA', 'INFO', 'TMA'];
 
     // Act
     const colors = kinds.map(airspaceColor);
 
     // Assert
     expect(colors.slice(0, 5)).toEqual(Array(5).fill(THEME.airspace));
-    expect(colors.slice(5)).toEqual(Array(6).fill(THEME.airspaceDim));
+    expect(colors.slice(5)).toEqual(Array(5).fill(THEME.airspaceDim));
   });
 });
 

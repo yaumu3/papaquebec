@@ -16,7 +16,7 @@ import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../ren
 import { hoverInstant } from '../state/lanes';
 import { declinationAt } from '../state/magnetic';
 import {
-  aero,
+  drawn,
   canvasSize,
   coast,
   drawnBlocks,
@@ -120,7 +120,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     projected()
       ? buildMap({
           coast: coast(),
-          aero: aero(),
+          drawn: drawn(),
           project: projectNm,
           layers: { ...settings.layers },
           labelDensity: settings.labelDensity,

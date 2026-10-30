@@ -3,7 +3,8 @@ import { createEffect, onCleanup, onMount } from 'solid-js';
 import { ScopeCanvas } from './canvas/ScopeCanvas';
 import { cx } from './design/cx';
 import { connectFeed, feedOptionsFromUrl } from './feed/connect';
-import { parseAero, parseCoast } from './lib/mapdata';
+import { parseCoast } from './lib/mapdata';
+import { parseMapSet } from './lib/mapset';
 import { loadDeclination } from './lib/wmm';
 import { About } from './panels/About';
 import { ContextMenu } from './panels/ContextMenu';
@@ -17,7 +18,7 @@ import { TopBar } from './panels/TopBar';
 import { plotted } from './state/lanes';
 import { keepUnscrolled } from './state/layout';
 import { setDeclinationAt } from './state/magnetic';
-import { setBuiltinAero } from './state/mapsets';
+import { setBuiltinMapSet } from './state/mapsets';
 import { ndRangeNm } from './state/nd';
 import { qnhReport } from './state/qnh';
 import { listSort, panels, setCoast, setTick } from './state/scope';
@@ -44,9 +45,9 @@ export function App() {
     void loadJson('./map/coast.json')
       .then((raw) => setCoast(parseCoast(raw)))
       .catch((err: unknown) => console.warn('coast.json unavailable', err));
-    void loadJson('./map/aero.json')
-      .then((raw) => setBuiltinAero(parseAero(raw)))
-      .catch((err: unknown) => console.warn('aero.json unavailable', err));
+    void loadJson('./map/openaip.mapset.geojson')
+      .then((raw) => setBuiltinMapSet(parseMapSet(raw)))
+      .catch((err: unknown) => console.warn('openaip.mapset.geojson unavailable', err));
     void loadDeclination()
       .then((declination) => setDeclinationAt(() => declination))
       .catch((err: unknown) => console.warn('magnetic model unavailable', err));

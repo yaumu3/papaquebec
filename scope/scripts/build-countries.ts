@@ -1,6 +1,6 @@
 /**
  * Bounding boxes of every country polygon, keyed by ISO 3166-1 alpha-2, from Natural Earth's
- * 10 m admin-0 countries (public domain). Vendored as `scripts/countries.json` so the aero
+ * 10 m admin-0 countries (public domain). Vendored as `scripts/countries.json` so the map
  * build can pick which openAIP country exports cover the site without a geometry library.
  *
  *   bun scripts/build-countries.ts [ne_10m_admin_0_countries.geojson]

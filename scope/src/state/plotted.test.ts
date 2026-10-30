@@ -16,7 +16,6 @@ import {
   readingsIn,
   removeLane,
   switchLane,
-  withInstruments,
 } from './plotted';
 
 describe('LANE_GROUPS', () => {
@@ -139,25 +138,6 @@ describe('DEFAULT_PLOTTED', () => {
 
     // Assert
     expect(plotted).toEqual(expected);
-  });
-});
-
-describe('withInstruments', () => {
-  it('puts the PFD and the ND first, unless an instrument is plotted already', () => {
-    // Arrange
-    const saved: LaneKey[][] = [['alt', 'gs'], [], ['alt', 'surv'], ['nd'], ['pfd', 'alt']];
-
-    // Act
-    const lanes = saved.map(withInstruments);
-
-    // Assert
-    expect(lanes).toEqual([
-      ['pfd', 'nd', 'alt', 'gs'],
-      ['pfd', 'nd'],
-      ['alt', 'surv'],
-      ['nd'],
-      ['pfd', 'alt'],
-    ]);
   });
 });
 

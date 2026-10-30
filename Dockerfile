@@ -56,7 +56,8 @@ RUN apk add --no-cache tini ca-certificates
 COPY --from=server /papaquebec /usr/bin/papaquebec
 WORKDIR /app
 COPY scope/package.json ./
-COPY scope/scripts/build-coast.ts scope/scripts/build-aero.ts scope/scripts/site.ts scope/scripts/guards.ts scope/scripts/countries.ts scope/scripts/countries.json scope/scripts/openaip.ts ./scripts/
+COPY scope/src/lib/mapsetFormat.ts ./src/lib/
+COPY scope/scripts/build-coast.ts scope/scripts/build-mapset.ts scope/scripts/site.ts scope/scripts/guards.ts scope/scripts/countries.ts scope/scripts/countries.json scope/scripts/openaip.ts ./scripts/
 COPY --from=build /app/dist ./dist
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN mkdir -p public/map

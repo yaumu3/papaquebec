@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { inverse } from '../../lib/geodesic';
-import type { AeroLayers } from '../../lib/mapdata';
+import type { DrawnLayers } from '../../lib/mapdata';
 import type { Layers } from '../../state/settingsDefaults';
 import { MAP_LAYERS } from '../layers';
 import type { Batch } from '../protocol';
@@ -19,7 +18,7 @@ const allLayers: Layers = {
   airports: true,
 };
 
-const aero: AeroLayers = {
+const drawn: DrawnLayers = {
   waypoints: [],
   navaids: [{ id: 'HME', lat: 35.5, lon: 139.8 }],
   airways: [],
@@ -31,7 +30,7 @@ const aero: AeroLayers = {
 function mapInput(over: Partial<MapInput> = {}): MapInput {
   return {
     coast: { lines: [] },
-    aero,
+    drawn,
     project: (lat, lon) => ({ x: lon, y: lat }),
     layers: allLayers,
     labelDensity: 'normal',
@@ -84,39 +83,36 @@ describe('buildMap', () => {
     const cases = [true, false];
 
     // Act
-    const drawn = cases.map((navaidsInRange) => {
+    const counts = cases.map((navaidsInRange) => {
       const { fixes } = buildMap(mapInput({ navaidsInRange }));
       return count(fixes, 'markers');
     });
 
     // Assert
-    expect(drawn).toEqual([1, 0]);
+    expect(counts).toEqual([1, 0]);
   });
 });
 
 describe('buildMap airspace', () => {
-  it('draws a circular airspace as the geodesic circle of its radius', () => {
+  it('draws an area as one line per closed segment', () => {
     // Arrange
-    const center = { lat: 35.5, lon: 139.8 };
-    const circle = {
-      name: 'CTR',
-      center: [center.lat, center.lon] as [number, number],
-      radiusNm: 5,
+    const area = {
+      name: 'PAPAQ',
+      kind: 'CTR',
+      points: [
+        [35.5, 139.8],
+        [35.6, 139.8],
+        [35.6, 139.9],
+      ] as [number, number][],
+      dashed: true,
     };
-    const input = mapInput({ aero: { ...aero, airspace: [circle] } });
+    const input = mapInput({ drawn: { ...drawn, airspace: [area] } });
 
     // Act
     const { airspace } = buildMap(input);
 
     // Assert
-    const lines = airspace.find((b) => b.kind === 'lines');
-    const starts = Array.from({ length: lines?.count ?? 0 }, (_, i) => ({
-      lon: lines?.data[i * 16] ?? 0,
-      lat: lines?.data[i * 16 + 1] ?? 0,
-    }));
-    expect(starts.length).toBeGreaterThan(0);
-    // Within what Float32 instance data holds of a longitude near 140°, about half a metre.
-    expect(starts.every((p) => Math.abs(inverse(center, p).distanceNm - 5) < 1e-3)).toBe(true);
+    expect(count(airspace, 'lines')).toBe(3);
   });
 });
 
@@ -129,7 +125,7 @@ describe('buildMap edges', () => {
       [40, 140],
     ];
     const input = mapInput({
-      aero: { ...aero, sectors: [{ name: 'S', points: outline }] },
+      drawn: { ...drawn, sectors: [{ name: 'S', points: outline }] },
       coast: { lines: [outline.map(([lat, lon]) => [lon, lat] as [number, number])] },
     });
 

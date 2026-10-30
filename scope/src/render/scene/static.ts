@@ -1,10 +1,10 @@
 import type { ProjectFn } from '../../lib/geo';
-import type { AeroLayers, CoastData } from '../../lib/mapdata';
+import type { DrawnLayers, CoastData } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
 import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
-import { closedRoute, projectedCircle, route } from './paths';
+import { closedRoute, route } from './paths';
 import { ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
@@ -21,7 +21,7 @@ export interface RingsInput {
 /** Everything the map layers draw from. Zooming changes none of it but `navaidsInRange`. */
 export interface MapInput {
   coast: CoastData;
-  aero: AeroLayers;
+  drawn: DrawnLayers;
   project: ProjectFn;
   layers: Layers;
   labelDensity: LabelDensity;
@@ -54,11 +54,11 @@ export function buildRings(input: RingsInput): Batch[] {
   return [lines.finish(), text.finish()];
 }
 
-function airwaysLayer({ aero, project, layers, atlas }: MapInput, labels: number): Batch[] {
+function airwaysLayer({ drawn, project, layers, atlas }: MapInput, labels: number): Batch[] {
   const lines = new LineBatch();
   const text = new TextBatch(atlas);
   if (layers.airways) {
-    for (const aw of aero.airways) {
+    for (const aw of drawn.airways) {
       const pts = route(aw.points, project);
       lines.polyline(pts, THEME.airway);
       const mid = pts[Math.floor(pts.length / 2)];
@@ -72,22 +72,17 @@ function airwaysLayer({ aero, project, layers, atlas }: MapInput, labels: number
   return [lines.finish(), text.finish()];
 }
 
-function airspaceLayer({ aero, project, layers, atlas }: MapInput, labels: number): Batch[] {
+function airspaceLayer({ drawn, project, layers, atlas }: MapInput, labels: number): Batch[] {
   const lines = new LineBatch();
   const text = new TextBatch(atlas);
   if (layers.airspace) {
-    for (const a of aero.airspace) {
+    for (const a of drawn.airspace) {
       const style = a.dashed ? { dash: [4, 3] as [number, number] } : {};
-      if ('center' in a) {
-        const [lat, lon] = a.center;
-        lines.polyline(projectedCircle({ lat, lon }, a.radiusNm, project), THEME.airspace, style);
-        continue;
-      }
       const pts = closedRoute(a.points, project);
       lines.polyline(pts, airspaceColor(a.kind), style);
       const first = pts[0];
       if (labels >= 3 && first) {
-        const label = a.kind ? `${a.kind} ${a.name}` : a.name;
+        const label = `${a.kind} ${a.name}`;
         text.text(label, { ...first, px: 4, py: 2 }, 9, THEME.airspaceLabel);
       }
     }
@@ -95,10 +90,10 @@ function airspaceLayer({ aero, project, layers, atlas }: MapInput, labels: numbe
   return [lines.finish(), text.finish()];
 }
 
-function sectorLayer({ aero, project, layers }: MapInput): Batch[] {
+function sectorLayer({ drawn, project, layers }: MapInput): Batch[] {
   const lines = new LineBatch();
   if (layers.sector) {
-    for (const s of aero.sectors) {
+    for (const s of drawn.sectors) {
       lines.polyline(closedRoute(s.points, project), THEME.sector, { dash: [6, 4] });
     }
   }
@@ -156,7 +151,7 @@ const NAVAID: FixStyle = {
 };
 
 function fixesLayer(input: MapInput, labels: number): Batch[] {
-  const { aero, project, layers } = input;
+  const { drawn, project, layers } = input;
   const markers = new MarkerBatch();
   const text = new TextBatch(input.atlas);
   const draw = (fixes: readonly { id: string; lat: number; lon: number }[], style: FixStyle) => {
@@ -171,9 +166,9 @@ function fixesLayer(input: MapInput, labels: number): Batch[] {
       }
     }
   };
-  if (layers.waypoints) draw(aero.waypoints, WAYPOINT);
-  if (layers.airports) draw(aero.airports, AIRPORT);
-  if (layers.navaids && input.navaidsInRange) draw(aero.navaids, NAVAID);
+  if (layers.waypoints) draw(drawn.waypoints, WAYPOINT);
+  if (layers.airports) draw(drawn.airports, AIRPORT);
+  if (layers.navaids && input.navaidsInRange) draw(drawn.navaids, NAVAID);
   return [markers.finish(), text.finish()];
 }
 

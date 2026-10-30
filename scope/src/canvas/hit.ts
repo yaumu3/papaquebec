@@ -6,7 +6,7 @@ import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/rbl';
 import { restingOffset } from '../render/scene/targets';
 import { toScreen, toWorld } from '../render/scene/view';
-import { aero, drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
+import { drawn, drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
@@ -47,8 +47,8 @@ export function targetScreen(view: View, hex: string): { cx: number; cy: number 
 }
 
 /** A block's rectangle for its target at `cx, cy`: where it was last drawn, else at its bearing. */
-export function drawnBlockRect(t: Track, cx: number, cy: number, drawn: Offset | undefined): Rect {
-  const { dx, dy } = drawn ?? restingOffset(t);
+export function drawnBlockRect(t: Track, cx: number, cy: number, last: Offset | undefined): Rect {
+  const { dx, dy } = last ?? restingOffset(t);
   return {
     x0: cx + dx,
     y0: cy + dy,
@@ -131,8 +131,8 @@ export function fixAt(
   let best: { name: string; x: number; y: number } | null = null;
   let bestD = reach * reach;
   const fixes = [
-    ...(settings.layers.waypoints ? aero().waypoints : []),
-    ...(settings.layers.navaids ? aero().navaids : []),
+    ...(settings.layers.waypoints ? drawn().waypoints : []),
+    ...(settings.layers.navaids ? drawn().navaids : []),
   ];
   for (const f of fixes) {
     const p = projectNm(f.lat, f.lon);

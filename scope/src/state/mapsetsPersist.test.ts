@@ -1,78 +1,57 @@
 import { describe, expect, it } from 'bun:test';
 
-import { EMPTY_AERO } from '../lib/mapdata';
 import { loadMapSets, MAPSETS_KEY, saveMapSets } from './mapsetsPersist';
 import { fullStorage, memoryStorage } from './memoryStorage';
 
-const fixes = {
-  ...EMPTY_AERO,
-  title: 'My fixes',
-  waypoints: [{ id: 'CHIBA', lat: 35.6, lon: 140.1 }],
-}; // Chiba
-
 describe('loadMapSets', () => {
-  it('starts with the built-in set on and nothing imported', () => {
+  it('starts with the built-in set on when nothing usable is stored', () => {
     // Arrange
-    const empty = memoryStorage();
-    const broken = memoryStorage({ [MAPSETS_KEY]: '{not json' });
+    const storages = [
+      memoryStorage(),
+      memoryStorage({ [MAPSETS_KEY]: '{not json' }),
+      memoryStorage({ [MAPSETS_KEY]: '{"builtinEnabled":"yes"}' }),
+    ];
 
     // Act
-    const out = [loadMapSets(empty), loadMapSets(broken)];
+    const loaded = storages.map(loadMapSets);
 
     // Assert
-    expect(out).toEqual([
-      { builtinEnabled: true, imported: [] },
-      { builtinEnabled: true, imported: [] },
-    ]);
+    expect(loaded).toEqual(storages.map(() => ({ builtinEnabled: true })));
   });
 
-  it('keeps imported sets that still validate and drops the rest', () => {
+  it('keeps a stored flag', () => {
     // Arrange
-    const stored = {
-      builtinEnabled: false,
-      imported: [
-        { id: 'a', enabled: false, data: fixes },
-        { id: 'b', enabled: true, data: { waypoints: [] } },
-        { id: 7, enabled: true, data: fixes },
-        'junk',
-      ],
-    };
-    const storage = memoryStorage({ [MAPSETS_KEY]: JSON.stringify(stored) });
+    const storage = memoryStorage({ [MAPSETS_KEY]: '{"builtinEnabled":false}' });
 
     // Act
-    const out = loadMapSets(storage);
+    const loaded = loadMapSets(storage);
 
     // Assert
-    expect(out).toEqual({
-      builtinEnabled: false,
-      imported: [{ id: 'a', enabled: false, data: fixes }],
-    });
+    expect(loaded).toEqual({ builtinEnabled: false });
   });
 });
 
 describe('saveMapSets', () => {
-  it('round-trips through storage and reports success', () => {
+  it('round-trips through storage', () => {
     // Arrange
     const storage = memoryStorage();
-    const state = { builtinEnabled: true, imported: [{ id: 'a', enabled: true, data: fixes }] };
 
     // Act
-    const saved = saveMapSets(storage, state);
-    const back = loadMapSets(storage);
+    saveMapSets(storage, { builtinEnabled: false });
 
     // Assert
-    expect(saved).toBe(true);
-    expect(back).toEqual(state);
+    expect(loadMapSets(storage)).toEqual({ builtinEnabled: false });
+    expect(storage.getItem(MAPSETS_KEY)).toBe('{"builtinEnabled":false}');
   });
 
-  it('reports a storage that refuses the write', () => {
+  it('drops a write the storage refuses', () => {
     // Arrange
     const storage = fullStorage();
 
     // Act
-    const saved = saveMapSets(storage, { builtinEnabled: true, imported: [] });
+    saveMapSets(storage, { builtinEnabled: true });
 
     // Assert
-    expect(saved).toBe(false);
+    expect(storage.length).toBe(0);
   });
 });

@@ -1,0 +1,847 @@
+{
+ "type": "FeatureCollection",
+ "version": 2,
+ "id": "example-set",
+ "title": "Example map set (fictional)",
+ "effective": "2026-10-29",
+ "note": "Fictional data illustrating the format. Not for navigation.",
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "ad",
+    "id": "XQPA",
+    "name": "PAPAQ"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     130.4508,
+     33.5859
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "navaid",
+    "id": "QDG",
+    "kind": "VORTAC"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     130.4406,
+     33.5967
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "navaid",
+    "id": "QIK",
+    "kind": "VOR/DME"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     129.96,
+     33.73
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "fix",
+    "id": "TAVRO"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     130.93,
+     33.47
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "fix",
+    "id": "NIMBA"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     131.16,
+     34.02
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "fix",
+    "id": "ZOLEK"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     131.9,
+     34.3
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "vfr",
+    "id": "CAUSEWAY",
+    "ad": "XQPA"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     130.31,
+     33.66
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "vfr",
+    "id": "CAUSEWAY",
+    "ad": "XQPB"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     131.03,
+     33.86
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "conv",
+    "name": "V901"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      129.96,
+      33.73
+     ],
+     [
+      130.4406,
+      33.5967
+     ],
+     [
+      130.93,
+      33.47
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "rnav",
+    "name": "Y902"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      129.96,
+      33.73
+     ],
+     [
+      130.4406,
+      33.5967
+     ],
+     [
+      130.93,
+      33.47
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "rnav",
+    "name": "Y903",
+    "oneWay": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      131.16,
+      34.02
+     ],
+     [
+      130.4406,
+      33.5967
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "conv",
+    "name": "A901",
+    "kind": "OTR"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      129.96,
+      33.73
+     ],
+     [
+      130.4406,
+      33.5967
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "conv",
+    "name": "A901",
+    "kind": "OTR",
+    "oneWay": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      130.93,
+      33.47
+     ],
+     [
+      131.9,
+      34.3
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "sid",
+    "name": "TAVRO2",
+    "oneWay": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      130.4508,
+      33.5859
+     ],
+     [
+      130.93,
+      33.47
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "hold",
+    "inboundMag": 205,
+    "inboundTrue": 198,
+    "turn": "R",
+    "kind": "RNAV"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     131.16,
+     34.02
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "hold",
+    "inboundMag": 25,
+    "turn": "L"
+   },
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     131.16,
+     34.02
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "ctr",
+    "name": "PAPAQ",
+    "callsign": "PAPAQ TOWER",
+    "freqs": [
+     "118.05"
+    ],
+    "lower": "SFC",
+    "upper": "3000FT"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       130.33,
+       33.68
+      ],
+      [
+       130.57,
+       33.68
+      ],
+      [
+       130.57,
+       33.49
+      ],
+      [
+       130.33,
+       33.49
+      ],
+      [
+       130.33,
+       33.68
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "tma",
+    "name": "PAPAQ",
+    "lower": "SFC",
+    "upper": "FL240"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       130.0,
+       34.0
+      ],
+      [
+       130.8,
+       34.0
+      ],
+      [
+       130.8,
+       33.2
+      ],
+      [
+       130.0,
+       33.2
+      ],
+      [
+       130.0,
+       34.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "tma",
+    "name": "PAPAQ",
+    "lower": "SFC",
+    "upper": "FL160"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       130.8,
+       34.0
+      ],
+      [
+       131.2,
+       34.0
+      ],
+      [
+       131.2,
+       33.2
+      ],
+      [
+       130.8,
+       33.2
+      ],
+      [
+       130.8,
+       34.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "sector",
+    "name": "Z55",
+    "callsign": "QUEBEC CONTROL",
+    "freqs": [
+     "134.65"
+    ],
+    "upper": "FL375"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       129.5,
+       34.5
+      ],
+      [
+       131.5,
+       34.5
+      ],
+      [
+       131.5,
+       33.0
+      ],
+      [
+       129.5,
+       33.0
+      ],
+      [
+       129.5,
+       34.5
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "sector",
+    "name": "Z55",
+    "callsign": "QUEBEC CONTROL",
+    "freqs": [
+     "127.35"
+    ],
+    "lower": "FL375"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       129.5,
+       34.5
+      ],
+      [
+       131.5,
+       34.5
+      ],
+      [
+       131.5,
+       33.0
+      ],
+      [
+       129.5,
+       33.0
+      ],
+      [
+       129.5,
+       34.5
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "cta",
+    "name": "QUEBEC PCA",
+    "kind": "PCA",
+    "lower": "FL200",
+    "upper": "UNL"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       129.0,
+       35.0
+      ],
+      [
+       132.0,
+       35.0
+      ],
+      [
+       132.0,
+       31.0
+      ],
+      [
+       129.0,
+       31.0
+      ],
+      [
+       129.0,
+       35.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "dng",
+    "name": "D-901",
+    "kind": "D",
+    "lower": "SFC",
+    "upper": "35000FT"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       131.3,
+       34.2
+      ],
+      [
+       131.6,
+       34.2
+      ],
+      [
+       131.6,
+       34.0
+      ],
+      [
+       131.3,
+       34.0
+      ],
+      [
+       131.3,
+       34.2
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "pr",
+    "name": "XQ R-927",
+    "kind": "R",
+    "lower": "GND",
+    "upper": "12000FT"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       130.2,
+       33.1
+      ],
+      [
+       130.3,
+       33.1
+      ],
+      [
+       130.3,
+       33.0
+      ],
+      [
+       130.2,
+       33.0
+      ],
+      [
+       130.2,
+       33.1
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "fir",
+    "name": "PAPAQ FIR"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      128.0,
+      30.0
+     ],
+     [
+      127.5,
+      31.0
+     ],
+     [
+      127.0,
+      32.5
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "asr",
+    "name": "NORTH QNH AREA"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       129.0,
+       35.0
+      ],
+      [
+       131.0,
+       35.0
+      ],
+      [
+       131.0,
+       31.0
+      ],
+      [
+       129.0,
+       31.0
+      ],
+      [
+       129.0,
+       35.0
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "dct",
+    "name": "ZOLEK DCT NIMBA"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      131.9,
+      34.3
+     ],
+     [
+      131.16,
+      34.02
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "star",
+    "name": "NIMBA1",
+    "oneWay": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      131.16,
+      34.02
+     ],
+     [
+      130.4508,
+      33.5859
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "trans",
+    "name": "TAVRO2.ZOLEK",
+    "oneWay": true
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      130.93,
+      33.47
+     ],
+     [
+      131.9,
+      34.3
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "advisory",
+    "name": "PAPAQ TCA",
+    "kind": "TCA",
+    "lower": "SFC",
+    "upper": "9000FT"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       130.2,
+       33.9
+      ],
+      [
+       130.7,
+       33.9
+      ],
+      [
+       130.7,
+       33.3
+      ],
+      [
+       130.2,
+       33.3
+      ],
+      [
+       130.2,
+       33.9
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "tra",
+    "name": "W-972",
+    "kind": "MIL",
+    "lower": "SFC",
+    "upper": "UNL"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       129.0,
+       34.9
+      ],
+      [
+       129.6,
+       34.9
+      ],
+      [
+       129.6,
+       34.2
+      ],
+      [
+       129.0,
+       34.2
+      ],
+      [
+       129.0,
+       34.9
+      ]
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "adiz",
+    "name": "EXAMPLE ADIZ"
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      126.0,
+      30.0
+     ],
+     [
+      126.0,
+      36.0
+     ],
+     [
+      128.5,
+      38.0
+     ]
+    ]
+   }
+  },
+  {
+   "type": "Feature",
+   "properties": {
+    "layer": "civt",
+    "name": "ISLE",
+    "lower": "SFC",
+    "upper": "5000FT"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       130.1,
+       33.35
+      ],
+      [
+       130.3,
+       33.35
+      ],
+      [
+       130.3,
+       33.2
+      ],
+      [
+       130.1,
+       33.2
+      ],
+      [
+       130.1,
+       33.35
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}
