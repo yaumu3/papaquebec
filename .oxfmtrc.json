@@ -10,6 +10,8 @@
     "scope/public/map",
     "scope/src/feed/gen",
     "scope/scripts/countries.json",
+    "scope/schema/**/*.json",
+    "scope/schema/*.geojson",
     "docs"
   ]
 }
