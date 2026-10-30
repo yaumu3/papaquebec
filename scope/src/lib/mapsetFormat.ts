@@ -6,6 +6,9 @@
 
 export const MAPSET_VERSION = 2;
 
+/** The set generated around the site at container start; a preset that cannot be removed. */
+export const BUILTIN_ID = 'openaip';
+
 export const POINT_LAYERS = ['ad', 'navaid', 'fix', 'vfr'] as const;
 export const ROUTE_LAYERS = ['conv', 'rnav', 'dct', 'sid', 'star', 'trans'] as const;
 export const AREA_LAYERS = [
@@ -24,6 +27,7 @@ export const AREA_LAYERS = [
 ] as const;
 export const LAYERS = [...POINT_LAYERS, ...ROUTE_LAYERS, 'hold', ...AREA_LAYERS] as const;
 
+export type AreaLayer = (typeof AREA_LAYERS)[number];
 export type Layer = (typeof LAYERS)[number];
 
 /** The area layers that divide airspace among control units: an ACC sector, a FIR or UIR. */

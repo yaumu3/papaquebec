@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
 import { EMPTY_AERO } from '../lib/mapdata';
-import { armRemoval, BUILTIN_ID, createMapSets, freshId, importNote } from './mapsets';
+import { BUILTIN_ID } from '../lib/mapsetFormat';
+import { armRemoval, createMapSets, freshId, importNote } from './mapsets';
 import { loadMapSets } from './mapsetsPersist';
 import { fullStorage, memoryStorage } from './memoryStorage';
 

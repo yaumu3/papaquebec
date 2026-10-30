@@ -3,7 +3,10 @@ import { createEffect, onCleanup, onMount } from 'solid-js';
 import { ScopeCanvas } from './canvas/ScopeCanvas';
 import { cx } from './design/cx';
 import { connectFeed, feedOptionsFromUrl } from './feed/connect';
-import { parseAero, parseCoast } from './lib/mapdata';
+import { chartOf } from './lib/chart';
+import { drawnOf } from './lib/drawn';
+import { type AeroData, parseCoast } from './lib/mapdata';
+import { type MapSetData, parseMapSet } from './lib/mapset';
 import { loadDeclination } from './lib/wmm';
 import { About } from './panels/About';
 import { ContextMenu } from './panels/ContextMenu';
@@ -25,6 +28,11 @@ import { persist, setSettings, settings } from './state/settings';
 
 import s from './app.module.css';
 
+/** Until the store holds map sets: the set as the old data shape. */
+function drawnFrom(set: MapSetData): AeroData {
+  return { title: set.title, ...(set.note ? { note: set.note } : {}), ...drawnOf(chartOf([set])) };
+}
+
 async function loadJson(url: string): Promise<unknown> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
@@ -44,9 +52,9 @@ export function App() {
     void loadJson('./map/coast.json')
       .then((raw) => setCoast(parseCoast(raw)))
       .catch((err: unknown) => console.warn('coast.json unavailable', err));
-    void loadJson('./map/aero.json')
-      .then((raw) => setBuiltinAero(parseAero(raw)))
-      .catch((err: unknown) => console.warn('aero.json unavailable', err));
+    void loadJson('./map/openaip.mapset.geojson')
+      .then((raw) => setBuiltinAero(drawnFrom(parseMapSet(raw))))
+      .catch((err: unknown) => console.warn('openaip.mapset.geojson unavailable', err));
     void loadDeclination()
       .then((declination) => setDeclinationAt(() => declination))
       .catch((err: unknown) => console.warn('magnetic model unavailable', err));

@@ -8,11 +8,9 @@ import {
   mergeAero,
   validateAero,
 } from '../lib/mapdata';
+import { BUILTIN_ID } from '../lib/mapsetFormat';
 import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
 import { versioned } from './versioned';
-
-/** The set generated around the site at container start; a preset that cannot be removed. */
-export const BUILTIN_ID = 'openaip';
 
 export interface MapSet {
   id: string;

@@ -1,20 +1,21 @@
 /**
  * Current aeronautical data around the site from openAIP's daily exports
  * (https://storage.openaip.net/openaip-system-exports/, anonymous, CC BY-NC-SA 4.0):
- * every country whose territory lies within the radius, written to `public/map/aero.json`.
+ * every country whose territory lies within the radius, written as the built-in map set to
+ * `public/map/openaip.mapset.geojson`.
  * Runs before every build; when the exports cannot be reached, an existing file is kept.
  *
- *   bun scripts/build-aero.ts [lat lon] [radiusNm=150]      site from PQ_SITE
+ *   bun scripts/build-mapset.ts [lat lon] [radiusNm=150]      site from PQ_SITE
  */
 import { existsSync, writeFileSync } from 'node:fs';
 
 import { countriesNear } from './countries';
 import table from './countries.json';
-import { toAero } from './openaip';
+import { toMapSet } from './openaip';
 import { resolveSite } from './site';
 
 const EXPORTS = 'https://storage.openaip.net/openaip-system-exports';
-const OUT = 'public/map/aero.json';
+const OUT = 'public/map/openaip.mapset.geojson';
 
 const [, , ...args] = process.argv;
 const positional = args.length >= 2 ? args.slice(0, 2) : [];
@@ -51,24 +52,11 @@ try {
     reportingPoints: perCountry.flatMap((c) => c.rpp),
   };
   const fetched = new Date().toISOString().slice(0, 10);
-  const aero = toAero(input, site, radiusNm);
-  writeFileSync(
-    OUT,
-    JSON.stringify(
-      {
-        title: `openAIP ${countries.join(' ')} ${fetched}`,
-        note: `openAIP (https://www.openaip.net, CC BY-NC-SA 4.0) within ${radiusNm} NM of ${site.lat}, ${site.lon}; countries ${countries.join(', ')}; fetched ${fetched}.`,
-        ...aero,
-      },
-      null,
-      1,
-    ),
-  );
-  console.log(
-    `${aero.airspace.length} airspaces, ${aero.sectors.length} sectors, ${aero.navaids.length} navaids, ${aero.airports.length} airports, ${aero.waypoints.length} reporting points -> ${OUT}`,
-  );
+  const set = toMapSet(input, { site, radiusNm, countries, fetched });
+  writeFileSync(OUT, JSON.stringify(set, null, 1));
+  console.log(`${set.features.length} features -> ${OUT}`);
 } catch (err) {
-  console.warn(`aero data not refreshed: ${err instanceof Error ? err.message : String(err)}`);
+  console.warn(`map data not refreshed: ${err instanceof Error ? err.message : String(err)}`);
   if (!existsSync(OUT)) {
     console.warn(`no ${OUT} either; the scope will draw no aeronautical data`);
     process.exit(1);

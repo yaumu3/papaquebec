@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun run proto && bunx --bun vite",
-    "map": "bun scripts/build-coast.ts && bun scripts/build-aero.ts",
+    "map": "bun scripts/build-coast.ts && bun scripts/build-mapset.ts",
     "proto": "bunx --bun buf generate ../proto --template buf.gen.yaml",
     "schema": "bun scripts/build-schema.ts",
     "icons": "bun scripts/build-icons.ts",

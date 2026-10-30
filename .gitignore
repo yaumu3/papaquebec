@@ -6,7 +6,7 @@ scope/src/feed/gen/
 .vite/
 coverage/
 scope/public/map/coast.json
-scope/public/map/aero.json
+scope/public/map/openaip.mapset.geojson
 scope/public/aero.schema.json
 scope/public/favicon.ico
 scope/public/icon-192.png

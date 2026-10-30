@@ -151,10 +151,10 @@ and sends them to every scope over the feed:
 
 - `public/map/coast.json`: [Natural Earth](https://www.naturalearthdata.com) 10 m coastline (public
   domain) within 300 NM of the site; skipped while the file already covers the same site.
-- `public/map/aero.json`: airspace, navaids, airports and reporting points within 150 NM from
-  [openAIP](https://www.openaip.net)'s daily exports (anonymous download, CC BY-NC-SA 4.0), for
-  every country in range, titled with the fetch date. When the exports cannot be reached the
-  previous file is kept.
+- `public/map/openaip.mapset.geojson`: airspace, navaids, airports and reporting points within
+  150 NM from [openAIP](https://www.openaip.net)'s daily exports (anonymous download, CC BY-NC-SA
+  4.0), for every country in range, titled with the fetch date. When the exports cannot be
+  reached the previous file is kept.
 
 The site comes from `PQ_SITE` (`lat,lon`); pass `<lat> <lon>` and optionally a radius to either
 script to override it.
@@ -333,9 +333,10 @@ crates:
 
 The code is MIT licensed. The generated aeronautical data is openAIP's, [CC BY-NC-SA
 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/): it may not be used commercially, and a
-copy of `aero.json` passed on keeps that license. Registrations and types are from the [Mictronics
-aircraft database](https://github.com/Mictronics/aircraft-database), made available under the [Open
-Data Commons Attribution License](https://opendatacommons.org/licenses/by/1-0/); the server
-downloads it, and none of it is in this repository. METARs and the station list are public domain
-from NOAA's Aviation Weather Center, which the server reads. The coastline is public domain and JetBrains
-Mono is under the [SIL Open Font License](https://openfontlicense.org), shipped in `public/fonts`.
+copy of `openaip.mapset.geojson` passed on keeps that license. Registrations and types are from the
+[Mictronics aircraft database](https://github.com/Mictronics/aircraft-database), made available
+under the [Open Data Commons Attribution License](https://opendatacommons.org/licenses/by/1-0/); the
+server downloads it, and none of it is in this repository. METARs and the station list are public
+domain from NOAA's Aviation Weather Center, which the server reads. The coastline is public domain
+and JetBrains Mono is under the [SIL Open Font License](https://openfontlicense.org), shipped in
+`public/fonts`.

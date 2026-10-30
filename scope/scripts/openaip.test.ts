@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 
-import { toAero, withinRadius } from './openaip';
+import { chartOf } from '../src/lib/chart';
+import { drawnOf } from '../src/lib/drawn';
+import type { DrawnLayers } from '../src/lib/mapdata';
+import { parseMapSet, validateMapSet } from '../src/lib/mapset';
+import { type OpenAipInput, toMapSet, withinRadius } from './openaip';
 
 const point = (lat: number, lon: number) => ({ type: 'Point', coordinates: [lon, lat] });
 const poly = (pts: [number, number][]) => ({
@@ -124,69 +128,199 @@ describe('withinRadius', () => {
   });
 });
 
-describe('toAero', () => {
-  it('maps navaids, airports, reporting points and airspace polygons into the scope format', () => {
+const AREA = { site, radiusNm: 300, countries: ['JP'], fetched: '2026-10-30' };
+
+/** An airspace record of the given type and name around the site, with the given limits. */
+const airspace = (
+  type: number,
+  name: string,
+  limits: { lowerLimit?: unknown; upperLimit?: unknown } = {},
+) => ({
+  name,
+  type,
+  ...limits,
+  geometry: poly([
+    [35.7, 140.1],
+    [35.7, 140.2],
+    [35.6, 140.2],
+    [35.7, 140.1],
+  ]),
+});
+
+const inputOf = (parts: Partial<OpenAipInput>): OpenAipInput => ({
+  navaids: [],
+  airports: [],
+  reportingPoints: [],
+  airspaces: [],
+  ...parts,
+});
+
+describe('toMapSet', () => {
+  it('draws what the old conversion drew, apart from two known differences', () => {
     // Arrange
-    const input = FIXTURE;
-
-    // Act
-    const aero = toAero(input, site, 300);
-
-    // Assert
-    expect(aero.navaids).toEqual([{ id: 'NRE', kind: 'VOR-DME', lat: 35.76, lon: 140.38 }]);
-    expect(aero.airports).toEqual([{ id: 'RJAA', name: 'NARITA INTL', lat: 35.765, lon: 140.386 }]);
-    expect(aero.waypoints).toEqual([{ id: 'CHIBA', lat: 35.6, lon: 140.1 }]);
-    const polygons = aero.airspace.filter((a) => 'points' in a);
-    expect(polygons.map((a) => [a.name, a.kind, a.dashed])).toEqual([
-      ['NARITA CTR', 'CTR', false],
-      ['R-134', 'R', true],
-      ['TOKYO ACA-3', 'ACA', false],
-      ['NARITA INFO ZONE-2', 'INFO', false],
-    ]);
-    expect(polygons[0]).toMatchObject({ lowerFt: 0, upperFt: 3000 });
-    expect(polygons[0]?.points).toHaveLength(5);
-    expect(aero.sectors.map((s) => s.name)).toEqual(['TOKYO FIR']);
-  });
-
-  it('matches the output frozen before the map set format', () => {
-    // Arrange
-    const frozen: ReturnType<typeof toAero> = JSON.parse(
+    const frozen: DrawnLayers = JSON.parse(
       readFileSync(new URL('./openaip.frozen.json', import.meta.url), 'utf8'),
     );
+    // The frozen output is the pre-PR conversion: it spells openAIP type 4 'VOR-DME', the map set
+    // 'VOR/DME'. The other known difference is real-data only: FL999, openAIP's unlimited, is
+    // 'UNL' now and so has no upperFt, where it was 99900 (R-116-3).
+    const expected: DrawnLayers = structuredClone(frozen);
+    for (const navaid of expected.navaids) {
+      if (navaid.kind === 'VOR-DME') navaid.kind = 'VOR/DME';
+    }
 
     // Act
-    const aero = toAero(FIXTURE, site, 300);
+    const drawn = drawnOf(chartOf([parseMapSet(toMapSet(FIXTURE, AREA))]));
 
     // Assert
-    expect(aero).toEqual(frozen);
+    expect(drawn).toEqual(expected);
   });
 
-  it('converts flight-level and meter limits to feet', () => {
+  it('produces a set that passes the strict parse', () => {
     // Arrange
-    const input = {
-      navaids: [],
-      airports: [],
-      reportingPoints: [],
-      airspaces: [
-        {
-          name: 'TMA',
-          type: 7,
-          lowerLimit: { value: 600, unit: 0, referenceDatum: 1 },
-          upperLimit: { value: 145, unit: 6, referenceDatum: 2 },
-          geometry: poly([
-            [35.7, 140.1], // Chiba
-            [35.7, 140.2],
-            [35.6, 140.2],
-            [35.7, 140.1],
-          ]),
-        },
-      ],
-    };
+    const set = toMapSet(FIXTURE, AREA);
 
     // Act
-    const aero = toAero(input, site, 300);
+    const verdict = validateMapSet(set);
 
     // Assert
-    expect(aero.airspace[0]).toMatchObject({ lowerFt: 1969, upperFt: 14500 });
+    expect(verdict.ok).toBe(true);
+  });
+
+  it('names the set as the built-in one, with no effective date', () => {
+    // Arrange
+    const area = { ...AREA, countries: ['JP', 'KR'] };
+
+    // Act
+    const set = toMapSet(inputOf({}), area);
+
+    // Assert
+    expect(set).toEqual({
+      type: 'FeatureCollection',
+      version: 2,
+      id: 'openaip',
+      title: 'openAIP JP KR 2026-10-30',
+      note: expect.stringContaining('CC BY-NC-SA 4.0'),
+      features: [],
+    });
+  });
+
+  it('files each airspace type, or its name when the type is Other, under a layer and kind', () => {
+    // Arrange
+    const table: [number, string, string | undefined, string | undefined][] = [
+      [1, 'ZONE', 'pr', 'R'],
+      [2, 'ZONE', 'dng', 'D'],
+      [3, 'ZONE', 'pr', 'P'],
+      [4, 'ZONE', 'ctr', 'CTR'],
+      [5, 'ZONE', 'advisory', 'TMZ'],
+      [6, 'ZONE', 'advisory', 'RMZ'],
+      [7, 'ZONE', 'tma', 'TMA'],
+      [8, 'ZONE', 'tra', 'TRA'],
+      [9, 'ZONE', 'tra', 'TSA'],
+      [13, 'ZONE', 'ctr', 'ATZ'],
+      [17, 'ZONE', 'dng', 'ALERT'],
+      [18, 'ZONE', 'dng', 'WARNING'],
+      [23, 'ZONE', 'ctr', 'TIZ'],
+      [24, 'ZONE', 'ctr', 'TIA'],
+      [25, 'ZONE', 'tra', 'MTA'],
+      [26, 'ZONE', 'cta', 'CTA'],
+      [10, 'ZONE', 'fir', undefined],
+      [27, 'ZONE', 'sector', undefined],
+      [0, 'QUEBEC TCA', 'advisory', 'TCA'],
+      [0, 'QUEBEC ACA-1', 'tma', 'ACA'],
+      [0, 'QUEBEC PCA', 'cta', 'PCA'],
+      [0, 'QUEBEC INFO ZONE-2', 'ctr', 'INFO'],
+      [0, 'QUEBEC TCA HORIZONTAL SURFACE', undefined, undefined],
+    ];
+
+    // Act
+    const filed = table.map(([type, name]) => {
+      const [feature] = toMapSet(inputOf({ airspaces: [airspace(type, name)] }), AREA).features;
+      const p = feature?.properties;
+      return p && 'kind' in p ? [p.layer, p.kind] : [p?.layer, undefined];
+    });
+
+    // Assert
+    expect(filed).toEqual(table.map(([, , layer, kind]) => [layer, kind]));
+  });
+
+  it('spells each navaid type as the format lists it, folding the DVOR variants', () => {
+    // Arrange
+    const kinds = ['DME', 'TACAN', 'NDB', 'VOR', 'VOR/DME', 'VORTAC', 'VOR', 'VOR/DME', 'VORTAC'];
+
+    // Act
+    const filed = kinds.map((_, type) => {
+      const navaids = [{ identifier: 'QAA', type, geometry: point(35.76, 140.38) }];
+      const [feature] = toMapSet(inputOf({ navaids }), AREA).features;
+      return feature && 'kind' in feature.properties ? feature.properties.kind : undefined;
+    });
+
+    // Assert
+    expect(filed).toEqual(kinds);
+  });
+
+  it('writes openAIP limits as published strings', () => {
+    // Arrange
+    const table: [{ value: number; unit: number; referenceDatum: number }, string | undefined][] = [
+      [{ value: 3000, unit: 1, referenceDatum: 1 }, '3000FT'],
+      [{ value: 600, unit: 0, referenceDatum: 1 }, '1969FT'],
+      [{ value: 0, unit: 1, referenceDatum: 0 }, 'SFC'],
+      [{ value: 1500, unit: 1, referenceDatum: 0 }, '1500FT AGL'],
+      [{ value: 145, unit: 6, referenceDatum: 2 }, 'FL145'],
+      [{ value: 5, unit: 6, referenceDatum: 2 }, 'FL05'],
+      [{ value: 999, unit: 6, referenceDatum: 2 }, 'UNL'],
+      [{ value: 3, unit: 9, referenceDatum: 1 }, undefined],
+    ];
+
+    // Act
+    const written = table.map(([upperLimit]) => {
+      const [feature] = toMapSet(
+        inputOf({ airspaces: [airspace(7, 'ZONE', { upperLimit })] }),
+        AREA,
+      ).features;
+      return feature && 'upper' in feature.properties ? feature.properties.upper : undefined;
+    });
+
+    // Assert
+    expect(written).toEqual(table.map(([, limit]) => limit));
+  });
+
+  it('truncates a long name to 64 characters and a long id to 32', () => {
+    // Arrange
+    const input = inputOf({
+      airspaces: [airspace(7, 'Q'.repeat(70))],
+      airports: [
+        { icaoCode: 'X'.repeat(40), name: 'A'.repeat(70), type: 0, geometry: point(35.7, 140.3) },
+      ],
+    });
+
+    // Act
+    const features = toMapSet(input, AREA).features;
+
+    // Assert
+    expect(
+      features.map((f) => [
+        'id' in f.properties ? f.properties.id.length : null,
+        'name' in f.properties ? f.properties.name?.length : null,
+      ]),
+    ).toEqual([
+      [32, 64],
+      [null, 64],
+    ]);
+  });
+
+  it('keeps the first of a repeated point id and warns once', () => {
+    // Arrange
+    const warnings: string[] = [];
+    const input = inputOf({
+      navaids: [{ identifier: 'QAA', type: 3, geometry: point(35.76, 140.38) }],
+      airports: [{ icaoCode: 'QAA', name: 'OTHER', type: 0, geometry: point(35.7, 140.3) }],
+    });
+
+    // Act
+    const features = toMapSet(input, AREA, (message) => warnings.push(message)).features;
+
+    // Assert
+    expect([features.map((f) => f.properties.layer), warnings.length]).toEqual([['navaid'], 1]);
   });
 });
