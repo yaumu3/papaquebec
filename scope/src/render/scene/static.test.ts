@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { inverse } from '../../lib/geodesic';
 import type { DrawnLayers } from '../../lib/mapdata';
 import type { Layers } from '../../state/settingsDefaults';
 import { MAP_LAYERS } from '../layers';
@@ -95,28 +94,25 @@ describe('buildMap', () => {
 });
 
 describe('buildMap airspace', () => {
-  it('draws a circular airspace as the geodesic circle of its radius', () => {
+  it('draws an area as one line per closed segment', () => {
     // Arrange
-    const center = { lat: 35.5, lon: 139.8 };
-    const circle = {
-      name: 'CTR',
-      center: [center.lat, center.lon] as [number, number],
-      radiusNm: 5,
+    const area = {
+      name: 'PAPAQ',
+      kind: 'CTR',
+      points: [
+        [35.5, 139.8],
+        [35.6, 139.8],
+        [35.6, 139.9],
+      ] as [number, number][],
+      dashed: true,
     };
-    const input = mapInput({ drawn: { ...drawn, airspace: [circle] } });
+    const input = mapInput({ drawn: { ...drawn, airspace: [area] } });
 
     // Act
     const { airspace } = buildMap(input);
 
     // Assert
-    const lines = airspace.find((b) => b.kind === 'lines');
-    const starts = Array.from({ length: lines?.count ?? 0 }, (_, i) => ({
-      lon: lines?.data[i * 16] ?? 0,
-      lat: lines?.data[i * 16 + 1] ?? 0,
-    }));
-    expect(starts.length).toBeGreaterThan(0);
-    // Within what Float32 instance data holds of a longitude near 140°, about half a metre.
-    expect(starts.every((p) => Math.abs(inverse(center, p).distanceNm - 5) < 1e-3)).toBe(true);
+    expect(count(airspace, 'lines')).toBe(3);
   });
 });
 

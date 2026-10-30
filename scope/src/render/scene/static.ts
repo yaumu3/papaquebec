@@ -4,7 +4,7 @@ import type { LabelDensity, Layers } from '../../state/settings';
 import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
-import { closedRoute, projectedCircle, route } from './paths';
+import { closedRoute, route } from './paths';
 import { ringRadii } from './rings';
 import { airspaceColor, THEME } from './rules';
 
@@ -78,16 +78,11 @@ function airspaceLayer({ drawn, project, layers, atlas }: MapInput, labels: numb
   if (layers.airspace) {
     for (const a of drawn.airspace) {
       const style = a.dashed ? { dash: [4, 3] as [number, number] } : {};
-      if ('center' in a) {
-        const [lat, lon] = a.center;
-        lines.polyline(projectedCircle({ lat, lon }, a.radiusNm, project), THEME.airspace, style);
-        continue;
-      }
       const pts = closedRoute(a.points, project);
       lines.polyline(pts, airspaceColor(a.kind), style);
       const first = pts[0];
       if (labels >= 3 && first) {
-        const label = a.kind ? `${a.kind} ${a.name}` : a.name;
+        const label = `${a.kind} ${a.name}`;
         text.text(label, { ...first, px: 4, py: 2 }, 9, THEME.airspaceLabel);
       }
     }

@@ -69,9 +69,10 @@ describe('drawnOf', () => {
 
     // Act
     const drawn = table.map(({ layer, kind }) =>
-      adapted(area({ layer, name: 'ZONE', ...(kind ? { kind } : {}) })).airspace.map((a) =>
-        'kind' in a ? [a.kind, a.dashed] : null,
-      ),
+      adapted(area({ layer, name: 'ZONE', ...(kind ? { kind } : {}) })).airspace.map((a) => [
+        a.kind,
+        a.dashed,
+      ]),
     );
 
     // Assert
@@ -111,9 +112,7 @@ describe('drawnOf', () => {
     const [drawn] = adapted(set).airspace;
 
     // Assert
-    expect(drawn && 'points' in drawn ? drawn.points : null).toEqual(
-      SQUARE.map(([lon, lat]) => [lat, lon]),
-    );
+    expect(drawn?.points).toEqual(SQUARE.map(([lon, lat]) => [lat, lon]));
   });
 
   it('draws one airway per Feature of a route', () => {
@@ -160,7 +159,7 @@ describe('drawnOf', () => {
     // Act
     const feet = limits.map(([lower, upper]) => {
       const [drawn] = adapted(area({ layer: 'tma', name: 'ZONE', lower, upper })).airspace;
-      return drawn && 'points' in drawn ? [drawn.lowerFt, drawn.upperFt] : null;
+      return [drawn?.lowerFt, drawn?.upperFt];
     });
 
     // Assert

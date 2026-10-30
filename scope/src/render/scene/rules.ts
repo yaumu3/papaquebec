@@ -45,8 +45,8 @@ export const THEME = {
 /** Control zones and special-use areas: what the operator must not miss. Everything else is context. */
 const BRIGHT_AIRSPACE = new Set(['CTR', 'ATZ', 'TIZ', 'TIA', 'R', 'D', 'P', 'ALERT', 'WARNING']);
 
-export function airspaceColor(kind: string | undefined): string {
-  return kind !== undefined && BRIGHT_AIRSPACE.has(kind) ? THEME.airspace : THEME.airspaceDim;
+export function airspaceColor(kind: string): string {
+  return BRIGHT_AIRSPACE.has(kind) ? THEME.airspace : THEME.airspaceDim;
 }
 
 /** Whether the position is as old as the lapse, or older. */
