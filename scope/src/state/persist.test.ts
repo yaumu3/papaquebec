@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'bun:test';
 
-import { FL_MAX } from './filter';
 import type { ListSort } from './listSort';
 import { memoryStorage } from './memoryStorage';
 import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
@@ -134,18 +133,18 @@ describe('loadPersisted filter', () => {
 });
 
 describe('loadPersisted band', () => {
-  it('reads a saved upper edge past the top stop as UNL and keeps the lower edge', () => {
+  it('falls back to the default band when a saved upper edge is past the top stop', () => {
     // Arrange
     const storage = memoryStorage({
       [PERSIST_KEY]: JSON.stringify({ settings: { filter: { lowerFl: 100, upperFl: 600 } } }),
     });
+    const { lowerFl, upperFl } = DEFAULTS.settings.filter;
 
     // Act
     const { filter } = loadPersisted(storage, DEFAULTS).settings;
 
     // Assert
-    expect(filter.lowerFl).toBe(100);
-    expect(filter.upperFl).toBe(FL_MAX);
+    expect([filter.lowerFl, filter.upperFl]).toEqual([lowerFl, upperFl]);
   });
 });
 
