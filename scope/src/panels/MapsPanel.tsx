@@ -51,7 +51,7 @@ function MapSetImport() {
       setNote('could not read the file');
       return;
     }
-    setNote(importNote(importMapSet(text)));
+    setNote(await importNote(importMapSet(text)));
   };
   return (
     <>
