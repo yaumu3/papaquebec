@@ -26,6 +26,9 @@ export const LAYERS = [...POINT_LAYERS, ...ROUTE_LAYERS, 'hold', ...AREA_LAYERS]
 
 export type Layer = (typeof LAYERS)[number];
 
+/** The area layers that divide airspace among control units: an ACC sector, a FIR or UIR. */
+export const SECTOR_LAYERS: ReadonlySet<Layer> = new Set<Layer>(['sector', 'fir']);
+
 /** A published vertical limit: SFC, GND, UNL, a flight level, or feet with their reference. */
 export const LIMIT_PATTERN = /^(SFC|GND|UNL|FL[0-9]{2,3}|[0-9]{1,5}FT( AGL)?)$/;
 /** A frequency in MHz as published, e.g. `127.35`. */
