@@ -219,3 +219,38 @@ export function validateMapSet(raw: unknown): MapSetValidation {
   if (repeats.length) return { ok: false, message: describeIssues(repeats) };
   return { ok: true, data: { ...root.data, features } };
 }
+
+/** The title a lenient parse gives a set that names none. */
+export const UNTITLED_MAPSET = 'untitled map set';
+
+const OPTIONAL_MEMBERS = ['id', 'effective', 'note'] as const;
+
+/** The root members that fit their schema; a malformed optional one is left out. */
+function wellFormedMembers(raw: Record<string, unknown>) {
+  const title = Collection.shape.title.safeParse(raw.title);
+  const optional = OPTIONAL_MEMBERS.filter(
+    (key) => raw[key] !== undefined && Collection.shape[key].safeParse(raw[key]).success,
+  ).map((key) => [key, raw[key]]);
+  return { title: title.success ? title.data : UNTITLED_MAPSET, ...Object.fromEntries(optional) };
+}
+
+/**
+ * Lenient: a Feature that is malformed, or repeats an earlier point id, is dropped, so a partial
+ * chart still draws. A root that is not a version 2 FeatureCollection still throws.
+ */
+export function parseMapSet(raw: unknown): MapSetData {
+  if (!isRecord(raw) || raw.type !== 'FeatureCollection' || raw.version !== MAPSET_VERSION) {
+    throw new Error('not a version 2 map set');
+  }
+  const parsed = Array.isArray(raw.features) ? raw.features.map(parseFeature) : [];
+  const valid = parsed.flatMap((p) => (p.ok ? [p.data] : []));
+  const repeats = new Set(repeatedIds(valid).map(({ later }) => later));
+  const features = valid.filter((_, i) => !repeats.has(i));
+  const root = Collection.parse({
+    type: raw.type,
+    version: raw.version,
+    ...wellFormedMembers(raw),
+    features: [],
+  });
+  return { ...root, features };
+}

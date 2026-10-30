@@ -19,6 +19,9 @@ export interface CorpusCase {
   at?: string;
 }
 
+/** The layer of each Feature of the example, in order. */
+export const EXAMPLE_LAYERS = EXAMPLE.features.map((f) => String(f.properties?.layer));
+
 /** The index of the example's first Feature on `layer`. */
 export const indexOf = (layer: string): number => {
   const at = EXAMPLE.features.findIndex((f) => f.properties?.layer === layer);
