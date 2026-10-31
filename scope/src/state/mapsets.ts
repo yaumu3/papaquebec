@@ -5,6 +5,7 @@ import { type Chart, chartOf, setIdentity } from '../lib/chart';
 import { isRecord } from '../lib/guards';
 import { type MapSetData, validateMapSet } from '../lib/mapset';
 import { BUILTIN_ID, MAPSET_VERSION } from '../lib/mapsetFormat';
+import { type Topology, topologyOf } from '../lib/topology';
 import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
 import { type MapSetStore, openMapSetStore, type StoredMapSet } from './mapsetStore';
 import { versioned } from './versioned';
@@ -23,6 +24,8 @@ export interface MapSets {
   mapSets: Accessor<MapSet[]>;
   /** The enabled sets merged into items. */
   chart: Accessor<Chart>;
+  /** The chart's shared edges, rebuilt with it. */
+  topology: Accessor<Topology>;
   /** Settles once the stored sets are merged in, or the store proved unavailable. */
   hydrated: Promise<void>;
   setBuiltinMapSet: (data: MapSetData) => void;
@@ -55,13 +58,13 @@ export function createMapSets(storage: Storage | null, opening: Promise<MapSetSt
   });
 
   /** Read as plain data: a rebuild through store proxies tracks every coordinate. */
-  const chart = versioned(() =>
-    chartOf(store.sets.filter((s) => s.enabled).map((s) => unwrap(s.data))),
+  const merged = versioned(() =>
+    topologyOf(chartOf(store.sets.filter((s) => s.enabled).map((s) => unwrap(s.data)))),
   );
 
   /** After a change to the sets: the merge is stale, and the built-in flag goes to storage. */
   const commit = () => {
-    chart.invalidate();
+    merged.invalidate();
     const builtin = store.sets.find((s) => s.builtin);
     if (storage) saveMapSets(storage, { builtinEnabled: builtin?.enabled ?? true });
   };
@@ -92,18 +95,19 @@ export function createMapSets(storage: Storage | null, opening: Promise<MapSetSt
         ...sets,
         ...loaded.filter((s) => !sets.some((own) => own.identity === s.identity)),
       ]);
-      chart.invalidate();
+      merged.invalidate();
     })
     .catch(() => {});
 
   return {
     mapSets: () => store.sets,
-    chart: chart.get,
+    chart: () => merged.get().chart,
+    topology: merged.get,
     hydrated,
     setBuiltinMapSet(data) {
       // Assigned whole, since a value set at its `data` path would merge into the placeholder.
       setStore('sets', (sets) => sets.map((set) => (set.builtin ? { ...set, data } : set)));
-      chart.invalidate();
+      merged.invalidate();
     },
     importMapSet(text) {
       let raw: unknown;
@@ -139,7 +143,7 @@ export function createMapSets(storage: Storage | null, opening: Promise<MapSetSt
         void stored((open) => open.delete(identity));
       }
       setStore('sets', (sets) => sets.filter((s) => s.identity !== identity || s.builtin));
-      chart.invalidate();
+      merged.invalidate();
     },
   };
 }
@@ -162,4 +166,12 @@ const sets = createMapSets(
   typeof localStorage === 'undefined' ? null : localStorage,
   openMapSetStore(globalThis.indexedDB),
 );
-export const { mapSets, chart, setBuiltinMapSet, importMapSet, toggleMapSet, removeMapSet } = sets;
+export const {
+  mapSets,
+  chart,
+  topology,
+  setBuiltinMapSet,
+  importMapSet,
+  toggleMapSet,
+  removeMapSet,
+} = sets;

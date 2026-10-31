@@ -460,3 +460,32 @@ describe('armRemoval', () => {
     ]);
   });
 });
+
+describe('the topology of the chart', () => {
+  it('is one object across reads, built over the chart that is read', () => {
+    // Arrange
+    const { sets } = created();
+    importing(sets, fixes);
+
+    // Act
+    const [first, second] = [sets.topology(), sets.topology()];
+
+    // Assert
+    expect(second).toBe(first);
+    expect(first.chart).toBe(sets.chart());
+  });
+
+  it('is rebuilt with the chart after a change to the sets', () => {
+    // Arrange
+    const { sets } = created();
+    importing(sets, fixes);
+    const before = sets.topology();
+
+    // Act
+    sets.toggleMapSet('my-fixes');
+
+    // Assert
+    expect(sets.topology()).not.toBe(before);
+    expect(sets.topology().chart).toBe(sets.chart());
+  });
+});
