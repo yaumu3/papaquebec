@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import type { Chart, ItemPart } from './chart';
 import type { LonLat } from './mapdata';
 import type { Layer } from './mapsetFormat';
-import { topologyOf } from './topology';
+import { ownersOf, runsOf, type Stretch, type Network, topologyOf } from './topology';
 
 const A: LonLat = [130.6, 33.7];
 const B: LonLat = [130.7, 33.7];
@@ -13,20 +13,30 @@ const D: LonLat = [130.6, 33.8];
 type Outline = LonLat[];
 type LinearLayer = Exclude<Layer, 'ad' | 'navaid' | 'fix' | 'vfr' | 'hold'>;
 
-function partOf(layer: LinearLayer, name: string, outlines: Outline[], lower?: string): ItemPart {
+interface Extra {
+  lower?: string;
+  kind?: string;
+}
+
+function partOf(
+  layer: LinearLayer,
+  name: string,
+  outlines: Outline[],
+  extra: Extra = {},
+): ItemPart {
   const [first = []] = outlines;
   const geometry =
     outlines.length > 1
       ? { type: 'Polygon' as const, coordinates: outlines }
       : { type: 'LineString' as const, coordinates: first };
-  const properties = { layer, name, ...(lower ? { lower } : {}) };
+  const properties = { layer, name, ...extra };
   return { geometry, properties };
 }
 
 const chartWith = (...parts: ItemPart[]): Chart =>
   parts.map((part, i) => ({ key: String(i), layer: part.properties.layer, parts: [part] }));
 
-const nameOf = ({ properties }: ItemPart) => ('name' in properties ? properties.name : '');
+const nameOf = ({ properties }: ItemPart) => ('name' in properties ? (properties.name ?? '') : '');
 
 const square: Outline = [A, B, C, D, A];
 
@@ -131,7 +141,7 @@ describe('topologyOf', () => {
     // Arrange
     const chart = chartWith(
       partOf('fir', 'fir', [square]),
-      partOf('sector', 'upper', [square], 'FL195'),
+      partOf('sector', 'upper', [square], { lower: 'FL195' }),
       partOf('tma', 'tma1', [square]),
       partOf('sector', 'lower', [square]),
       partOf('tma', 'tma2', [square]),
@@ -172,5 +182,127 @@ describe('topologyOf', () => {
     expect([areas.edgeCount, routes.edgeCount]).toEqual([1, 1]);
     expect([...(areas.paths[0]?.edges ?? [])]).toEqual([0]);
     expect([...(routes.paths[0]?.edges ?? [])]).toEqual([0]);
+  });
+});
+
+const run = (from: number, to: number): Stretch => ({ from, to });
+
+const E: LonLat = [130.8, 33.7];
+const F: LonLat = [130.8, 33.8];
+
+/** The runs each named part draws, its paths in order, when only the parts not hidden draw. */
+function runsDrawn(network: Network, hidden: string[] = []): Record<string, Stretch[]> {
+  const drawn = new Set(
+    network.paths.map((p) => p.part).filter((p) => !hidden.includes(nameOf(p))),
+  );
+  const owners = ownersOf(network, drawn);
+  return Object.fromEntries(network.paths.map((path) => [nameOf(path.part), runsOf(path, owners)]));
+}
+
+describe('ownersOf', () => {
+  it('names the occurrence that draws each edge, and -1 where no drawn part has it', () => {
+    // Arrange
+    const { areas } = topologyOf(
+      chartWith(partOf('tma', 'T', [[A, B, C]]), partOf('fir', 'F', [[A, B, D]])),
+    );
+    const everything = new Set(areas.paths.map((p) => p.part));
+    const onlyFir = new Set(areas.paths.slice(1).map((p) => p.part));
+
+    // Act
+    const owners = [everything, onlyFir].map((drawn) => Array.from(ownersOf(areas, drawn)));
+
+    // Assert
+    expect(owners).toEqual([
+      [0, 1, 3],
+      [2, -1, 3],
+    ]);
+  });
+});
+
+describe('runsOf', () => {
+  it('draws a shared edge once, by the rule that picks its owner', () => {
+    // Arrange
+    const rows: [string, Chart, string[], Record<string, Stretch[]>][] = [
+      [
+        'front layer over a layer behind',
+        chartWith(partOf('fir', 'fir', [[A, B, D]]), partOf('tma', 'tma', [[A, B, C]])),
+        [],
+        { tma: [run(0, 2)], fir: [run(1, 2)] },
+      ],
+      [
+        'the front layer hidden hands the edge down',
+        chartWith(partOf('fir', 'fir', [[A, B, D]]), partOf('tma', 'tma', [[A, B, C]])),
+        ['tma'],
+        { tma: [], fir: [run(0, 2)] },
+      ],
+      [
+        'a lower stratum over an upper one that comes first',
+        chartWith(
+          partOf('sector', 'upper', [[A, B, C]], { lower: 'FL195' }),
+          partOf('sector', 'lower', [[A, B, D]]),
+        ),
+        [],
+        { lower: [run(0, 2)], upper: [run(1, 2)] },
+      ],
+      [
+        'the first in chart order among equals, whatever their kinds',
+        chartWith(
+          partOf('tma', 'first', [[A, B, C]], { kind: 'X' }),
+          partOf('tma', 'second', [[A, B, D]], { kind: 'Y' }),
+        ),
+        [],
+        { first: [run(0, 2)], second: [run(1, 2)] },
+      ],
+      [
+        'a path that retraces an edge draws it once',
+        chartWith(partOf('asr', 'R', [[A, B, A, C]])),
+        [],
+        { R: [run(0, 1), run(2, 3)] },
+      ],
+      [
+        'an edge shared mid-path splits the path into two runs',
+        chartWith(partOf('fir', 'long', [[A, B, C, D, E]]), partOf('tma', 'short', [[B, C]])),
+        [],
+        { short: [run(0, 1)], long: [run(0, 1), run(2, 4)] },
+      ],
+      [
+        'a run does not wrap across the start of a ring',
+        chartWith(partOf('fir', 'ring', [square]), partOf('tma', 'side', [[C, D]])),
+        [],
+        { side: [run(0, 1)], ring: [run(0, 2), run(3, 4)] },
+      ],
+    ];
+
+    // Act
+    const results = rows.map(([, chart, hidden]) => runsDrawn(topologyOf(chart).areas, hidden));
+
+    // Assert
+    expect(results).toEqual(rows.map(([, , , expected]) => expected));
+  });
+
+  it('draws the edge two parts of one item share once', () => {
+    // Arrange
+    const step = partOf('tma', 'step', [[B, E, F, C, B]]);
+    const base = partOf('tma', 'base', [square]);
+    const chart: Chart = [{ key: 'T', layer: 'tma', parts: [base, step] }];
+
+    // Act
+    const runs = runsDrawn(topologyOf(chart).areas);
+
+    // Assert
+    expect(runs).toEqual({ base: [run(0, 4)], step: [run(0, 3)] });
+  });
+
+  it('keeps a run inside the stretch it is asked for', () => {
+    // Arrange
+    const { routes } = topologyOf(chartWith(partOf('conv', 'R', [[A, B, C, D, E]])));
+    const [path] = routes.paths;
+    const owners = ownersOf(routes, new Set(routes.paths.map((p) => p.part)));
+
+    // Act
+    const runs = path && runsOf(path, owners, run(1, 3));
+
+    // Assert
+    expect(runs).toEqual([run(1, 3)]);
   });
 });

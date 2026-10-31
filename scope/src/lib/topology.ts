@@ -110,3 +110,47 @@ export function topologyOf(chart: Chart): Topology {
   const vertexOf = vertexNumbering();
   return { chart, areas: networkOf(areas, vertexOf), routes: networkOf(routes, vertexOf) };
 }
+
+/** The edges of a path from vertex index `from` to `to`. */
+export interface Stretch {
+  from: number;
+  to: number;
+}
+
+/**
+ * Per edge of the network, the occurrence that draws it: the first among the drawn parts' paths,
+ * which are in front-first order. `-1` where no drawn part has the edge.
+ */
+export function ownersOf(network: Network, drawn: ReadonlySet<ItemPart>): Int32Array {
+  const owners = new Int32Array(network.edgeCount).fill(-1);
+  for (const path of network.paths) {
+    if (!drawn.has(path.part)) continue;
+    path.edges.forEach((edge, i) => {
+      if (owners[edge] === -1) owners[edge] = path.firstOccurrence + i;
+    });
+  }
+  return owners;
+}
+
+/**
+ * The runs of a path within a stretch (the whole path by default): maximal chains of consecutive
+ * edges the path owns. A run does not wrap across the start of a ring.
+ */
+export function runsOf(
+  path: ChartPath,
+  owners: Int32Array,
+  within: Stretch = { from: 0, to: path.edges.length },
+): Stretch[] {
+  const runs: Stretch[] = [];
+  let from = -1;
+  for (let i = within.from; i < within.to; i++) {
+    const owned = owners[path.edges[i] ?? -1] === path.firstOccurrence + i;
+    if (owned && from < 0) from = i;
+    if (!owned && from >= 0) {
+      runs.push({ from, to: i });
+      from = -1;
+    }
+  }
+  if (from >= 0) runs.push({ from, to: within.to });
+  return runs;
+}
