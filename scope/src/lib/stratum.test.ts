@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ItemPart } from './chart';
-import { isUpperStratum } from './stratum';
+import { isUpperStratum, stratumTag } from './stratum';
 
 const area = (lower?: string): ItemPart => ({
   geometry: { type: 'Polygon', coordinates: [] },
@@ -42,5 +42,65 @@ describe('isUpperStratum', () => {
 
     // Assert
     expect(verdict).toBe(false);
+  });
+});
+
+const sector = (lower?: string, upper?: string): ItemPart => ({
+  geometry: { type: 'Polygon', coordinates: [] },
+  properties: {
+    layer: 'sector',
+    name: 'X',
+    ...(lower ? { lower } : {}),
+    ...(upper ? { upper } : {}),
+  },
+});
+
+describe('stratumTag', () => {
+  it('writes the band of an item from its parts, compared in feet', () => {
+    // Arrange
+    const rows: [string, [string | undefined, string | undefined][], string][] = [
+      ['surface to a limit', [['SFC', 'FL335']], '335−'],
+      ['a limit to unlimited', [['FL335', 'UNL']], '335+'],
+      ['between two limits', [['FL250', 'FL335']], '250–335'],
+      ['surface to unlimited', [['SFC', 'UNL']], ''],
+      ['no lower limit is the surface', [[undefined, 'FL335']], '335−'],
+      ['GND is the surface', [['GND', 'FL335']], '335−'],
+      ['0FT is the surface', [['0FT', 'FL335']], '335−'],
+      ['no upper limit is unlimited', [['FL335', undefined]], '335+'],
+      ['a limit that is not a level, as published', [['SFC', '9000FT']], '9000FT−'],
+      ['AGL as published', [['2500FT AGL', 'FL100']], '2500FT AGL–100'],
+      [
+        'the lowest lower limit in feet, not as text',
+        [
+          ['5000FT', 'FL200'],
+          ['FL040', 'FL200'],
+        ],
+        '040–200',
+      ],
+      [
+        'the highest upper limit in feet, not as text',
+        [
+          ['SFC', 'FL100'],
+          ['SFC', '12000FT'],
+        ],
+        '12000FT−',
+      ],
+      [
+        'two strata that together span everything',
+        [
+          ['SFC', 'FL375'],
+          ['FL375', 'UNL'],
+        ],
+        '',
+      ],
+    ];
+
+    // Act
+    const tags = rows.map(([, bands]) =>
+      stratumTag(bands.map(([lower, upper]) => sector(lower, upper))),
+    );
+
+    // Assert
+    expect(tags).toEqual(rows.map(([, , expected]) => expected));
   });
 });
