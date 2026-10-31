@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { DRAW_STACK } from '../lib/layers';
 import { memoryStorage } from './memoryStorage';
 import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
-import { DEFAULT_SETTINGS, type ListSort, type ShownLayers } from './settings';
+import { DEFAULT_SETTINGS, type ListSort, type Settings, type ShownLayers } from './settings';
 
 const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
 const DEFAULT_SORT: ListSort = { key: 'id', dir: 'asc' };
@@ -261,5 +261,84 @@ describe('loadPersisted ndRangeNm', () => {
 
     // Assert
     expect(ranges).toEqual([40, 20, 20, 20, 20]);
+  });
+});
+
+const loaded = (settings: unknown) =>
+  loadPersisted(memoryStorage({ [PERSIST_KEY]: JSON.stringify({ settings }) }), DEFAULTS).settings;
+
+describe('loadPersisted tree state', () => {
+  it('opens no group and no layer, and stores no exception, by default', () => {
+    // Arrange
+    const storage = memoryStorage();
+
+    // Act
+    const { settings } = loadPersisted(storage, DEFAULTS);
+
+    // Assert
+    expect(settings.openGroups).toEqual([]);
+    expect(settings.openLayers).toEqual([]);
+    expect(settings.exceptions).toEqual({});
+  });
+
+  it('round-trips the exceptions in order, and the open groups and layers', () => {
+    // Arrange
+    const storage = memoryStorage();
+    const state: Persisted = {
+      ...DEFAULTS,
+      settings: {
+        ...DEFAULT_SETTINGS,
+        exceptions: { fix: new Set(['z', 'a']), ctr: new Set(['q']) },
+        openGroups: ['POINTS', 'AIRSPACE'],
+        openLayers: ['fix'],
+      },
+    };
+    savePersisted(storage, state);
+
+    // Act
+    const back = loadPersisted(storage, DEFAULTS);
+
+    // Assert
+    expect([...(back.settings.exceptions.fix ?? [])]).toEqual(['z', 'a']);
+    expect(back).toEqual(state);
+  });
+
+  it('falls back field by field on bad stored values', () => {
+    // Arrange
+    const rows: [unknown, Partial<Settings>][] = [
+      [{ exceptions: 'fix' }, { exceptions: {} }],
+      [{ exceptions: { fix: 'a' } }, { exceptions: {} }],
+      [{ exceptions: { fix: ['a', 3, null, 'b'] } }, { exceptions: { fix: new Set(['a', 'b']) } }],
+      [{ exceptions: { nowhere: ['a'], ctr: ['b'] } }, { exceptions: { ctr: new Set(['b']) } }],
+      [{ openGroups: ['AIRSPACE', 'NOWHERE', 7] }, { openGroups: ['AIRSPACE'] }],
+      [{ openGroups: 'AIRSPACE' }, { openGroups: [] }],
+      [{ openLayers: ['fix', 'nowhere', 7] }, { openLayers: ['fix'] }],
+      [{ openLayers: { fix: true } }, { openLayers: [] }],
+    ];
+
+    // Act
+    const results = rows.map(([stored]) => loaded(stored));
+
+    // Assert
+    expect(results).toEqual(
+      rows.map(([, expected]) => Object.assign({}, DEFAULT_SETTINGS, expected)),
+    );
+  });
+
+  it('keeps the shown layers of a stored object that has none of the tree state', () => {
+    // Arrange
+    const stored = { shownLayers: { ctr: false, fix: false } };
+
+    // Act
+    const settings = loaded(stored);
+
+    // Assert
+    expect(settings.shownLayers).toEqual({
+      ...DEFAULT_SETTINGS.shownLayers,
+      ctr: false,
+      fix: false,
+    });
+    expect(settings.openGroups).toEqual([]);
+    expect(settings.exceptions).toEqual({});
   });
 });

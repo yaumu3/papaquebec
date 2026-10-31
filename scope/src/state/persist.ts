@@ -1,6 +1,6 @@
 import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
-import { DRAW_STACK } from '../lib/layers';
+import { DRAW_STACK, LAYER_GROUPS } from '../lib/layers';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { isLaneKey, type LaneKey } from './plotted';
 import {
@@ -18,6 +18,7 @@ import {
   QNH_MIN_INHG,
   RANGE_MAX_NM,
   RANGE_MIN_NM,
+  type Exceptions,
   type Settings,
   type ShownLayers,
   TRANSITION_ALT_MAX_FT,
@@ -67,6 +68,24 @@ function shownLayersFrom(raw: Record<string, unknown>, fallback: ShownLayers): S
   return out;
 }
 
+/** The exceptions saved for each layer, in order; layers and values not known are dropped. */
+function exceptionsFrom(raw: unknown, fallback: Exceptions): Exceptions {
+  if (!isRecord(raw)) return fallback;
+  const out: Exceptions = {};
+  for (const layer of DRAW_STACK) {
+    const keys = raw[layer];
+    if (Array.isArray(keys)) out[layer] = new Set(keys.filter((k) => typeof k === 'string'));
+  }
+  return out;
+}
+
+/** The members of `among` the list holds; an empty list is a choice to open nothing. */
+function knownOf<T>(raw: unknown, among: readonly T[], fallback: readonly T[]): readonly T[] {
+  return Array.isArray(raw) ? among.filter((x) => raw.includes(x)) : fallback;
+}
+
+const GROUP_TITLES = LAYER_GROUPS.map((group) => group.title);
+
 function carried(old: unknown): Record<string, unknown> {
   return isRecord(old) ? { coast: old.coast, rings: old.rings } : {};
 }
@@ -110,6 +129,9 @@ function settingsFrom(raw: unknown, fallback: Settings): Settings {
     trailSec: oneOf<number>(TRAIL_STEPS, raw.trailSec, fallback.trailSec),
     filter: filterFrom(raw.filter, fallback.filter),
     shownLayers: shownLayersFrom(raw, fallback.shownLayers),
+    exceptions: exceptionsFrom(raw.exceptions, fallback.exceptions),
+    openGroups: knownOf(raw.openGroups, GROUP_TITLES, fallback.openGroups),
+    openLayers: knownOf<string>(raw.openLayers, DRAW_STACK, fallback.openLayers),
     labelDensity: oneOf(LABEL_DENSITIES, raw.labelDensity, fallback.labelDensity),
     altimeter: altimeterFrom(raw.altimeter, fallback.altimeter),
     qnh: qnhFrom(raw.qnh, fallback.qnh),
@@ -148,7 +170,15 @@ export function loadPersisted(storage: Storage, defaults: Persisted): Persisted 
   };
 }
 
+/** Sets are written as lists; JSON has no set. */
+const asArrays = (exceptions: Exceptions) =>
+  Object.fromEntries(Object.entries(exceptions).map(([layer, keys]) => [layer, [...keys]]));
+
 /** Best effort: the scope works without storage. */
 export function savePersisted(storage: Storage, state: Persisted): void {
-  writeJson(storage, PERSIST_KEY, state);
+  const { settings } = state;
+  writeJson(storage, PERSIST_KEY, {
+    ...state,
+    settings: { ...settings, exceptions: asArrays(settings.exceptions) },
+  });
 }
