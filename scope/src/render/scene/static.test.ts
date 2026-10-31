@@ -14,6 +14,10 @@ const ringPath = (r: number) => [
 const count = (batches: Batch[] | undefined, kind: Batch['kind']) =>
   (batches ?? []).filter((b) => b.kind === kind).reduce((n, b) => n + b.count, 0);
 
+/** Where the first glyph of the first text batch is anchored. */
+const firstAt = (batches: Batch[] | undefined) =>
+  Array.from(batches?.find((b) => b.kind === 'text')?.data.subarray(0, 2) ?? []);
+
 const project = (lat: number, lon: number) => ({ x: lon, y: lat });
 
 describe('buildRings', () => {
@@ -25,10 +29,9 @@ describe('buildRings', () => {
     const { ringLines, ringLabels } = buildRings(input);
 
     // Assert
-    const text = ringLabels?.find((b) => b.kind === 'text');
     expect(count(ringLines, 'lines')).toBe(4 * 2);
     expect(count(ringLabels, 'text')).toBe('10203040'.length);
-    expect([text?.data[0], text?.data[1]]).toEqual([1, 10]);
+    expect(firstAt(ringLabels)).toEqual([1, 10]);
   });
 
   it('draws nothing when the rings are hidden, and still fills both slots', () => {

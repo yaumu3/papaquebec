@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { chartOf } from '../src/lib/chart';
+import { type ChartItem, chartOf } from '../src/lib/chart';
 import { parseMapSet, validateMapSet } from '../src/lib/mapset';
 import { type OpenAipInput, toMapSet, withinRadius } from './openaip';
 
@@ -152,6 +152,11 @@ const inputOf = (parts: Partial<OpenAipInput>): OpenAipInput => ({
   ...parts,
 });
 
+const rowOf = ({ layer, parts: [part] }: ChartItem) => {
+  const p: Record<string, unknown> = part?.properties ?? {};
+  return [layer, p.kind, p.id ?? p.name, p.lower, p.upper];
+};
+
 describe('toMapSet', () => {
   it('files each feature under its layer, with its kind and limits', () => {
     // Arrange
@@ -167,13 +172,9 @@ describe('toMapSet', () => {
     ];
 
     // Act
-    const chart = chartOf([parseMapSet(toMapSet(FIXTURE, AREA))]);
+    const filed = chartOf([parseMapSet(toMapSet(FIXTURE, AREA))]).map(rowOf);
 
     // Assert
-    const filed = chart.map(({ layer, parts: [part] }) => {
-      const p: Record<string, unknown> = part?.properties ?? {};
-      return [layer, p.kind, p.id ?? p.name, p.lower, p.upper];
-    });
     expect(filed).toEqual(expected);
   });
 

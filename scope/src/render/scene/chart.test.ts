@@ -199,15 +199,18 @@ describe('buildChart lines', () => {
       ),
     );
     const shuffled = items.toReversed();
+    const expected = lineLayers.map((l) => DRAW_STACK.indexOf(l)).toReversed();
 
     // Act
     const drawn = instances(build(shuffled).lines).map((i) => i.a.y);
 
     // Assert
-    const expected = lineLayers.map((l) => DRAW_STACK.indexOf(l)).toReversed();
     expect(drawn).toEqual(expected);
   });
 });
+
+const markerXs = ({ count, data }: Batch) =>
+  Array.from({ length: count }, (_, i) => data[i * MARKER_STRIDE]);
 
 describe('buildChart markers', () => {
   it('draws each kind of point with its own glyph, size and colour', () => {
@@ -237,13 +240,13 @@ describe('buildChart markers', () => {
     const items = pointLayers.map((layer) =>
       itemOf(layer, partOf(layer, point([DRAW_STACK.indexOf(layer), 0]))),
     );
+    const expected = pointLayers.map((l) => DRAW_STACK.indexOf(l)).toReversed();
 
     // Act
-    const { markers } = build(items.toReversed());
+    const xs = markerXs(build(items.toReversed()).markers);
 
     // Assert
-    const xs = Array.from({ length: markers.count }, (_, i) => markers.data[i * MARKER_STRIDE]);
-    expect(xs).toEqual(pointLayers.map((l) => DRAW_STACK.indexOf(l)).toReversed());
+    expect(xs).toEqual(expected);
   });
 
   it('draws a route layer as lines only', () => {
@@ -304,6 +307,9 @@ describe('buildChart labels', () => {
       ['adiz', null],
       ['dct', null],
     ];
+    const expected = from.map(([, first]) =>
+      LABEL_DENSITIES.map((d) => (first !== null && rank(d) >= rank(first) ? 1 : 0)),
+    );
 
     // Act
     const counts = from.map(([layer]) =>
@@ -313,9 +319,6 @@ describe('buildChart labels', () => {
     );
 
     // Assert
-    const expected = from.map(([, first]) =>
-      LABEL_DENSITIES.map((d) => (first !== null && rank(d) >= rank(first) ? 1 : 0)),
-    );
     expect(counts).toEqual(expected);
   });
 

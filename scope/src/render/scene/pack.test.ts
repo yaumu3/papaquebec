@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
+import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
 import { LineBatch, MarkerBatch, parseColor, TextBatch } from './pack';
 
 describe('parseColor', () => {
@@ -23,6 +23,10 @@ const lines = (draw: (b: LineBatch) => void, capacity?: number) => {
   draw(b);
   return b.finish();
 };
+
+/** The distance along the polyline carried by each segment. */
+const distances = ({ count, data }: Batch) =>
+  Array.from({ length: count }, (_, i) => data[i * LINE_STRIDE + 9]);
 
 describe('LineBatch', () => {
   const white = '#ffffff';
@@ -100,10 +104,9 @@ describe('LineBatch', () => {
     ];
 
     // Act
-    const batch = lines((b) => b.polyline(path, white));
+    const along = distances(lines((b) => b.polyline(path, white)));
 
     // Assert
-    const along = [0, 1, 2].map((i) => batch.data[i * LINE_STRIDE + 9]);
     expect(along).toEqual([0, 3, 7]);
   });
 
@@ -116,13 +119,14 @@ describe('LineBatch', () => {
     ];
 
     // Act
-    const batch = lines((b) => {
-      b.polyline(path, white);
-      b.polyline(path, white);
-    });
+    const along = distances(
+      lines((b) => {
+        b.polyline(path, white);
+        b.polyline(path, white);
+      }),
+    );
 
     // Assert
-    const along = [0, 1, 2, 3].map((i) => batch.data[i * LINE_STRIDE + 9]);
     expect(along).toEqual([0, 5, 0, 5]);
   });
 
