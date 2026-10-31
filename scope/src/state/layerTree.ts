@@ -2,6 +2,7 @@
 
 import { batch, createMemo, createRoot, createSignal } from 'solid-js';
 
+import type { ChartItem } from '../lib/chart';
 import { LAYER_GROUPS, type ScopeLayer } from '../lib/layers';
 import { type TreeItem, itemsIn, treeItemsOf } from '../lib/treeItems';
 import { afterDot, type LayerLeaves } from '../lib/treeRows';
@@ -45,6 +46,26 @@ export const { treeItems, found } = createRoot(() => {
     found: createMemo(() => (searching() ? searchTree(items(), terms()) : null)),
   };
 });
+
+const [underMouse, setUnderMouse] = createSignal<string | null>(null);
+const [focused, setFocused] = createSignal<string | null>(null);
+
+/** The key of the item row under the mouse, else of the one with focus. */
+export const pointedAt = (): string | null => underMouse() ?? focused();
+
+/** A row's pointer or focus gone only clears its own key: another row may have taken it since. */
+const clearing = (key: string) => (now: string | null) => (now === key ? null : now);
+
+export const enterRow = (key: string): void => void setUnderMouse(key);
+export const leaveRow = (key: string): void => void setUnderMouse(clearing(key));
+export const focusRow = (key: string): void => void setFocused(key);
+export const blurRow = (key: string): void => void setFocused(clearing(key));
+
+/** The item the tree points at, whether it draws or not: pointing at a hidden one finds it. */
+export function pointedItem(): ChartItem | null {
+  const key = pointedAt();
+  return key === null ? null : (topology().chart.find((item) => item.key === key) ?? null);
+}
 
 export type OpenList = 'openGroups' | 'openLayers';
 

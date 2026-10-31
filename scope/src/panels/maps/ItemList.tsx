@@ -1,10 +1,19 @@
-import { createMemo, For, Show } from 'solid-js';
+import { createMemo, For, onCleanup, Show } from 'solid-js';
 
+import { isMouse } from '../../canvas/input/devices/mouse';
 import { cx } from '../../design/cx';
 import { LAYER_NAMES, type ScopeLayer } from '../../lib/layers';
 import { itemsIn, type TreeItem } from '../../lib/treeItems';
 import { isItemShown, type LayerState } from '../../lib/visibility';
-import { listedItems, tapItem, treeItems } from '../../state/layerTree';
+import {
+  blurRow,
+  enterRow,
+  focusRow,
+  leaveRow,
+  listedItems,
+  tapItem,
+  treeItems,
+} from '../../state/layerTree';
 import { layerState } from '../../state/layerVisibility';
 import { Marked } from './Marked';
 
@@ -16,6 +25,11 @@ function ItemRow(props: {
   state: () => LayerState;
 }) {
   const item = () => props.byKey().get(props.itemKey);
+  // A removed row fires no leave or blur, so its key is cleared with it.
+  onCleanup(() => {
+    leaveRow(props.itemKey);
+    blurRow(props.itemKey);
+  });
   return (
     <Show when={item()}>
       {(row) => {
@@ -29,6 +43,10 @@ function ItemRow(props: {
               aria-pressed={shown()}
               aria-label={row().tag ? `${row().name} ${row().tag}` : row().name}
               onClick={() => tapItem(row())}
+              onPointerEnter={(e) => isMouse(e) && enterRow(row().key)}
+              onPointerLeave={(e) => isMouse(e) && leaveRow(row().key)}
+              onFocus={() => focusRow(row().key)}
+              onBlur={() => blurRow(row().key)}
             >
               <span class={s.drawing} aria-hidden="true" />
               <span class={s.guide} aria-hidden="true" />

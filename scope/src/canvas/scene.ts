@@ -13,9 +13,11 @@ import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
 import { buildCoast, buildRings } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
+import { buildTraces } from '../render/scene/traces';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
 import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
 import { hoverInstant } from '../state/lanes';
+import { pointedItem } from '../state/layerTree';
 import { declinationAt } from '../state/magnetic';
 import { topology } from '../state/mapsets';
 import {
@@ -136,6 +138,10 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         : null,
     );
   }
+
+  show(() =>
+    projected() ? { traces: buildTraces({ pointedAt: pointedItem(), project: projectNm }) } : null,
+  );
 
   const layoutScale = settledScale(view);
   /**

@@ -1,14 +1,25 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 
+import { parseMapSet } from '../lib/mapset';
+import { EXAMPLE } from '../lib/mapsetCorpus';
+import { everyItemSet, isItemShown } from '../lib/visibility';
 import {
+  blurRow,
+  enterRow,
+  focusRow,
   isOpen,
+  leaveRow,
   type OpenList,
+  pointedAt,
+  pointedItem,
   query,
   searching,
   setQuery,
   toggleOpen,
   typeQuery,
 } from './layerTree';
+import { layerState, setLayerState } from './layerVisibility';
+import { mapSets, setBuiltinMapSet, topology } from './mapsets';
 import { setSettings, settings } from './settings';
 
 describe('toggleOpen', () => {
@@ -124,5 +135,110 @@ describe('searching the tree', () => {
     expect(isOpen('openGroups', 'AIRSPACE')).toBe(false);
     expect(isOpen('openLayers', 'fix')).toBe(true);
     expect(remembered()).toEqual([['POINTS'], ['fix']]);
+  });
+});
+
+const rest = () => {
+  leaveRow('a');
+  leaveRow('b');
+  blurRow('a');
+  blurRow('b');
+};
+
+describe('pointedAt', () => {
+  it('is the row under the mouse, over the row with focus', () => {
+    // Arrange
+    rest();
+    focusRow('a');
+
+    // Act
+    enterRow('b');
+
+    // Assert
+    expect(pointedAt()).toBe('b');
+  });
+
+  it('is the row with focus when the mouse leaves', () => {
+    // Arrange
+    rest();
+    focusRow('a');
+    enterRow('b');
+
+    // Act
+    leaveRow('b');
+
+    // Assert
+    expect(pointedAt()).toBe('a');
+  });
+
+  it('is nothing when the mouse and the focus have left', () => {
+    // Arrange
+    rest();
+    focusRow('a');
+    enterRow('b');
+    leaveRow('b');
+
+    // Act
+    blurRow('a');
+
+    // Assert
+    expect(pointedAt()).toBeNull();
+  });
+
+  it('ignores a leave of a row not under the mouse', () => {
+    // Arrange
+    rest();
+    enterRow('b');
+
+    // Act
+    leaveRow('a');
+
+    // Assert
+    expect(pointedAt()).toBe('b');
+  });
+
+  it('ignores a blur of a row without focus', () => {
+    // Arrange
+    rest();
+    focusRow('a');
+
+    // Act
+    blurRow('b');
+
+    // Assert
+    expect(pointedAt()).toBe('a');
+  });
+});
+
+describe('pointedItem', () => {
+  const original = mapSets().find((set) => set.builtin)?.data;
+  let key = '';
+  afterEach(() => {
+    if (original) setBuiltinMapSet(original);
+    setLayerState('fix', everyItemSet(true));
+    blurRow(key);
+  });
+
+  it('is an item whose layer is hidden, since pointing at it is how it is found', () => {
+    // Arrange
+    setBuiltinMapSet(parseMapSet(EXAMPLE));
+    setLayerState('fix', everyItemSet(false));
+    key =
+      topology().chart.find(
+        (item) =>
+          item.layer === 'fix' &&
+          item.parts.some((p) => 'id' in p.properties && p.properties.id === 'TAVRO'),
+      )?.key ?? '';
+    // Precondition
+    const hidden = !isItemShown(layerState('fix'), key);
+    rest();
+    focusRow(key);
+
+    // Act
+    const item = pointedItem();
+
+    // Assert
+    expect(hidden).toBe(true);
+    expect(item?.key).toBe(key);
   });
 });
