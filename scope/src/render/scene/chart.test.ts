@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { ChartItem, ItemPart } from '../../lib/chart';
+import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
 import { DRAW_STACK, isStyled, type StyledLayer } from '../../lib/layers';
+import { parseMapSet } from '../../lib/mapset';
 import { isPointLayer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
@@ -50,7 +51,7 @@ const itemOf = (layer: StyledLayer, ...parts: ItemPart[]): ChartItem => ({
 });
 
 const build = (
-  items: ChartItem[],
+  items: Chart,
   layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
 ) => {
@@ -417,6 +418,40 @@ describe('buildChart markers', () => {
 
     // Assert
     expect(xs).toEqual(expected);
+  });
+
+  it('draws the same navaid of two sets once, with its label, and one elsewhere twice', () => {
+    // Arrange
+    const navaidSet = (id: string, at: Position) =>
+      parseMapSet({
+        type: 'FeatureCollection',
+        version: 2,
+        id,
+        title: id,
+        features: [
+          {
+            type: 'Feature',
+            properties: { layer: 'navaid', id: 'Q' },
+            geometry: { type: 'Point', coordinates: at },
+          },
+        ],
+      });
+    const rows: Position[] = [
+      [139.8, 35.5],
+      [139.8, 35.7],
+    ];
+    const charts = rows.map((at) =>
+      chartOf([navaidSet('first', [139.8, 35.5]), navaidSet('second', at)]),
+    );
+
+    // Act
+    const drawn = charts.map((chart) => build(chart, ['navaid'], 'dense'));
+
+    // Assert
+    expect(drawn.map((d) => [d.markers.count, d.labels.count])).toEqual([
+      [1, 1],
+      [2, 2],
+    ]);
   });
 
   it('draws a route layer as lines only', () => {

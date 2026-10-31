@@ -165,6 +165,9 @@ export type MapSetData = Omit<z.infer<typeof Collection>, 'features'> & {
   features: MapSetFeature[];
 };
 
+/** A set is known by its `id` member, else its title. */
+export const setIdentity = (set: MapSetData): string => set.id ?? set.title;
+
 type Parsed<T> = { ok: true; data: T } | { ok: false; issues: Issue[] };
 
 const isLayer = (v: unknown): v is Layer => (LAYERS as readonly unknown[]).includes(v);

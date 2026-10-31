@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { parseMapSet, UNTITLED_MAPSET, validateMapSet } from './mapset';
+import { parseMapSet, setIdentity, UNTITLED_MAPSET, validateMapSet } from './mapset';
 import {
   CORPUS,
   EXAMPLE,
@@ -211,5 +211,23 @@ describe('parseMapSet', () => {
       undefined,
       undefined,
     ]);
+  });
+});
+
+describe('setIdentity', () => {
+  it('is the id when the set has one, else its title', () => {
+    // Arrange
+    const withId = parseMapSet(EXAMPLE);
+    const withoutId = parseMapSet(
+      variant((c) => {
+        delete c.id;
+      }),
+    );
+
+    // Act
+    const identities = [withId, withoutId].map(setIdentity);
+
+    // Assert
+    expect(identities).toEqual(['example-set', withoutId.title]);
   });
 });

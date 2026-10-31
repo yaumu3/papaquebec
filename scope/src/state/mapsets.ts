@@ -1,9 +1,9 @@
 import type { Accessor } from 'solid-js';
 import { createStore, unwrap } from 'solid-js/store';
 
-import { type Chart, chartOf, setIdentity } from '../lib/chart';
+import { type Chart, chartOf } from '../lib/chart';
 import { isRecord } from '../lib/guards';
-import { type MapSetData, validateMapSet } from '../lib/mapset';
+import { type MapSetData, setIdentity, validateMapSet } from '../lib/mapset';
 import { BUILTIN_ID, MAPSET_VERSION } from '../lib/mapsetFormat';
 import { type Topology, topologyOf } from '../lib/topology';
 import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
