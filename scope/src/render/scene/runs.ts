@@ -1,8 +1,9 @@
-import { isUpperStratum, type ItemPart } from '../../lib/chart';
+import type { ItemPart } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import type { StyledLayer } from '../../lib/layers';
 import { isRouteLayer } from '../../lib/mapsetFormat';
 import { type Cuts, NO_CUTS, type Span, spansOf, stopCuts } from '../../lib/stops';
+import { isUpperStratum } from '../../lib/stratum';
 import {
   type ChartPath,
   type ChartPoint,

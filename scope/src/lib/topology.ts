@@ -5,7 +5,7 @@
  * a route edge never meet.
  */
 
-import { type Chart, isUpperStratum, type ItemPart, outlinesOf, toGrid } from './chart';
+import { type Chart, type ItemPart, outlinesOf, toGrid } from './chart';
 import { DRAW_STACK } from './layers';
 import type { LonLat } from './mapdata';
 import {
@@ -16,6 +16,7 @@ import {
   type PointLayer,
   type RouteLayer,
 } from './mapsetFormat';
+import { isUpperStratum } from './stratum';
 
 /** The layers whose parts make paths: areas and routes. */
 export type PathLayer = AreaLayer | RouteLayer;
