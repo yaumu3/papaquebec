@@ -1,7 +1,6 @@
 import { createSignal, For, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { LAYER_GROUPS, LAYER_NAMES } from '../lib/layers';
 import {
   armRemoval,
   importMapSet,
@@ -11,11 +10,12 @@ import {
   removeMapSet,
   toggleMapSet,
 } from '../state/mapsets';
-import { type LabelDensity, setSettings, settings, toggleLayer } from '../state/settings';
+import { type LabelDensity, setSettings, settings } from '../state/settings';
 import { Button } from '../ui/Button';
 import { Pills } from '../ui/Pills';
 import { Divider, SectionTitle } from '../ui/Section';
 import { Window } from '../ui/Window';
+import { LayerTree } from './maps/LayerTree';
 
 import s from './MapsPanel.module.css';
 
@@ -126,26 +126,7 @@ function MapSetList() {
 export function MapsPanel() {
   return (
     <Window id="maps">
-      <For each={LAYER_GROUPS}>
-        {(group) => (
-          <>
-            <SectionTitle>{group.title}</SectionTitle>
-            <div class={s.layers}>
-              <For each={group.layers}>
-                {(layer) => (
-                  <Button
-                    class={s.layer}
-                    on={settings.shownLayers[layer]}
-                    onClick={() => toggleLayer(layer)}
-                  >
-                    {LAYER_NAMES[layer]}
-                  </Button>
-                )}
-              </For>
-            </div>
-          </>
-        )}
-      </For>
+      <LayerTree />
       <SectionTitle>LABEL DENSITY</SectionTitle>
       <Pills
         options={[

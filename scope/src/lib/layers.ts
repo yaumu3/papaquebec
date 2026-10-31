@@ -86,6 +86,31 @@ export const LAYER_NAMES: Record<ScopeLayer, string> = {
   rings: 'RANGE RINGS',
 };
 
+/** Where the AIP describes a layer, for the layers it describes. */
+export const LAYER_AIP_REFS: Partial<Record<ScopeLayer, string>> = {
+  ad: 'AD 2',
+  vfr: 'AD 2.24 visual approach charts',
+  navaid: 'ENR 4.1',
+  fix: 'ENR 4.4',
+  conv: 'ENR 3',
+  rnav: 'ENR 3',
+  dct: 'ENR 3, other routes',
+  hold: 'ENR 3, en-route holding',
+  sid: 'AD 2.22',
+  star: 'AD 2.22',
+  trans: 'AD 2.22',
+  pr: 'ENR 5.1',
+  dng: 'ENR 5.1',
+  tra: 'ENR 5.2',
+  adiz: 'ENR 5.2',
+  ctr: 'AD 2.17',
+  tma: 'ENR 2.1',
+  cta: 'ENR 2.1',
+  advisory: 'ENR 2.2',
+  fir: 'ENR 2.1',
+  asr: 'ENR 1.7',
+};
+
 const NAVAID_MAX_RANGE = 120;
 
 /** Navaids clutter a wide range; they show only out to `NAVAID_MAX_RANGE`. */

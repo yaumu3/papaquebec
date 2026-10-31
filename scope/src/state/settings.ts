@@ -1,6 +1,5 @@
 import { createStore } from 'solid-js/store';
 
-import type { ScopeLayer } from '../lib/layers';
 import { loadPersisted, type Persisted, savePersisted } from './persist';
 import { DEFAULT_PLOTTED } from './plotted';
 import {
@@ -45,10 +44,6 @@ export function persist(rest: Omit<Persisted, 'settings'>): void {
     qnh: { ...settings.qnh },
   };
   savePersisted(storage, { settings: snapshot, ...rest });
-}
-
-export function toggleLayer(layer: ScopeLayer): void {
-  setSettings('shownLayers', layer, (v) => !v);
 }
 
 /** Jump to the next preset above or below the current range. */

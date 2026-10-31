@@ -3,7 +3,7 @@
  * layer's summary. A leaf is an item, or a layer without items.
  */
 
-import { isScopeMade, type ScopeLayer } from './layers';
+import { isScopeMade, LAYER_AIP_REFS, LAYER_NAMES, type ScopeLayer } from './layers';
 import type { TreeItem } from './treeItems';
 import { everyItemSet, isItemShown, itemsSetTo, type LayerState } from './visibility';
 
@@ -81,4 +81,11 @@ export function layerSummary(
       ? shown.map(({ name }) => name).join(' ')
       : `${shown.length}/${items.length}`;
   return { text, tone: 'subset' };
+}
+
+/** A layer row's full name for its title: with the AIP reference, and when no set has data for it. */
+export function layerTitle(layer: ScopeLayer, hasItems: boolean): string {
+  const ref = LAYER_AIP_REFS[layer];
+  const named = ref === undefined ? LAYER_NAMES[layer] : `${LAYER_NAMES[layer]}, AIP ${ref}`;
+  return hasItems || isScopeMade(layer) ? named : `${named}, no data in the enabled sets`;
 }

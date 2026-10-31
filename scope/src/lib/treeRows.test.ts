@@ -8,6 +8,7 @@ import {
   groupCount,
   type LayerLeaves,
   layerSummary,
+  layerTitle,
   type RowState,
   rowStateOf,
   type StateOf,
@@ -201,5 +202,26 @@ describe('layerSummary', () => {
 
     // Assert
     expect(results).toEqual(rows.map(([, , , expected]) => expected));
+  });
+});
+
+describe('layerTitle', () => {
+  it('names a layer in full with its AIP reference, and says when it has no data', () => {
+    // Arrange
+    const rows: [ScopeLayer, boolean, string][] = [
+      ['fix', true, 'FIXES, AIP ENR 4.4'],
+      ['fix', false, 'FIXES, AIP ENR 4.4, no data in the enabled sets'],
+      ['sector', true, 'SECTORS'],
+      ['sector', false, 'SECTORS, no data in the enabled sets'],
+      ['advisory', true, 'ADVISORY AREAS, AIP ENR 2.2'],
+      ['coast', false, 'COASTLINE'],
+      ['rings', false, 'RANGE RINGS'],
+    ];
+
+    // Act
+    const titles = rows.map(([layer, hasItems]) => layerTitle(layer, hasItems));
+
+    // Assert
+    expect(titles).toEqual(rows.map(([, , expected]) => expected));
   });
 });
