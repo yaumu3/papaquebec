@@ -10,6 +10,7 @@ import {
   type PathLayer,
   runsOf,
   type Stretch,
+  type ChartPath,
   type Network,
   topologyOf,
 } from './topology';
@@ -193,13 +194,17 @@ const run = (from: number, to: number): Stretch => ({ from, to });
 const E: LonLat = [130.8, 33.7];
 const F: LonLat = [130.8, 33.8];
 
+const whole = (path: ChartPath): Stretch => ({ from: 0, to: path.edges.length });
+
 /** The runs each named part draws, its paths in order, when only the parts not hidden draw. */
 function runsDrawn(network: Network, hidden: string[] = []): Record<string, Stretch[]> {
   const drawn = new Set(
     network.paths.map((p) => p.part).filter((p) => !hidden.includes(nameOf(p))),
   );
   const owners = ownersOf(network, drawn);
-  return Object.fromEntries(network.paths.map((path) => [nameOf(path.part), runsOf(path, owners)]));
+  return Object.fromEntries(
+    network.paths.map((path) => [nameOf(path.part), runsOf(path, owners, whole(path))]),
+  );
 }
 
 describe('ownersOf', () => {

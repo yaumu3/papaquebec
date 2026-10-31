@@ -172,14 +172,10 @@ export function ownersOf(network: Network, drawn: ReadonlySet<ItemPart>): Int32A
 }
 
 /**
- * The runs of a path within a stretch (the whole path by default): maximal chains of consecutive
- * edges the path owns. A run does not wrap across the start of a ring.
+ * The runs of a path within a stretch: maximal chains of consecutive edges the path owns. A run
+ * does not wrap across the start of a ring.
  */
-export function runsOf(
-  path: ChartPath,
-  owners: Int32Array,
-  within: Stretch = { from: 0, to: path.edges.length },
-): Stretch[] {
+export function runsOf(path: ChartPath, owners: Int32Array, within: Stretch): Stretch[] {
   const runs: Stretch[] = [];
   let from = -1;
   for (let i = within.from; i < within.to; i++) {

@@ -1,6 +1,7 @@
 import { type ChartItem, type ItemPart, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import type { StyledLayer } from '../../lib/layers';
+import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo } from '../protocol';
@@ -14,11 +15,11 @@ import {
 } from './layerStyles';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { route } from './paths';
-import { drawRuns } from './runs';
+import { drawRuns, routeCuts } from './runs';
 
 export interface ChartInput {
   topology: Topology;
-  /** The points that draw; read only when a point layer is among `layers`. */
+  /** The points that draw; read only when a point or a route layer is among `layers`. */
   drawnPoints: () => readonly ChartPoint[];
   project: ProjectFn;
   /** The layers to draw, front first, as in the draw stack. */
@@ -91,8 +92,8 @@ export function buildChart({
 }: ChartInput): SliceBatches {
   const out = { lines: new LineBatch(), markers: new MarkerBatch(), labels: new TextBatch(atlas) };
   const drawn = partsOn(topology, layers);
-  drawRuns(topology.areas, drawn, project, out.lines);
-  drawRuns(topology.routes, drawn, project, out.lines);
+  drawRuns(topology.areas, drawn, NO_CUTS, project, out.lines);
+  drawRuns(topology.routes, drawn, routeCuts(layers, drawnPoints), project, out.lines);
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
     if (isPointStyle(style)) {

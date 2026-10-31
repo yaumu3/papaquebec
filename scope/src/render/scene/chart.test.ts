@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, isStyled, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, isStyled, type StyledLayer, visibleLayers } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { isPointLayer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
@@ -67,6 +67,8 @@ interface Instance {
   along: number;
   pattern: number[];
   color: number[];
+  /** The distance back to the span's first stop and ahead to its last, and the two cuts. */
+  span: number[];
 }
 
 /** The instances of a lines batch, as they were packed. */
@@ -82,6 +84,7 @@ function instances(batch: Batch): Instance[] {
       along: d[o + 9] ?? 0,
       pattern: Array.from(d.subarray(o + 10, o + 14)),
       color: Array.from(d.subarray(o + 14, o + 18)),
+      span: Array.from(d.subarray(o + 18, o + 22)),
     };
   });
 }
@@ -377,6 +380,200 @@ describe('buildChart shared edges', () => {
 
     // Assert
     expect(glyphs(labels).map((g) => g.at.x)).toEqual([1, 1]);
+  });
+});
+
+const chord = ({ a, b }: Instance) => Math.hypot(b.x - a.x, b.y - a.y);
+
+/** Whether any part of an instance shows at `pxPerNm`, by the line shader's rule for the cuts. */
+function visibleAt(i: Instance, pxPerNm: number): boolean {
+  const [back, ahead, cutBack, cutAhead] = i.span;
+  const len = chord(i) * pxPerNm;
+  const from = cutBack ? Math.max(0, (cutBack - (back ?? 0) * pxPerNm) / len) : 0;
+  const to = cutAhead ? Math.min(1, 1 - (cutAhead - (ahead ?? 0) * pxPerNm) / len) : 1;
+  return from <= to;
+}
+
+const stopAt = (layer: StyledLayer, at: Position) => itemOf(layer, partOf(layer, point(at)));
+const routeOf = (layer: StyledLayer, ...at: Position[]) =>
+  itemOf(layer, partOf(layer, line(...at)));
+
+describe('buildChart routes stop short of points', () => {
+  const conv = packed('#82573c');
+  const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[]) =>
+    instances(build(items, layers).lines)
+      .filter((i) => i.color.every((c, k) => c === conv[k]))
+      .map((i) => i.span);
+
+  it('cuts a route back at a stop on either side of it', () => {
+    // Arrange
+    const items = [routeOf('conv', [0, 0], [1, 0], [2, 0]), stopAt('fix', [1, 0])];
+
+    // Act
+    const cuts = new Set(
+      cutsOf(items, ['conv', 'fix']).map(([, , back, ahead]) => `${back},${ahead}`),
+    );
+
+    // Assert
+    expect([...cuts].toSorted()).toEqual(['0,7', '7,0']);
+  });
+
+  it('measures the way back and ahead along the whole span, across vertices and runs', () => {
+    // Arrange
+    const rows: [string, ChartItem[], StyledLayer[], number[][]][] = [
+      [
+        'a stop at each end, across edges of unequal length',
+        [
+          routeOf('conv', [0, 0], [1, 0], [3, 0], [7, 0]),
+          stopAt('fix', [0, 0]),
+          stopAt('navaid', [7, 0]),
+        ],
+        ['conv', 'fix', 'navaid'],
+        [
+          [0, 6, 7, 8],
+          [1, 4, 7, 8],
+          [3, 0, 7, 8],
+        ],
+      ],
+      [
+        'a run another route owns in the middle',
+        [
+          routeOf('conv', [0, 0], [1, 0], [3, 0], [4, 0], [6, 0]),
+          routeOf('sid', [1, 0], [3, 0]),
+          stopAt('fix', [0, 0]),
+          stopAt('fix', [6, 0]),
+        ],
+        ['sid', 'conv', 'fix'],
+        [
+          [0, 5, 7, 7],
+          [3, 2, 7, 7],
+          [4, 0, 7, 7],
+        ],
+      ],
+      [
+        'a stop inside a path, and none at its ends',
+        [routeOf('conv', [0, 0], [2, 0], [3, 0], [5, 0]), stopAt('fix', [2, 0])],
+        ['conv', 'fix'],
+        [
+          [0, 0, 0, 7],
+          [0, 2, 7, 0],
+          [1, 0, 7, 0],
+        ],
+      ],
+    ];
+
+    // Act
+    const spans = rows.map(([, items, layers]) =>
+      cutsOf(items, layers).map((span) => span.map((v) => Math.round(v * 1000) / 1000)),
+    );
+
+    // Assert
+    expect(spans).toEqual(rows.map(([, , , expected]) => expected));
+  });
+
+  it('writes no cut where no point stands at a vertex, where the point layer is hidden, or the navaid is out of range', () => {
+    // Arrange
+    const through = routeOf('conv', [0, 0], [1, 0], [2, 0]);
+    const rows: [string, ChartItem[], readonly StyledLayer[]][] = [
+      ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix']],
+      ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv']],
+      [
+        'a navaid beyond the range threshold',
+        [through, stopAt('navaid', [1, 0])],
+        visibleLayers(
+          ['conv', 'navaid'],
+          () => true,
+          () => false,
+        ),
+      ],
+    ];
+
+    // Act
+    const spans = rows.map(([, items, layers]) => cutsOf(items, layers));
+
+    // Assert
+    expect(spans.map((list) => list.every((s) => s.every((v) => v === 0)))).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(spans.map((list) => list.length > 0)).toEqual([true, true, true]);
+  });
+
+  it('cuts half the marker plus 3 CSS px', () => {
+    // Arrange
+    const rows: [StyledLayer, number][] = [
+      ['fix', 7],
+      ['navaid', 8],
+      ['ad', 7.5],
+      ['vfr', 6],
+    ];
+    const charts = rows.map(([layer]) => ({
+      layer,
+      items: [routeOf('conv', [0, 0], [1, 0], [2, 0]), stopAt(layer, [1, 0])],
+    }));
+
+    // Act
+    const cuts = charts.map(({ layer, items }) => cutsOf(items, ['conv', layer])[0]?.[3]);
+
+    // Assert
+    expect(cuts).toEqual(rows.map(([, cut]) => cut));
+  });
+
+  it('draws a span shorter than its two cuts at no zoom where it is short, and at a closer one, from one batch', () => {
+    // Arrange
+    const items = [
+      routeOf('conv', [0, 0], [0.001, 0]),
+      stopAt('fix', [0, 0]),
+      stopAt('fix', [0.001, 0]),
+    ];
+    const drawn = instances(build(items, ['conv', 'fix']).lines);
+    const [far, near] = [1000, 100_000];
+
+    // Act
+    const shown = [far, near].map((zoom) => drawn.some((i) => visibleAt(i, zoom)));
+
+    // Assert
+    expect(shown).toEqual([false, true]);
+  });
+
+  it('reads the drawn points only for a route or a point layer', () => {
+    // Arrange
+    const items = [
+      routeOf('conv', [0, 0], [1, 0]),
+      itemOf('tma', partOf('tma', polygon(triangle(0)))),
+    ];
+    const rows: StyledLayer[][] = [['tma'], [], ['conv'], ['fix']];
+    const reads = rows.map(() => 0);
+    const inputs = rows.map((layers, i) => ({
+      topology: topologyOf(items),
+      drawnPoints: () => {
+        reads[i] = (reads[i] ?? 0) + 1;
+        return [];
+      },
+      project,
+      layers,
+      labelDensity: 'normal' as const,
+      atlas,
+    }));
+
+    // Act
+    for (const input of inputs) buildChart(input);
+
+    // Assert
+    expect(reads.map((n) => n > 0)).toEqual([false, false, true, true]);
+  });
+
+  it('does not cut an area outline where a point stands on its vertex', () => {
+    // Arrange
+    const items = [itemOf('tma', partOf('tma', polygon(triangle(0)))), stopAt('fix', [0.01, 0])];
+
+    // Act
+    const { lines } = build(items, ['tma', 'fix']);
+
+    // Assert
+    expect(instances(lines).every((i) => i.span.every((v) => v === 0))).toBe(true);
+    expect(lines.count).toBe(3);
   });
 });
 

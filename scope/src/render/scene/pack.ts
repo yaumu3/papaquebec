@@ -15,6 +15,9 @@ export interface Anchor {
   py?: number;
 }
 
+/** The distance between two anchors on the world plane. */
+export const chordOf = (a: Anchor, b: Anchor): number => Math.hypot(b.x - a.x, b.y - a.y);
+
 export type Rgba = [number, number, number, number];
 
 const colorCache = new Map<string, Rgba>();
@@ -145,7 +148,7 @@ export class LineBatch {
       const a = points[i - 1];
       const b = points[i];
       if (!a || !b) continue;
-      const chord = Math.hypot(b.x - a.x, b.y - a.y);
+      const chord = chordOf(a, b);
       const span = place && [
         place.back + along,
         place.length - place.back - along - chord,
