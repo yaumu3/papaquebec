@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import { type Batch, transferables } from './protocol';
 
 describe('transferables', () => {
-  it('lists the buffer behind each batch once, so a layer moves to the worker uncopied', () => {
+  it('lists the buffer behind each batch once, so a slot moves to the worker uncopied', () => {
     // Arrange
     const own = new Float32Array(16);
     const shared = new Float32Array(32);

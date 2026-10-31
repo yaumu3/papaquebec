@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import { readFileSync } from 'node:fs';
 
-import { chartOf } from '../src/lib/chart';
-import { drawnOf } from '../src/lib/drawn';
-import type { DrawnLayers } from '../src/lib/mapdata';
+import { type ChartItem, chartOf } from '../src/lib/chart';
 import { parseMapSet, validateMapSet } from '../src/lib/mapset';
 import { type OpenAipInput, toMapSet, withinRadius } from './openaip';
 
@@ -155,25 +152,30 @@ const inputOf = (parts: Partial<OpenAipInput>): OpenAipInput => ({
   ...parts,
 });
 
+const rowOf = ({ layer, parts: [part] }: ChartItem) => {
+  const p: Record<string, unknown> = part?.properties ?? {};
+  return [layer, p.kind, p.id ?? p.name, p.lower, p.upper];
+};
+
 describe('toMapSet', () => {
-  it('draws what the old conversion drew, apart from two known differences', () => {
+  it('files each feature under its layer, with its kind and limits', () => {
     // Arrange
-    const frozen: DrawnLayers = JSON.parse(
-      readFileSync(new URL('./openaip.frozen.json', import.meta.url), 'utf8'),
-    );
-    // The frozen output is the pre-PR conversion: it spells openAIP type 4 'VOR-DME', the map set
-    // 'VOR/DME'. The other known difference is real-data only: FL999, openAIP's unlimited, is
-    // 'UNL' now and so has no upperFt, where it was 99900 (R-116-3).
-    const expected: DrawnLayers = structuredClone(frozen);
-    for (const navaid of expected.navaids) {
-      if (navaid.kind === 'VOR-DME') navaid.kind = 'VOR/DME';
-    }
+    const expected = [
+      ['navaid', 'VOR/DME', 'NRE', undefined, undefined],
+      ['ad', undefined, 'RJAA', undefined, undefined],
+      ['vfr', undefined, 'CHIBA', undefined, undefined],
+      ['ctr', 'CTR', 'NARITA CTR', 'SFC', '3000FT'],
+      ['fir', undefined, 'TOKYO FIR', undefined, undefined],
+      ['pr', 'R', 'R-134', undefined, undefined],
+      ['tma', 'ACA', 'TOKYO ACA-3', undefined, undefined],
+      ['ctr', 'INFO', 'NARITA INFO ZONE-2', undefined, undefined],
+    ];
 
     // Act
-    const drawn = drawnOf(chartOf([parseMapSet(toMapSet(FIXTURE, AREA))]));
+    const filed = chartOf([parseMapSet(toMapSet(FIXTURE, AREA))]).map(rowOf);
 
     // Assert
-    expect(drawn).toEqual(expected);
+    expect(filed).toEqual(expected);
   });
 
   it('produces a set that passes the strict parse', () => {

@@ -1,5 +1,4 @@
 import { PALETTE } from '../../design/palette';
-import { LAYER_ORDER, type LayerName } from '../layers';
 import {
   type AtlasInfo,
   type Batch,
@@ -9,6 +8,7 @@ import {
   TEXT_STRIDE,
   type View,
 } from '../protocol';
+import { SLOT_ORDER, type SlotName } from '../slots';
 import { webgpuMissingReason } from './availability';
 import { LINE_SHADER, MARKER_SHADER, TEXT_SHADER, VIEW_UNIFORM_BYTES } from './shaders';
 
@@ -33,8 +33,7 @@ function instanceLayout(stride: number, attrs: [number, GPUVertexFormat][]): GPU
   let offset = 0;
   const attributes: GPUVertexAttribute[] = attrs.map(([location, format]) => {
     const a = { shaderLocation: location, offset, format };
-    offset +=
-      format === 'float32x4' ? 16 : format === 'float32x3' ? 12 : format === 'float32x2' ? 8 : 4;
+    offset += format === 'float32x4' ? 16 : format === 'float32x2' ? 8 : 4;
     return a;
   });
   return { arrayStride: stride * 4, stepMode: 'instance', attributes };
@@ -42,7 +41,7 @@ function instanceLayout(stride: number, attrs: [number, GPUVertexFormat][]): GPU
 
 /**
  * Raw WebGPU renderer. Owns the device and every GPU resource; holds no scene
- * state beyond the packed instance buffers it was last given per named layer.
+ * state beyond the packed instance buffers it was last given per named slot.
  * One draw call per batch, whatever the object count.
  */
 export class GpuRenderer {
@@ -55,7 +54,7 @@ export class GpuRenderer {
   private atlasBindGroup: GPUBindGroup | null = null;
   private atlasLayout!: GPUBindGroupLayout;
   private msaa: GPUTexture | null = null;
-  private layers = new Map<LayerName, GpuBatch[]>();
+  private slots = new Map<SlotName, GpuBatch[]>();
   private view: View | null = null;
   private sizeDirty = true;
 
@@ -138,8 +137,9 @@ export class GpuRenderer {
         instanceLayout(LINE_STRIDE, [
           [0, 'float32x4'],
           [1, 'float32x4'],
-          [2, 'float32x3'],
+          [2, 'float32x2'],
           [3, 'float32x4'],
+          [4, 'float32x4'],
         ]),
       ),
       markers: make(
@@ -202,8 +202,8 @@ export class GpuRenderer {
     );
   }
 
-  setLayer(name: LayerName, batches: Batch[]): void {
-    const existing = this.layers.get(name) ?? [];
+  setSlot(name: SlotName, batches: Batch[]): void {
+    const existing = this.slots.get(name) ?? [];
     const next: GpuBatch[] = batches.map((b, i) => {
       const prev = existing[i];
       const bytes = b.data.byteLength;
@@ -228,7 +228,7 @@ export class GpuRenderer {
       return gpu;
     });
     for (const stale of existing.slice(batches.length)) stale.buffer.destroy();
-    this.layers.set(name, next);
+    this.slots.set(name, next);
   }
 
   private ensureMsaa(): GPUTextureView {
@@ -245,7 +245,7 @@ export class GpuRenderer {
     return this.msaa.createView();
   }
 
-  /** Draws every layer it holds, back to front in `LAYER_ORDER`. */
+  /** Draws every slot it holds, back to front in `SLOT_ORDER`. */
   draw(): void {
     if (!this.view) return;
     const encoder = this.device.createCommandEncoder();
@@ -261,8 +261,8 @@ export class GpuRenderer {
       ],
     });
     pass.setBindGroup(0, this.viewBindGroup);
-    for (const name of LAYER_ORDER) {
-      for (const b of this.layers.get(name) ?? []) {
+    for (const name of SLOT_ORDER) {
+      for (const b of this.slots.get(name) ?? []) {
         if (b.count === 0) continue;
         if (b.kind === 'text') {
           if (!this.atlasBindGroup) continue;
@@ -278,8 +278,8 @@ export class GpuRenderer {
   }
 
   destroy(): void {
-    for (const batches of this.layers.values()) for (const b of batches) b.buffer.destroy();
-    this.layers.clear();
+    for (const batches of this.slots.values()) for (const b of batches) b.buffer.destroy();
+    this.slots.clear();
     this.msaa?.destroy();
     this.device.destroy();
   }

@@ -10,17 +10,26 @@ export const THEME = {
   bg: PALETTE.bg,
   coast: '#707070',
   airspace: '#a04040',
-  airway: '#3a6a78',
-  airwayLabel: '#4a8090',
-  waypoint: '#707070',
-  waypointLabel: '#7a7a7a',
+  rnav: '#3a6a78',
+  rnavLabel: '#4a8090',
+  fix: '#707070',
+  fixLabel: '#7a7a7a',
   navaid: '#808080',
   navaidLabel: '#909090',
-  airport: '#8a8a8a',
-  airportLabel: '#a0a0a0',
+  ad: '#8a8a8a',
+  adLabel: '#a0a0a0',
   airspaceDim: '#5e3a3a',
   airspaceLabel: '#8a5050',
   sector: '#4a6878',
+  sectorLabel: '#5a7a8a',
+  conv: '#82573c',
+  convLabel: '#9a6a4c',
+  procedure: '#33606c',
+  procedureLabel: '#40707c',
+  fir: '#606060',
+  boundaryDim: '#4a4a47',
+  vfr: '#5c5c5c',
+  vfrLabel: '#6a6a6a',
   ring: '#3a3a3a',
   ringEdge: '#606060',
   ringLabel: '#555555',
@@ -41,13 +50,6 @@ export const THEME = {
   filtered: '#808080',
   hover: PALETTE.hover,
 } as const;
-
-/** Control zones and special-use areas: what the operator must not miss. Everything else is context. */
-const BRIGHT_AIRSPACE = new Set(['CTR', 'ATZ', 'TIZ', 'TIA', 'R', 'D', 'P', 'ALERT', 'WARNING']);
-
-export function airspaceColor(kind: string): string {
-  return BRIGHT_AIRSPACE.has(kind) ? THEME.airspace : THEME.airspaceDim;
-}
 
 /** Whether the position is as old as the lapse, or older. */
 export function isStale(t: Pick<Readings, 'seenPos'>): boolean {

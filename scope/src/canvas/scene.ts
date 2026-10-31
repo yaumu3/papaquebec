@@ -2,21 +2,22 @@ import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from '
 
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer, type RenderStatus } from '../render/facade';
-import { LAYER_ORDER, type LayerName } from '../render/layers';
 import { type Move, retarget, settleMoves } from '../render/layout/moves';
 import { applyPlacement, blockSubjects, viewportRect } from '../render/layout/placement';
 import { workerPlacer } from '../render/layout/placer';
 import { fixNearest } from '../render/layout/trails';
-import type { AtlasInfo, Batch, View } from '../render/protocol';
+import type { AtlasInfo, View } from '../render/protocol';
+import { buildChart, navaidsShownAt, visibleLayers } from '../render/scene/chart';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
-import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
+import { buildCoast, buildRings } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
+import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
 import { hoverInstant } from '../state/lanes';
 import { declinationAt } from '../state/magnetic';
+import { chart } from '../state/mapsets';
 import {
-  drawn,
   canvasSize,
   coast,
   drawnBlocks,
@@ -40,8 +41,6 @@ import { halfLongEdgeNm } from './view';
 
 /** How long a zoom must rest before data blocks are laid out again at the new scale. */
 const ZOOM_SETTLE_MS = 150;
-
-type Layers = Partial<Record<LayerName, Batch[]>>;
 
 /** Whether the site is known, so map data can be projected onto the scope. */
 const projected = () => projectionVersion() > 0;
@@ -67,7 +66,7 @@ function settledScale(view: () => View): () => number {
 }
 
 /**
- * Connects state to the renderer. Each layer is rebuilt when what its builder reads changes;
+ * Connects state to the renderer. Each slot is rebuilt when what its builder reads changes;
  * the only timers are the one that settles a zoom and the frames of a block sliding to a new
  * bearing.
  */
@@ -82,15 +81,15 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     setAtlas(info);
   });
 
-  /** Hands the renderer the layers `build` returns, again whenever what it reads changes. */
-  const show = (build: (atlas: AtlasInfo) => Layers | null) =>
+  /** Hands the renderer the slots `build` returns, again whenever what it reads changes. */
+  const show = (build: (atlas: AtlasInfo) => Slots | null) =>
     createEffect(() => {
       const a = atlas();
-      const layers = a && build(a);
-      if (!layers) return;
-      for (const name of LAYER_ORDER) {
-        const batches = layers[name];
-        if (batches) renderer.setLayer(name, batches);
+      const slots = a && build(a);
+      if (!slots) return;
+      for (const name of SLOT_ORDER) {
+        const batches = slots[name];
+        if (batches) renderer.setSlot(name, batches);
       }
     });
 
@@ -103,32 +102,39 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     const path = ringPath();
     if (!path) return null;
     const { width, height } = canvasSize();
-    return {
-      rings: buildRings({
-        layers: { ...settings.layers },
-        rangeNm: settings.rangeNm,
-        ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
-        ringPath: path,
-        atlas: a,
-      }),
-    };
+    return buildRings({
+      shown: settings.shownLayers.rings,
+      rangeNm: settings.rangeNm,
+      ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
+      ringPath: path,
+      atlas: a,
+    });
   });
 
-  /** Zooming reaches the map layers only when it shows or hides the navaids. */
-  const navaidsInRange = createMemo(() => navaidsShownAt(settings.rangeNm));
-  show((a) =>
+  show(() =>
     projected()
-      ? buildMap({
-          coast: coast(),
-          drawn: drawn(),
-          project: projectNm,
-          layers: { ...settings.layers },
-          labelDensity: settings.labelDensity,
-          navaidsInRange: navaidsInRange(),
-          atlas: a,
-        })
+      ? buildCoast({ shown: settings.shownLayers.coast, coast: coast(), project: projectNm })
       : null,
   );
+
+  /** Zooming reaches the chart only when it shows or hides the navaids. */
+  const navaidsInRange = createMemo(() => navaidsShownAt(settings.rangeNm));
+  for (const slice of CHART_SLICES) {
+    show((a) =>
+      projected()
+        ? sliceSlots(
+            slice,
+            buildChart({
+              chart: chart(),
+              project: projectNm,
+              layers: visibleLayers(slice.layers, (l) => settings.shownLayers[l], navaidsInRange),
+              labelDensity: settings.labelDensity,
+              atlas: a,
+            }),
+          )
+        : null,
+    );
+  }
 
   const layoutScale = settledScale(view);
   /**

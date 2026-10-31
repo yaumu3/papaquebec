@@ -1,4 +1,5 @@
 import { type Altimeter, STANDARD_ALTIMETER } from '../lib/altitude';
+import type { ScopeLayer } from '../lib/layers';
 import { FL_MAX, type Filter } from './filter';
 
 /** Range presets on the Display panel; the wheel zooms continuously between the limits. */
@@ -8,28 +9,10 @@ export const RANGE_MAX_NM = 400;
 export const VECTOR_STEPS = [0, 0.5, 1, 2] as const;
 export const TRAIL_STEPS = [0, 30, 60, 120] as const;
 
-export type LayerKey =
-  | 'coast'
-  | 'airspace'
-  | 'waypoints'
-  | 'airways'
-  | 'navaids'
-  | 'rings'
-  | 'sector'
-  | 'airports';
-export type Layers = Record<LayerKey, boolean>;
+/** Whether each layer is drawn. */
+export type ShownLayers = Record<ScopeLayer, boolean>;
 export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
 
-export const LAYER_KEYS: LayerKey[] = [
-  'coast',
-  'airspace',
-  'waypoints',
-  'airways',
-  'navaids',
-  'rings',
-  'sector',
-  'airports',
-];
 export const LABEL_DENSITIES: readonly LabelDensity[] = ['off', 'sparse', 'normal', 'dense'];
 
 export interface Settings {
@@ -40,7 +23,7 @@ export interface Settings {
   /** Seconds of trail; 0 hides it. */
   trailSec: number;
   filter: Filter;
-  layers: Layers;
+  shownLayers: ShownLayers;
   labelDensity: LabelDensity;
   altimeter: Altimeter;
   qnh: QnhSetting;
@@ -64,15 +47,32 @@ export const DEFAULT_SETTINGS: Settings = {
   vectorMin: 2,
   trailSec: 60,
   filter: { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' },
-  layers: {
+  shownLayers: {
+    ad: true,
+    navaid: true,
+    fix: true,
+    vfr: false,
+    sid: false,
+    star: false,
+    trans: false,
+    conv: true,
+    rnav: true,
+    dct: false,
+    hold: false,
+    ctr: true,
+    pr: true,
+    tma: true,
+    sector: true,
+    fir: true,
+    dng: true,
+    tra: false,
+    adiz: false,
+    cta: false,
+    advisory: false,
+    civt: false,
+    asr: false,
     coast: true,
-    airspace: true,
-    waypoints: true,
-    airways: false,
-    navaids: true,
     rings: true,
-    sector: false,
-    airports: true,
   },
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },

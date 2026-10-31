@@ -4,10 +4,10 @@
  * keeps no scene state beyond those buffers.
  */
 
-import type { LayerName } from './layers';
+import type { SlotName } from './slots';
 
 /** Floats per instance. See `pack.ts` for the layouts. */
-export const LINE_STRIDE = 16;
+export const LINE_STRIDE = 18;
 export const MARKER_STRIDE = 12;
 export const TEXT_STRIDE = 16;
 
@@ -62,7 +62,7 @@ export type ToWorker =
   | { type: 'probe' }
   | { type: 'init'; canvas: OffscreenCanvas; view: View }
   | { type: 'atlas'; info: AtlasInfo; pixels: Uint8Array }
-  | { type: 'layer'; name: LayerName; batches: Batch[] }
+  | { type: 'slot'; name: SlotName; batches: Batch[] }
   | { type: 'view'; view: View }
   | { type: 'draw' };
 
@@ -72,7 +72,7 @@ export type FromWorker =
   | { type: 'error'; message: string }
   | { type: 'lost'; reason: string };
 
-/** The buffers behind a layer's batches, each once, to hand to the worker rather than copy. */
+/** The buffers behind a slot's batches, each once, to hand to the worker rather than copy. */
 export function transferables(batches: readonly Batch[]): ArrayBuffer[] {
   return [...new Set(batches.map((b) => b.data.buffer))];
 }

@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
+import { LAYER_GROUPS, LAYER_NAMES } from '../lib/layers';
 import {
   armRemoval,
   importMapSet,
@@ -10,31 +11,13 @@ import {
   removeMapSet,
   toggleMapSet,
 } from '../state/mapsets';
-import {
-  type LabelDensity,
-  type LayerKey,
-  setSettings,
-  settings,
-  toggleLayer,
-} from '../state/settings';
+import { type LabelDensity, setSettings, settings, toggleLayer } from '../state/settings';
 import { Button } from '../ui/Button';
 import { Pills } from '../ui/Pills';
 import { Divider, SectionTitle } from '../ui/Section';
 import { Window } from '../ui/Window';
 
 import s from './MapsPanel.module.css';
-
-/** Two to a row: what the scope is drawn over, then areas, ground facilities and the route structure. */
-const LAYERS: [LayerKey, string][] = [
-  ['coast', 'COAST'],
-  ['rings', 'RINGS'],
-  ['airspace', 'AIRSPACE'],
-  ['sector', 'SECTOR'],
-  ['airports', 'AIRPORTS'],
-  ['navaids', 'NAVAIDS'],
-  ['waypoints', 'WAYPTS'],
-  ['airways', 'AIRWAYS'],
-];
 
 /** The chosen file goes through the strict schema; the note reports the outcome. */
 function MapSetImport() {
@@ -143,16 +126,26 @@ function MapSetList() {
 export function MapsPanel() {
   return (
     <Window id="maps">
-      <SectionTitle>LAYERS</SectionTitle>
-      <div class={s.layers}>
-        <For each={LAYERS}>
-          {([key, label]) => (
-            <Button on={settings.layers[key]} onClick={() => toggleLayer(key)}>
-              {label}
-            </Button>
-          )}
-        </For>
-      </div>
+      <For each={LAYER_GROUPS}>
+        {(group) => (
+          <>
+            <SectionTitle>{group.title}</SectionTitle>
+            <div class={s.layers}>
+              <For each={group.layers}>
+                {(layer) => (
+                  <Button
+                    class={s.layer}
+                    on={settings.shownLayers[layer]}
+                    onClick={() => toggleLayer(layer)}
+                  >
+                    {LAYER_NAMES[layer]}
+                  </Button>
+                )}
+              </For>
+            </div>
+          </>
+        )}
+      </For>
       <SectionTitle>LABEL DENSITY</SectionTitle>
       <Pills
         options={[

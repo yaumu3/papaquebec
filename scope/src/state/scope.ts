@@ -5,12 +5,9 @@ import type { Vec2 } from '../lib/geo';
 import type { CoastData } from '../lib/mapdata';
 import { type Filterable, visibility } from './filter';
 import type { ListSort } from './listSort';
-import { drawn } from './mapsets';
 import { type PanelId, persisted, settings } from './settings';
 
 export type { PanelId };
-/** The enabled map sets merged; see `mapsets`. */
-export { drawn };
 
 /** What the scope knows of the feed; `feedState` tells its state from this and the clock. */
 export interface FeedStatus {

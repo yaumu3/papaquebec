@@ -1,12 +1,11 @@
 import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
+import { DRAW_STACK } from '../lib/layers';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
 import { isLaneKey, type LaneKey } from './plotted';
 import {
   LABEL_DENSITIES,
-  LAYER_KEYS,
-  type Layers,
   ND_RANGES_NM,
   type NdRangeNm,
   PANEL_IDS,
@@ -18,6 +17,7 @@ import {
   RANGE_MAX_NM,
   RANGE_MIN_NM,
   type Settings,
+  type ShownLayers,
   TRANSITION_ALT_MAX_FT,
   TRAIL_STEPS,
   VECTOR_STEPS,
@@ -57,10 +57,16 @@ function filterFrom(raw: unknown, fallback: Filter): Filter {
   };
 }
 
-function layersFrom(raw: unknown, fallback: Layers): Layers {
+/** The flags saved for each layer; failing those, the old object's coast and rings, nothing else. */
+function shownLayersFrom(raw: Record<string, unknown>, fallback: ShownLayers): ShownLayers {
+  const saved = isRecord(raw.shownLayers) ? raw.shownLayers : carried(raw.layers);
   const out = { ...fallback };
-  if (isRecord(raw)) for (const k of LAYER_KEYS) out[k] = bool(raw[k], fallback[k]);
+  for (const k of DRAW_STACK) out[k] = bool(saved[k], fallback[k]);
   return out;
+}
+
+function carried(old: unknown): Record<string, unknown> {
+  return isRecord(old) ? { coast: old.coast, rings: old.rings } : {};
 }
 
 const numberIn = (v: unknown, min: number, max: number, fallback: number): number =>
@@ -101,7 +107,7 @@ function settingsFrom(raw: unknown, fallback: Settings): Settings {
     vectorMin: oneOf<number>(VECTOR_STEPS, raw.vectorMin, fallback.vectorMin),
     trailSec: oneOf<number>(TRAIL_STEPS, raw.trailSec, fallback.trailSec),
     filter: filterFrom(raw.filter, fallback.filter),
-    layers: layersFrom(raw.layers, fallback.layers),
+    shownLayers: shownLayersFrom(raw, fallback.shownLayers),
     labelDensity: oneOf(LABEL_DENSITIES, raw.labelDensity, fallback.labelDensity),
     altimeter: altimeterFrom(raw.altimeter, fallback.altimeter),
     qnh: qnhFrom(raw.qnh, fallback.qnh),

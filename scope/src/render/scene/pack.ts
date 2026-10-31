@@ -70,16 +70,23 @@ class InstanceBuffer {
   }
 }
 
+/** Alternating on and off lengths in CSS px, up to two pairs; empty is solid. */
+export type DashPattern =
+  | readonly []
+  | readonly [number, number]
+  | readonly [number, number, number, number];
+
 export interface LineStyle {
   /** CSS px. */
   width?: number;
-  /** [on, off] in CSS px; omitted for solid. */
-  dash?: [number, number];
+  dash?: DashPattern;
 }
 
 /**
- * Layout per instance (16 floats):
- * `ax ay apx apy bx by bpx bpy width dashOn dashOff r g b a _`
+ * Layout per instance (18 floats):
+ * `ax ay apx apy bx by bpx bpy width along p0 p1 p2 p3 r g b a`
+ * `along` is the world distance from the polyline's start to `a`; the dash pattern `p0..p3`
+ * runs on from it, so it does not restart at a vertex.
  */
 export class LineBatch {
   private readonly buf: InstanceBuffer;
@@ -88,10 +95,9 @@ export class LineBatch {
     this.buf = new InstanceBuffer(LINE_STRIDE, capacity);
   }
 
-  segment(a: Anchor, b: Anchor, color: string, style: LineStyle = {}): void {
+  segment(a: Anchor, b: Anchor, color: string, style: LineStyle = {}, along = 0): void {
     const at = this.buf.next();
     const d = this.buf.buffer;
-    const [r, g, bl, al] = parseColor(color);
     d[at] = a.x;
     d[at + 1] = a.y;
     d[at + 2] = a.px ?? 0;
@@ -101,19 +107,19 @@ export class LineBatch {
     d[at + 6] = b.px ?? 0;
     d[at + 7] = b.py ?? 0;
     d[at + 8] = style.width ?? 1;
-    d[at + 9] = style.dash?.[0] ?? 0;
-    d[at + 10] = style.dash?.[1] ?? 0;
-    d[at + 11] = r;
-    d[at + 12] = g;
-    d[at + 13] = bl;
-    d[at + 14] = al;
+    d[at + 9] = along;
+    d.set(style.dash ?? [], at + 10);
+    d.set(parseColor(color), at + 14);
   }
 
   polyline(points: readonly Anchor[], color: string, style: LineStyle = {}): void {
+    let along = 0;
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1];
       const b = points[i];
-      if (a && b) this.segment(a, b, color, style);
+      if (!a || !b) continue;
+      this.segment(a, b, color, style, along);
+      along += Math.hypot(b.x - a.x, b.y - a.y);
     }
   }
 

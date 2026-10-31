@@ -41,17 +41,21 @@ fn corner(i: u32) -> vec2f {
 export const LINE_SHADER = /* wgsl */ `
 ${COMMON}
 struct In {
-  @location(0) a: vec4f,      // world.xy, px.xy
+  @location(0) a: vec4f,        // world.xy, px.xy
   @location(1) b: vec4f,
-  @location(2) style: vec3f,  // width, dashOn, dashOff (CSS px)
-  @location(3) color: vec4f,
+  @location(2) style: vec2f,    // width (CSS px), world distance along the polyline to a (NM)
+  @location(3) pattern: vec4f,  // on, off, on, off (CSS px); all 0 is solid
+  @location(4) color: vec4f,
 };
 struct Out {
   @builtin(position) pos: vec4f,
   @location(0) color: vec4f,
   @location(1) dist: f32,
-  @location(2) dash: vec2f,
+  @location(2) @interpolate(flat) pattern: vec4f,
 };
+fn patternLength(pattern: vec4f) -> f32 {
+  return pattern.x + pattern.y + pattern.z + pattern.w;
+}
 @vertex fn vs(@builtin(vertex_index) vi: u32, in: In) -> Out {
   let pa = toDevice(in.a.xy, in.a.zw);
   let pb = toDevice(in.b.xy, in.b.zw);
@@ -62,17 +66,26 @@ struct Out {
   let c = corner(vi);
   let half = in.style.x * u.dpr * 0.5;
   let p = pa + dir * (c.x * len) + n * ((c.y * 2.0 - 1.0) * half);
+  let pattern = in.pattern * u.dpr;
+  let period = patternLength(pattern);
+  var phase = 0.0;
+  if (period > 0.0) {
+    let along = in.style.y * u.pxPerNm * u.dpr;
+    phase = along - floor(along / period) * period;
+  }
   var o: Out;
   o.pos = toClip(p);
   o.color = in.color;
-  o.dist = c.x * len;
-  o.dash = in.style.yz * u.dpr;
+  o.dist = phase + c.x * len;
+  o.pattern = pattern;
   return o;
 }
 @fragment fn fs(in: Out) -> @location(0) vec4f {
-  if (in.dash.x > 0.0) {
-    let period = in.dash.x + in.dash.y;
-    if (in.dist - floor(in.dist / period) * period > in.dash.x) { discard; }
+  let period = patternLength(in.pattern);
+  if (period > 0.0) {
+    let t = in.dist - floor(in.dist / period) * period;
+    let gap = t >= in.pattern.x && t < in.pattern.x + in.pattern.y;
+    if (gap || t >= in.pattern.x + in.pattern.y + in.pattern.z) { discard; }
   }
   return in.color;
 }

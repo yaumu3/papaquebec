@@ -124,7 +124,7 @@ function drawSelection(lines: LineBatch, d: Drawable): void {
   }
 }
 
-/** The targets layer: glyphs, trails, vectors and data blocks at the bearings the placer set. */
+/** The targets slot: glyphs, trails, vectors and data blocks at the bearings the placer set. */
 export function buildTargets(input: TargetInput): Batch[] {
   const lines = new LineBatch();
   const markers = new MarkerBatch();

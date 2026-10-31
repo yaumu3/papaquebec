@@ -1,6 +1,6 @@
 .layers {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-1);
 }
 .sets {
@@ -13,11 +13,14 @@
   align-items: stretch;
   gap: var(--space-2);
 }
+.layer,
 .setToggle {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.setToggle {
+  flex: 1;
 }
 .remove {
   padding: 0 var(--space-2);

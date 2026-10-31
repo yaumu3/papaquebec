@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
+import { DRAW_STACK } from '../lib/layers';
 import type { ListSort } from './listSort';
 import { memoryStorage } from './memoryStorage';
 import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
-import { DEFAULT_SETTINGS } from './settings';
+import { DEFAULT_SETTINGS, type ShownLayers } from './settings';
 
 const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
 const DEFAULT_SORT: ListSort = { key: 'id', dir: 'asc' };
@@ -38,7 +39,7 @@ describe('loadPersisted', () => {
         vectorMin: 99,
         trailSec: 120,
         filter: { lowerFl: 100, upperFl: 50, squawk: 'nonvfr' },
-        layers: { coast: false, airspace: 'yes' },
+        shownLayers: { coast: false, ctr: 'yes' },
         labelDensity: 'loud',
         altimeter: { transitionAltFt: 5000, qnhInHg: 99 },
       },
@@ -55,11 +56,82 @@ describe('loadPersisted', () => {
     expect(settings.vectorMin).toBe(DEFAULT_SETTINGS.vectorMin);
     expect(settings.trailSec).toBe(120);
     expect(settings.filter).toEqual({ ...DEFAULT_SETTINGS.filter, squawk: 'nonvfr' });
-    expect(settings.layers).toEqual({ ...DEFAULT_SETTINGS.layers, coast: false });
+    expect(settings.shownLayers).toEqual({ ...DEFAULT_SETTINGS.shownLayers, coast: false });
     expect(settings.labelDensity).toBe(DEFAULT_SETTINGS.labelDensity);
     expect(settings.altimeter).toEqual({ ...DEFAULT_SETTINGS.altimeter, transitionAltFt: 5000 });
     expect(panels).toEqual({ ...DEFAULT_PANELS, list: false });
     expect(listSort).toEqual({ key: 'dist', dir: 'asc' });
+  });
+});
+
+describe('loadPersisted layers', () => {
+  const HIDDEN: string[] = [
+    'adiz',
+    'cta',
+    'advisory',
+    'asr',
+    'tra',
+    'civt',
+    'dct',
+    'sid',
+    'star',
+    'trans',
+    'vfr',
+    'hold',
+  ];
+
+  it('hides exactly the twelve layers the spec hides, until they are shown', () => {
+    // Arrange
+    const shown = DEFAULT_SETTINGS.shownLayers;
+
+    // Act
+    const hidden: string[] = DRAW_STACK.filter((layer) => !shown[layer]);
+
+    // Assert
+    expect(hidden.toSorted()).toEqual(HIDDEN.toSorted());
+  });
+
+  it('reads the saved flags, and from the old ones only the coast and the rings', () => {
+    // Arrange
+    const D = DEFAULT_SETTINGS.shownLayers;
+    const rows: { name: string; stored: object; expected: ShownLayers }[] = [
+      {
+        name: 'old flags: sector off, coast and rings off',
+        stored: { layers: { sector: false, coast: false, rings: false } },
+        expected: { ...D, coast: false, rings: false },
+      },
+      {
+        name: 'old flags reach no new layer',
+        stored: { layers: { airspace: false, waypoints: false, airways: true, navaids: false } },
+        expected: { ...D },
+      },
+      {
+        name: 'saved flags win over the old coast',
+        stored: { shownLayers: { sector: false, ctr: false }, layers: { coast: false } },
+        expected: { ...D, sector: false, ctr: false },
+      },
+      {
+        name: 'junk falls back per key',
+        stored: { shownLayers: { ctr: 'yes', fir: 1, bogus: false, vfr: true } },
+        expected: { ...D, vfr: true },
+      },
+      {
+        name: 'junk old flags fall back',
+        stored: { layers: { coast: 'no', rings: 0 } },
+        expected: { ...D },
+      },
+    ];
+
+    // Act
+    const loaded = rows.map(({ stored }) =>
+      loadPersisted(
+        memoryStorage({ [PERSIST_KEY]: JSON.stringify({ settings: stored }) }),
+        DEFAULTS,
+      ),
+    );
+
+    // Assert
+    expect(loaded.map((p) => p.settings.shownLayers)).toEqual(rows.map((r) => r.expected));
   });
 });
 

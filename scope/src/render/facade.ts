@@ -1,5 +1,4 @@
 import { GpuRenderer } from './gpu/renderer';
-import type { LayerName } from './layers';
 import {
   type AtlasInfo,
   type Batch,
@@ -8,6 +7,7 @@ import {
   transferables,
   type View,
 } from './protocol';
+import type { SlotName } from './slots';
 
 export type RenderStatus =
   | { kind: 'starting' }
@@ -19,30 +19,30 @@ export interface Renderer {
   setView(view: View): void;
   setAtlas(info: AtlasInfo, pixels: Uint8Array): void;
   /** Takes the batches: once the renderer is up their buffers move to the worker, unusable here. */
-  setLayer(name: LayerName, batches: Batch[]): void;
+  setSlot(name: SlotName, batches: Batch[]): void;
   destroy(): void;
 }
 
 /**
- * What the main thread keeps until the renderer is ready, then replays into it. Layers are kept
+ * What the main thread keeps until the renderer is ready, then replays into it. Slots are kept
  * only until then: after it, nothing replays them, so they move to the worker instead.
  */
 interface Retained {
   view: View | null;
   atlas: { info: AtlasInfo; pixels: Uint8Array } | null;
-  layers: Map<LayerName, Batch[]>;
+  slots: Map<SlotName, Batch[]>;
 }
 
 /** The calls a ready renderer takes, whether it draws on this thread or in the worker. */
-type Sink = Pick<GpuRenderer, 'setView' | 'setAtlas' | 'setLayer' | 'draw'>;
+type Sink = Pick<GpuRenderer, 'setView' | 'setAtlas' | 'setSlot' | 'draw'>;
 
-/** Posts each call to the render worker, handing layer buffers over rather than copying them. */
+/** Posts each call to the render worker, handing slot buffers over rather than copying them. */
 function workerSink(worker: Worker): Sink {
   const post = (m: ToWorker, transfer: Transferable[] = []) => worker.postMessage(m, transfer);
   return {
     setView: (view) => post({ type: 'view', view }),
     setAtlas: (info, pixels) => post({ type: 'atlas', info, pixels }),
-    setLayer: (name, batches) => post({ type: 'layer', name, batches }, transferables(batches)),
+    setSlot: (name, batches) => post({ type: 'slot', name, batches }, transferables(batches)),
     draw: () => post({ type: 'draw' }),
   };
 }
@@ -73,7 +73,7 @@ export function createRenderer(
   view: View,
   onStatus: (s: RenderStatus) => void,
 ): Renderer {
-  const retained: Retained = { view, atlas: null, layers: new Map() };
+  const retained: Retained = { view, atlas: null, slots: new Map() };
   let worker: Worker | null = null;
   let local: GpuRenderer | null = null;
   /** Whichever renderer is ready to take calls; null until then and once its device is lost. */
@@ -94,8 +94,8 @@ export function createRenderer(
   const open = (ready: Sink) => {
     sink = ready;
     if (retained.atlas) ready.setAtlas(retained.atlas.info, retained.atlas.pixels);
-    for (const [name, batches] of retained.layers) ready.setLayer(name, batches);
-    retained.layers.clear();
+    for (const [name, batches] of retained.slots) ready.setSlot(name, batches);
+    retained.slots.clear();
     if (retained.view) ready.setView(retained.view);
     requestFrame();
   };
@@ -158,9 +158,9 @@ export function createRenderer(
       sink?.setAtlas(info, pixels);
       requestFrame();
     },
-    setLayer(name, batches) {
-      if (sink) sink.setLayer(name, batches);
-      else retained.layers.set(name, batches);
+    setSlot(name, batches) {
+      if (sink) sink.setSlot(name, batches);
+      else retained.slots.set(name, batches);
       requestFrame();
     },
     destroy() {
