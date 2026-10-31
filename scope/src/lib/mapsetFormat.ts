@@ -27,8 +27,16 @@ export const AREA_LAYERS = [
 ] as const;
 export const LAYERS = [...POINT_LAYERS, ...ROUTE_LAYERS, 'hold', ...AREA_LAYERS] as const;
 
+export type PointLayer = (typeof POINT_LAYERS)[number];
 export type AreaLayer = (typeof AREA_LAYERS)[number];
+export type RouteLayer = (typeof ROUTE_LAYERS)[number];
 export type Layer = (typeof LAYERS)[number];
+
+const POINTS: ReadonlySet<Layer> = new Set(POINT_LAYERS);
+const ROUTES: ReadonlySet<Layer> = new Set(ROUTE_LAYERS);
+
+export const isPointLayer = (layer: Layer): layer is PointLayer => POINTS.has(layer);
+export const isRouteLayer = (layer: Layer): layer is RouteLayer => ROUTES.has(layer);
 
 /** The area layers that divide airspace among control units: an ACC sector, a FIR or UIR. */
 export const SECTOR_LAYERS: ReadonlySet<Layer> = new Set<Layer>(['sector', 'fir']);

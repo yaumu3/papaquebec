@@ -15,6 +15,8 @@ import {
   EFFECTIVE_PATTERN,
   FREQ_PATTERN,
   ID_MAX,
+  isPointLayer,
+  isRouteLayer,
   KIND_MAX,
   LAYERS,
   type Layer,
@@ -141,12 +143,10 @@ export type MapSetFeature =
   | z.infer<typeof HoldFeature>
   | z.infer<typeof AreaFeature>;
 
-const isOneOf = (layers: readonly string[], layer: Layer) => layers.includes(layer);
-
 function featureSchema(layer: Layer) {
   if (layer === 'hold') return HoldFeature;
-  if (isOneOf(POINT_LAYERS, layer)) return PointFeature;
-  if (isOneOf(ROUTE_LAYERS, layer)) return RouteFeature;
+  if (isPointLayer(layer)) return PointFeature;
+  if (isRouteLayer(layer)) return RouteFeature;
   return AreaFeature;
 }
 

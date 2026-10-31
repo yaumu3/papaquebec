@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { DRAW_STACK, isStyled, type StyledLayer } from '../../lib/layers';
-import { POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
+import { isPointLayer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
@@ -26,8 +26,6 @@ const triangle = (x: number): Position[] => [
 ];
 
 const has = (layers: readonly string[], layer: string) => layers.includes(layer);
-const isPointLayer = (layer: StyledLayer): layer is (typeof POINT_LAYERS)[number] =>
-  has(POINT_LAYERS, layer);
 
 /** What a test may add to a part: a kind, a name, or for an area a lower limit. */
 interface Extra {
