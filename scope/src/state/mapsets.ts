@@ -54,7 +54,10 @@ export function createMapSets(storage: Storage | null, opening: Promise<MapSetSt
     ],
   });
 
-  const chart = versioned(() => chartOf(store.sets.filter((s) => s.enabled).map((s) => s.data)));
+  /** Read as plain data: a rebuild through store proxies tracks every coordinate. */
+  const chart = versioned(() =>
+    chartOf(store.sets.filter((s) => s.enabled).map((s) => unwrap(s.data))),
+  );
 
   /** After a change to the sets: the merge is stale, and the built-in flag goes to storage. */
   const commit = () => {
