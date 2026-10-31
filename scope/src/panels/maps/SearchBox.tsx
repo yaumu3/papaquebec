@@ -5,7 +5,11 @@ import { query, setQuery, typeQuery } from '../../state/layerTree';
 import s from './SearchBox.module.css';
 
 /** The box that filters the tree; a composition in progress does not filter until it ends. */
-export function SearchBox() {
+export function SearchBox(props: {
+  ref?: (node: HTMLInputElement) => void;
+  /** Down was pressed in the box: on to the first row. */
+  onDown: () => void;
+}) {
   let input: HTMLInputElement | undefined;
   const clear = () => {
     setQuery('');
@@ -16,6 +20,7 @@ export function SearchBox() {
       <input
         ref={(node) => {
           input = node;
+          props.ref?.(node);
         }}
         type="search"
         class={s.box}
@@ -28,10 +33,15 @@ export function SearchBox() {
         onInput={(e) => typeQuery(e.currentTarget.value, e.isComposing)}
         onCompositionEnd={(e) => typeQuery(e.currentTarget.value, false)}
         on:keydown={(e) => {
-          if (e.key !== 'Escape' || e.isComposing || !e.currentTarget.value) return;
-          e.preventDefault();
-          e.stopPropagation();
-          setQuery('');
+          if (e.isComposing) return;
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            props.onDown();
+          } else if (e.key === 'Escape' && e.currentTarget.value) {
+            e.preventDefault();
+            e.stopPropagation();
+            setQuery('');
+          }
         }}
       />
       <Show when={query()}>

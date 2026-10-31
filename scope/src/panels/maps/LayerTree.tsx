@@ -26,6 +26,7 @@ import { ItemList } from './ItemList';
 import { Marked } from './Marked';
 import { SearchBox } from './SearchBox';
 import { Swatch } from './Swatch';
+import { onTreeKey } from './treeKeys';
 
 import s from './LayerTree.module.css';
 
@@ -152,13 +153,28 @@ function GroupBranch(props: { group: Group }) {
 
 /** The LAYERS section: groups of layers of items, each shown or hidden from its dot. */
 export function LayerTree(): JSX.Element {
+  let tree: HTMLDivElement | undefined;
+  let box: HTMLInputElement | undefined;
   return (
     <>
       <div class={s.titleLine}>
         <SectionTitle>LAYERS</SectionTitle>
-        <SearchBox />
+        <SearchBox
+          ref={(node) => {
+            box = node;
+          }}
+          onDown={() => tree?.querySelector<HTMLElement>('[data-head]')?.focus()}
+        />
       </div>
-      <div role="tree" aria-label="Layers" class={s.tree}>
+      <div
+        role="tree"
+        aria-label="Layers"
+        class={s.tree}
+        ref={(node) => {
+          tree = node;
+        }}
+        onKeyDown={(e) => tree && onTreeKey(e, tree, box)}
+      >
         <For each={LAYER_GROUPS}>{(group) => <GroupBranch group={group} />}</For>
       </div>
       <Show when={found()?.layers.size === 0}>
