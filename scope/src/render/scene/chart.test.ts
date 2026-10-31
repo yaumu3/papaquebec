@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { DRAW_STACK, isStyled, type StyledLayer } from '../../lib/layers';
 import { isPointLayer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
-import { topologyOf } from '../../lib/topology';
+import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
@@ -53,7 +53,11 @@ const build = (
   items: ChartItem[],
   layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
-) => buildChart({ topology: topologyOf(items), project, layers, labelDensity, atlas });
+) => {
+  const topology = topologyOf(items);
+  const drawnPoints = () => drawnPointsOf(topology, layers);
+  return buildChart({ topology, drawnPoints, project, layers, labelDensity, atlas });
+};
 
 interface Instance {
   a: { x: number; y: number };
@@ -521,6 +525,19 @@ describe('buildChart labels', () => {
 
     // Assert
     expect(glyphs(labels).map((g) => g.at)).toEqual([{ x: 5, y: 0 }]);
+  });
+
+  it('labels each part of a point item where it sits', () => {
+    // Arrange
+    const west = partOf('vfr', point([0, 0]));
+    const east = partOf('vfr', point([5, 0]));
+
+    // Act
+    const { markers, labels } = build([itemOf('vfr', west, east)], ['vfr'], 'dense');
+
+    // Assert
+    expect(markers.count).toBe(2);
+    expect(glyphs(labels).map((g) => g.at.x)).toEqual([0, 5]);
   });
 
   it('puts a route label at the middle of its path and an area label at its start', () => {

@@ -10,7 +10,7 @@ interface Refinement {
 }
 
 /** How a layer's items are named on the chart: from which label density up, and where. */
-interface LabelStyle {
+export interface LabelStyle {
   from: Exclude<LabelDensity, 'off'>;
   color: string;
   size: number;
@@ -33,7 +33,7 @@ export interface LineLayerStyle {
 }
 
 /** How a layer of points is drawn. */
-interface PointLayerStyle {
+export interface PointLayerStyle {
   shape: Shape;
   size: number;
   color: string;

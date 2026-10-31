@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js';
 
-import { navaidsShownAt, visibleLayers } from '../lib/layers';
+import { visibleLayers } from '../lib/layers';
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer, type RenderStatus } from '../render/facade';
 import { type Move, retarget, settleMoves } from '../render/layout/moves';
@@ -15,6 +15,7 @@ import { ringPaths } from '../render/scene/rings';
 import { buildCoast, buildRings } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
+import { drawnPoints, navaidsInRange } from '../state/drawnPoints';
 import { hoverInstant } from '../state/lanes';
 import { declinationAt } from '../state/magnetic';
 import { topology } from '../state/mapsets';
@@ -118,8 +119,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       : null,
   );
 
-  /** Zooming reaches the chart only when it shows or hides the navaids. */
-  const navaidsInRange = createMemo(() => navaidsShownAt(settings.rangeNm));
   for (const slice of CHART_SLICES) {
     show((a) =>
       projected()
@@ -127,6 +126,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
             slice,
             buildChart({
               topology: topology(),
+              drawnPoints,
               project: projectNm,
               layers: visibleLayers(slice.layers, (l) => settings.shownLayers[l], navaidsInRange),
               labelDensity: settings.labelDensity,

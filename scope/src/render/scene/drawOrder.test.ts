@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
+import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
 import { DRAW_STACK, type ScopeLayer, type StyledLayer, visibleLayers } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { POINT_LAYERS } from '../../lib/mapsetFormat';
-import { topologyOf } from '../../lib/topology';
+import { drawnPointsOf, topologyOf } from '../../lib/topology';
+import type { LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../slots';
 import { atlas } from './atlasFixture';
@@ -36,8 +37,15 @@ function itemAt(layer: StyledLayer): ChartItem {
   return { key: layer, layer, parts: [part] };
 }
 
+/** A slice of the chart built as the scope builds it. */
+function sliceOf(chart: Chart, layers: readonly StyledLayer[], labelDensity: LabelDensity) {
+  const topology = topologyOf(chart);
+  const drawnPoints = () => drawnPointsOf(topology, layers);
+  return buildChart({ topology, drawnPoints, project, layers, labelDensity, atlas });
+}
+
 /** Everything the scope draws from the map, as the effects post it. */
-function mapSlots(chart: ChartItem[]): Slots {
+function mapSlots(chart: Chart): Slots {
   const slots: Slots = {};
   for (const slice of CHART_SLICES) {
     const layers = visibleLayers(
@@ -45,13 +53,7 @@ function mapSlots(chart: ChartItem[]): Slots {
       () => true,
       () => true,
     );
-    const built = buildChart({
-      topology: topologyOf(chart),
-      project,
-      layers,
-      labelDensity: 'dense',
-      atlas,
-    });
+    const built = sliceOf(chart, layers, 'dense');
     Object.assign(slots, sliceSlots(slice, built));
   }
   const coastX = at('coast');
@@ -137,13 +139,7 @@ describe('the example map set', () => {
 
     // Act
     const undrawn = CHART_LAYERS.filter((layer) => {
-      const { lines, markers } = buildChart({
-        topology: topologyOf(items),
-        project,
-        layers: [layer],
-        labelDensity: 'off',
-        atlas,
-      });
+      const { lines, markers } = sliceOf(items, [layer], 'off');
       return lines.count + markers.count === 0;
     });
 
@@ -153,13 +149,10 @@ describe('the example map set', () => {
 
   it('draws no route segment twice', () => {
     // Arrange
-    const topology = topologyOf(chartOf([parseMapSet(EXAMPLE)]));
-    const layers = CHART_SLICES[1].layers;
+    const items = chartOf([parseMapSet(EXAMPLE)]);
 
     // Act
-    const keys = edgeKeys(
-      buildChart({ topology, project, layers, labelDensity: 'off', atlas }).lines,
-    );
+    const keys = edgeKeys(sliceOf(items, CHART_SLICES[1].layers, 'off').lines);
 
     // Assert
     expect(keys.length).toBeGreaterThan(0);

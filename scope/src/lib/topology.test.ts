@@ -1,9 +1,18 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Chart, ItemPart } from './chart';
+import { visibleLayers } from './layers';
 import type { LonLat } from './mapdata';
-import type { Layer } from './mapsetFormat';
-import { ownersOf, runsOf, type Stretch, type Network, topologyOf } from './topology';
+import type { Layer, PointLayer } from './mapsetFormat';
+import {
+  drawnPointsOf,
+  ownersOf,
+  type PathLayer,
+  runsOf,
+  type Stretch,
+  type Network,
+  topologyOf,
+} from './topology';
 
 const A: LonLat = [130.6, 33.7];
 const B: LonLat = [130.7, 33.7];
@@ -11,19 +20,13 @@ const C: LonLat = [130.7, 33.8];
 const D: LonLat = [130.6, 33.8];
 
 type Outline = LonLat[];
-type LinearLayer = Exclude<Layer, 'ad' | 'navaid' | 'fix' | 'vfr' | 'hold'>;
 
 interface Extra {
   lower?: string;
   kind?: string;
 }
 
-function partOf(
-  layer: LinearLayer,
-  name: string,
-  outlines: Outline[],
-  extra: Extra = {},
-): ItemPart {
+function partOf(layer: PathLayer, name: string, outlines: Outline[], extra: Extra = {}): ItemPart {
   const [first = []] = outlines;
   const geometry =
     outlines.length > 1
@@ -304,5 +307,74 @@ describe('runsOf', () => {
 
     // Assert
     expect(runs).toEqual([run(1, 3)]);
+  });
+});
+
+const pointPart = (layer: PointLayer, id: string, at: LonLat): ItemPart => ({
+  geometry: { type: 'Point', coordinates: at },
+  properties: { layer, id },
+});
+
+const pointItem = (layer: PointLayer, ...parts: ItemPart[]): Chart[number] => ({
+  key: layer + parts.length,
+  layer,
+  parts,
+});
+
+describe('the points of a topology', () => {
+  const chart: Chart = [
+    pointItem('fix', pointPart('fix', 'TAVRO', A)),
+    pointItem('vfr', pointPart('vfr', 'CAUSE', B), pointPart('vfr', 'CAUSE', E)),
+    pointItem('navaid', pointPart('navaid', 'QDG', C)),
+    pointItem('ad', pointPart('ad', 'QAAA', D)),
+  ];
+
+  it('lists a point for each part of a point item, in chart order, and none for a hold or a line', () => {
+    // Arrange
+    const hold: ItemPart = {
+      geometry: { type: 'Point', coordinates: A },
+      properties: { layer: 'hold', turn: 'R', inboundMag: 90, inboundTrue: 90 },
+    };
+    const mixed: Chart = [
+      ...chart,
+      { key: 'hold', layer: 'hold', parts: [hold] },
+      ...chartWith(partOf('conv', 'R', [[A, B]])),
+    ];
+
+    // Act
+    const { points } = topologyOf(mixed);
+
+    // Assert
+    expect(points.map((p) => [p.layer, p.id, p.at])).toEqual([
+      ['fix', 'TAVRO', A],
+      ['vfr', 'CAUSE', B],
+      ['vfr', 'CAUSE', E],
+      ['navaid', 'QDG', C],
+      ['ad', 'QAAA', D],
+    ]);
+  });
+
+  it('draws the points of the layers given, whatever routes are shown', () => {
+    // Arrange
+    const topology = topologyOf(chart);
+    const inRange = [true, false];
+    const rows: Layer[][] = [
+      ['fix'],
+      ['conv'],
+      [],
+      ...inRange.map((on) =>
+        visibleLayers(
+          ['navaid', 'fix'],
+          () => true,
+          () => on,
+        ),
+      ),
+    ];
+
+    // Act
+    const drawn = rows.map((layers) => drawnPointsOf(topology, layers).map((p) => p.id));
+
+    // Assert
+    expect(drawn).toEqual([['TAVRO'], [], [], ['TAVRO', 'QDG'], ['TAVRO']]);
   });
 });

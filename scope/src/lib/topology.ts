@@ -13,6 +13,7 @@ import {
   isPointLayer,
   isRouteLayer,
   type Layer,
+  type PointLayer,
   type RouteLayer,
 } from './mapsetFormat';
 
@@ -39,10 +40,19 @@ export interface Network {
   edgeCount: number;
 }
 
+/** One part of a point item: a place a symbol may stand. */
+export interface ChartPoint {
+  layer: PointLayer;
+  id: string;
+  at: LonLat;
+}
+
 export interface Topology {
   chart: Chart;
   areas: Network;
   routes: Network;
+  /** Every point part of the chart, in chart order. */
+  points: readonly ChartPoint[];
 }
 
 type Outline = Pick<ChartPath, 'part' | 'layer' | 'coordinates'>;
@@ -105,11 +115,22 @@ function networkOf(outlines: Outline[], vertexOf: (at: LonLat) => number): Netwo
   return { paths, edgeCount: edgeNumbers.size };
 }
 
-/** The shared-edge structure of the chart's area outlines and route lines. */
+/** The point parts of an item. */
+function pointsOf(parts: readonly ItemPart[]): ChartPoint[] {
+  return parts.flatMap(({ geometry, properties }) =>
+    geometry.type === 'Point' && 'id' in properties
+      ? [{ layer: properties.layer, id: properties.id, at: geometry.coordinates }]
+      : [],
+  );
+}
+
+/** The shared-edge structure of the chart's area outlines and route lines, and its points. */
 export function topologyOf(chart: Chart): Topology {
   const areas: Outline[] = [];
   const routes: Outline[] = [];
+  const points: ChartPoint[] = [];
   for (const { layer, parts } of chart) {
+    points.push(...pointsOf(parts));
     if (isPointLayer(layer) || layer === 'hold') continue;
     const into = isRouteLayer(layer) ? routes : areas;
     for (const part of parts) {
@@ -117,7 +138,12 @@ export function topologyOf(chart: Chart): Topology {
     }
   }
   const vertexOf = vertexNumbering();
-  return { chart, areas: networkOf(areas, vertexOf), routes: networkOf(routes, vertexOf) };
+  return {
+    chart,
+    areas: networkOf(areas, vertexOf),
+    routes: networkOf(routes, vertexOf),
+    points,
+  };
 }
 
 /** The edges of a path from vertex index `from` to `to`. */
@@ -163,3 +189,7 @@ export function runsOf(
   if (from >= 0) runs.push({ from, to: within.to });
   return runs;
 }
+
+/** The points on the layers that draw. */
+export const drawnPointsOf = (topology: Topology, layers: readonly Layer[]): ChartPoint[] =>
+  topology.points.filter((point) => layers.includes(point.layer));
