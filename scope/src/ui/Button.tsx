@@ -8,7 +8,7 @@ import s from './Button.module.css';
 export function Button(props: {
   on?: boolean;
   class?: string | undefined;
-  /** Read out in place of the content, for a button that shows a glyph. */
+  /** Read out in place of the content, for a glyph or for text that may be cut. */
   label?: string;
   onClick: () => void;
   children: JSX.Element;
