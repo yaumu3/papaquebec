@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { chartOf } from '../lib/chart';
+import { type ChartItem, chartOf } from '../lib/chart';
 import { blockOffset, DB_WIDTH } from '../lib/datablock';
 import { direct, inverse } from '../lib/geodesic';
 import type { ScopeLayer } from '../lib/layers';
@@ -80,7 +80,21 @@ describe('drawnBlockRect', () => {
 const at = (lon: number, lat: number) => ({ x: lon, y: lat });
 
 describe('fixNear', () => {
-  const chart = chartOf([parseMapSet(EXAMPLE)]);
+  const stepped: ChartItem = {
+    key: 'stepped',
+    layer: 'vfr',
+    parts: [
+      {
+        geometry: { type: 'Point', coordinates: [127, 36] },
+        properties: { layer: 'vfr', id: 'XSTEP' },
+      },
+      {
+        geometry: { type: 'Point', coordinates: [127.5, 36.5] },
+        properties: { layer: 'vfr', id: 'XSTEP' },
+      },
+    ],
+  };
+  const chart = [...chartOf([parseMapSet(EXAMPLE)]), stepped];
   it('snaps onto a shown fix, VFR point or navaid, and onto nothing else', () => {
     // Arrange
     const reach = 0.01;
@@ -94,6 +108,18 @@ describe('fixNear', () => {
       { name: 'a fix whose layer is hidden', shown: ['vfr'], where: [130.93, 33.47], found: null },
       { name: 'a shown VFR point', shown: ['vfr'], where: [130.31, 33.66], found: 'CAUSEWAY' },
       { name: 'a shown navaid', shown: ['navaid'], where: [130.4406, 33.5967], found: 'QDG' },
+      {
+        name: 'the first part of a stepped VFR item',
+        shown: ['vfr'],
+        where: [127, 36],
+        found: 'XSTEP',
+      },
+      {
+        name: 'the later part of a stepped VFR item',
+        shown: ['vfr'],
+        where: [127.5, 36.5],
+        found: 'XSTEP',
+      },
       { name: 'a navaid with nothing shown', shown: [], where: [130.4406, 33.5967], found: null },
       {
         name: 'an aerodrome, which is not a fix',
@@ -111,6 +137,24 @@ describe('fixNear', () => {
 
     // Assert
     expect(found.map((f) => f?.name ?? null)).toEqual(rows.map((r) => r.found));
+  });
+
+  it('snaps onto the nearest of the fixes in reach', () => {
+    // Arrange
+    const reach = 1;
+    const rows: { near: string; where: [number, number] }[] = [
+      { near: 'TAVRO', where: [130.94, 33.48] },
+      { near: 'NIMBA', where: [131.17, 34.03] },
+      { near: 'ZOLEK', where: [131.91, 34.31] },
+    ];
+
+    // Act
+    const found = rows.map((r) =>
+      fixNear(chart, (l) => l === 'fix', at(...r.where), reach, plane.project),
+    );
+
+    // Assert
+    expect(found.map((f) => f?.name)).toEqual(rows.map((r) => r.near));
   });
 
   it('reports where the fix is on the plane', () => {
