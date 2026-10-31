@@ -28,6 +28,12 @@ const lines = (draw: (b: LineBatch) => void, capacity?: number) => {
 const distances = ({ count, data }: Batch) =>
   Array.from({ length: count }, (_, i) => data[i * LINE_STRIDE + 9]);
 
+/** The back and ahead distances and the two cuts carried by each segment. */
+const spans = ({ count, data }: Batch) =>
+  Array.from({ length: count }, (_, i) =>
+    Array.from(data.subarray(i * LINE_STRIDE + 18, i * LINE_STRIDE + 22)),
+  );
+
 describe('LineBatch', () => {
   const white = '#ffffff';
 
@@ -67,6 +73,48 @@ describe('LineBatch', () => {
       [3, 1, 0, 0],
       [8, 2, 1, 2],
     ]);
+  });
+
+  it('writes zeros for the span of a segment or polyline that has no place', () => {
+    // Arrange
+    const [a, b, c] = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 4 },
+    ];
+
+    // Act
+    const batch = lines((lb) => {
+      lb.segment(a, b, white);
+      lb.polyline([a, b, c], white);
+    });
+
+    // Assert
+    expect(spans(batch)).toEqual([
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+    ]);
+  });
+
+  it('carries the distance to the stops and the cuts on each segment of a placed polyline', () => {
+    // Arrange
+    const path = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 4 },
+    ];
+    const place = { back: 2, length: 20, cutBack: 6, cutAhead: 4 };
+
+    // Act
+    const batch = lines((b) => b.polyline(path, white, {}, place));
+
+    // Assert
+    expect(spans(batch)).toEqual([
+      [2, 15, 6, 4],
+      [5, 11, 6, 4],
+    ]);
+    expect(distances(batch)).toEqual([0, 3]);
   });
 
   it('keeps a width below 1 as given', () => {

@@ -46,12 +46,14 @@ struct In {
   @location(2) style: vec2f,    // width (CSS px), world distance along the polyline to a (NM)
   @location(3) pattern: vec4f,  // on, off, on, off (CSS px); all 0 is solid
   @location(4) color: vec4f,
+  @location(5) span: vec4f,     // NM from the span's first stop to a, NM from b to its last, cuts (CSS px)
 };
 struct Out {
   @builtin(position) pos: vec4f,
   @location(0) color: vec4f,
   @location(1) dist: f32,
   @location(2) @interpolate(flat) pattern: vec4f,
+  @location(3) pastCut: vec2f,
 };
 fn patternLength(pattern: vec4f) -> f32 {
   return pattern.x + pattern.y + pattern.z + pattern.w;
@@ -68,9 +70,14 @@ fn patternLength(pattern: vec4f) -> f32 {
   let p = pa + dir * (c.x * len) + n * ((c.y * 2.0 - 1.0) * half);
   let pattern = in.pattern * u.dpr;
   let period = patternLength(pattern);
+  let scale = u.pxPerNm * u.dpr;
+  let cutBack = in.span.z * u.dpr;
+  let cutAhead = in.span.w * u.dpr;
   var phase = 0.0;
   if (period > 0.0) {
-    let along = in.style.y * u.pxPerNm * u.dpr;
+    // The dash runs from the polyline's start, or from the cut point if that lies further on.
+    let lead = select(0.0, max(cutBack - (in.span.x - in.style.y) * scale, 0.0), cutBack > 0.0);
+    let along = in.style.y * scale - lead;
     phase = along - floor(along / period) * period;
   }
   var o: Out;
@@ -78,9 +85,16 @@ fn patternLength(pattern: vec4f) -> f32 {
   o.color = in.color;
   o.dist = phase + c.x * len;
   o.pattern = pattern;
+  // Device px past each cut; an end with no cut gets a constant, since an interpolated distance
+  // extrapolates beyond the quad under multisampling and would clip the end of every line.
+  o.pastCut = vec2f(
+    select(1.0, in.span.x * scale + c.x * len - cutBack, cutBack > 0.0),
+    select(1.0, in.span.y * scale + (1.0 - c.x) * len - cutAhead, cutAhead > 0.0),
+  );
   return o;
 }
 @fragment fn fs(in: Out) -> @location(0) vec4f {
+  if (in.pastCut.x < 0.0 || in.pastCut.y < 0.0) { discard; }
   let period = patternLength(in.pattern);
   if (period > 0.0) {
     let t = in.dist - floor(in.dist / period) * period;
