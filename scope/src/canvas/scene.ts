@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js';
 
+import { navaidsShownAt, visibleLayers } from '../lib/layers';
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer, type RenderStatus } from '../render/facade';
 import { type Move, retarget, settleMoves } from '../render/layout/moves';
@@ -7,7 +8,7 @@ import { applyPlacement, blockSubjects, viewportRect } from '../render/layout/pl
 import { workerPlacer } from '../render/layout/placer';
 import { fixNearest } from '../render/layout/trails';
 import type { AtlasInfo, View } from '../render/protocol';
-import { buildChart, navaidsShownAt, visibleLayers } from '../render/scene/chart';
+import { buildChart } from '../render/scene/chart';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, type ScopeLayer, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, type ScopeLayer, type StyledLayer, visibleLayers } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { POINT_LAYERS } from '../../lib/mapsetFormat';
@@ -9,7 +9,7 @@ import { topologyOf } from '../../lib/topology';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../slots';
 import { atlas } from './atlasFixture';
-import { buildChart, visibleLayers } from './chart';
+import { buildChart } from './chart';
 import { buildCoast, buildRings } from './static';
 
 const project = (lat: number, lon: number) => ({ x: lon, y: lat });
