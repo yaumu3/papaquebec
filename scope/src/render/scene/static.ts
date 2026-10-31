@@ -62,10 +62,10 @@ function airwaysLayer({ drawn, project, layers, atlas }: MapInput, labels: numbe
   if (layers.airways) {
     for (const aw of drawn.airways) {
       const pts = route(flipped(aw.points), project);
-      lines.polyline(pts, THEME.airway);
+      lines.polyline(pts, THEME.rnav);
       const mid = pts[Math.floor(pts.length / 2)];
       if (labels >= 2 && mid) {
-        text.text(aw.name, { ...mid, px: 4, py: -6 }, 9, THEME.airwayLabel, {
+        text.text(aw.name, { ...mid, px: 4, py: -6 }, 9, THEME.rnavLabel, {
           baseline: 'bottom',
         });
       }
@@ -130,14 +130,14 @@ interface FixStyle {
 const WAYPOINT: FixStyle = {
   shape: Shape.Triangle,
   size: 8,
-  color: THEME.waypoint,
-  label: { from: 2, px: 5, py: -3, size: 9, color: THEME.waypointLabel, baseline: 'bottom' },
+  color: THEME.fix,
+  label: { from: 2, px: 5, py: -3, size: 9, color: THEME.fixLabel, baseline: 'bottom' },
 };
 const AIRPORT: FixStyle = {
   shape: Shape.Ring,
   size: 9,
-  color: THEME.airport,
-  label: { from: 1, px: 8, py: -1, size: 10, color: THEME.airportLabel, baseline: 'middle' },
+  color: THEME.ad,
+  label: { from: 1, px: 8, py: -1, size: 10, color: THEME.adLabel, baseline: 'middle' },
 };
 const NAVAID: FixStyle = {
   shape: Shape.Hexagon,
