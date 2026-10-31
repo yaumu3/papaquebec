@@ -2,12 +2,14 @@ import { describe, expect, it } from 'bun:test';
 
 import {
   distanceToSegment,
+  flatDistanceNm,
   trueToMagnetic,
   velocityNm,
   nearest,
   rankByDistance,
   splitByCircle,
 } from './geo';
+import { direct, inverse } from './geodesic';
 
 describe('trueToMagnetic', () => {
   it('subtracts east declination and wraps into 0..360', () => {
@@ -89,6 +91,37 @@ describe('nearest', () => {
     // Assert
     expect(hit?.id).toBe('RJTT');
     expect(none).toBeNull();
+  });
+});
+
+describe('flatDistanceNm', () => {
+  it('is within 1% of the geodesic over a few nautical miles, at any latitude and across the antimeridian', () => {
+    // Arrange
+    const rows: [number, number, number, number][] = [
+      [0, 140, 90, 1],
+      [35.5, 139.8, 45, 1],
+      [35.5, 139.8, 0, 5],
+      [60, 10, 180, 1],
+      [60, 10, 90, 5],
+    ];
+    const east = { lat: 35, lon: 179.99 };
+    const west = { lat: 35, lon: -179.99 };
+    const pairs = [
+      ...rows.map(([lat, lon, bearing, nm]) => {
+        const from = { lat, lon };
+        return { from, to: direct(from, bearing, nm) };
+      }),
+      { from: east, to: west },
+      { from: west, to: east },
+    ];
+
+    // Act
+    const ratios = pairs.map(
+      ({ from, to }) => flatDistanceNm(from, to) / inverse(from, to).distanceNm,
+    );
+
+    // Assert
+    expect(ratios.map((r) => Math.abs(r - 1) < 0.01)).toEqual(pairs.map(() => true));
   });
 });
 

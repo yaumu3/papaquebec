@@ -68,12 +68,17 @@ export type ProjectFn = (lat: number, lon: number) => Vec2;
 /** The inverse of a `ProjectFn`: a point on the plane back to lat/lon. */
 export type UnprojectFn = (x: number, y: number) => GeoPoint;
 
-/** Equirectangular distance, good enough to rank nearby items. */
-function flatDistance(lat: number, lon: number, p: GeoPoint): number {
-  const k = Math.cos((lat * Math.PI) / 180);
-  const dLat = p.lat - lat;
-  const dLon = (p.lon - lon) * k;
-  return dLat * dLat + dLon * dLon;
+/** Nautical miles in a degree of latitude, near enough: it runs from 59.7 at the equator to 60.3 at the poles. */
+const NM_PER_DEGREE = 60;
+
+/**
+ * Equirectangular distance in nautical miles, the short way round the antimeridian. Within 1% of
+ * the geodesic over a few nautical miles, at any latitude: enough to rank nearby items or to
+ * tell whether two are one.
+ */
+export function flatDistanceNm(a: GeoPoint, b: GeoPoint): number {
+  const east = turn(a.lon, b.lon) * Math.cos(a.lat * RAD);
+  return NM_PER_DEGREE * Math.hypot(b.lat - a.lat, east);
 }
 
 /** A copy of the items ordered nearest first. */
@@ -83,7 +88,7 @@ export function rankByDistance<T extends GeoPoint>(
   items: readonly T[],
 ): T[] {
   return items
-    .map((it) => ({ it, d: flatDistance(lat, lon, it) }))
+    .map((it) => ({ it, d: flatDistanceNm({ lat, lon }, it) }))
     .toSorted((a, b) => a.d - b.d)
     .map((x) => x.it);
 }
