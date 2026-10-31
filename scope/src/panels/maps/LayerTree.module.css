@@ -57,6 +57,10 @@
   font-size: var(--text-sm);
   letter-spacing: var(--tracking-wide);
   text-align: left;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 .dot {
   justify-items: center;
@@ -185,5 +189,17 @@
     box-shadow:
       inset 0 0 0 1px var(--text),
       0 0 0 3px var(--control-hover);
+  }
+}
+@media (pointer: coarse) {
+  .tree {
+    --row-h: 36px;
+    --item-h: 32px;
+    --dot-w: 36px;
+  }
+}
+@media (max-width: 720px) {
+  .tree {
+    margin-inline: calc(-1 * var(--space-6));
   }
 }
