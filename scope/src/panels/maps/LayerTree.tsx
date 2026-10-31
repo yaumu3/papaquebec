@@ -11,7 +11,9 @@ import {
   rowStateOf,
 } from '../../lib/treeRows';
 import {
+  found,
   groupLeaves,
+  isLayerListed,
   isOpen,
   leavesOf,
   tapDot,
@@ -21,6 +23,8 @@ import {
 import { layerState } from '../../state/layerVisibility';
 import { SectionTitle } from '../../ui/Section';
 import { ItemList } from './ItemList';
+import { Marked } from './Marked';
+import { SearchBox } from './SearchBox';
 import { Swatch } from './Swatch';
 
 import s from './LayerTree.module.css';
@@ -67,38 +71,44 @@ function LayerBranch(props: { layer: ScopeLayer }) {
   const expanded = () => (hasItems() ? open() : undefined);
   const onHead = () => (hasItems() ? toggleOpen('openLayers', props.layer) : tapDot([leaves()]));
   return (
-    <div role="treeitem" aria-expanded={expanded()}>
-      <div class={cx(s.row, stateClass(state()), summary()?.tone === 'none' && s.noData)}>
-        <Dot state={state()} label={LAYER_NAMES[props.layer]} onTap={() => tapDot([leaves()])} />
-        <button
-          type="button"
-          data-head
-          class={s.layerHead}
-          aria-expanded={expanded()}
-          title={layerTitle(props.layer, hasItems())}
-          onClick={onHead}
-        >
-          <span class={s.guide} aria-hidden="true" />
-          <span class={s.chevron}>
-            <Show when={hasItems()}>
-              <Chevron />
+    <Show when={isLayerListed(props.layer)}>
+      <div role="treeitem" aria-expanded={expanded()}>
+        <div class={cx(s.row, stateClass(state()), summary()?.tone === 'none' && s.noData)}>
+          <Dot state={state()} label={LAYER_NAMES[props.layer]} onTap={() => tapDot([leaves()])} />
+          <button
+            type="button"
+            data-head
+            class={s.layerHead}
+            aria-expanded={expanded()}
+            title={layerTitle(props.layer, hasItems())}
+            onClick={onHead}
+          >
+            <span class={s.guide} aria-hidden="true" />
+            <span class={s.chevron}>
+              <Show when={hasItems()}>
+                <Chevron />
+              </Show>
+            </span>
+            <span class={s.swatch}>
+              <Swatch layer={props.layer} />
+            </span>
+            <span class={s.name}>
+              <Marked text={LAYER_NAMES[props.layer]} />
+            </span>
+            <Show when={summary()}>
+              {(text) => (
+                <span class={cx(s.summary, text().tone === 'subset' && s.subset)}>
+                  {text().text}
+                </span>
+              )}
             </Show>
-          </span>
-          <span class={s.swatch}>
-            <Swatch layer={props.layer} />
-          </span>
-          <span class={s.name}>{LAYER_NAMES[props.layer]}</span>
-          <Show when={summary()}>
-            {(text) => (
-              <span class={cx(s.summary, text().tone === 'subset' && s.subset)}>{text().text}</span>
-            )}
-          </Show>
-        </button>
+          </button>
+        </div>
+        <Show when={open()}>
+          <ItemList layer={props.layer} />
+        </Show>
       </div>
-      <Show when={open()}>
-        <ItemList layer={props.layer} />
-      </Show>
-    </div>
+    </Show>
   );
 }
 
@@ -108,31 +118,35 @@ function GroupBranch(props: { group: Group }) {
   const count = createMemo(() => groupCount(leaves(), layerState));
   const open = () => isOpen('openGroups', props.group.title);
   return (
-    <div role="treeitem" aria-expanded={open()} class={s.group}>
-      <div class={cx(s.row, stateClass(state()))}>
-        <Dot state={state()} label={props.group.title} onTap={() => tapDot(leaves())} />
-        <button
-          type="button"
-          data-head
-          class={s.groupHead}
-          aria-expanded={open()}
-          onClick={() => toggleOpen('openGroups', props.group.title)}
-        >
-          <span class={s.chevron}>
-            <Chevron />
-          </span>
-          <span class={s.name}>{props.group.title}</span>
-          <Show when={count().on < count().all}>
-            <span class={s.summary}>{`${count().on}/${count().all}`}</span>
-          </Show>
-        </button>
-      </div>
-      <Show when={open()}>
-        <div role="group">
-          <For each={props.group.layers}>{(layer) => <LayerBranch layer={layer} />}</For>
+    <Show when={leaves().length > 0}>
+      <div role="treeitem" aria-expanded={open()} class={s.group}>
+        <div class={cx(s.row, stateClass(state()))}>
+          <Dot state={state()} label={props.group.title} onTap={() => tapDot(leaves())} />
+          <button
+            type="button"
+            data-head
+            class={s.groupHead}
+            aria-expanded={open()}
+            onClick={() => toggleOpen('openGroups', props.group.title)}
+          >
+            <span class={s.chevron}>
+              <Chevron />
+            </span>
+            <span class={s.name}>
+              <Marked text={props.group.title} />
+            </span>
+            <Show when={count().on < count().all}>
+              <span class={s.summary}>{`${count().on}/${count().all}`}</span>
+            </Show>
+          </button>
         </div>
-      </Show>
-    </div>
+        <Show when={open()}>
+          <div role="group">
+            <For each={props.group.layers}>{(layer) => <LayerBranch layer={layer} />}</For>
+          </div>
+        </Show>
+      </div>
+    </Show>
   );
 }
 
@@ -140,10 +154,16 @@ function GroupBranch(props: { group: Group }) {
 export function LayerTree(): JSX.Element {
   return (
     <>
-      <SectionTitle>LAYERS</SectionTitle>
+      <div class={s.titleLine}>
+        <SectionTitle>LAYERS</SectionTitle>
+        <SearchBox />
+      </div>
       <div role="tree" aria-label="Layers" class={s.tree}>
         <For each={LAYER_GROUPS}>{(group) => <GroupBranch group={group} />}</For>
       </div>
+      <Show when={found()?.layers.size === 0}>
+        <div class={s.none}>NOTHING MATCHES</div>
+      </Show>
     </>
   );
 }

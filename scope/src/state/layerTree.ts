@@ -1,44 +1,88 @@
 /** What the layer tree reads and writes: its items, which rows are open, and what a tap sets. */
 
-import { batch, createMemo, createRoot } from 'solid-js';
+import { batch, createMemo, createRoot, createSignal } from 'solid-js';
 
 import { LAYER_GROUPS, type ScopeLayer } from '../lib/layers';
 import { type TreeItem, itemsIn, treeItemsOf } from '../lib/treeItems';
 import { afterDot, type LayerLeaves } from '../lib/treeRows';
+import { searchTree, termsOf } from '../lib/treeSearch';
 import { isItemShown, itemsSetTo } from '../lib/visibility';
 import { layerState, setLayerState } from './layerVisibility';
 import { topology } from './mapsets';
 import { setSettings, settings } from './settings';
 
-/** The chart's items for the tree; a memo in a root of its own, like `drawnPoints`. */
-export const treeItems = createRoot(() => createMemo(() => treeItemsOf(topology())));
+const [query, setQueryText] = createSignal('');
+/** The rows closed during this search; every change of the query opens them all again. */
+const [closedInSearch, setClosedInSearch] = createSignal<readonly string[]>([]);
+
+export { query };
+
+export const terms = () => termsOf(query());
+
+/** Whether the tree is filtered: a query of spaces is none. */
+export const searching = () => terms().length > 0;
+
+export function setQuery(text: string): void {
+  batch(() => {
+    setQueryText(text);
+    setClosedInSearch([]);
+  });
+}
+
+/** The search box's input: a composition in progress waits for its end. */
+export function typeQuery(text: string, composing: boolean): void {
+  if (!composing) setQuery(text);
+}
+
+/**
+ * The chart's items for the tree, and what the search keeps of them; memos in a root of their
+ * own, like `drawnPoints`.
+ */
+export const { treeItems, found } = createRoot(() => {
+  const items = createMemo(() => treeItemsOf(topology()));
+  return {
+    treeItems: items,
+    found: createMemo(() => (searching() ? searchTree(items(), terms()) : null)),
+  };
+});
 
 export type OpenList = 'openGroups' | 'openLayers';
 
-export const isOpen = (list: OpenList, id: string): boolean => settings[list].includes(id);
+/** Whether a row is open: while searching, every row but those closed since the query changed. */
+export const isOpen = (list: OpenList, id: string): boolean =>
+  searching() ? !closedInSearch().includes(id) : settings[list].includes(id);
 
 const flipped = (list: readonly string[], id: string): string[] =>
   list.includes(id) ? list.filter((open) => open !== id) : [...list, id];
 
+/** Opens or closes a row; while searching that is not remembered. */
 export function toggleOpen(list: OpenList, id: string): void {
-  setSettings(list, flipped(settings[list], id));
+  if (searching()) setClosedInSearch(flipped(closedInSearch(), id));
+  else setSettings(list, flipped(settings[list], id));
 }
 
 const keysIn = (layer: ScopeLayer): string[] => itemsIn(treeItems(), layer).map((item) => item.key);
 
-/** What a row reaches in a layer: every item of the chart, until a search narrows the list. */
+/** The items the tree lists under a layer: those the search keeps, or all of them. */
+export const listedItems = (layer: ScopeLayer): readonly TreeItem[] =>
+  found()?.layers.get(layer) ?? itemsIn(treeItems(), layer);
+
+/** Whether the tree lists a layer: not while a search keeps nothing of it. */
+export const isLayerListed = (layer: ScopeLayer): boolean => found()?.layers.has(layer) ?? true;
+
+/** What a row reaches in a layer: the items listed, of all those in the chart. */
 export function leavesOf(layer: ScopeLayer): LayerLeaves {
-  const present = keysIn(layer);
-  return { layer, listed: present, present };
+  return { layer, listed: listedItems(layer).map((item) => item.key), present: keysIn(layer) };
 }
 
 export const groupLeaves = (group: (typeof LAYER_GROUPS)[number]): LayerLeaves[] =>
-  group.layers.map(leavesOf);
+  group.layers.filter(isLayerListed).map(leavesOf);
 
 /** A tap on a dot: every leaf under it shown, or all hidden when all are shown already. */
 export function tapDot(leaves: readonly LayerLeaves[]): void {
   batch(() => {
-    for (const [layer, state] of afterDot(leaves, layerState, false)) setLayerState(layer, state);
+    for (const [layer, state] of afterDot(leaves, layerState, searching()))
+      setLayerState(layer, state);
   });
 }
 

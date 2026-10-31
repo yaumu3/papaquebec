@@ -1,3 +1,28 @@
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-4) 0 var(--space-2);
+}
+.titleLine:first-child {
+  margin-top: 0;
+}
+.titleLine > :first-child {
+  margin: 0;
+}
+.none {
+  padding: var(--space-4) 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking);
+  text-align: center;
+}
+.tree mark {
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .tree {
   display: flex;
   flex-direction: column;

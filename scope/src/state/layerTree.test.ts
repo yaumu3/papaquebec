@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
-import { isOpen, type OpenList, toggleOpen } from './layerTree';
+import {
+  isOpen,
+  type OpenList,
+  query,
+  searching,
+  setQuery,
+  toggleOpen,
+  typeQuery,
+} from './layerTree';
 import { setSettings, settings } from './settings';
 
 describe('toggleOpen', () => {
@@ -28,5 +36,93 @@ describe('toggleOpen', () => {
 
     // Assert
     expect(settings.openGroups).toEqual(['ROUTES']);
+  });
+});
+
+const remembered = () => [settings.openGroups, settings.openLayers];
+
+describe('searching the tree', () => {
+  it('waits for a composition to end before the query changes', () => {
+    // Arrange
+    setQuery('');
+
+    // Act
+    typeQuery('ct', true);
+
+    // Assert
+    expect(query()).toBe('');
+    expect(searching()).toBe(false);
+  });
+
+  it('takes the text once the composition has ended', () => {
+    // Arrange
+    setQuery('');
+
+    // Act
+    typeQuery('ctr', false);
+
+    // Assert
+    expect(query()).toBe('ctr');
+    expect(searching()).toBe(true);
+  });
+
+  it('is no search for a query of spaces', () => {
+    // Arrange
+    setQuery('');
+
+    // Act
+    setQuery('   ');
+
+    // Assert
+    expect(searching()).toBe(false);
+  });
+
+  it('has every row open, whatever was remembered, and remembers nothing of it', () => {
+    // Arrange
+    setSettings('openGroups', ['POINTS']);
+    setSettings('openLayers', []);
+    setQuery('');
+
+    // Act
+    setQuery('ctr');
+
+    // Assert
+    expect(isOpen('openGroups', 'AIRSPACE')).toBe(true);
+    expect(isOpen('openLayers', 'ctr')).toBe(true);
+    expect(remembered()).toEqual([['POINTS'], []]);
+  });
+
+  it('keeps a row closed that was closed while searching, until the query changes', () => {
+    // Arrange
+    setSettings('openGroups', ['POINTS']);
+    setSettings('openLayers', []);
+    setQuery('ctr');
+    toggleOpen('openGroups', 'AIRSPACE');
+    const closed = isOpen('openGroups', 'AIRSPACE');
+
+    // Act
+    setQuery('ctrl');
+
+    // Assert
+    expect(closed).toBe(false);
+    expect(isOpen('openGroups', 'AIRSPACE')).toBe(true);
+    expect(remembered()).toEqual([['POINTS'], []]);
+  });
+
+  it('gives back the remembered rows when the search is cleared', () => {
+    // Arrange
+    setSettings('openGroups', ['POINTS']);
+    setSettings('openLayers', ['fix']);
+    setQuery('ctr');
+    toggleOpen('openGroups', 'POINTS');
+
+    // Act
+    setQuery('');
+
+    // Assert
+    expect(isOpen('openGroups', 'POINTS')).toBe(true);
+    expect(isOpen('openGroups', 'AIRSPACE')).toBe(false);
+    expect(isOpen('openLayers', 'fix')).toBe(true);
+    expect(remembered()).toEqual([['POINTS'], ['fix']]);
   });
 });

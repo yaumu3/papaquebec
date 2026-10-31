@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
+import { setQuery } from '../state/layerTree';
 import {
   armRemoval,
   importMapSet,
@@ -125,7 +126,7 @@ function MapSetList() {
 
 export function MapsPanel() {
   return (
-    <Window id="maps">
+    <Window id="maps" onHide={() => setQuery('')}>
       <LayerTree />
       <SectionTitle>LABEL DENSITY</SectionTitle>
       <Pills
