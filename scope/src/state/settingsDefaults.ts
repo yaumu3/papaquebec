@@ -1,4 +1,5 @@
 import { type Altimeter, STANDARD_ALTIMETER } from '../lib/altitude';
+import { DRAW_STACK, type ScopeLayer } from '../lib/layers';
 import { FL_MAX, type Filter } from './filter';
 
 /** Range presets on the Display panel; the wheel zooms continuously between the limits. */
@@ -18,6 +19,8 @@ export type LayerKey =
   | 'sector'
   | 'airports';
 export type Layers = Record<LayerKey, boolean>;
+/** Whether each layer is drawn. */
+export type ShownLayers = Record<ScopeLayer, boolean>;
 export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
 
 export const LAYER_KEYS: LayerKey[] = [
@@ -30,6 +33,20 @@ export const LAYER_KEYS: LayerKey[] = [
   'sector',
   'airports',
 ];
+const HIDDEN_BY_DEFAULT: ReadonlySet<ScopeLayer> = new Set([
+  'adiz',
+  'cta',
+  'advisory',
+  'asr',
+  'tra',
+  'civt',
+  'dct',
+  'sid',
+  'star',
+  'trans',
+  'vfr',
+  'hold',
+]);
 export const LABEL_DENSITIES: readonly LabelDensity[] = ['off', 'sparse', 'normal', 'dense'];
 
 export interface Settings {
@@ -41,6 +58,7 @@ export interface Settings {
   trailSec: number;
   filter: Filter;
   layers: Layers;
+  shownLayers: ShownLayers;
   labelDensity: LabelDensity;
   altimeter: Altimeter;
   qnh: QnhSetting;
@@ -74,6 +92,9 @@ export const DEFAULT_SETTINGS: Settings = {
     sector: false,
     airports: true,
   },
+  shownLayers: Object.fromEntries(
+    DRAW_STACK.map((layer) => [layer, !HIDDEN_BY_DEFAULT.has(layer)]),
+  ) as ShownLayers,
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },
   qnh: { auto: true, station: '' },

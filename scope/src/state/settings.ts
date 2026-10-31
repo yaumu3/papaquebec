@@ -38,6 +38,7 @@ export function persist(rest: Omit<Persisted, 'settings'>): void {
     ...settings,
     filter: { ...settings.filter },
     layers: { ...settings.layers },
+    shownLayers: { ...settings.shownLayers },
     altimeter: { ...settings.altimeter },
     qnh: { ...settings.qnh },
   };
