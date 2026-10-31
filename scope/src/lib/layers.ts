@@ -39,9 +39,11 @@ export type ScopeLayer = (typeof DRAW_STACK)[number];
 /** A map set layer with a style: every one but `hold`, which draws nothing yet. */
 export type StyledLayer = Exclude<Layer, 'hold'>;
 
+/** Whether the scope makes a layer itself, from no map set: the coastline and the range rings. */
+export const isScopeMade = (layer: ScopeLayer) => layer === 'coast' || layer === 'rings';
+
 /** Whether a layer has a style: not `hold`, and not the two the scope makes itself. */
-export const isStyled = (layer: ScopeLayer) =>
-  layer !== 'hold' && layer !== 'coast' && layer !== 'rings';
+export const isStyled = (layer: ScopeLayer) => layer !== 'hold' && !isScopeMade(layer);
 
 /** The groups of the Maps panel, in the order they are listed there, which is not the draw order. */
 export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
