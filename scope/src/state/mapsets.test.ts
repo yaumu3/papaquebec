@@ -76,8 +76,8 @@ const created = (spy = spyStore(), storage = memoryStorage()) => ({
 /** The ids of the points the chart holds on a layer. */
 const idsOf = (sets: ReturnType<typeof createMapSets>, layer: string) =>
   sets
-    .chart()
-    .filter((item) => item.layer === layer)
+    .topology()
+    .chart.filter((item) => item.layer === layer)
     .flatMap((item) => item.parts.map((p) => ('id' in p.properties ? p.properties.id : '')));
 const importing = (sets: ReturnType<typeof createMapSets>, document: object) =>
   sets.importMapSet(JSON.stringify(document));
@@ -88,7 +88,7 @@ describe('createMapSets', () => {
     const { sets } = created();
 
     // Act
-    const [list, chart] = [sets.mapSets(), sets.chart()];
+    const [list, chart] = [sets.mapSets(), sets.topology().chart];
 
     // Assert
     expect(list.map((s) => [s.identity, s.builtin, s.enabled])).toEqual([[BUILTIN_ID, true, true]]);
@@ -201,7 +201,7 @@ describe('createMapSets', () => {
     // Assert
     expect(idsOf(sets, 'fix')).toEqual([]);
     expect(idsOf(sets, 'navaid')).toEqual(['QDG']);
-    expect(sets.chart().map((item) => item.layer)).toEqual(['navaid']);
+    expect(sets.topology().chart.map((item) => item.layer)).toEqual(['navaid']);
   });
 
   it('removes an imported set but never the built-in one', () => {
@@ -395,7 +395,7 @@ describe('a chart read before a change', () => {
   it('follows the built-in set arriving', () => {
     // Arrange
     const { sets } = created();
-    sets.chart();
+    sets.topology();
 
     // Act
     sets.setBuiltinMapSet(parsed(builtIn));
@@ -407,7 +407,7 @@ describe('a chart read before a change', () => {
   it('follows an import', () => {
     // Arrange
     const { sets } = created();
-    sets.chart();
+    sets.topology();
 
     // Act
     const out = importing(sets, fixes);
@@ -421,7 +421,7 @@ describe('a chart read before a change', () => {
     // Arrange
     const { sets } = created();
     importing(sets, fixes);
-    sets.chart();
+    sets.topology();
 
     // Act
     sets.removeMapSet('my-fixes');
@@ -439,7 +439,7 @@ describe('a chart read before a change', () => {
       const { sets } = created();
       sets.setBuiltinMapSet(parsed(builtIn));
       importing(sets, fixes);
-      sets.chart();
+      sets.topology();
       return { identity, left, sets };
     });
 
@@ -457,7 +457,7 @@ describe('a chart read before a change', () => {
       sets.setBuiltinMapSet(parsed(builtIn));
       importing(sets, fixes);
       sets.toggleMapSet(identity);
-      sets.chart();
+      sets.topology();
       return { identity, sets, storage };
     });
 
@@ -478,7 +478,7 @@ describe('a chart read before a change', () => {
   it('follows the hydration', async () => {
     // Arrange
     const { sets } = created(spyStore([stored(more)]));
-    sets.chart();
+    sets.topology();
 
     // Act
     await sets.hydrated;
@@ -531,7 +531,7 @@ describe('armRemoval', () => {
 });
 
 describe('the topology of the chart', () => {
-  it('is one object across reads, built over the chart that is read', () => {
+  it('is one object across reads, holding the chart of the sets', () => {
     // Arrange
     const { sets } = created();
     importing(sets, fixes);
@@ -541,7 +541,7 @@ describe('the topology of the chart', () => {
 
     // Assert
     expect(second).toBe(first);
-    expect(first.chart).toBe(sets.chart());
+    expect(first.chart.map((item) => item.layer)).toEqual(['fix']);
   });
 
   it('is rebuilt with the chart after a change to the sets', () => {
@@ -555,6 +555,5 @@ describe('the topology of the chart', () => {
 
     // Assert
     expect(sets.topology()).not.toBe(before);
-    expect(sets.topology().chart).toBe(sets.chart());
   });
 });
