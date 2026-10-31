@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { chartOf, isUpperStratum, type ItemPart, setIdentity } from './chart';
+import { chartOf, isUpperStratum, type ItemPart, outlinesOf, setIdentity } from './chart';
 import { type MapSetData, validateMapSet } from './mapset';
 import { EXAMPLE, EXAMPLE_LAYERS, feature, variant } from './mapsetCorpus';
 
@@ -183,5 +183,38 @@ describe('isUpperStratum', () => {
 
     // Assert
     expect(verdict).toBe(false);
+  });
+});
+
+describe('outlinesOf', () => {
+  it('lists a point as one outline of one position, a line as itself, a polygon as its rings', () => {
+    // Arrange
+    const ring = [
+      [0, 0],
+      [2, 0],
+      [2, 2],
+      [0, 0],
+    ] as [number, number][];
+    const hole = [
+      [0.5, 0.5],
+      [1, 0.5],
+      [1, 1],
+      [0.5, 0.5],
+    ] as [number, number][];
+    const line = [
+      [0, 0],
+      [1, 1],
+    ] as [number, number][];
+    const geometries: ItemPart['geometry'][] = [
+      { type: 'Point', coordinates: [3, 4] },
+      { type: 'LineString', coordinates: line },
+      { type: 'Polygon', coordinates: [ring, hole] },
+    ];
+
+    // Act
+    const outlines = geometries.map(outlinesOf);
+
+    // Assert
+    expect(outlines).toEqual([[[[3, 4]]], [line], [ring, hole]]);
   });
 });

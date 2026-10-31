@@ -3,6 +3,7 @@
  * geometry and properties of every Feature filed under it, so a stepped area keeps its steps.
  */
 
+import type { LonLat } from './mapdata';
 import type { MapSetData, MapSetFeature } from './mapset';
 import type { Layer } from './mapsetFormat';
 
@@ -70,4 +71,14 @@ function limitFt(limit: string): number {
  */
 export function isUpperStratum({ properties: p }: ItemPart): boolean {
   return 'lower' in p && p.lower !== undefined && limitFt(p.lower) > 0;
+}
+
+/**
+ * The outlines of a geometry as source positions: a point's one position, a line, or a
+ * polygon's exterior ring and its holes.
+ */
+export function outlinesOf(geometry: ItemPart['geometry']): LonLat[][] {
+  if (geometry.type === 'Point') return [[geometry.coordinates]];
+  if (geometry.type === 'LineString') return [geometry.coordinates];
+  return geometry.coordinates;
 }

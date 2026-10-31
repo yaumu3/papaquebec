@@ -1,4 +1,10 @@
-import { type Chart, type ChartItem, isUpperStratum, type ItemPart } from '../../lib/chart';
+import {
+  type Chart,
+  type ChartItem,
+  isUpperStratum,
+  type ItemPart,
+  outlinesOf,
+} from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import type { StyledLayer } from '../../lib/layers';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
@@ -44,13 +50,7 @@ interface ChartBatches {
 
 /** The outlines of a geometry on the scope plane: a polygon's exterior ring and its holes. */
 function pathsOf(geometry: ItemPart['geometry'], project: ProjectFn): Anchor[][] {
-  const outlines =
-    geometry.type === 'Point'
-      ? [[geometry.coordinates]]
-      : geometry.type === 'LineString'
-        ? [geometry.coordinates]
-        : geometry.coordinates;
-  return outlines.map((outline) => route(outline, project));
+  return outlinesOf(geometry).map((outline) => route(outline, project));
 }
 
 /** A line's form in the layer's style, refined by the part's kind and stratum. */
