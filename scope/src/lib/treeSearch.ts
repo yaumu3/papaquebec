@@ -3,6 +3,9 @@
  * of the text's words.
  */
 
+import { LAYER_GROUPS, LAYER_NAMES, type ScopeLayer } from './layers';
+import { itemsIn, type TreeItem, type TreeItems } from './treeItems';
+
 /** The characters after which a word starts, besides the start of the text. */
 const WORD_BREAKS = ' ./-()';
 
@@ -42,4 +45,35 @@ export function markedPieces(text: string, terms: readonly string[]): Piece[] {
     else pieces.push({ text: char, marked });
   }
   return pieces;
+}
+
+export interface TreeSearch {
+  /** The items shown of each layer shown; a named layer without items shows with none. */
+  layers: ReadonlyMap<ScopeLayer, readonly TreeItem[]>;
+  /** The items a term names on their own row. */
+  traced: readonly TreeItem[];
+}
+
+const ownTexts = ({ name, tag }: TreeItem): string[] => [name, tag];
+
+/**
+ * What the tree shows for the terms. A layer is named when every term matches its display name
+ * or its group's title, and keeps all its items. Otherwise an item stays when each term matches
+ * its name or tag, or the layer's or group's text. A layer shows when it is named or keeps items.
+ */
+export function searchTree(items: TreeItems, terms: readonly string[]): TreeSearch {
+  const layers = new Map<ScopeLayer, readonly TreeItem[]>();
+  const traced: TreeItem[] = [];
+  for (const group of LAYER_GROUPS) {
+    for (const layer of group.layers) {
+      const around = [LAYER_NAMES[layer], group.title];
+      const left = terms.filter((term) => !matches(term, around));
+      const kept = itemsIn(items, layer).filter((item) =>
+        left.every((term) => matches(term, ownTexts(item))),
+      );
+      if (left.length === 0 || kept.length > 0) layers.set(layer, kept);
+      traced.push(...kept.filter((item) => terms.some((term) => matches(term, ownTexts(item)))));
+    }
+  }
+  return { layers, traced };
 }
