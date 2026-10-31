@@ -22,7 +22,7 @@ function input(over: Partial<HoverInput> = {}): HoverInput {
 
 /** Offsets into a line instance; see `pack.ts`. */
 const LINE_B_PX = 6;
-const LINE_RGBA = 11;
+const LINE_RGBA = 14;
 
 const batch = (batches: Batch[], kind: Batch['kind']) => batches.find((b) => b.kind === kind);
 const count = (batches: Batch[]) => batches.reduce((n, b) => n + b.count, 0);

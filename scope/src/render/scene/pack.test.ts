@@ -19,29 +19,118 @@ describe('parseColor', () => {
 });
 
 describe('LineBatch', () => {
+  const lines = (draw: (b: LineBatch) => void, capacity?: number) => {
+    const b = new LineBatch(capacity);
+    draw(b);
+    return b.finish();
+  };
+  const white = '#ffffff';
+
   it('packs one instance per segment with the documented layout', () => {
     // Arrange
-    const b = new LineBatch();
+    const style = { width: 2, dash: [4, 2] } as const;
 
     // Act
-    b.segment({ x: 1, y: 2 }, { x: 3, y: 4 }, '#ffffff', { width: 2, dash: [4, 2] });
-    const batch = b.finish();
+    const batch = lines((b) => b.segment({ x: 1, y: 2 }, { x: 3, y: 4 }, white, style, 5));
 
     // Assert
     expect(batch.kind).toBe('lines');
     expect(batch.count).toBe(1);
     expect(batch.data.length).toBe(LINE_STRIDE);
-    expect([...batch.data.subarray(0, 11)]).toEqual([1, 2, 0, 0, 3, 4, 0, 0, 2, 4, 2]);
-    expect([...batch.data.subarray(11, 15)]).toEqual([1, 1, 1, 1]);
+    expect([...batch.data.subarray(0, 14)]).toEqual([1, 2, 0, 0, 3, 4, 0, 0, 2, 5, 4, 2, 0, 0]);
+    expect([...batch.data.subarray(14, 18)]).toEqual([1, 1, 1, 1]);
+  });
+
+  it('packs a pattern of up to four lengths, and none as solid', () => {
+    // Arrange
+    const dashes = [undefined, [], [3, 1], [8, 2, 1, 2]] as const;
+
+    // Act
+    const batch = lines((b) => {
+      for (const dash of dashes)
+        b.segment({ x: 0, y: 0 }, { x: 1, y: 0 }, white, dash ? { dash } : {});
+    });
+
+    // Assert
+    const patterns = dashes.map((_, i) => [
+      ...batch.data.subarray(i * LINE_STRIDE + 10, i * LINE_STRIDE + 14),
+    ]);
+    expect(patterns).toEqual([
+      [0, 0, 0, 0],
+      [0, 0, 0, 0],
+      [3, 1, 0, 0],
+      [8, 2, 1, 2],
+    ]);
+  });
+
+  it('keeps a width below 1 as given', () => {
+    // Arrange
+    const style = { width: 0.5 };
+
+    // Act
+    const batch = lines((b) => b.segment({ x: 0, y: 0 }, { x: 1, y: 0 }, white, style));
+
+    // Assert
+    expect(batch.data[8]).toBe(0.5);
+  });
+
+  it('starts a lone segment at distance 0', () => {
+    // Arrange
+    const [a, c] = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ];
+
+    // Act
+    const batch = lines((b) => b.segment(a, c, white));
+
+    // Assert
+    expect(batch.data[9]).toBe(0);
+  });
+
+  it('carries the world distance along a polyline to each segment', () => {
+    // Arrange
+    const path = [
+      { x: 0, y: 0 },
+      { x: 3, y: 0 },
+      { x: 3, y: 4 },
+      { x: 0, y: 4 },
+    ];
+
+    // Act
+    const batch = lines((b) => b.polyline(path, white));
+
+    // Assert
+    const along = [0, 1, 2].map((i) => batch.data[i * LINE_STRIDE + 9]);
+    expect(along).toEqual([0, 3, 7]);
+  });
+
+  it('starts every polyline at distance 0', () => {
+    // Arrange
+    const path = [
+      { x: 0, y: 0 },
+      { x: 5, y: 0 },
+      { x: 5, y: 5 },
+    ];
+
+    // Act
+    const batch = lines((b) => {
+      b.polyline(path, white);
+      b.polyline(path, white);
+    });
+
+    // Assert
+    const along = [0, 1, 2, 3].map((i) => batch.data[i * LINE_STRIDE + 9]);
+    expect(along).toEqual([0, 5, 0, 5]);
   });
 
   it('accepts pixel offsets on either end', () => {
     // Arrange
-    const b = new LineBatch();
+    const from = { x: 0, y: 0, px: 3, py: -3 };
+    const to = { x: 0, y: 0, px: 10, py: -10 };
 
     // Act
-    b.segment({ x: 0, y: 0, px: 3, py: -3 }, { x: 0, y: 0, px: 10, py: -10 }, '#000000');
-    const batch = b.finish();
+    const batch = lines((b) => b.segment(from, to, '#000000'));
 
     // Assert
     expect([...batch.data.subarray(0, 8)]).toEqual([0, 0, 3, -3, 0, 0, 10, -10]);
@@ -50,11 +139,12 @@ describe('LineBatch', () => {
 
   it('grows past its initial capacity', () => {
     // Arrange
-    const b = new LineBatch(2);
+    const initial = 2;
 
     // Act
-    for (let i = 0; i < 100; i++) b.segment({ x: i, y: 0 }, { x: i, y: 1 }, '#ffffff');
-    const batch = b.finish();
+    const batch = lines((b) => {
+      for (let i = 0; i < 100; i++) b.segment({ x: i, y: 0 }, { x: i, y: 1 }, white);
+    }, initial);
 
     // Assert
     expect(batch.count).toBe(100);

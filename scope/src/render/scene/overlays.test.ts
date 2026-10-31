@@ -58,8 +58,8 @@ function strokes(batches: Batch[]): Stroke[] {
       pa: at(2),
       b: at(4),
       pb: at(6),
-      dash: [d[o + 9] ?? 0, d[o + 10] ?? 0],
-      color: Array.from(d.subarray(o + 11, o + 15)),
+      dash: [d[o + 10] ?? 0, d[o + 11] ?? 0],
+      color: Array.from(d.subarray(o + 14, o + 18)),
     };
   });
 }

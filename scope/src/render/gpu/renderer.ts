@@ -33,8 +33,7 @@ function instanceLayout(stride: number, attrs: [number, GPUVertexFormat][]): GPU
   let offset = 0;
   const attributes: GPUVertexAttribute[] = attrs.map(([location, format]) => {
     const a = { shaderLocation: location, offset, format };
-    offset +=
-      format === 'float32x4' ? 16 : format === 'float32x3' ? 12 : format === 'float32x2' ? 8 : 4;
+    offset += format === 'float32x4' ? 16 : format === 'float32x2' ? 8 : 4;
     return a;
   });
   return { arrayStride: stride * 4, stepMode: 'instance', attributes };
@@ -138,8 +137,9 @@ export class GpuRenderer {
         instanceLayout(LINE_STRIDE, [
           [0, 'float32x4'],
           [1, 'float32x4'],
-          [2, 'float32x3'],
+          [2, 'float32x2'],
           [3, 'float32x4'],
+          [4, 'float32x4'],
         ]),
       ),
       markers: make(
