@@ -59,7 +59,9 @@ function markers({ data, count }: Batch) {
   });
 }
 
-const grey = parseColor(THEME.hover).map((c) => Math.fround(c));
+const packed = (hex: string) => parseColor(hex).map((c) => Math.fround(c));
+const grey = packed(THEME.hover);
+const faint = packed(THEME.hoverFaint);
 
 describe('buildTraces', () => {
   it('draws every outline of every part, 2 px wide and solid in the hover grey', () => {
@@ -71,7 +73,7 @@ describe('buildTraces', () => {
     const stepped = area(polygon, lineOf([5, 0], [6, 0], [6, 1]));
 
     // Act
-    const [lines, dots] = buildTraces({ pointedAt: stepped, project });
+    const [, , lines, dots] = buildTraces({ pointedAt: stepped, searched: [], project });
 
     // Assert
     const drawn = segments(lines);
@@ -87,7 +89,7 @@ describe('buildTraces', () => {
     const through = route(lineOf([0, 0], [1, 0], [2, 0]));
 
     // Act
-    const [lines] = buildTraces({ pointedAt: through, project });
+    const [, , lines] = buildTraces({ pointedAt: through, searched: [], project });
 
     // Assert
     expect(segments(lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
@@ -98,7 +100,7 @@ describe('buildTraces', () => {
     const pointed = fix(pointAt([1, 2]), pointAt([3, 4]));
 
     // Act
-    const [lines, dots] = buildTraces({ pointedAt: pointed, project });
+    const [, , lines, dots] = buildTraces({ pointedAt: pointed, searched: [], project });
 
     // Assert
     expect(lines.count).toBe(0);
@@ -113,7 +115,7 @@ describe('buildTraces', () => {
     const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
 
     // Act
-    const [lines, dots] = buildTraces({ pointedAt: hold, project });
+    const [, , lines, dots] = buildTraces({ pointedAt: hold, searched: [], project });
 
     // Assert
     expect([lines.count, dots.count]).toEqual([0, 0]);
@@ -124,9 +126,65 @@ describe('buildTraces', () => {
     const none = null;
 
     // Act
-    const [lines, dots] = buildTraces({ pointedAt: none, project });
+    const [, , lines, dots] = buildTraces({ pointedAt: none, searched: [], project });
 
     // Assert
     expect([lines.count, dots.count]).toEqual([0, 0]);
+  });
+
+  it('draws what the search names at half strength, a ring at 8 px radius', () => {
+    // Arrange
+    const found = [area(lineOf([0, 0], [1, 0], [1, 1])), fix(pointAt([5, 6]))];
+
+    // Act
+    const [lines, dots] = buildTraces({ pointedAt: null, searched: found, project });
+
+    // Assert
+    const drawn = segments(lines);
+    expect(drawn.map((x) => x.color)).toEqual(drawn.map(() => faint));
+    expect(drawn.map((x) => [x.width, x.pattern])).toEqual(drawn.map(() => [2, [0, 0, 0, 0]]));
+    expect(markers(dots)).toEqual([{ at: [5, 6], size: 16, shape: Shape.TraceRing }]);
+    expect(faint[3]).toBeCloseTo(128 / 255, 2);
+  });
+
+  it('draws a hold the search names as nothing', () => {
+    // Arrange
+    const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
+
+    // Act
+    const batches = buildTraces({ pointedAt: null, searched: [hold], project });
+
+    // Assert
+    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('puts the search first and what is pointed at over it, an item in both drawn in both', () => {
+    // Arrange
+    const both = fix(pointAt([1, 2]));
+    const onlySearched = area(lineOf([0, 0], [1, 0]));
+
+    // Act
+    const [searchLines, searchDots, pointedLines, pointedDots] = buildTraces({
+      pointedAt: both,
+      searched: [onlySearched, both],
+      project,
+    });
+
+    // Assert
+    expect(segments(searchLines)).toHaveLength(1);
+    expect(markers(searchDots).map((m) => m.size)).toEqual([16]);
+    expect(pointedLines.count).toBe(0);
+    expect(markers(pointedDots).map((m) => m.size)).toEqual([18]);
+  });
+
+  it('gives only empty batches when nothing is searched or pointed at', () => {
+    // Arrange
+    const none = { pointedAt: null, searched: [], project };
+
+    // Act
+    const batches = buildTraces(none);
+
+    // Assert
+    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
   });
 });

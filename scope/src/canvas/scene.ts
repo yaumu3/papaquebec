@@ -17,7 +17,7 @@ import { buildTraces } from '../render/scene/traces';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
 import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
 import { hoverInstant } from '../state/lanes';
-import { pointedItem } from '../state/layerTree';
+import { pointedItem, searchedItems } from '../state/layerTree';
 import { declinationAt } from '../state/magnetic';
 import { topology } from '../state/mapsets';
 import {
@@ -140,7 +140,15 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   }
 
   show(() =>
-    projected() ? { traces: buildTraces({ pointedAt: pointedItem(), project: projectNm }) } : null,
+    projected()
+      ? {
+          traces: buildTraces({
+            pointedAt: pointedItem(),
+            searched: searchedItems(),
+            project: projectNm,
+          }),
+        }
+      : null,
   );
 
   const layoutScale = settledScale(view);

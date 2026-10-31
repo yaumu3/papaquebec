@@ -61,6 +61,9 @@ export const leaveRow = (key: string): void => void setUnderMouse(clearing(key))
 export const focusRow = (key: string): void => void setFocused(key);
 export const blurRow = (key: string): void => void setFocused(clearing(key));
 
+/** The items the search names on their own rows, to trace on the scope. */
+export const searchedItems = (): readonly ChartItem[] => found()?.traced ?? [];
+
 /** The item the tree points at, whether it draws or not: pointing at a hidden one finds it. */
 export function pointedItem(): ChartItem | null {
   const key = pointedAt();

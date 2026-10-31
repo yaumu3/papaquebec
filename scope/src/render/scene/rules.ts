@@ -49,6 +49,7 @@ export const THEME = {
   cursorFaint: '#d48cf04d',
   filtered: '#808080',
   hover: PALETTE.hover,
+  hoverFaint: `${PALETTE.hover}80`,
 } as const;
 
 /** Whether the position is as old as the lapse, or older. */

@@ -8,11 +8,14 @@ import { THEME } from './rules';
 interface TracesInput {
   /** The item the tree points at, whether it draws or not. */
   pointedAt: ChartItem | null;
+  /** The items the search names on their own rows. */
+  searched: readonly ChartItem[];
   project: ProjectFn;
 }
 
 const TRACE_WIDTH_PX = 2;
 const POINTED_RING_PX = 9;
+const SEARCH_RING_PX = 8;
 
 /**
  * An item's full geometry: every outline of every part, not cut back at stops, and a point as a
@@ -39,10 +42,30 @@ function traceItem(
   }
 }
 
-/** What the tree points at, drawn over the chart's labels and under the targets. */
-export function buildTraces({ pointedAt, project }: TracesInput): [Batch, Batch] {
+/** One trace of `items`: their lines, then their markers. */
+function trace(
+  items: readonly ChartItem[],
+  color: string,
+  ringPx: number,
+  project: ProjectFn,
+): [Batch, Batch] {
   const lines = new LineBatch(1);
   const markers = new MarkerBatch(1);
-  if (pointedAt) traceItem(pointedAt, THEME.hover, POINTED_RING_PX, project, lines, markers);
+  for (const item of items) traceItem(item, color, ringPx, project, lines, markers);
   return [lines.finish(), markers.finish()];
+}
+
+/**
+ * What the search names at half strength, then what the tree points at over it at full
+ * strength, drawn over the chart's labels and under the targets.
+ */
+export function buildTraces({
+  pointedAt,
+  searched,
+  project,
+}: TracesInput): [Batch, Batch, Batch, Batch] {
+  return [
+    ...trace(searched, THEME.hoverFaint, SEARCH_RING_PX, project),
+    ...trace(pointedAt ? [pointedAt] : [], THEME.hover, POINTED_RING_PX, project),
+  ];
 }
