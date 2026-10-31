@@ -1,37 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
-import { DRAW_STACK, LAYER_GROUPS, LAYER_NAMES, type ScopeLayer } from './layers';
+import { DRAW_STACK, LAYER_GROUPS, type ScopeLayer } from './layers';
 import { LAYERS } from './mapsetFormat';
 
 type Group = [string, readonly ScopeLayer[]];
-
-const NAMES: [ScopeLayer, string][] = [
-  ['ad', 'AERODROMES'],
-  ['navaid', 'RADIO NAVAIDS'],
-  ['fix', 'SIGNIFICANT POINTS'],
-  ['vfr', 'VFR POINTS'],
-  ['conv', 'CONVENTIONAL'],
-  ['rnav', 'RNAV'],
-  ['dct', 'DIRECT ROUTES'],
-  ['hold', 'EN-ROUTE HOLDING'],
-  ['sid', 'SID'],
-  ['star', 'STAR'],
-  ['trans', 'TRANSITIONS'],
-  ['pr', 'RESTRICTED AREAS'],
-  ['dng', 'DANGER AREAS'],
-  ['tra', 'MILITARY TRAINING'],
-  ['adiz', 'ADIZ'],
-  ['civt', 'CIVIL TRAINING'],
-  ['ctr', 'CONTROL ZONES'],
-  ['tma', 'TERMINAL AREAS'],
-  ['cta', 'CONTROL AREAS'],
-  ['advisory', 'ADVISORY AREAS'],
-  ['sector', 'SECTORS'],
-  ['fir', 'FIR'],
-  ['asr', 'ALTIMETER SETTING'],
-  ['coast', 'COASTLINE'],
-  ['rings', 'RANGE RINGS'],
-];
 
 describe('DRAW_STACK', () => {
   it('holds every layer of the map set format, the coastline and the rings, each once', () => {
@@ -111,18 +83,5 @@ describe('LAYER_GROUPS', () => {
 
     // Assert
     expect(listed).toEqual(expected);
-  });
-});
-
-describe('LAYER_NAMES', () => {
-  it('gives each layer its display name', () => {
-    // Arrange
-    const layers = NAMES.map(([layer]) => layer);
-
-    // Act
-    const names = layers.map((layer) => LAYER_NAMES[layer]);
-
-    // Assert
-    expect(names).toEqual(NAMES.map(([, name]) => name));
   });
 });

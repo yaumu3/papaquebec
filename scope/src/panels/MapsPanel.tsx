@@ -136,7 +136,6 @@ export function MapsPanel() {
                   <Button
                     class={s.layer}
                     on={settings.shownLayers[layer]}
-                    label={LAYER_NAMES[layer]}
                     onClick={() => toggleLayer(layer)}
                   >
                     {LAYER_NAMES[layer]}
