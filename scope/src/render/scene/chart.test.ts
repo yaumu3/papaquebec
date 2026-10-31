@@ -6,7 +6,7 @@ import { POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
-import { buildChart } from './chart';
+import { buildChart, navaidsShownAt, visibleLayers } from './chart';
 import { parseColor } from './pack';
 
 const project = (lat: number, lon: number) => ({ x: lon, y: lat });
@@ -376,5 +376,58 @@ describe('buildChart labels', () => {
 
     // Assert
     expect(colours).toEqual(rows.map(([, hex]) => packed(hex)));
+  });
+});
+
+describe('navaidsShownAt', () => {
+  it('shows navaids out to 120 NM and hides them beyond', () => {
+    // Arrange
+    const ranges = [120, 121];
+
+    // Act
+    const shown = ranges.map(navaidsShownAt);
+
+    // Assert
+    expect(shown).toEqual([true, false]);
+  });
+});
+
+describe('visibleLayers', () => {
+  const all: StyledLayer[] = ['ad', 'navaid', 'fix', 'ctr'];
+
+  it('keeps the layers that are shown, in order, and the navaids only within range', () => {
+    // Arrange
+    const rows: {
+      shown: (l: StyledLayer) => boolean;
+      inRange: boolean;
+      expected: StyledLayer[];
+    }[] = [
+      { shown: () => true, inRange: true, expected: ['ad', 'navaid', 'fix', 'ctr'] },
+      { shown: () => true, inRange: false, expected: ['ad', 'fix', 'ctr'] },
+      { shown: (l) => l !== 'ad' && l !== 'fix', inRange: true, expected: ['navaid', 'ctr'] },
+      { shown: () => false, inRange: true, expected: [] },
+    ];
+
+    // Act
+    const kept = rows.map((r) => visibleLayers(all, r.shown, () => r.inRange));
+
+    // Assert
+    expect(kept).toEqual(rows.map((r) => r.expected));
+  });
+
+  it('does not read the range for a navaid layer that is hidden', () => {
+    // Arrange
+    let reads = 0;
+    const inRange = () => {
+      reads += 1;
+      return true;
+    };
+
+    // Act
+    const kept = visibleLayers(all, (l) => l !== 'navaid', inRange);
+
+    // Assert
+    expect(reads).toBe(0);
+    expect(kept).toEqual(['ad', 'fix', 'ctr']);
   });
 });

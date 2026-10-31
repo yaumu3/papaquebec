@@ -1,44 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { DrawnLayers } from '../../lib/mapdata';
-import type { Layers } from '../../state/settingsDefaults';
 import type { Batch } from '../protocol';
-import { MAP_SLOTS } from '../slots';
 import { atlas } from './atlasFixture';
-import { buildMap, buildRings, type MapInput, navaidsShownAt } from './static';
-
-const allLayers: Layers = {
-  coast: true,
-  airspace: true,
-  waypoints: true,
-  airways: true,
-  navaids: true,
-  rings: true,
-  sector: true,
-  airports: true,
-};
-
-const drawn: DrawnLayers = {
-  waypoints: [],
-  navaids: [{ id: 'HME', lat: 35.5, lon: 139.8 }],
-  airways: [],
-  airspace: [],
-  sectors: [],
-  airports: [],
-};
-
-function mapInput(over: Partial<MapInput> = {}): MapInput {
-  return {
-    coast: { lines: [] },
-    drawn,
-    project: (lat, lon) => ({ x: lon, y: lat }),
-    layers: allLayers,
-    labelDensity: 'normal',
-    navaidsInRange: true,
-    atlas,
-    ...over,
-  };
-}
+import { buildCoast, buildRings } from './static';
 
 /** A stand-in ring outline of two segments, its first point north at `(1, r)`. */
 const ringPath = (r: number) => [
@@ -47,106 +11,70 @@ const ringPath = (r: number) => [
   { x: 1, y: r },
 ];
 
-const count = (batches: Batch[], kind: Batch['kind']) =>
-  batches.filter((b) => b.kind === kind).reduce((n, b) => n + b.count, 0);
+const count = (batches: Batch[] | undefined, kind: Batch['kind']) =>
+  (batches ?? []).filter((b) => b.kind === kind).reduce((n, b) => n + b.count, 0);
+
+const project = (lat: number, lon: number) => ({ x: lon, y: lat });
 
 describe('buildRings', () => {
   it('draws each ring along its path, with the radius printed at its first, northern point', () => {
     // Arrange
-    const input = { layers: allLayers, rangeNm: 40, ringExtentNm: 40, ringPath, atlas };
+    const input = { shown: true, rangeNm: 40, ringExtentNm: 40, ringPath, atlas };
 
     // Act
-    const batches = buildRings(input);
+    const { ringLines, ringLabels } = buildRings(input);
 
     // Assert
-    const text = batches.find((b) => b.kind === 'text');
-    expect(count(batches, 'lines')).toBe(4 * 2);
-    expect(count(batches, 'text')).toBe('10203040'.length);
+    const text = ringLabels?.find((b) => b.kind === 'text');
+    expect(count(ringLines, 'lines')).toBe(4 * 2);
+    expect(count(ringLabels, 'text')).toBe('10203040'.length);
     expect([text?.data[0], text?.data[1]]).toEqual([1, 10]);
   });
-});
 
-describe('buildMap', () => {
-  it('builds every map layer', () => {
+  it('draws nothing when the rings are hidden, and still fills both slots', () => {
     // Arrange
-    const input = mapInput();
+    const input = { shown: false, rangeNm: 40, ringExtentNm: 40, ringPath, atlas };
 
     // Act
-    const layers = buildMap(input);
+    const { ringLines, ringLabels } = buildRings(input);
 
     // Assert
-    expect(Object.keys(layers).toSorted()).toEqual([...MAP_SLOTS].toSorted());
-  });
-
-  it('draws navaids only while the range keeps them in view', () => {
-    // Arrange
-    const cases = [true, false];
-
-    // Act
-    const counts = cases.map((navaidsInRange) => {
-      const { fixes } = buildMap(mapInput({ navaidsInRange }));
-      return count(fixes, 'markers');
-    });
-
-    // Assert
-    expect(counts).toEqual([1, 0]);
+    expect([count(ringLines, 'lines'), count(ringLabels, 'text')]).toEqual([0, 0]);
+    expect([ringLines?.length, ringLabels?.length]).toEqual([1, 1]);
   });
 });
 
-describe('buildMap airspace', () => {
-  it('draws an area as one line per closed segment', () => {
-    // Arrange
-    const area = {
-      name: 'PAPAQ',
-      kind: 'CTR',
-      points: [
-        [35.5, 139.8],
-        [35.6, 139.8],
-        [35.6, 139.9],
-      ] as [number, number][],
-      dashed: true,
-    };
-    const input = mapInput({ drawn: { ...drawn, airspace: [area] } });
-
-    // Act
-    const { airspace } = buildMap(input);
-
-    // Assert
-    expect(count(airspace, 'lines')).toBe(3);
-  });
-});
-
-describe('buildMap edges', () => {
-  it('splits long sector and coast edges along the geodesic, closing the outline', () => {
+describe('buildCoast', () => {
+  it('splits long edges along the geodesic', () => {
     // Arrange
     const outline: [number, number][] = [
-      [35, 130],
-      [35, 150],
-      [40, 140],
+      [130, 35],
+      [150, 35],
+      [140, 40],
     ];
-    const input = mapInput({
-      drawn: { ...drawn, sectors: [{ name: 'S', points: outline }] },
-      coast: { lines: [outline.map(([lat, lon]) => [lon, lat] as [number, number])] },
-    });
 
     // Act
-    const { sector, coast } = buildMap(input);
+    const { coastLines } = buildCoast({ shown: true, coast: { lines: [outline] }, project });
 
     // Assert
-    expect(count(sector, 'lines')).toBeGreaterThan(3);
-    expect(count(coast, 'lines')).toBeGreaterThan(2);
+    expect(count(coastLines, 'lines')).toBeGreaterThan(2);
   });
-});
 
-describe('navaidsShownAt', () => {
-  it('shows navaids out to 120 NM and hides them beyond', () => {
+  it('draws nothing when the coastline is hidden', () => {
     // Arrange
-    const ranges = [120, 121];
+    const coast = {
+      lines: [
+        [
+          [130, 35],
+          [140, 40],
+        ] as [number, number][],
+      ],
+    };
 
     // Act
-    const shown = ranges.map(navaidsShownAt);
+    const { coastLines } = buildCoast({ shown: false, coast, project });
 
     // Assert
-    expect(shown).toEqual([true, false]);
+    expect(count(coastLines, 'lines')).toBe(0);
   });
 });

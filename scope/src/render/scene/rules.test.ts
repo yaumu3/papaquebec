@@ -2,15 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
 import { Shape } from '../protocol';
-import {
-  airspaceColor,
-  isStale,
-  targetShape,
-  THEME,
-  trackColor,
-  trackLabel,
-  typeLabel,
-} from './rules';
+import { isStale, targetShape, THEME, trackColor, trackLabel, typeLabel } from './rules';
 import { makeTrack as track } from './trackFixture';
 
 describe('isStale', () => {
@@ -87,20 +79,6 @@ describe('trackLabel', () => {
 
     // Assert
     expect(labels).toEqual(['TEST01', 'TEST-02', 'D00001']);
-  });
-});
-
-describe('airspaceColor', () => {
-  it('keeps control zones and special-use areas bright and dims area sectors', () => {
-    // Arrange
-    const kinds = ['CTR', 'ATZ', 'R', 'D', 'P', 'TCA', 'ACA', 'PCA', 'INFO', 'TMA'];
-
-    // Act
-    const colors = kinds.map(airspaceColor);
-
-    // Assert
-    expect(colors.slice(0, 5)).toEqual(Array(5).fill(THEME.airspace));
-    expect(colors.slice(5)).toEqual(Array(5).fill(THEME.airspaceDim));
   });
 });
 

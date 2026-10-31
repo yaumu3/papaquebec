@@ -1,5 +1,6 @@
 import { createStore } from 'solid-js/store';
 
+import type { ScopeLayer } from '../lib/layers';
 import { DEFAULT_LIST_SORT } from './listSort';
 import { loadPersisted, type Persisted, savePersisted } from './persist';
 import { DEFAULT_PLOTTED } from './plotted';
@@ -7,7 +8,6 @@ import {
   DEFAULT_ND_RANGE_NM,
   DEFAULT_PANELS,
   DEFAULT_SETTINGS,
-  type LayerKey,
   RANGE_MAX_NM,
   RANGE_MIN_NM,
   RANGE_STEPS,
@@ -37,7 +37,6 @@ export function persist(rest: Omit<Persisted, 'settings'>): void {
   const snapshot: Settings = {
     ...settings,
     filter: { ...settings.filter },
-    layers: { ...settings.layers },
     shownLayers: { ...settings.shownLayers },
     altimeter: { ...settings.altimeter },
     qnh: { ...settings.qnh },
@@ -45,8 +44,8 @@ export function persist(rest: Omit<Persisted, 'settings'>): void {
   savePersisted(storage, { settings: snapshot, ...rest });
 }
 
-export function toggleLayer(key: LayerKey): void {
-  setSettings('layers', key, (v) => !v);
+export function toggleLayer(layer: ScopeLayer): void {
+  setSettings('shownLayers', layer, (v) => !v);
 }
 
 /** Jump to the next preset above or below the current range. */

@@ -7,16 +7,17 @@ import { applyPlacement, blockSubjects, viewportRect } from '../render/layout/pl
 import { workerPlacer } from '../render/layout/placer';
 import { fixNearest } from '../render/layout/trails';
 import type { AtlasInfo, View } from '../render/protocol';
+import { buildChart, navaidsShownAt, visibleLayers } from '../render/scene/chart';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
-import { buildMap, buildRings, navaidsShownAt } from '../render/scene/static';
+import { buildCoast, buildRings } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
-import { SLOT_ORDER, type Slots } from '../render/slots';
+import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
 import { hoverInstant } from '../state/lanes';
 import { declinationAt } from '../state/magnetic';
+import { chart } from '../state/mapsets';
 import {
-  drawn,
   canvasSize,
   coast,
   drawnBlocks,
@@ -101,32 +102,39 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     const path = ringPath();
     if (!path) return null;
     const { width, height } = canvasSize();
-    return {
-      rings: buildRings({
-        layers: { ...settings.layers },
-        rangeNm: settings.rangeNm,
-        ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
-        ringPath: path,
-        atlas: a,
-      }),
-    };
+    return buildRings({
+      shown: settings.shownLayers.rings,
+      rangeNm: settings.rangeNm,
+      ringExtentNm: halfLongEdgeNm(width, height, settings.rangeNm),
+      ringPath: path,
+      atlas: a,
+    });
   });
 
-  /** Zooming reaches the map slots only when it shows or hides the navaids. */
-  const navaidsInRange = createMemo(() => navaidsShownAt(settings.rangeNm));
-  show((a) =>
+  show(() =>
     projected()
-      ? buildMap({
-          coast: coast(),
-          drawn: drawn(),
-          project: projectNm,
-          layers: { ...settings.layers },
-          labelDensity: settings.labelDensity,
-          navaidsInRange: navaidsInRange(),
-          atlas: a,
-        })
+      ? buildCoast({ shown: settings.shownLayers.coast, coast: coast(), project: projectNm })
       : null,
   );
+
+  /** Zooming reaches the chart only when it shows or hides the navaids. */
+  const navaidsInRange = createMemo(() => navaidsShownAt(settings.rangeNm));
+  for (const slice of CHART_SLICES) {
+    show((a) =>
+      projected()
+        ? sliceSlots(
+            slice,
+            buildChart({
+              chart: chart(),
+              project: projectNm,
+              layers: visibleLayers(slice.layers, (l) => settings.shownLayers[l], navaidsInRange),
+              labelDensity: settings.labelDensity,
+              atlas: a,
+            }),
+          )
+        : null,
+    );
+  }
 
   const layoutScale = settledScale(view);
   /**

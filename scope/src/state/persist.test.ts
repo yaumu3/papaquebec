@@ -39,7 +39,7 @@ describe('loadPersisted', () => {
         vectorMin: 99,
         trailSec: 120,
         filter: { lowerFl: 100, upperFl: 50, squawk: 'nonvfr' },
-        layers: { coast: false, airspace: 'yes' },
+        shownLayers: { coast: false, ctr: 'yes' },
         labelDensity: 'loud',
         altimeter: { transitionAltFt: 5000, qnhInHg: 99 },
       },
@@ -56,7 +56,7 @@ describe('loadPersisted', () => {
     expect(settings.vectorMin).toBe(DEFAULT_SETTINGS.vectorMin);
     expect(settings.trailSec).toBe(120);
     expect(settings.filter).toEqual({ ...DEFAULT_SETTINGS.filter, squawk: 'nonvfr' });
-    expect(settings.layers).toEqual({ ...DEFAULT_SETTINGS.layers, coast: false });
+    expect(settings.shownLayers).toEqual({ ...DEFAULT_SETTINGS.shownLayers, coast: false });
     expect(settings.labelDensity).toBe(DEFAULT_SETTINGS.labelDensity);
     expect(settings.altimeter).toEqual({ ...DEFAULT_SETTINGS.altimeter, transitionAltFt: 5000 });
     expect(panels).toEqual({ ...DEFAULT_PANELS, list: false });

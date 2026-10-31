@@ -51,13 +51,6 @@ export const THEME = {
   hover: PALETTE.hover,
 } as const;
 
-/** Control zones and special-use areas: what the operator must not miss. Everything else is context. */
-const BRIGHT_AIRSPACE = new Set(['CTR', 'ATZ', 'TIZ', 'TIA', 'R', 'D', 'P', 'ALERT', 'WARNING']);
-
-export function airspaceColor(kind: string): string {
-  return BRIGHT_AIRSPACE.has(kind) ? THEME.airspace : THEME.airspaceDim;
-}
-
 /** Whether the position is as old as the lapse, or older. */
 export function isStale(t: Pick<Readings, 'seenPos'>): boolean {
   return (t.seenPos ?? 0) >= LAPSE_SEC;

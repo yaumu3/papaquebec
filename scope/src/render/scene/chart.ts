@@ -2,10 +2,30 @@ import { type Chart, type ChartItem, isUpperStratum, type ItemPart } from '../..
 import type { ProjectFn } from '../../lib/geo';
 import type { StyledLayer } from '../../lib/layers';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
-import type { AtlasInfo, Batch } from '../protocol';
+import type { AtlasInfo } from '../protocol';
+import type { SliceBatches } from '../slots';
 import { isPointStyle, LAYER_STYLES, type LayerStyle, type LineLayerStyle } from './layerStyles';
 import { type Anchor, LineBatch, type LineStyle, MarkerBatch, TextBatch } from './pack';
 import { route } from './paths';
+
+const NAVAID_MAX_RANGE = 120;
+
+/** Navaids clutter a wide range; they show only out to `NAVAID_MAX_RANGE`. */
+export function navaidsShownAt(rangeNm: number): boolean {
+  return rangeNm <= NAVAID_MAX_RANGE;
+}
+
+/**
+ * The layers to build: those shown, and the navaids only when the range allows. The range is
+ * read only for a shown navaid layer, so a rebuild follows it only then.
+ */
+export function visibleLayers(
+  layers: readonly StyledLayer[],
+  shown: (layer: StyledLayer) => boolean,
+  navaidsInRange: () => boolean,
+): StyledLayer[] {
+  return layers.filter((l) => shown(l) && (l !== 'navaid' || navaidsInRange()));
+}
 
 export interface ChartInput {
   chart: Chart;
@@ -84,7 +104,7 @@ export function buildChart({
   layers,
   labelDensity,
   atlas,
-}: ChartInput): Record<keyof ChartBatches, Batch> {
+}: ChartInput): SliceBatches {
   const out = { lines: new LineBatch(), markers: new MarkerBatch(), labels: new TextBatch(atlas) };
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];

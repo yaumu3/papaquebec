@@ -9,30 +9,10 @@ export const RANGE_MAX_NM = 400;
 export const VECTOR_STEPS = [0, 0.5, 1, 2] as const;
 export const TRAIL_STEPS = [0, 30, 60, 120] as const;
 
-export type LayerKey =
-  | 'coast'
-  | 'airspace'
-  | 'waypoints'
-  | 'airways'
-  | 'navaids'
-  | 'rings'
-  | 'sector'
-  | 'airports';
-export type Layers = Record<LayerKey, boolean>;
 /** Whether each layer is drawn. */
 export type ShownLayers = Record<ScopeLayer, boolean>;
 export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
 
-export const LAYER_KEYS: LayerKey[] = [
-  'coast',
-  'airspace',
-  'waypoints',
-  'airways',
-  'navaids',
-  'rings',
-  'sector',
-  'airports',
-];
 const HIDDEN_BY_DEFAULT: ReadonlySet<ScopeLayer> = new Set([
   'adiz',
   'cta',
@@ -57,7 +37,6 @@ export interface Settings {
   /** Seconds of trail; 0 hides it. */
   trailSec: number;
   filter: Filter;
-  layers: Layers;
   shownLayers: ShownLayers;
   labelDensity: LabelDensity;
   altimeter: Altimeter;
@@ -82,16 +61,6 @@ export const DEFAULT_SETTINGS: Settings = {
   vectorMin: 2,
   trailSec: 60,
   filter: { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' },
-  layers: {
-    coast: true,
-    airspace: true,
-    waypoints: true,
-    airways: false,
-    navaids: true,
-    rings: true,
-    sector: false,
-    airports: true,
-  },
   shownLayers: Object.fromEntries(
     DRAW_STACK.map((layer) => [layer, !HIDDEN_BY_DEFAULT.has(layer)]),
   ) as ShownLayers,

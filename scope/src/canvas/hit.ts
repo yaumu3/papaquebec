@@ -1,12 +1,15 @@
+import type { Chart } from '../lib/chart';
 import { blockHeight, DB_WIDTH, type Rect } from '../lib/datablock';
-import { distanceToSegment, type ProjectFn, type UnprojectFn } from '../lib/geo';
+import { distanceToSegment, type ProjectFn, type UnprojectFn, type Vec2 } from '../lib/geo';
+import type { ScopeLayer } from '../lib/layers';
 import type { Offset } from '../render/layout/moves';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/rbl';
 import { restingOffset } from '../render/scene/targets';
 import { toScreen, toWorld } from '../render/scene/view';
-import { drawn, drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
+import { chart } from '../state/mapsets';
+import { drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
 import { settings } from '../state/settings';
 import type { Track } from '../state/track';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
@@ -120,27 +123,40 @@ export function rblAt(view: View, cx: number, cy: number): Rbl | null {
   });
 }
 
+/** The layers whose points the range cursor snaps onto. */
+const SNAP_LAYERS: readonly ScopeLayer[] = ['fix', 'vfr', 'navaid'];
+
+/** The point of a shown fix, VFR point or navaid nearest `at`, if any is within `reach`. */
+export function fixNear(
+  items: Chart,
+  shown: (layer: ScopeLayer) => boolean,
+  at: Vec2,
+  reach: number,
+  project: ProjectFn,
+): { name: string; x: number; y: number } | null {
+  let best: { name: string; x: number; y: number } | null = null;
+  let bestD = reach * reach;
+  for (const item of items) {
+    if (!SNAP_LAYERS.includes(item.layer) || !shown(item.layer)) continue;
+    for (const { geometry, properties } of item.parts) {
+      if (geometry.type !== 'Point' || !('id' in properties)) continue;
+      const [lon, lat] = geometry.coordinates;
+      const p = project(lat, lon);
+      const d = (p.x - at.x) ** 2 + (p.y - at.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = { name: properties.id, ...p };
+      }
+    }
+  }
+  return best;
+}
+
 export function fixAt(
   view: View,
   cx: number,
   cy: number,
 ): { name: string; x: number; y: number } | null {
-  if (!settings.layers.waypoints && !settings.layers.navaids) return null;
-  const w = toWorld(view, cx, cy);
   const reach = FIX_PX / view.pxPerNm;
-  let best: { name: string; x: number; y: number } | null = null;
-  let bestD = reach * reach;
-  const fixes = [
-    ...(settings.layers.waypoints ? drawn().waypoints : []),
-    ...(settings.layers.navaids ? drawn().navaids : []),
-  ];
-  for (const f of fixes) {
-    const p = projectNm(f.lat, f.lon);
-    const d = (p.x - w.x) ** 2 + (p.y - w.y) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = { name: f.id, ...p };
-    }
-  }
-  return best;
+  return fixNear(chart(), (l) => settings.shownLayers[l], toWorld(view, cx, cy), reach, projectNm);
 }

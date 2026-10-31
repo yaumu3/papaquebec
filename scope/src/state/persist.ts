@@ -6,8 +6,6 @@ import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
 import { isLaneKey, type LaneKey } from './plotted';
 import {
   LABEL_DENSITIES,
-  LAYER_KEYS,
-  type Layers,
   ND_RANGES_NM,
   type NdRangeNm,
   PANEL_IDS,
@@ -57,12 +55,6 @@ function filterFrom(raw: unknown, fallback: Filter): Filter {
     ground: bool(raw.ground, fallback.ground),
     squawk: oneOf(SQUAWK_FILTERS, raw.squawk, fallback.squawk),
   };
-}
-
-function layersFrom(raw: unknown, fallback: Layers): Layers {
-  const out = { ...fallback };
-  if (isRecord(raw)) for (const k of LAYER_KEYS) out[k] = bool(raw[k], fallback[k]);
-  return out;
 }
 
 /** The flags saved for each layer; failing those, the old object's coast and rings, nothing else. */
@@ -115,7 +107,6 @@ function settingsFrom(raw: unknown, fallback: Settings): Settings {
     vectorMin: oneOf<number>(VECTOR_STEPS, raw.vectorMin, fallback.vectorMin),
     trailSec: oneOf<number>(TRAIL_STEPS, raw.trailSec, fallback.trailSec),
     filter: filterFrom(raw.filter, fallback.filter),
-    layers: layersFrom(raw.layers, fallback.layers),
     shownLayers: shownLayersFrom(raw, fallback.shownLayers),
     labelDensity: oneOf(LABEL_DENSITIES, raw.labelDensity, fallback.labelDensity),
     altimeter: altimeterFrom(raw.altimeter, fallback.altimeter),

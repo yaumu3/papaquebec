@@ -14,12 +14,6 @@ export const route = (points: readonly LonLat[], project: ProjectFn): Anchor[] =
     project,
   );
 
-/** A route back to its first point, for an outline. */
-export function closedRoute(points: readonly LonLat[], project: ProjectFn): Anchor[] {
-  const first = points[0];
-  return route(first ? [...points, first] : points, project);
-}
-
 /** The points `radiusNm` from `center` along the earth, on the scope plane, from due north round. */
 export function projectedCircle(center: GeoPoint, radiusNm: number, project: ProjectFn): Anchor[] {
   return geodesicCircle(center, radiusNm, CIRCLE_SEGMENTS).map((p) => project(p.lat, p.lon));
