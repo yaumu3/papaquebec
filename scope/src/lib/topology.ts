@@ -45,6 +45,8 @@ export interface ChartPoint {
   layer: PointLayer;
   id: string;
   at: LonLat;
+  /** Shared with any route position at the same identity. */
+  vertex: number;
 }
 
 export interface Topology {
@@ -68,14 +70,16 @@ function numberOf(numbers: Map<number, number>, key: number): number {
   return numbers.size - 1;
 }
 
+type VertexOf = (at: LonLat) => number;
+
 /** Gives one vertex number to every identity. */
-function vertexNumbering() {
+function vertexNumbering(): VertexOf {
   const numbers = new Map<number, number>();
   return ([lon, lat]: LonLat) => numberOf(numbers, toGrid(lon) * IDENTITY_KEY_BASE + toGrid(lat));
 }
 
 /** An outline's positions and their vertices, without a position at its neighbour's identity. */
-function distinctVertices(outline: LonLat[], vertexOf: (at: LonLat) => number) {
+function distinctVertices(outline: LonLat[], vertexOf: VertexOf) {
   const coordinates: LonLat[] = [];
   const vertices: number[] = [];
   for (const at of outline) {
@@ -93,7 +97,7 @@ const byFront = (a: Outline, b: Outline) =>
   stackIndex(a.layer) - stackIndex(b.layer) ||
   Number(isUpperStratum(a.part)) - Number(isUpperStratum(b.part));
 
-function networkOf(outlines: Outline[], vertexOf: (at: LonLat) => number): Network {
+function networkOf(outlines: Outline[], vertexOf: VertexOf): Network {
   const edgeNumbers = new Map<number, number>();
   const edgeOf = (a: number, b: number) =>
     numberOf(edgeNumbers, Math.min(a, b) * EDGE_KEY_BASE + Math.max(a, b));
@@ -116,10 +120,10 @@ function networkOf(outlines: Outline[], vertexOf: (at: LonLat) => number): Netwo
 }
 
 /** The point parts of an item. */
-function pointsOf(parts: readonly ItemPart[]): ChartPoint[] {
-  return parts.flatMap(({ geometry, properties }) =>
-    geometry.type === 'Point' && 'id' in properties
-      ? [{ layer: properties.layer, id: properties.id, at: geometry.coordinates }]
+function pointsOf(parts: readonly ItemPart[], vertexOf: VertexOf): ChartPoint[] {
+  return parts.flatMap(({ geometry: g, properties: p }) =>
+    g.type === 'Point' && 'id' in p
+      ? [{ layer: p.layer, id: p.id, at: g.coordinates, vertex: vertexOf(g.coordinates) }]
       : [],
   );
 }
@@ -129,15 +133,15 @@ export function topologyOf(chart: Chart): Topology {
   const areas: Outline[] = [];
   const routes: Outline[] = [];
   const points: ChartPoint[] = [];
+  const vertexOf = vertexNumbering();
   for (const { layer, parts } of chart) {
-    points.push(...pointsOf(parts));
+    points.push(...pointsOf(parts, vertexOf));
     if (isPointLayer(layer) || layer === 'hold') continue;
     const into = isRouteLayer(layer) ? routes : areas;
     for (const part of parts) {
       for (const coordinates of outlinesOf(part.geometry)) into.push({ part, layer, coordinates });
     }
   }
-  const vertexOf = vertexNumbering();
   return {
     chart,
     areas: networkOf(areas, vertexOf),

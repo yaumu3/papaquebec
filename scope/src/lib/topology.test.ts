@@ -378,3 +378,28 @@ describe('the points of a topology', () => {
     expect(drawn).toEqual([['TAVRO'], [], [], ['TAVRO', 'QDG'], ['TAVRO']]);
   });
 });
+
+describe('the vertex of a point', () => {
+  it('is the vertex of the route position at its identity, and its own where no route is', () => {
+    // Arrange
+    const nearB: LonLat = [130.700004, 33.7];
+    const chart: Chart = [
+      ...chartWith(partOf('conv', 'R', [[A, B]])),
+      pointItem('fix', pointPart('fix', 'ON', nearB)),
+      pointItem('fix', pointPart('fix', 'OFF', E)),
+    ];
+
+    // Act
+    const {
+      routes: {
+        paths: [path],
+      },
+      points: [on, off],
+    } = topologyOf(chart);
+
+    // Assert
+    expect(on?.vertex).toBe(path?.vertices[1]);
+    expect(off?.vertex).not.toBe(path?.vertices[0]);
+    expect(off?.vertex).not.toBe(path?.vertices[1]);
+  });
+});
