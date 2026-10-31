@@ -29,13 +29,14 @@ const has = (layers: readonly string[], layer: string) => layers.includes(layer)
 const isPointLayer = (layer: StyledLayer): layer is (typeof POINT_LAYERS)[number] =>
   has(POINT_LAYERS, layer);
 
-/** What a test may add to a part: a kind, or for an area a lower limit. */
+/** What a test may add to a part: a kind, a name, or for an area a lower limit. */
 interface Extra {
   kind?: string;
+  name?: string;
   lower?: string;
 }
 
-/** The properties each group of layers carries; `extra` adds a kind or a lower limit. */
+/** The properties each group of layers carries; `extra` adds a kind, a name or a lower limit. */
 function partOf(layer: StyledLayer, geometry: Geometry, extra: Extra = {}): ItemPart {
   const properties = isPointLayer(layer)
     ? { layer, id: 'Q', ...extra }
@@ -327,6 +328,18 @@ describe('buildChart labels', () => {
 
     // Assert
     expect(labels.count).toBe(1);
+  });
+
+  it('prints a point by its ident, not by its name', () => {
+    // Arrange
+    const shown: StyledLayer[] = ['ad', 'navaid'];
+    const items = shown.map((layer) => onePart(layer, point([0, 0]), { name: 'PAPAQ' }));
+
+    // Act
+    const counts = items.map((item) => build([item], shown, 'dense').labels.count);
+
+    // Assert
+    expect(counts).toEqual([1, 1]);
   });
 
   it('labels a stepped item once, where its first part starts', () => {
