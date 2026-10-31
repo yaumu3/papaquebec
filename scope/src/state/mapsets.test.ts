@@ -322,6 +322,58 @@ describe('storage of imported sets', () => {
   });
 });
 
+describe('a chart read before a change', () => {
+  it('follows the built-in set arriving', () => {
+    // Arrange
+    const { sets } = created();
+    sets.chart();
+
+    // Act
+    sets.setBuiltinMapSet(parsed(builtIn));
+
+    // Assert
+    expect(idsOf(sets, 'fix')).toEqual(['NIMBA']);
+  });
+
+  it('follows an import', () => {
+    // Arrange
+    const { sets } = created();
+    sets.chart();
+
+    // Act
+    const out = importing(sets, fixes);
+
+    // Assert
+    expect(out.ok).toBe(true);
+    expect(idsOf(sets, 'fix')).toEqual(['TAVRO']);
+  });
+
+  it('follows a removal', () => {
+    // Arrange
+    const { sets } = created();
+    importing(sets, fixes);
+    sets.chart();
+
+    // Act
+    sets.removeMapSet('my-fixes');
+
+    // Assert
+    expect(idsOf(sets, 'fix')).toEqual([]);
+  });
+
+  it('follows the hydration', async () => {
+    // Arrange
+    const { sets } = created(spyStore([stored(more)]));
+    sets.chart();
+
+    // Act
+    await sets.hydrated;
+
+    // Assert
+    expect(idsOf(sets, 'navaid')).toEqual(['QDG']);
+  });
+});
+
 describe('importNote', () => {
   it('reports a failure or an unsaved import, and nothing for a clean one', async () => {
     // Arrange
