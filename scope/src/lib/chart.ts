@@ -24,13 +24,16 @@ export type Chart = readonly ChartItem[];
 /** A set is known by its `id` member, else its title. */
 export const setIdentity = (set: MapSetData): string => set.id ?? set.title;
 
-const HOLD_DEGREES = 1e-5;
-const toHoldGrid = (degrees: number) => Math.round(degrees / HOLD_DEGREES) * HOLD_DEGREES;
+/** Grid cells per degree: two positions in one cell are the same place (1e-5°, about 1 m). */
+const GRID_PER_DEGREE = 1e5;
+
+/** A coordinate's grid cell, an integer. */
+export const toGrid = (degrees: number): number => Math.round(degrees * GRID_PER_DEGREE);
 
 /** What names an item within its layer: a designator, an id, or for a hold its pattern. */
 function naming({ properties: p, geometry: g }: MapSetFeature): unknown[] {
   if ('turn' in p) {
-    const at = g.type === 'Point' ? g.coordinates.map(toHoldGrid) : [];
+    const at = g.type === 'Point' ? g.coordinates.map(toGrid) : [];
     return [...at, p.turn, p.inboundMag, p.inboundTrue];
   }
   if ('id' in p) return p.layer === 'vfr' ? [p.id, p.ad] : [p.id];
