@@ -63,6 +63,12 @@ const created = (spy = spyStore(), storage = memoryStorage()) => ({
   storage,
   sets: createMapSets(storage, Promise.resolve(spy.store)),
 });
+/** The ids of the points the chart holds on a layer. */
+const idsOf = (sets: ReturnType<typeof createMapSets>, layer: string) =>
+  sets
+    .chart()
+    .filter((item) => item.layer === layer)
+    .flatMap((item) => item.parts.map((p) => ('id' in p.properties ? p.properties.id : '')));
 const importing = (sets: ReturnType<typeof createMapSets>, document: object) =>
   sets.importMapSet(JSON.stringify(document));
 
@@ -72,11 +78,11 @@ describe('createMapSets', () => {
     const { sets } = created();
 
     // Act
-    const [list, drawn] = [sets.mapSets(), sets.drawn()];
+    const [list, chart] = [sets.mapSets(), sets.chart()];
 
     // Assert
     expect(list.map((s) => [s.identity, s.builtin, s.enabled])).toEqual([[BUILTIN_ID, true, true]]);
-    expect(drawn.waypoints).toEqual([]);
+    expect(chart).toEqual([]);
   });
 
   it('starts the built-in set as the stored flag left it', () => {
@@ -100,7 +106,7 @@ describe('createMapSets', () => {
 
     // Assert
     expect(sets.mapSets()[0]?.data.title).toBe('openAIP XX');
-    expect(sets.drawn().waypoints.map((w) => w.id)).toEqual(['NIMBA']);
+    expect(idsOf(sets, 'fix')).toEqual(['NIMBA']);
   });
 
   it('adds a valid import, enabled and stored under its identity', async () => {
@@ -114,7 +120,7 @@ describe('createMapSets', () => {
     // Assert
     expect(kept).toBe(true);
     expect(sets.mapSets().map((s) => s.identity)).toEqual([BUILTIN_ID, 'my-fixes']);
-    expect(sets.drawn().waypoints.map((w) => w.id)).toEqual(['TAVRO']);
+    expect(idsOf(sets, 'fix')).toEqual(['TAVRO']);
     expect([...records.keys()]).toEqual(['my-fixes']);
   });
 
@@ -157,7 +163,7 @@ describe('createMapSets', () => {
       ['my-fixes', 'My fixes, revised'],
       ['more-fixes', 'More fixes'],
     ]);
-    expect(sets.drawn().waypoints).toEqual([]);
+    expect(idsOf(sets, 'fix')).toEqual([]);
   });
 
   it('rejects text that is not JSON or not a map set, changing nothing', () => {
@@ -183,8 +189,8 @@ describe('createMapSets', () => {
     for (const identity of ['my-fixes', BUILTIN_ID]) sets.toggleMapSet(identity);
 
     // Assert
-    expect(sets.drawn().waypoints).toEqual([]);
-    expect(sets.drawn().navaids.map((n) => n.id)).toEqual(['QDG']);
+    expect(idsOf(sets, 'fix')).toEqual([]);
+    expect(idsOf(sets, 'navaid')).toEqual(['QDG']);
     expect(sets.chart().map((item) => item.layer)).toEqual(['navaid']);
   });
 
@@ -256,7 +262,7 @@ describe('storage of imported sets', () => {
       ['more-fixes', true],
       ['my-fixes', false],
     ]);
-    expect(sets.drawn().navaids.map((n) => n.id)).toEqual(['QDG']);
+    expect(idsOf(sets, 'navaid')).toEqual(['QDG']);
   });
 
   it('keeps an import made before hydration finishes', async () => {
@@ -299,7 +305,7 @@ describe('storage of imported sets', () => {
 
     // Assert
     expect(kept).toBe(false);
-    expect(sets.drawn().waypoints.map((w) => w.id)).toEqual(['TAVRO']);
+    expect(idsOf(sets, 'fix')).toEqual(['TAVRO']);
   });
 
   it('draws an import for the session when the store cannot be opened, and says so', async () => {

@@ -2,9 +2,7 @@ import type { Accessor } from 'solid-js';
 import { createStore, unwrap } from 'solid-js/store';
 
 import { type Chart, chartOf, setIdentity } from '../lib/chart';
-import { drawnOf } from '../lib/drawn';
 import { isRecord } from '../lib/guards';
-import type { DrawnLayers } from '../lib/mapdata';
 import { type MapSetData, validateMapSet } from '../lib/mapset';
 import { BUILTIN_ID, MAPSET_VERSION } from '../lib/mapsetFormat';
 import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
@@ -25,8 +23,6 @@ export interface MapSets {
   mapSets: Accessor<MapSet[]>;
   /** The enabled sets merged into items. */
   chart: Accessor<Chart>;
-  /** The chart as the lists the scope draws. */
-  drawn: Accessor<DrawnLayers>;
   /** Settles once the stored sets are merged in, or the store proved unavailable. */
   hydrated: Promise<void>;
   setBuiltinMapSet: (data: MapSetData) => void;
@@ -59,15 +55,10 @@ export function createMapSets(storage: Storage | null, opening: Promise<MapSetSt
   });
 
   const chart = versioned(() => chartOf(store.sets.filter((s) => s.enabled).map((s) => s.data)));
-  const drawn = versioned(() => drawnOf(chart.get()));
-  const refresh = () => {
-    chart.invalidate();
-    drawn.invalidate();
-  };
 
   /** After a change to the sets: the merge is stale, and the built-in flag goes to storage. */
   const commit = () => {
-    refresh();
+    chart.invalidate();
     const builtin = store.sets.find((s) => s.builtin);
     if (storage) saveMapSets(storage, { builtinEnabled: builtin?.enabled ?? true });
   };
@@ -98,19 +89,18 @@ export function createMapSets(storage: Storage | null, opening: Promise<MapSetSt
         ...sets,
         ...loaded.filter((s) => !sets.some((own) => own.identity === s.identity)),
       ]);
-      refresh();
+      chart.invalidate();
     })
     .catch(() => {});
 
   return {
     mapSets: () => store.sets,
     chart: chart.get,
-    drawn: drawn.get,
     hydrated,
     setBuiltinMapSet(data) {
       // Assigned whole, since a value set at its `data` path would merge into the placeholder.
       setStore('sets', (sets) => sets.map((set) => (set.builtin ? { ...set, data } : set)));
-      refresh();
+      chart.invalidate();
     },
     importMapSet(text) {
       let raw: unknown;
@@ -146,7 +136,7 @@ export function createMapSets(storage: Storage | null, opening: Promise<MapSetSt
         void stored((open) => open.delete(identity));
       }
       setStore('sets', (sets) => sets.filter((s) => s.identity !== identity || s.builtin));
-      refresh();
+      chart.invalidate();
     },
   };
 }
@@ -169,5 +159,4 @@ const sets = createMapSets(
   typeof localStorage === 'undefined' ? null : localStorage,
   openMapSetStore(globalThis.indexedDB),
 );
-export const { mapSets, chart, drawn, setBuiltinMapSet, importMapSet, toggleMapSet, removeMapSet } =
-  sets;
+export const { mapSets, chart, setBuiltinMapSet, importMapSet, toggleMapSet, removeMapSet } = sets;
