@@ -1,5 +1,5 @@
 import type { ProjectFn } from '../../lib/geo';
-import type { DrawnLayers, CoastData } from '../../lib/mapdata';
+import type { CoastData, DrawnLayers, LatLon, LonLat } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
 import type { MapSlot } from '../slots';
@@ -31,6 +31,8 @@ export interface MapInput {
 
 const NAVAID_MAX_RANGE = 120;
 
+const flipped = (points: readonly LatLon[]): LonLat[] => points.map(([lat, lon]) => [lon, lat]);
+
 function density(d: LabelDensity): number {
   return { off: 0, sparse: 1, normal: 2, dense: 3 }[d];
 }
@@ -59,7 +61,7 @@ function airwaysLayer({ drawn, project, layers, atlas }: MapInput, labels: numbe
   const text = new TextBatch(atlas);
   if (layers.airways) {
     for (const aw of drawn.airways) {
-      const pts = route(aw.points, project);
+      const pts = route(flipped(aw.points), project);
       lines.polyline(pts, THEME.airway);
       const mid = pts[Math.floor(pts.length / 2)];
       if (labels >= 2 && mid) {
@@ -78,7 +80,7 @@ function airspaceLayer({ drawn, project, layers, atlas }: MapInput, labels: numb
   if (layers.airspace) {
     for (const a of drawn.airspace) {
       const style = a.dashed ? { dash: [4, 3] as [number, number] } : {};
-      const pts = closedRoute(a.points, project);
+      const pts = closedRoute(flipped(a.points), project);
       lines.polyline(pts, airspaceColor(a.kind), style);
       const first = pts[0];
       if (labels >= 3 && first) {
@@ -94,7 +96,7 @@ function sectorLayer({ drawn, project, layers }: MapInput): Batch[] {
   const lines = new LineBatch();
   if (layers.sector) {
     for (const s of drawn.sectors) {
-      lines.polyline(closedRoute(s.points, project), THEME.sector, { dash: [6, 4] });
+      lines.polyline(closedRoute(flipped(s.points), project), THEME.sector, { dash: [6, 4] });
     }
   }
   return [lines.finish()];
@@ -104,13 +106,7 @@ function coastLayer({ coast, project, layers }: MapInput): Batch[] {
   const lines = new LineBatch(4096);
   if (layers.coast) {
     for (const line of coast.lines) {
-      lines.polyline(
-        route(
-          line.map(([lon, lat]) => [lat, lon]),
-          project,
-        ),
-        THEME.coast,
-      );
+      lines.polyline(route(line, project), THEME.coast);
     }
   }
   return [lines.finish()];
