@@ -16,7 +16,7 @@ import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../ren
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
 import { hoverInstant } from '../state/lanes';
 import { declinationAt } from '../state/magnetic';
-import { chart } from '../state/mapsets';
+import { topology } from '../state/mapsets';
 import {
   canvasSize,
   coast,
@@ -125,7 +125,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         ? sliceSlots(
             slice,
             buildChart({
-              chart: chart(),
+              topology: topology(),
               project: projectNm,
               layers: visibleLayers(slice.layers, (l) => settings.shownLayers[l], navaidsInRange),
               labelDensity: settings.labelDensity,

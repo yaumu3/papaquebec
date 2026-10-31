@@ -1,18 +1,14 @@
-import {
-  type Chart,
-  type ChartItem,
-  isUpperStratum,
-  type ItemPart,
-  outlinesOf,
-} from '../../lib/chart';
+import { type ChartItem, type ItemPart, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import type { StyledLayer } from '../../lib/layers';
+import type { Topology } from '../../lib/topology';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo } from '../protocol';
 import type { SliceBatches } from '../slots';
-import { isPointStyle, LAYER_STYLES, type LayerStyle, type LineLayerStyle } from './layerStyles';
-import { type Anchor, LineBatch, type LineStyle, MarkerBatch, TextBatch } from './pack';
+import { isPointStyle, LAYER_STYLES, type LayerStyle } from './layerStyles';
+import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { route } from './paths';
+import { drawRuns } from './runs';
 
 const NAVAID_MAX_RANGE = 120;
 
@@ -34,7 +30,7 @@ export function visibleLayers(
 }
 
 export interface ChartInput {
-  chart: Chart;
+  topology: Topology;
   project: ProjectFn;
   /** The layers to draw, front first, as in the draw stack. */
   layers: readonly StyledLayer[];
@@ -49,31 +45,8 @@ interface ChartBatches {
 }
 
 /** The outlines of a geometry on the scope plane: a polygon's exterior ring and its holes. */
-function pathsOf(geometry: ItemPart['geometry'], project: ProjectFn): Anchor[][] {
-  return outlinesOf(geometry).map((outline) => route(outline, project));
-}
-
-/** A line's form in the layer's style, refined by the part's kind and stratum. */
-function lineLook(style: LineLayerStyle, part: ItemPart): LineStyle {
-  const { kind } = part.properties;
-  const byKind = kind === undefined ? undefined : style.kinds?.get(kind);
-  const upper = isUpperStratum(part) ? style.upper : undefined;
-  return { ...style, ...byKind, ...upper };
-}
-
-/**
- * Draws a part in its layer's style: a marker at each anchor of a point, else its outlines.
- * Returns the outlines, for the item's label.
- */
-function drawPart(part: ItemPart, style: LayerStyle, project: ProjectFn, out: ChartBatches) {
-  const paths = pathsOf(part.geometry, project);
-  if (isPointStyle(style)) {
-    for (const at of paths.flat()) out.markers.marker(at, style.shape, style.size, style.color);
-  } else {
-    for (const path of paths) out.lines.polyline(path, style.color, lineLook(style, part));
-  }
-  return paths;
-}
+const pathsOf = (geometry: ItemPart['geometry'], project: ProjectFn): Anchor[][] =>
+  outlinesOf(geometry).map((outline) => route(outline, project));
 
 const nameOf = ({ properties: p }: ItemPart): string | undefined =>
   'id' in p ? p.id : 'name' in p ? p.name : undefined;
@@ -82,34 +55,55 @@ const nameOf = ({ properties: p }: ItemPart): string | undefined =>
 function labelItem(
   item: ChartItem,
   style: LayerStyle,
-  path: Anchor[],
+  project: ProjectFn,
   density: LabelDensity,
   out: ChartBatches,
 ) {
   const { label } = style;
-  const name = item.parts[0] && nameOf(item.parts[0]);
-  if (!label || name === undefined) return;
+  const [first] = item.parts;
+  const name = first && nameOf(first);
+  if (!label || !first || name === undefined) return;
   if (LABEL_DENSITIES.indexOf(density) < LABEL_DENSITIES.indexOf(label.from)) return;
+  const path = route(outlinesOf(first.geometry)[0] ?? [], project);
   const at = label.at === 'middle' ? path[Math.floor(path.length / 2)] : path[0];
   if (!at) return;
   const { px, py, size, color, baseline } = label;
   out.labels.text(name, { ...at, px, py }, size, color, { baseline });
 }
 
+/** A marker at each anchor of a point item's parts, in the layer's style. */
+function markItem(item: ChartItem, style: LayerStyle, project: ProjectFn, markers: MarkerBatch) {
+  if (!isPointStyle(style)) return;
+  for (const part of item.parts) {
+    for (const at of pathsOf(part.geometry, project).flat()) {
+      markers.marker(at, style.shape, style.size, style.color);
+    }
+  }
+}
+
+/** The parts of the items on the layers, which are the parts to draw. */
+function partsOn(topology: Topology, layers: readonly StyledLayer[]): Set<ItemPart> {
+  const shown = new Set<string>(layers);
+  return new Set(topology.chart.filter((i) => shown.has(i.layer)).flatMap((i) => i.parts));
+}
+
 /** The chart's lines, point markers and labels, each back to front through the stack. */
 export function buildChart({
-  chart,
+  topology,
   project,
   layers,
   labelDensity,
   atlas,
 }: ChartInput): SliceBatches {
   const out = { lines: new LineBatch(), markers: new MarkerBatch(), labels: new TextBatch(atlas) };
+  const drawn = partsOn(topology, layers);
+  drawRuns(topology.areas, drawn, project, out.lines);
+  drawRuns(topology.routes, drawn, project, out.lines);
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
-    for (const item of chart.filter((i) => i.layer === layer)) {
-      const [first] = item.parts.map((part) => drawPart(part, style, project, out));
-      labelItem(item, style, first?.[0] ?? [], labelDensity, out);
+    for (const item of topology.chart.filter((i) => i.layer === layer)) {
+      markItem(item, style, project, out.markers);
+      labelItem(item, style, project, labelDensity, out);
     }
   }
   return { lines: out.lines.finish(), markers: out.markers.finish(), labels: out.labels.finish() };

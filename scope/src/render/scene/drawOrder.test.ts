@@ -5,6 +5,7 @@ import { DRAW_STACK, type ScopeLayer, type StyledLayer } from '../../lib/layers'
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { POINT_LAYERS } from '../../lib/mapsetFormat';
+import { topologyOf } from '../../lib/topology';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../slots';
 import { atlas } from './atlasFixture';
@@ -44,7 +45,13 @@ function mapSlots(chart: ChartItem[]): Slots {
       () => true,
       () => true,
     );
-    const built = buildChart({ chart, project, layers, labelDensity: 'dense', atlas });
+    const built = buildChart({
+      topology: topologyOf(chart),
+      project,
+      layers,
+      labelDensity: 'dense',
+      atlas,
+    });
     Object.assign(slots, sliceSlots(slice, built));
   }
   const coastX = at('coast');
@@ -113,6 +120,16 @@ describe('the draw order of the chart', () => {
   });
 });
 
+/** Each instance of a lines batch as its unordered pair of ends, rounded to 1e-5. */
+function edgeKeys({ data, count }: Batch): string[] {
+  return Array.from({ length: count }, (_, i) => {
+    const [ax = 0, ay = 0, bx = 0, by = 0] = [0, 1, 4, 5].map((k) =>
+      Math.round((data[i * LINE_STRIDE + k] ?? 0) * 1e5),
+    );
+    return (ax < bx || (ax === bx && ay <= by) ? [ax, ay, bx, by] : [bx, by, ax, ay]).join();
+  });
+}
+
 describe('the example map set', () => {
   it('draws every layer but hold', () => {
     // Arrange
@@ -121,7 +138,7 @@ describe('the example map set', () => {
     // Act
     const undrawn = CHART_LAYERS.filter((layer) => {
       const { lines, markers } = buildChart({
-        chart: items,
+        topology: topologyOf(items),
         project,
         layers: [layer],
         labelDensity: 'off',
@@ -132,5 +149,20 @@ describe('the example map set', () => {
 
     // Assert
     expect(undrawn).toEqual([]);
+  });
+
+  it('draws no route segment twice', () => {
+    // Arrange
+    const topology = topologyOf(chartOf([parseMapSet(EXAMPLE)]));
+    const layers = CHART_SLICES[1].layers;
+
+    // Act
+    const keys = edgeKeys(
+      buildChart({ topology, project, layers, labelDensity: 'off', atlas }).lines,
+    );
+
+    // Assert
+    expect(keys.length).toBeGreaterThan(0);
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

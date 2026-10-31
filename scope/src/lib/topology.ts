@@ -8,12 +8,21 @@
 import { type Chart, isUpperStratum, type ItemPart, outlinesOf, toGrid } from './chart';
 import { DRAW_STACK } from './layers';
 import type { LonLat } from './mapdata';
-import { isPointLayer, isRouteLayer, type Layer } from './mapsetFormat';
+import {
+  type AreaLayer,
+  isPointLayer,
+  isRouteLayer,
+  type Layer,
+  type RouteLayer,
+} from './mapsetFormat';
+
+/** The layers whose parts make paths: areas and routes. */
+export type PathLayer = AreaLayer | RouteLayer;
 
 /** One outline of a part, with no two neighbouring positions at one identity. */
 export interface ChartPath {
   part: ItemPart;
-  layer: Layer;
+  layer: PathLayer;
   coordinates: LonLat[];
   /** The vertex of each coordinate. */
   vertices: Int32Array;

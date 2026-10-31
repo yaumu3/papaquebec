@@ -93,7 +93,7 @@ const areaLine = (
 ) => line(color, { ...rest, label: { ...AREA_LABEL, color: labelColor } });
 
 /** The style of every layer that is drawn. Unknown kinds draw as their layer's default. */
-export const LAYER_STYLES: Record<StyledLayer, LayerStyle> = {
+export const LAYER_STYLES = {
   ad: {
     shape: Shape.Ring,
     size: 9,
@@ -155,6 +155,6 @@ export const LAYER_STYLES: Record<StyledLayer, LayerStyle> = {
   advisory: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [10, 3, 2, 3] }),
   civt: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [2, 3] }),
   asr: areaLine(THEME.boundaryDim, THEME.sectorLabel, { dash: [2, 4] }),
-};
+} satisfies Record<StyledLayer, LayerStyle>;
 
 export const isPointStyle = (style: LayerStyle): style is PointLayerStyle => 'shape' in style;

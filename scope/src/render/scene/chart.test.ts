@@ -3,6 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { DRAW_STACK, isStyled, type StyledLayer } from '../../lib/layers';
 import { isPointLayer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
+import { topologyOf } from '../../lib/topology';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
@@ -52,7 +53,7 @@ const build = (
   items: ChartItem[],
   layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
-) => buildChart({ chart: items, project, layers, labelDensity, atlas });
+) => buildChart({ topology: topologyOf(items), project, layers, labelDensity, atlas });
 
 interface Instance {
   a: { x: number; y: number };
@@ -204,6 +205,173 @@ describe('buildChart lines', () => {
 
     // Assert
     expect(drawn).toEqual(expected);
+  });
+});
+
+describe('buildChart shared edges', () => {
+  it("draws an edge two layers share once, in the front layer's colour, and hands it down when the front layer is hidden", () => {
+    // Arrange
+    const items = [
+      itemOf('fir', partOf('fir', line([0, 0], [1, 0], [0, 1]))),
+      itemOf('tma', partOf('tma', line([0, 0], [1, 0], [1, 1]))),
+    ];
+    const rows: StyledLayer[][] = [['tma', 'fir'], ['fir']];
+
+    // Act
+    const drawn = rows.map((layers) => instances(build(items, layers).lines));
+
+    // Assert
+    expect(drawn.map((batch) => batch.map((i) => [i.a.x, i.a.y, i.b.x, i.b.y]))).toEqual([
+      [
+        [1, 0, 0, 1],
+        [0, 0, 1, 0],
+        [1, 0, 1, 1],
+      ],
+      [
+        [0, 0, 1, 0],
+        [1, 0, 0, 1],
+      ],
+    ]);
+    expect(drawn.map((batch) => batch.map((i) => i.color))).toEqual([
+      [packed('#606060'), packed('#5e3a3a'), packed('#5e3a3a')],
+      [packed('#606060'), packed('#606060')],
+    ]);
+  });
+
+  it("draws the footprint two strata share once, with the lower stratum's dash, whichever part comes first", () => {
+    // Arrange
+    const lower = partOf(
+      'sector',
+      polygon([
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 0],
+      ]),
+    );
+    const upper = partOf(
+      'sector',
+      polygon([
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ]),
+      { lower: 'FL335' },
+    );
+    const orders = [
+      [lower, upper],
+      [upper, lower],
+    ];
+
+    // Act
+    const dashes = orders.map((parts) =>
+      instances(build([itemOf('sector', ...parts)]).lines)
+        .map((i) => i.pattern[0])
+        .toSorted((a, b) => (a ?? 0) - (b ?? 0)),
+    );
+
+    // Assert
+    expect(dashes).toEqual([
+      [6, 6, 6, 12, 12],
+      [6, 6, 6, 12, 12],
+    ]);
+  });
+
+  it('draws the edge two parts of one stepped item share once', () => {
+    // Arrange
+    const base = partOf(
+      'tma',
+      polygon([
+        [0, 0],
+        [1, 0],
+        [1, 1],
+        [0, 1],
+        [0, 0],
+      ]),
+    );
+    const step = partOf(
+      'tma',
+      polygon([
+        [1, 0],
+        [2, 0],
+        [2, 1],
+        [1, 1],
+        [1, 0],
+      ]),
+    );
+
+    // Act
+    const { lines } = build([itemOf('tma', base, step)]);
+
+    // Assert
+    expect(lines.count).toBe(7);
+  });
+
+  it('splits a path at an edge it shares, and restarts the dash in the next run', () => {
+    // Arrange
+    const items = [
+      itemOf('fir', partOf('fir', line([0, 0], [1, 0], [2, 0], [3, 0], [4, 0]))),
+      itemOf('tma', partOf('tma', line([1, 0], [2, 0]))),
+    ];
+
+    // Act
+    const drawn = instances(build(items).lines).map((i) => [i.a.x, i.along]);
+
+    // Assert
+    expect(drawn).toEqual([
+      [0, 0],
+      [2, 0],
+      [3, 1],
+      [1, 0],
+    ]);
+  });
+
+  it('draws a route segment two routes share once, as the front layer', () => {
+    // Arrange
+    const items = [
+      itemOf('rnav', partOf('rnav', line([1, 0], [2, 0], [2, 1]))),
+      itemOf('conv', partOf('conv', line([0, 0], [1, 0], [2, 0]))),
+    ];
+
+    // Act
+    const drawn = instances(build(items).lines);
+
+    // Assert
+    expect(drawn.map((i) => [i.a.x, i.a.y, i.b.x, i.b.y].concat(i.color))).toEqual([
+      [2, 0, 2, 1].concat(packed('#3a6a78')),
+      [0, 0, 1, 0].concat(packed('#82573c')),
+      [1, 0, 2, 0].concat(packed('#82573c')),
+    ]);
+  });
+
+  it('keeps an area and a route on one line apart, and draws both', () => {
+    // Arrange
+    const items = [
+      itemOf('sector', partOf('sector', line([0, 0], [1, 0]))),
+      itemOf('conv', partOf('conv', line([0, 0], [1, 0]))),
+    ];
+
+    // Act
+    const { lines } = build(items);
+
+    // Assert
+    expect(lines.count).toBe(2);
+  });
+
+  it('labels an item from its whole path even when it owns none of its edges', () => {
+    // Arrange
+    const items = [
+      itemOf('conv', partOf('conv', line([0, 0], [1, 0], [2, 0]))),
+      itemOf('rnav', partOf('rnav', line([0, 0], [1, 0], [2, 0]))),
+    ];
+
+    // Act
+    const { labels } = build(items, ['conv', 'rnav'], 'dense');
+
+    // Assert
+    expect(glyphs(labels).map((g) => g.at.x)).toEqual([1, 1]);
   });
 });
 
