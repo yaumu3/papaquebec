@@ -33,7 +33,7 @@ export function distanceToSegment(p: Vec2, a: Vec2, b: Vec2): number {
 }
 
 /** A segment from its first point to its second. */
-export type Span = [Vec2, Vec2];
+export type Segment = [Vec2, Vec2];
 
 /** Segment `p`–`q` split into what lies outside the circle of radius `r` about `c` and what inside. */
 export function splitByCircle(
@@ -41,7 +41,7 @@ export function splitByCircle(
   q: Vec2,
   c: Vec2,
   r: number,
-): { outside: Span[]; inside: Span[] } {
+): { outside: Segment[]; inside: Segment[] } {
   const d = { x: q.x - p.x, y: q.y - p.y };
   const f = { x: p.x - c.x, y: p.y - c.y };
   const a = d.x * d.x + d.y * d.y;
@@ -52,7 +52,7 @@ export function splitByCircle(
   const t2 = Math.min((-b + Math.sqrt(disc)) / (2 * a), 1);
   if (t1 >= 1 || t2 <= 0) return { outside: [[p, q]], inside: [] };
   const at = (t: number) => ({ x: p.x + d.x * t, y: p.y + d.y * t });
-  const outside: Span[] = [];
+  const outside: Segment[] = [];
   if (t1 > 0) outside.push([p, at(t1)]);
   if (t2 < 1) outside.push([at(t2), q]);
   return { outside, inside: [[at(t1), at(t2)]] };
