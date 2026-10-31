@@ -26,7 +26,7 @@ export interface HoverInput {
 const RING_PX = 14;
 
 /**
- * The hover highlight, drawn over the targets layer so a hover never rebuilds it: a box round
+ * The hover highlight, drawn over the targets slot so a hover never rebuilds it: a box round
  * the target and its leader again at full brightness, and a ring on the trail at the instant
  * hovered on the history lanes. The selected target is highlighted already, and a filtered one
  * has no block to lead to.

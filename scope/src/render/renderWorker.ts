@@ -36,8 +36,8 @@ self.addEventListener('message', (e: MessageEvent<ToWorker>) => {
       case 'atlas':
         renderer?.setAtlas(m.info, m.pixels);
         break;
-      case 'layer':
-        renderer?.setLayer(m.name, m.batches);
+      case 'slot':
+        renderer?.setSlot(m.name, m.batches);
         break;
       case 'view':
         renderer?.setView(m.view);

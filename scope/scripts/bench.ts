@@ -1,7 +1,7 @@
 /**
  * Load test: the built scope in headless Chromium, fed by a server flying the sim with extra
  * traffic, driven through idle, pan, zoom and hover. Reports main-thread frame intervals and long tasks, the
- * messages posted to the render worker (one `layer:<name>` per layer rebuild) with their bytes,
+ * messages posted to the render worker (one `slot:<name>` per slot rebuild) with their bytes,
  * and the sampled time in each function named in `--fn`, callees included. Function names need
  * the unminified build `bun run bench` makes.
  *
@@ -23,7 +23,7 @@ const { values: opt } = parseArgs({
     warmup: { type: 'string', default: '6000' },
     fn: {
       type: 'string',
-      default: 'buildRings,buildMap,blockSubjects,buildTargets,buildHover,buildOverlays,setLayer',
+      default: 'buildRings,buildMap,blockSubjects,buildTargets,buildHover,buildOverlays,setSlot',
     },
     json: { type: 'string' },
   },
@@ -45,7 +45,7 @@ const RECORDER = `(() => {
   const post = Worker.prototype.postMessage;
   Worker.prototype.postMessage = function (m, ...rest) {
     if (s.recording && m && typeof m.type === 'string') {
-      const key = m.type === 'layer' ? 'layer:' + m.name : m.type;
+      const key = m.type === 'slot' ? 'slot:' + m.name : m.type;
       const bytes = (m.batches ?? []).reduce((a, b) => a + b.data.byteLength, 0);
       const e = (s.messages[key] ??= { n: 0, bytes: 0 });
       e.n += 1;

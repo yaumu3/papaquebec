@@ -1,8 +1,8 @@
 import type { ProjectFn } from '../../lib/geo';
 import type { DrawnLayers, CoastData } from '../../lib/mapdata';
 import type { LabelDensity, Layers } from '../../state/settings';
-import type { MapLayer } from '../layers';
 import { type AtlasInfo, type Batch, Shape } from '../protocol';
+import type { MapSlot } from '../slots';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch, type TextStyle } from './pack';
 import { closedRoute, route } from './paths';
 import { ringRadii } from './rings';
@@ -172,7 +172,7 @@ function fixesLayer(input: MapInput, labels: number): Batch[] {
   return [markers.finish(), text.finish()];
 }
 
-export function buildMap(input: MapInput): Record<MapLayer, Batch[]> {
+export function buildMap(input: MapInput): Record<MapSlot, Batch[]> {
   const labels = density(input.labelDensity);
   return {
     airways: airwaysLayer(input, labels),

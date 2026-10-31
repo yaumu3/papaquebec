@@ -2,8 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import type { DrawnLayers } from '../../lib/mapdata';
 import type { Layers } from '../../state/settingsDefaults';
-import { MAP_LAYERS } from '../layers';
 import type { Batch } from '../protocol';
+import { MAP_SLOTS } from '../slots';
 import { atlas } from './atlasFixture';
 import { buildMap, buildRings, type MapInput, navaidsShownAt } from './static';
 
@@ -75,7 +75,7 @@ describe('buildMap', () => {
     const layers = buildMap(input);
 
     // Assert
-    expect(Object.keys(layers).toSorted()).toEqual([...MAP_LAYERS].toSorted());
+    expect(Object.keys(layers).toSorted()).toEqual([...MAP_SLOTS].toSorted());
   });
 
   it('draws navaids only while the range keeps them in view', () => {
