@@ -1,11 +1,11 @@
 import { createStore } from 'solid-js/store';
 
 import type { ScopeLayer } from '../lib/layers';
-import { DEFAULT_LIST_SORT } from './listSort';
 import { loadPersisted, type Persisted, savePersisted } from './persist';
 import { DEFAULT_PLOTTED } from './plotted';
 import {
   DEFAULT_ND_RANGE_NM,
+  DEFAULT_LIST_SORT,
   DEFAULT_PANELS,
   DEFAULT_SETTINGS,
   RANGE_MAX_NM,
