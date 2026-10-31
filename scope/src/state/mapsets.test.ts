@@ -361,6 +361,26 @@ describe('a chart read before a change', () => {
     expect(idsOf(sets, 'fix')).toEqual([]);
   });
 
+  it('follows a toggle', () => {
+    // Arrange
+    const rows = [
+      { identity: 'my-fixes', left: ['NIMBA'] },
+      { identity: BUILTIN_ID, left: ['TAVRO'] },
+    ].map(({ identity, left }) => {
+      const { sets } = created();
+      sets.setBuiltinMapSet(parsed(builtIn));
+      importing(sets, fixes);
+      sets.chart();
+      return { identity, left, sets };
+    });
+
+    // Act
+    for (const { sets, identity } of rows) sets.toggleMapSet(identity);
+
+    // Assert
+    expect(rows.map((r) => idsOf(r.sets, 'fix'))).toEqual(rows.map((r) => r.left));
+  });
+
   it('follows the hydration', async () => {
     // Arrange
     const { sets } = created(spyStore([stored(more)]));
