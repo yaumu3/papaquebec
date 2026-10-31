@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { Chart, ChartItem } from './chart';
 import {
   DRAW_STACK,
   LAYER_GROUPS,
   navaidsShownAt,
   type ScopeLayer,
   type StyledLayer,
-  visibleLayers,
+  drawnItemsOf,
 } from './layers';
-import { LAYERS } from './mapsetFormat';
+import { type Layer, LAYERS } from './mapsetFormat';
 
 type Group = [string, readonly ScopeLayer[]];
 
@@ -106,27 +107,35 @@ describe('navaidsShownAt', () => {
   });
 });
 
-describe('visibleLayers', () => {
-  const all: StyledLayer[] = ['ad', 'navaid', 'fix', 'ctr'];
+const layersOf = (items: readonly ChartItem[]) => items.map((item) => item.layer);
 
-  it('keeps the layers that are shown, in order, and the navaids only within range', () => {
+describe('drawnItemsOf', () => {
+  const all: StyledLayer[] = ['ad', 'navaid', 'fix', 'ctr'];
+  const chartLayers: Layer[] = ['ad', 'navaid', 'navaid', 'fix', 'ctr', 'sector'];
+  const chart: Chart = chartLayers.map((layer, i) => ({ key: String(i), layer, parts: [] }));
+
+  it('keeps the items of the layers given that are shown, in chart order, and navaids only within range', () => {
     // Arrange
     const rows: {
-      shown: (l: StyledLayer) => boolean;
+      shown: (l: Layer) => boolean;
       inRange: boolean;
-      expected: StyledLayer[];
+      expected: Layer[];
     }[] = [
-      { shown: () => true, inRange: true, expected: ['ad', 'navaid', 'fix', 'ctr'] },
+      { shown: () => true, inRange: true, expected: ['ad', 'navaid', 'navaid', 'fix', 'ctr'] },
       { shown: () => true, inRange: false, expected: ['ad', 'fix', 'ctr'] },
-      { shown: (l) => l !== 'ad' && l !== 'fix', inRange: true, expected: ['navaid', 'ctr'] },
+      {
+        shown: (l) => l !== 'ad' && l !== 'fix',
+        inRange: true,
+        expected: ['navaid', 'navaid', 'ctr'],
+      },
       { shown: () => false, inRange: true, expected: [] },
     ];
 
     // Act
-    const kept = rows.map((r) => visibleLayers(all, r.shown, () => r.inRange));
+    const kept = rows.map((r) => drawnItemsOf(chart, all, r.shown, () => r.inRange));
 
     // Assert
-    expect(kept).toEqual(rows.map((r) => r.expected));
+    expect(kept.map(layersOf)).toEqual(rows.map((r) => r.expected));
   });
 
   it('does not read the range for a navaid layer that is hidden', () => {
@@ -138,10 +147,42 @@ describe('visibleLayers', () => {
     };
 
     // Act
-    const kept = visibleLayers(all, (l) => l !== 'navaid', inRange);
+    const kept = drawnItemsOf(chart, all, (l) => l !== 'navaid', inRange);
 
     // Assert
     expect(reads).toBe(0);
-    expect(kept).toEqual(['ad', 'fix', 'ctr']);
+    expect(layersOf(kept)).toEqual(['ad', 'fix', 'ctr']);
+  });
+
+  it('reads the range once, however many navaids there are', () => {
+    // Arrange
+    let reads = 0;
+    const inRange = () => {
+      reads += 1;
+      return true;
+    };
+
+    // Act
+    const kept = drawnItemsOf(chart, all, () => true, inRange);
+
+    // Assert
+    expect(reads).toBe(1);
+    expect(layersOf(kept)).toContain('navaid');
+  });
+
+  it('leaves out the items of a layer that is not among those given', () => {
+    // Arrange
+    const given: StyledLayer[] = ['sector'];
+
+    // Act
+    const kept = drawnItemsOf(
+      chart,
+      given,
+      () => true,
+      () => true,
+    );
+
+    // Assert
+    expect(layersOf(kept)).toEqual(['sector']);
   });
 });

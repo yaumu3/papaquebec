@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, isStyled, type StyledLayer, visibleLayers } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { isPointLayer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
@@ -54,10 +54,17 @@ const build = (
   items: Chart,
   layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
+  inRange = true,
 ) => {
   const topology = topologyOf(items);
-  const drawnPoints = () => drawnPointsOf(topology, layers);
-  return buildChart({ topology, drawnPoints, project, layers, labelDensity, atlas });
+  const drawnItems = drawnItemsOf(
+    items,
+    layers,
+    () => true,
+    () => inRange,
+  );
+  const drawnPoints = () => drawnPointsOf(topology, drawnItems);
+  return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
 };
 
 interface Instance {
@@ -400,8 +407,8 @@ const routeOf = (layer: StyledLayer, ...at: Position[]) =>
 
 describe('buildChart routes stop short of points', () => {
   const conv = packed('#82573c');
-  const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[]) =>
-    instances(build(items, layers).lines)
+  const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[], inRange = true) =>
+    instances(build(items, layers, 'normal', inRange).lines)
       .filter((i) => i.color.every((c, k) => c === conv[k]))
       .map((i) => i.span);
 
@@ -474,22 +481,19 @@ describe('buildChart routes stop short of points', () => {
   it('writes no cut where no point stands at a vertex, where the point layer is hidden, or the navaid is out of range', () => {
     // Arrange
     const through = routeOf('conv', [0, 0], [1, 0], [2, 0]);
-    const rows: [string, ChartItem[], readonly StyledLayer[]][] = [
-      ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix']],
-      ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv']],
+    const rows: [string, ChartItem[], readonly StyledLayer[], boolean][] = [
+      ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix'], true],
+      ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv'], true],
       [
         'a navaid beyond the range threshold',
         [through, stopAt('navaid', [1, 0])],
-        visibleLayers(
-          ['conv', 'navaid'],
-          () => true,
-          () => false,
-        ),
+        ['conv', 'navaid'],
+        false,
       ],
     ];
 
     // Act
-    const spans = rows.map(([, items, layers]) => cutsOf(items, layers));
+    const spans = rows.map(([, items, layers, inRange]) => cutsOf(items, layers, inRange));
 
     // Assert
     expect(spans.map((list) => list.every((s) => s.every((v) => v === 0)))).toEqual([
@@ -553,6 +557,12 @@ describe('buildChart routes stop short of points', () => {
       },
       project,
       layers,
+      drawnItems: drawnItemsOf(
+        items,
+        layers,
+        () => true,
+        () => true,
+      ),
       labelDensity: 'normal' as const,
       atlas,
     }));

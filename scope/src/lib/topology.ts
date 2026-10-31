@@ -5,7 +5,7 @@
  * a route edge never meet.
  */
 
-import { type Chart, type ItemPart, outlinesOf, toGrid } from './chart';
+import { type Chart, type ChartItem, type ItemPart, outlinesOf, toGrid } from './chart';
 import { DRAW_STACK } from './layers';
 import type { LonLat } from './mapdata';
 import {
@@ -43,6 +43,8 @@ export interface Network {
 
 /** One part of a point item: a place a symbol may stand. */
 export interface ChartPoint {
+  /** The key of its item. */
+  key: string;
   layer: PointLayer;
   id: string;
   at: LonLat;
@@ -121,10 +123,10 @@ function networkOf(outlines: Outline[], vertexOf: VertexOf): Network {
 }
 
 /** The point parts of an item. */
-function pointsOf(parts: readonly ItemPart[], vertexOf: VertexOf): ChartPoint[] {
+function pointsOf({ key, parts }: ChartItem, vertexOf: VertexOf): ChartPoint[] {
   return parts.flatMap(({ geometry: g, properties: p }) =>
     g.type === 'Point' && 'id' in p
-      ? [{ layer: p.layer, id: p.id, at: g.coordinates, vertex: vertexOf(g.coordinates) }]
+      ? [{ key, layer: p.layer, id: p.id, at: g.coordinates, vertex: vertexOf(g.coordinates) }]
       : [],
   );
 }
@@ -135,8 +137,9 @@ export function topologyOf(chart: Chart): Topology {
   const routes: Outline[] = [];
   const points: ChartPoint[] = [];
   const vertexOf = vertexNumbering();
-  for (const { layer, parts } of chart) {
-    points.push(...pointsOf(parts, vertexOf));
+  for (const item of chart) {
+    const { layer, parts } = item;
+    points.push(...pointsOf(item, vertexOf));
     if (isPointLayer(layer) || layer === 'hold') continue;
     const into = isRouteLayer(layer) ? routes : areas;
     for (const part of parts) {
@@ -191,6 +194,8 @@ export function runsOf(path: ChartPath, owners: Int32Array, within: Stretch): St
   return runs;
 }
 
-/** The points on the layers that draw. */
-export const drawnPointsOf = (topology: Topology, layers: readonly Layer[]): ChartPoint[] =>
-  topology.points.filter((point) => layers.includes(point.layer));
+/** The points of the items that draw. */
+export function drawnPointsOf(topology: Topology, items: readonly ChartItem[]): ChartPoint[] {
+  const drawn = new Set(items.map((item) => item.key));
+  return topology.points.filter((point) => drawn.has(point.key));
+}

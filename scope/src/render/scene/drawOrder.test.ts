@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, type ScopeLayer, type StyledLayer, visibleLayers } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, type ScopeLayer, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { POINT_LAYERS } from '../../lib/mapsetFormat';
@@ -46,20 +46,21 @@ function itemAt(layer: StyledLayer): ChartItem {
 /** A slice of the chart built as the scope builds it. */
 function sliceOf(chart: Chart, layers: readonly StyledLayer[], labelDensity: LabelDensity) {
   const topology = topologyOf(chart);
-  const drawnPoints = () => drawnPointsOf(topology, layers);
-  return buildChart({ topology, drawnPoints, project, layers, labelDensity, atlas });
+  const drawnItems = drawnItemsOf(
+    chart,
+    layers,
+    () => true,
+    () => true,
+  );
+  const drawnPoints = () => drawnPointsOf(topology, drawnItems);
+  return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
 }
 
 /** Everything the scope draws from the map, as the effects post it. */
 function mapSlots(chart: Chart): Slots {
   const slots: Slots = {};
   for (const slice of CHART_SLICES) {
-    const layers = visibleLayers(
-      slice.layers,
-      () => true,
-      () => true,
-    );
-    const built = sliceOf(chart, layers, 'dense');
+    const built = sliceOf(chart, slice.layers, 'dense');
     Object.assign(slots, sliceSlots(slice, built));
   }
   const coastX = at('coast');

@@ -19,11 +19,13 @@ import { drawRuns, routeCuts } from './runs';
 
 export interface ChartInput {
   topology: Topology;
-  /** The points that draw; read only when a point or a route layer is among `layers`. */
+  /** The points that draw; read only for a point layer among `layers`, or when a route item draws. */
   drawnPoints: () => readonly ChartPoint[];
   project: ProjectFn;
-  /** The layers to draw, front first, as in the draw stack. */
+  /** The slice's layers, front first, as in the draw stack. */
   layers: readonly StyledLayer[];
+  /** The items to draw, of `layers`. */
+  drawnItems: readonly ChartItem[];
   labelDensity: LabelDensity;
   atlas: AtlasInfo;
 }
@@ -75,11 +77,9 @@ function drawPoint(
   if (reaches(style.label, density)) putLabel(id, anchor, style.label, out.labels);
 }
 
-/** The parts of the items on the layers, which are the parts to draw. */
-function partsOn(topology: Topology, layers: readonly StyledLayer[]): Set<ItemPart> {
-  const shown = new Set<string>(layers);
-  return new Set(topology.chart.filter((i) => shown.has(i.layer)).flatMap((i) => i.parts));
-}
+/** The parts of the items to draw. */
+const partsOf = (items: readonly ChartItem[]): Set<ItemPart> =>
+  new Set(items.flatMap((item) => item.parts));
 
 /** The chart's lines, point markers and labels, each back to front through the stack. */
 export function buildChart({
@@ -87,13 +87,14 @@ export function buildChart({
   drawnPoints,
   project,
   layers,
+  drawnItems,
   labelDensity,
   atlas,
 }: ChartInput): SliceBatches {
   const out = { lines: new LineBatch(), markers: new MarkerBatch(), labels: new TextBatch(atlas) };
-  const drawn = partsOn(topology, layers);
+  const drawn = partsOf(drawnItems);
   drawRuns(topology.areas, drawn, NO_CUTS, project, out.lines);
-  drawRuns(topology.routes, drawn, routeCuts(layers, drawnPoints), project, out.lines);
+  drawRuns(topology.routes, drawn, routeCuts(drawnItems, drawnPoints), project, out.lines);
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
     if (isPointStyle(style)) {
@@ -101,7 +102,7 @@ export function buildChart({
         drawPoint(point, style, project, labelDensity, out);
       }
     } else {
-      for (const item of topology.chart.filter((i) => i.layer === layer)) {
+      for (const item of drawnItems.filter((i) => i.layer === layer)) {
         labelItem(item, style, project, labelDensity, out.labels);
       }
     }

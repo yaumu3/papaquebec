@@ -1,3 +1,4 @@
+import type { Chart, ChartItem } from './chart';
 import type { Layer } from './mapsetFormat';
 
 /**
@@ -92,13 +93,19 @@ export function navaidsShownAt(rangeNm: number): boolean {
 }
 
 /**
- * The layers to build: those shown, and the navaids only when the range allows. The range is
- * read only for a shown navaid layer, so a rebuild follows it only then.
+ * The items of the chart that draw: those on the shown `layers`, and the navaids only when the
+ * range allows. The range is read at most once, and only for a shown navaid layer, so a rebuild
+ * follows it only then.
  */
-export function visibleLayers(
-  layers: readonly StyledLayer[],
-  shown: (layer: StyledLayer) => boolean,
+export function drawnItemsOf(
+  chart: Chart,
+  layers: readonly Layer[],
+  shown: (layer: Layer) => boolean,
   navaidsInRange: () => boolean,
-): StyledLayer[] {
-  return layers.filter((l) => shown(l) && (l !== 'navaid' || navaidsInRange()));
+): ChartItem[] {
+  const on = new Set(layers.filter(shown));
+  const items = chart.filter((item) => on.has(item.layer));
+  return on.has('navaid') && !navaidsInRange()
+    ? items.filter((item) => item.layer !== 'navaid')
+    : items;
 }

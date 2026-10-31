@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Chart, ItemPart } from './chart';
-import { visibleLayers } from './layers';
+import { drawnItemsOf } from './layers';
 import type { LonLat } from './mapdata';
 import type { Layer, PointLayer } from './mapsetFormat';
 import {
@@ -362,22 +362,24 @@ describe('the points of a topology', () => {
   it('draws the points of the layers given, whatever routes are shown', () => {
     // Arrange
     const topology = topologyOf(chart);
-    const inRange = [true, false];
-    const rows: Layer[][] = [
-      ['fix'],
-      ['conv'],
-      [],
-      ...inRange.map((on) =>
-        visibleLayers(
-          ['navaid', 'fix'],
-          () => true,
-          () => on,
-        ),
-      ),
+    const rows: [Layer[], boolean][] = [
+      [['fix'], true],
+      [['conv'], true],
+      [[], true],
+      [['navaid', 'fix'], true],
+      [['navaid', 'fix'], false],
     ];
+    const items = rows.map(([layers, inRange]) =>
+      drawnItemsOf(
+        chart,
+        layers,
+        () => true,
+        () => inRange,
+      ),
+    );
 
     // Act
-    const drawn = rows.map((layers) => drawnPointsOf(topology, layers).map((p) => p.id));
+    const drawn = items.map((drawnItems) => drawnPointsOf(topology, drawnItems).map((p) => p.id));
 
     // Assert
     expect(drawn).toEqual([['TAVRO'], [], [], ['TAVRO', 'QDG'], ['TAVRO']]);
