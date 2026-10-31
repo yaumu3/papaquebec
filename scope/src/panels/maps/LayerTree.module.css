@@ -153,6 +153,9 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
+.more {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--item-h)), transparent);
+}
 .drawing {
   width: 7px;
   height: 7px;

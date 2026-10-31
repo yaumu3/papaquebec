@@ -1,4 +1,4 @@
-import { createMemo, For, onCleanup, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js';
 
 import { isMouse } from '../../canvas/input/devices/mouse';
 import { cx } from '../../design/cx';
@@ -15,6 +15,7 @@ import {
   treeItems,
 } from '../../state/layerTree';
 import { layerState } from '../../state/layerVisibility';
+import { scrollView } from '../lanes/scroll';
 import { Marked } from './Marked';
 
 import s from './LayerTree.module.css';
@@ -66,17 +67,43 @@ function ItemRow(props: {
   );
 }
 
-/** A layer's items, at most eight rows tall, scrolling on their own. */
+/**
+ * A layer's items, at most eight rows tall, scrolling on their own; the last row fades while
+ * there is more below.
+ */
 export function ItemList(props: { layer: ScopeLayer }) {
   const state = createMemo(() => layerState(props.layer));
   const byKey = createMemo(
     () => new Map(itemsIn(treeItems(), props.layer).map((item) => [item.key, item])),
   );
+  const keys = createMemo(() => listedItems(props.layer).map((item) => item.key));
+  const [more, setMore] = createSignal(false);
+  let list: HTMLDivElement | undefined;
+  const measure = () => {
+    if (list) setMore(scrollView(list.scrollTop, list.clientHeight, list.scrollHeight).cutBottom);
+  };
+  // The rows have changed by the time this runs; a hidden list has no size and fades nothing.
+  createEffect(() => {
+    keys();
+    measure();
+  });
+  onMount(() => {
+    if (!list) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    onCleanup(() => observer.disconnect());
+  });
   return (
-    <div role="group" aria-label={`${LAYER_NAMES[props.layer]} items`} class={s.items}>
-      <For each={listedItems(props.layer).map((item) => item.key)}>
-        {(key) => <ItemRow itemKey={key} byKey={byKey} state={state} />}
-      </For>
+    <div
+      role="group"
+      aria-label={`${LAYER_NAMES[props.layer]} items`}
+      class={cx(s.items, more() && s.more)}
+      ref={(node) => {
+        list = node;
+      }}
+      onScroll={measure}
+    >
+      <For each={keys()}>{(key) => <ItemRow itemKey={key} byKey={byKey} state={state} />}</For>
     </div>
   );
 }
