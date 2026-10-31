@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { chartOf, isUpperStratum, type ItemPart, setIdentity } from './chart';
+import { chartOf, isUpperStratum, type ItemPart, outlinesOf } from './chart';
+import { direct } from './geodesic';
 import { type MapSetData, validateMapSet } from './mapset';
 import { EXAMPLE, EXAMPLE_LAYERS, feature, variant } from './mapsetCorpus';
 
@@ -34,24 +35,6 @@ const withNudgedHold = (by: number) =>
       c.features.push(copy);
     }),
   );
-
-describe('setIdentity', () => {
-  it('is the id when the set has one, else its title', () => {
-    // Arrange
-    const withId = example;
-    const withoutId = parsed(
-      variant((c) => {
-        delete c.id;
-      }),
-    );
-
-    // Act
-    const identities = [withId, withoutId].map(setIdentity);
-
-    // Assert
-    expect(identities).toEqual(['example-set', example.title]);
-  });
-});
 
 describe('chartOf', () => {
   it('joins the Features of one layer and name into an item with a part each', () => {
@@ -115,23 +98,6 @@ describe('chartOf', () => {
     expect(counts).toEqual([2, 3]);
   });
 
-  it('gives the same set under two identities separate items', () => {
-    // Arrange
-    const other = parsed(
-      variant((c) => {
-        c.id = 'another';
-      }),
-    );
-
-    const single = chartOf([example]).length;
-
-    // Act
-    const chart = chartOf([example, other]);
-
-    // Assert
-    expect([chart.length, new Set(chart.map((i) => i.key)).size]).toEqual([2 * single, 2 * single]);
-  });
-
   it('lists items in the order they first appear', () => {
     // Arrange
     const expected = EXAMPLE_LAYERS.filter((_, i) => !JOINING.has(i));
@@ -141,6 +107,208 @@ describe('chartOf', () => {
 
     // Assert
     expect(layers).toEqual(expected);
+  });
+});
+
+type Position = [number, number];
+
+const HERE = { lat: 35.5, lon: 139.8 };
+/** A position `nm` nautical miles east of `HERE`, as a GeoJSON position. */
+const eastOf = (nm: number): Position => {
+  const { lat, lon } = direct(HERE, 90, nm);
+  return [lon, lat];
+};
+const RING: Position[] = [
+  [139.8, 35.5],
+  [139.9, 35.5],
+  [139.9, 35.6],
+  [139.8, 35.5],
+];
+
+const feat = (properties: object, geometry: object) => ({ type: 'Feature', properties, geometry });
+const areaFeature = (name: string, kind: string, ring: Position[] = RING) =>
+  feat({ layer: 'tma', name, kind }, { type: 'Polygon', coordinates: [ring] });
+const routeFeature = (name: string, kind: string) =>
+  feat({ layer: 'conv', name, kind }, { type: 'LineString', coordinates: [eastOf(0), eastOf(5)] });
+const pointFeature = (layer: string, id: string, kind: string, at: Position, ad?: string) =>
+  feat({ layer, id, kind, ...(ad ? { ad } : {}) }, { type: 'Point', coordinates: at });
+const holdFeature = (turn: string, kind: string, inbound: object = { inboundMag: 90 }) =>
+  feat({ layer: 'hold', turn, kind, ...inbound }, { type: 'Point', coordinates: eastOf(0) });
+const setWith = (id: string, features: object[]) =>
+  parsed({ type: 'FeatureCollection', version: 2, id, title: id, features });
+
+/** Each item as its layer and the kinds of its parts. */
+type Kept = [string, (string | undefined)[]][];
+const kindsOf = (sets: MapSetData[]): Kept =>
+  chartOf(sets).map((item) => [item.layer, item.parts.map((p) => p.properties.kind)]);
+
+describe('chartOf across sets', () => {
+  const near = eastOf(0.5);
+  const far = eastOf(2);
+  const rows: [string, object[], object[], Kept][] = [
+    [
+      "an area of the same name: the first set's item whole, parts unmixed",
+      [areaFeature('X', 'A'), areaFeature('X', 'A2', RING.toReversed())],
+      [areaFeature('X', 'B')],
+      [['tma', ['A', 'A2']]],
+    ],
+    [
+      'a route of the same name',
+      [routeFeature('V9', 'A')],
+      [routeFeature('V9', 'B')],
+      [['conv', ['A']]],
+    ],
+    [
+      'a navaid within 1 NM',
+      [pointFeature('navaid', 'QDG', 'A', eastOf(0))],
+      [pointFeature('navaid', 'QDG', 'B', near)],
+      [['navaid', ['A']]],
+    ],
+    [
+      'a navaid of the same id 2 NM away is another navaid',
+      [pointFeature('navaid', 'QDG', 'A', eastOf(0))],
+      [pointFeature('navaid', 'QDG', 'B', far)],
+      [
+        ['navaid', ['A']],
+        ['navaid', ['B']],
+      ],
+    ],
+    [
+      'a fix within 1 NM, and one 2 NM away',
+      [pointFeature('fix', 'TAVRO', 'A', eastOf(0)), pointFeature('fix', 'NIMBA', 'A', eastOf(0))],
+      [pointFeature('fix', 'TAVRO', 'B', near), pointFeature('fix', 'NIMBA', 'B', far)],
+      [
+        ['fix', ['A']],
+        ['fix', ['A']],
+        ['fix', ['B']],
+      ],
+    ],
+    [
+      'an aerodrome within 1 NM',
+      [pointFeature('ad', 'QAAA', 'A', eastOf(0))],
+      [pointFeature('ad', 'QAAA', 'B', near)],
+      [['ad', ['A']]],
+    ],
+    [
+      'a fix and a navaid of one id are two things',
+      [pointFeature('fix', 'QDG', 'A', eastOf(0))],
+      [pointFeature('navaid', 'QDG', 'B', eastOf(0))],
+      [
+        ['fix', ['A']],
+        ['navaid', ['B']],
+      ],
+    ],
+    [
+      'a VFR point of the same id and aerodrome within 1 NM',
+      [pointFeature('vfr', 'CAUSE', 'A', eastOf(0), 'QAAA')],
+      [pointFeature('vfr', 'CAUSE', 'B', near, 'QAAA')],
+      [['vfr', ['A']]],
+    ],
+    [
+      'a VFR point of the same id at another aerodrome, and one of the same aerodrome 2 NM away',
+      [pointFeature('vfr', 'CAUSE', 'A', eastOf(0), 'QAAA')],
+      [
+        pointFeature('vfr', 'CAUSE', 'B', near, 'QBBB'),
+        pointFeature('vfr', 'CAUSE', 'C', far, 'QAAA'),
+      ],
+      [
+        ['vfr', ['A']],
+        ['vfr', ['B']],
+        ['vfr', ['C']],
+      ],
+    ],
+    [
+      'a VFR item of two places, matched by a later set at its second place only',
+      [
+        pointFeature('vfr', 'CAUSE', 'A', eastOf(0), 'QAAA'),
+        pointFeature('vfr', 'CAUSE', 'A2', eastOf(10), 'QAAA'),
+      ],
+      [pointFeature('vfr', 'CAUSE', 'B', eastOf(10.5), 'QAAA')],
+      [['vfr', ['A', 'A2']]],
+    ],
+    [
+      'a hold of the same pattern, and one with another turn',
+      [holdFeature('R', 'A')],
+      [holdFeature('R', 'B'), holdFeature('L', 'C')],
+      [
+        ['hold', ['A']],
+        ['hold', ['C']],
+      ],
+    ],
+    [
+      'a hold of another magnetic inbound, and one of another true inbound',
+      [holdFeature('R', 'A')],
+      [
+        holdFeature('R', 'B', { inboundMag: 270 }),
+        holdFeature('R', 'C', { inboundMag: 90, inboundTrue: 83 }),
+      ],
+      [
+        ['hold', ['A']],
+        ['hold', ['B']],
+        ['hold', ['C']],
+      ],
+    ],
+  ];
+
+  it("keeps the first set's item whole and drops a matching item of a later set", () => {
+    // Arrange
+    const sets = rows.map(([, first, second]) => [
+      setWith('first', first),
+      setWith('second', second),
+    ]);
+
+    // Act
+    const kept = sets.map(kindsOf);
+
+    // Assert
+    expect(kept).toEqual(rows.map(([, , , expected]) => expected));
+  });
+
+  it('takes the other item when the sets come the other way round', () => {
+    // Arrange
+    const sets = [
+      setWith('first', [pointFeature('navaid', 'QDG', 'A', eastOf(0))]),
+      setWith('second', [pointFeature('navaid', 'QDG', 'B', near)]),
+    ];
+
+    // Act
+    const kept = kindsOf(sets.toReversed());
+
+    // Assert
+    expect(kept).toEqual([['navaid', ['B']]]);
+  });
+
+  it('drops a point of a third set that matches the first of two kept points of its id', () => {
+    // Arrange
+    const sets = [
+      setWith('first', [pointFeature('navaid', 'QDG', 'A', eastOf(0))]),
+      setWith('second', [pointFeature('navaid', 'QDG', 'B', far)]),
+      setWith('third', [pointFeature('navaid', 'QDG', 'C', near)]),
+    ];
+
+    // Act
+    const kept = kindsOf(sets);
+
+    // Assert
+    expect(kept).toEqual([
+      ['navaid', ['A']],
+      ['navaid', ['B']],
+    ]);
+  });
+
+  it('keys an item by its layer and naming, and a point also by where it stands, never by its set', () => {
+    // Arrange
+    const sets = [
+      setWith('alpha', [areaFeature('X', 'A'), pointFeature('navaid', 'QDG', 'A', eastOf(0))]),
+      setWith('omega', [pointFeature('navaid', 'QDG', 'B', far)]),
+    ];
+
+    // Act
+    const keys = chartOf(sets).map((item) => item.key);
+
+    // Assert
+    expect(new Set(keys).size).toBe(3);
+    expect(keys.some((key) => key.includes('alpha') || key.includes('omega'))).toBe(false);
   });
 });
 
@@ -183,5 +351,38 @@ describe('isUpperStratum', () => {
 
     // Assert
     expect(verdict).toBe(false);
+  });
+});
+
+describe('outlinesOf', () => {
+  it('lists a point as one outline of one position, a line as itself, a polygon as its rings', () => {
+    // Arrange
+    const ring = [
+      [0, 0],
+      [2, 0],
+      [2, 2],
+      [0, 0],
+    ] as [number, number][];
+    const hole = [
+      [0.5, 0.5],
+      [1, 0.5],
+      [1, 1],
+      [0.5, 0.5],
+    ] as [number, number][];
+    const line = [
+      [0, 0],
+      [1, 1],
+    ] as [number, number][];
+    const geometries: ItemPart['geometry'][] = [
+      { type: 'Point', coordinates: [3, 4] },
+      { type: 'LineString', coordinates: line },
+      { type: 'Polygon', coordinates: [ring, hole] },
+    ];
+
+    // Act
+    const outlines = geometries.map(outlinesOf);
+
+    // Assert
+    expect(outlines).toEqual([[[[3, 4]]], [line], [ring, hole]]);
   });
 });

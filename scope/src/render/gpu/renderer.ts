@@ -140,6 +140,7 @@ export class GpuRenderer {
           [2, 'float32x2'],
           [3, 'float32x4'],
           [4, 'float32x4'],
+          [5, 'float32x4'],
         ]),
       ),
       markers: make(

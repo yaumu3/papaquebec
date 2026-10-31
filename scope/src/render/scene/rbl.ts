@@ -1,6 +1,6 @@
 import { formatMmSs } from '../../lib/format';
 import {
-  type Span,
+  type Segment,
   splitByCircle,
   type GeoPoint,
   type ProjectFn,
@@ -95,14 +95,14 @@ function reachAlong(dir: Vec2, box: Box, pad: number): number {
   return Math.min(x, y) + pad;
 }
 
-/** The spans of a path that lie further than `r` from `c`. */
-function clearOf(path: Vec2[], c: Vec2, r: number): Span[] {
+/** The segments of a path that lie further than `r` from `c`. */
+function clearOf(path: Vec2[], c: Vec2, r: number): Segment[] {
   return path.slice(1).flatMap((q, i) => splitByCircle(path[i] ?? q, q, c, r).outside);
 }
 
-/** The dotted spans, faint within `reach` of `c` where the readout sits, so the text stays clear. */
-function drawFadingAt(lines: LineBatch, spans: Span[], c: Vec2, reach: number): void {
-  const parts = spans.map(([p, q]) => splitByCircle(p, q, c, reach));
+/** The dotted segments, faint within `reach` of `c` where the readout sits, so the text stays clear. */
+function drawFadingAt(lines: LineBatch, segments: Segment[], c: Vec2, reach: number): void {
+  const parts = segments.map(([p, q]) => splitByCircle(p, q, c, reach));
   for (const [p, q] of parts.flatMap((s) => s.outside))
     lines.segment(p, q, THEME.cursor, { dash: RBL_DASH });
   for (const [p, q] of parts.flatMap((s) => s.inside))
@@ -155,8 +155,8 @@ export function drawRbl(
   const end = siteOn(path, 'end');
   const tipPx = reachAlong(end.dir, { w: END_PX, h: END_PX }, 1);
   const basePx = tipPx + ARROW_PX * Math.cos(ARROW_SPREAD);
-  const spans = clearOf(path, end.at, basePx / input.view.pxPerNm);
-  drawFadingAt(lines, spans, site.at, reach / input.view.pxPerNm);
+  const segments = clearOf(path, end.at, basePx / input.view.pxPerNm);
+  drawFadingAt(lines, segments, site.at, reach / input.view.pxPerNm);
   drawArrow(lines, end, -tipPx);
   markers.marker(a.pos, onTarget[0] ? Shape.Square : Shape.HollowSquare, END_PX, THEME.cursor);
   markers.marker(b.pos, onTarget[1] ? Shape.Square : Shape.HollowSquare, END_PX, THEME.cursor);

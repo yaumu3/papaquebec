@@ -1,16 +1,15 @@
-import type { Chart } from '../lib/chart';
 import { blockHeight, DB_WIDTH, type Rect } from '../lib/datablock';
 import { distanceToSegment, type ProjectFn, type UnprojectFn, type Vec2 } from '../lib/geo';
-import type { ScopeLayer } from '../lib/layers';
+import type { PointLayer } from '../lib/mapsetFormat';
+import type { ChartPoint } from '../lib/topology';
 import type { Offset } from '../render/layout/moves';
 import type { View } from '../render/protocol';
 import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/rbl';
 import { restingOffset } from '../render/scene/targets';
 import { toScreen, toWorld } from '../render/scene/view';
-import { chart } from '../state/mapsets';
+import { drawnPoints } from '../state/drawnPoints';
 import { drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
-import { settings } from '../state/settings';
 import type { Track } from '../state/track';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
 import { anchorFor } from './rbl';
@@ -124,29 +123,25 @@ export function rblAt(view: View, cx: number, cy: number): Rbl | null {
 }
 
 /** The layers whose points the range cursor snaps onto. */
-const SNAP_LAYERS: ReadonlySet<ScopeLayer> = new Set(['fix', 'vfr', 'navaid']);
+const SNAP_LAYERS: ReadonlySet<PointLayer> = new Set(['fix', 'vfr', 'navaid']);
 
-/** The point of a shown fix, VFR point or navaid nearest `at`, if any is within `reach`. */
+/** The fix, VFR point or navaid among the drawn points nearest `at`, if any is within `reach`. */
 export function fixNear(
-  items: Chart,
-  shown: (layer: ScopeLayer) => boolean,
+  points: readonly ChartPoint[],
   at: Vec2,
   reach: number,
   project: ProjectFn,
 ): { name: string; x: number; y: number } | null {
   let best: { name: string; x: number; y: number } | null = null;
   let bestD = reach * reach;
-  for (const item of items) {
-    if (!SNAP_LAYERS.has(item.layer) || !shown(item.layer)) continue;
-    for (const { geometry, properties } of item.parts) {
-      if (geometry.type !== 'Point' || !('id' in properties)) continue;
-      const [lon, lat] = geometry.coordinates;
-      const p = project(lat, lon);
-      const d = (p.x - at.x) ** 2 + (p.y - at.y) ** 2;
-      if (d < bestD) {
-        bestD = d;
-        best = { name: properties.id, ...p };
-      }
+  for (const point of points) {
+    if (!SNAP_LAYERS.has(point.layer)) continue;
+    const [lon, lat] = point.at;
+    const p = project(lat, lon);
+    const d = (p.x - at.x) ** 2 + (p.y - at.y) ** 2;
+    if (d < bestD) {
+      bestD = d;
+      best = { name: point.id, ...p };
     }
   }
   return best;
@@ -158,5 +153,5 @@ export function fixAt(
   cy: number,
 ): { name: string; x: number; y: number } | null {
   const reach = FIX_PX / view.pxPerNm;
-  return fixNear(chart(), (l) => settings.shownLayers[l], toWorld(view, cx, cy), reach, projectNm);
+  return fixNear(drawnPoints(), toWorld(view, cx, cy), reach, projectNm);
 }

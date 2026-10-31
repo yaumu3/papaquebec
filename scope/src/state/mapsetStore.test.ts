@@ -14,6 +14,7 @@ const data = (title: string): MapSetData => ({
 const record = (identity: string, enabled = true): StoredMapSet => ({
   identity,
   enabled,
+  imported: 0,
   data: data(identity),
 });
 

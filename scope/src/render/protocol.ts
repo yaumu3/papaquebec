@@ -7,7 +7,7 @@
 import type { SlotName } from './slots';
 
 /** Floats per instance. See `pack.ts` for the layouts. */
-export const LINE_STRIDE = 18;
+export const LINE_STRIDE = 22;
 export const MARKER_STRIDE = 12;
 export const TEXT_STRIDE = 16;
 

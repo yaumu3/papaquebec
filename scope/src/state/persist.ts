@@ -2,7 +2,6 @@ import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
 import { DRAW_STACK } from '../lib/layers';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
-import { type ListSort, SORT_DIRS, SORT_KEYS } from './listSort';
 import { isLaneKey, type LaneKey } from './plotted';
 import {
   LABEL_DENSITIES,
@@ -13,6 +12,9 @@ import {
   QNH_MAX_INHG,
   type QnhSetting,
   STATION_RE,
+  type ListSort,
+  SORT_DIRS,
+  SORT_KEYS,
   QNH_MIN_INHG,
   RANGE_MAX_NM,
   RANGE_MIN_NM,

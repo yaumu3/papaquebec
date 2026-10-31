@@ -81,3 +81,22 @@ export const LAYER_NAMES: Record<ScopeLayer, string> = {
   coast: 'COASTLINE',
   rings: 'RANGE RINGS',
 };
+
+const NAVAID_MAX_RANGE = 120;
+
+/** Navaids clutter a wide range; they show only out to `NAVAID_MAX_RANGE`. */
+export function navaidsShownAt(rangeNm: number): boolean {
+  return rangeNm <= NAVAID_MAX_RANGE;
+}
+
+/**
+ * The layers to build: those shown, and the navaids only when the range allows. The range is
+ * read only for a shown navaid layer, so a rebuild follows it only then.
+ */
+export function visibleLayers(
+  layers: readonly StyledLayer[],
+  shown: (layer: StyledLayer) => boolean,
+  navaidsInRange: () => boolean,
+): StyledLayer[] {
+  return layers.filter((l) => shown(l) && (l !== 'navaid' || navaidsInRange()));
+}

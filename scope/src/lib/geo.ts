@@ -33,7 +33,7 @@ export function distanceToSegment(p: Vec2, a: Vec2, b: Vec2): number {
 }
 
 /** A segment from its first point to its second. */
-export type Span = [Vec2, Vec2];
+export type Segment = [Vec2, Vec2];
 
 /** Segment `p`–`q` split into what lies outside the circle of radius `r` about `c` and what inside. */
 export function splitByCircle(
@@ -41,7 +41,7 @@ export function splitByCircle(
   q: Vec2,
   c: Vec2,
   r: number,
-): { outside: Span[]; inside: Span[] } {
+): { outside: Segment[]; inside: Segment[] } {
   const d = { x: q.x - p.x, y: q.y - p.y };
   const f = { x: p.x - c.x, y: p.y - c.y };
   const a = d.x * d.x + d.y * d.y;
@@ -52,7 +52,7 @@ export function splitByCircle(
   const t2 = Math.min((-b + Math.sqrt(disc)) / (2 * a), 1);
   if (t1 >= 1 || t2 <= 0) return { outside: [[p, q]], inside: [] };
   const at = (t: number) => ({ x: p.x + d.x * t, y: p.y + d.y * t });
-  const outside: Span[] = [];
+  const outside: Segment[] = [];
   if (t1 > 0) outside.push([p, at(t1)]);
   if (t2 < 1) outside.push([at(t2), q]);
   return { outside, inside: [[at(t1), at(t2)]] };
@@ -68,12 +68,17 @@ export type ProjectFn = (lat: number, lon: number) => Vec2;
 /** The inverse of a `ProjectFn`: a point on the plane back to lat/lon. */
 export type UnprojectFn = (x: number, y: number) => GeoPoint;
 
-/** Equirectangular distance, good enough to rank nearby items. */
-function flatDistance(lat: number, lon: number, p: GeoPoint): number {
-  const k = Math.cos((lat * Math.PI) / 180);
-  const dLat = p.lat - lat;
-  const dLon = (p.lon - lon) * k;
-  return dLat * dLat + dLon * dLon;
+/** Nautical miles in a degree of latitude, near enough: it runs from 59.7 at the equator to 60.3 at the poles. */
+const NM_PER_DEGREE = 60;
+
+/**
+ * Equirectangular distance in nautical miles, the short way round the antimeridian. Within 1% of
+ * the geodesic over a few nautical miles, at any latitude: enough to rank nearby items or to
+ * tell whether two are one.
+ */
+export function flatDistanceNm(a: GeoPoint, b: GeoPoint): number {
+  const east = turn(a.lon, b.lon) * Math.cos(a.lat * RAD);
+  return NM_PER_DEGREE * Math.hypot(b.lat - a.lat, east);
 }
 
 /** A copy of the items ordered nearest first. */
@@ -83,7 +88,7 @@ export function rankByDistance<T extends GeoPoint>(
   items: readonly T[],
 ): T[] {
   return items
-    .map((it) => ({ it, d: flatDistance(lat, lon, it) }))
+    .map((it) => ({ it, d: flatDistanceNm({ lat, lon }, it) }))
     .toSorted((a, b) => a.d - b.d)
     .map((x) => x.it);
 }

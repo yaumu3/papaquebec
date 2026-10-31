@@ -12,7 +12,7 @@ import {
   sourceName,
 } from '../lib/format';
 import { isEmergency, isStale, trackLabel, typeLabel } from '../render/scene/rules';
-import { distanceFromSite, type SortKey, sortTracks, toggleSort } from '../state/listSort';
+import { distanceFromSite, sortTracks, toggleSort } from '../state/listSort';
 import { magneticTrack } from '../state/magnetic';
 import {
   hoverMark,
@@ -24,7 +24,7 @@ import {
   setSelected,
   snapshotVersion,
 } from '../state/scope';
-import { settings } from '../state/settings';
+import { settings, type SortKey } from '../state/settings';
 import type { Track } from '../state/track';
 import { trackStore } from '../state/tracks';
 import { hoverPlace } from '../ui/hoverPlace';

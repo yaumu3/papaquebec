@@ -4,6 +4,8 @@ import type { MapSetData } from '../lib/mapset';
 export interface StoredMapSet {
   identity: string;
   enabled: boolean;
+  /** When it was imported, in ms since the epoch: the newest import takes precedence. */
+  imported: number;
   data: MapSetData;
 }
 

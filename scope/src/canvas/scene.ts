@@ -1,5 +1,6 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js';
 
+import { visibleLayers } from '../lib/layers';
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer, type RenderStatus } from '../render/facade';
 import { type Move, retarget, settleMoves } from '../render/layout/moves';
@@ -7,16 +8,17 @@ import { applyPlacement, blockSubjects, viewportRect } from '../render/layout/pl
 import { workerPlacer } from '../render/layout/placer';
 import { fixNearest } from '../render/layout/trails';
 import type { AtlasInfo, View } from '../render/protocol';
-import { buildChart, navaidsShownAt, visibleLayers } from '../render/scene/chart';
+import { buildChart } from '../render/scene/chart';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
 import { buildCoast, buildRings } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
+import { drawnPoints, navaidsInRange } from '../state/drawnPoints';
 import { hoverInstant } from '../state/lanes';
 import { declinationAt } from '../state/magnetic';
-import { chart } from '../state/mapsets';
+import { topology } from '../state/mapsets';
 import {
   canvasSize,
   coast,
@@ -117,15 +119,14 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       : null,
   );
 
-  /** Zooming reaches the chart only when it shows or hides the navaids. */
-  const navaidsInRange = createMemo(() => navaidsShownAt(settings.rangeNm));
   for (const slice of CHART_SLICES) {
     show((a) =>
       projected()
         ? sliceSlots(
             slice,
             buildChart({
-              chart: chart(),
+              topology: topology(),
+              drawnPoints,
               project: projectNm,
               layers: visibleLayers(slice.layers, (l) => settings.shownLayers[l], navaidsInRange),
               labelDensity: settings.labelDensity,

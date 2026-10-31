@@ -4,8 +4,7 @@ import type { FeedDown } from '../feed/push';
 import type { Vec2 } from '../lib/geo';
 import type { CoastData } from '../lib/mapdata';
 import { type Filterable, visibility } from './filter';
-import type { ListSort } from './listSort';
-import { type PanelId, persisted, settings } from './settings';
+import { type ListSort, type PanelId, persisted, settings } from './settings';
 
 export type { PanelId };
 

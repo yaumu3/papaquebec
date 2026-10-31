@@ -6,8 +6,9 @@ const stackSlice = (first: StyledLayer, last: StyledLayer) =>
   DRAW_STACK.slice(DRAW_STACK.indexOf(first), DRAW_STACK.indexOf(last) + 1).filter(isStyled);
 
 /**
- * The chart is built in three runs of the draw stack, so a toggle rebuilds one run. Each fills a
- * slot for its lines and markers and one for its labels. `hold` sits in none: it draws nothing.
+ * The chart is built in three slices of the draw stack, so a toggle rebuilds only the slices that
+ * read its layer. Each fills a slot for its lines and markers and one for its labels. `hold` sits
+ * in none: it draws nothing.
  */
 export const CHART_SLICES = [
   { layers: stackSlice('ctr', 'asr'), shapes: 'areaLines', labels: 'areaLabels' },

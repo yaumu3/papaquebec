@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import { DRAW_STACK } from '../lib/layers';
-import type { ListSort } from './listSort';
 import { memoryStorage } from './memoryStorage';
 import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
-import { DEFAULT_SETTINGS, type ShownLayers } from './settings';
+import { DEFAULT_SETTINGS, type ListSort, type ShownLayers } from './settings';
 
 const DEFAULT_PANELS = { display: true, maps: true, list: true, detail: true };
 const DEFAULT_SORT: ListSort = { key: 'id', dir: 'asc' };

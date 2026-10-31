@@ -90,3 +90,23 @@ export const ND_RANGES_NM = [10, 20, 40, 80] as const;
 export type NdRangeNm = (typeof ND_RANGES_NM)[number];
 /** The range the ND opens on. */
 export const DEFAULT_ND_RANGE_NM: NdRangeNm = 20;
+
+export type SortKey = 'id' | 'type' | 'alt' | 'gs' | 'track' | 'squawk' | 'dist' | 'source';
+export type SortDir = 'asc' | 'desc';
+export const SORT_KEYS: readonly SortKey[] = [
+  'id',
+  'type',
+  'alt',
+  'gs',
+  'track',
+  'squawk',
+  'dist',
+  'source',
+];
+export const SORT_DIRS: readonly SortDir[] = ['asc', 'desc'];
+export const DEFAULT_LIST_SORT: ListSort = { key: 'id', dir: 'asc' };
+
+export interface ListSort {
+  key: SortKey;
+  dir: SortDir;
+}

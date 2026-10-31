@@ -1,26 +1,7 @@
 import { trackLabel } from '../render/scene/rules';
 import { magneticTrack } from './magnetic';
+import type { ListSort, SortKey } from './settingsDefaults';
 import type { Track } from './track';
-
-export type SortKey = 'id' | 'type' | 'alt' | 'gs' | 'track' | 'squawk' | 'dist' | 'source';
-export type SortDir = 'asc' | 'desc';
-export const SORT_KEYS: readonly SortKey[] = [
-  'id',
-  'type',
-  'alt',
-  'gs',
-  'track',
-  'squawk',
-  'dist',
-  'source',
-];
-export const SORT_DIRS: readonly SortDir[] = ['asc', 'desc'];
-export const DEFAULT_LIST_SORT: ListSort = { key: 'id', dir: 'asc' };
-
-export interface ListSort {
-  key: SortKey;
-  dir: SortDir;
-}
 
 /** Plane distance from the site (the projection origin), NM; undefined without a drawable position. */
 export function distanceFromSite(t: Track): number | undefined {

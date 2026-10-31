@@ -15,6 +15,9 @@ export interface Anchor {
   py?: number;
 }
 
+/** The distance between two anchors on the world plane. */
+export const chordOf = (a: Anchor, b: Anchor): number => Math.hypot(b.x - a.x, b.y - a.y);
+
 export type Rgba = [number, number, number, number];
 
 const colorCache = new Map<string, Rgba>();
@@ -83,10 +86,24 @@ export interface LineStyle {
 }
 
 /**
- * Layout per instance (18 floats):
- * `ax ay apx apy bx by bpx bpy width along p0 p1 p2 p3 r g b a`
+ * Where a polyline sits in a span of a route, which the line shader cuts back at its stops: the
+ * world distance from the span's first stop to the polyline's start, the span's length, and the
+ * cut at each end in CSS px (0 where the span does not end at a stop).
+ */
+export interface SpanPlace {
+  back: number;
+  length: number;
+  cutBack: number;
+  cutAhead: number;
+}
+
+/**
+ * Layout per instance (22 floats):
+ * `ax ay apx apy bx by bpx bpy width along p0 p1 p2 p3 r g b a back ahead cutBack cutAhead`
  * `along` is the world distance from the polyline's start to `a`; the dash pattern `p0..p3`
- * runs on from it, so it does not restart at a vertex.
+ * runs on from it, so it does not restart at a vertex. `back` is the world distance from the
+ * span's first stop to `a` and `ahead` from `b` to its last; the cuts are in CSS px. A line
+ * outside a span writes 0 in all four.
  */
 export class LineBatch {
   private readonly buf: InstanceBuffer;
@@ -95,7 +112,14 @@ export class LineBatch {
     this.buf = new InstanceBuffer(LINE_STRIDE, capacity);
   }
 
-  segment(a: Anchor, b: Anchor, color: string, style: LineStyle = {}, along = 0): void {
+  segment(
+    a: Anchor,
+    b: Anchor,
+    color: string,
+    style: LineStyle = {},
+    along = 0,
+    span: readonly number[] = [],
+  ): void {
     const at = this.buf.next();
     const d = this.buf.buffer;
     d[at] = a.x;
@@ -110,16 +134,29 @@ export class LineBatch {
     d[at + 9] = along;
     d.set(style.dash ?? [], at + 10);
     d.set(parseColor(color), at + 14);
+    d.set(span, at + 18);
   }
 
-  polyline(points: readonly Anchor[], color: string, style: LineStyle = {}): void {
+  polyline(
+    points: readonly Anchor[],
+    color: string,
+    style: LineStyle = {},
+    place?: SpanPlace,
+  ): void {
     let along = 0;
     for (let i = 1; i < points.length; i++) {
       const a = points[i - 1];
       const b = points[i];
       if (!a || !b) continue;
-      this.segment(a, b, color, style, along);
-      along += Math.hypot(b.x - a.x, b.y - a.y);
+      const chord = chordOf(a, b);
+      const span = place && [
+        place.back + along,
+        place.length - place.back - along - chord,
+        place.cutBack,
+        place.cutAhead,
+      ];
+      this.segment(a, b, color, style, along, span);
+      along += chord;
     }
   }
 
