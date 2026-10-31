@@ -3,8 +3,10 @@ import { describe, expect, it } from 'bun:test';
 import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
 import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
-import { isPointLayer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
+import { isPointLayer, type Layer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
+import type { LayerState } from '../../lib/visibility';
+import { allShown, shownExcept } from '../../lib/visibilityFixture';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
@@ -50,19 +52,28 @@ const itemOf = (layer: StyledLayer, ...parts: ItemPart[]): ChartItem => ({
   parts,
 });
 
+/** What the scope reads to decide what draws: the navaid range and each layer's state. */
+interface Reads {
+  inRange?: boolean;
+  stateOf?: (layer: Layer) => LayerState;
+}
+
+/** Every layer shown, and the items with these keys hidden. */
+const hiding =
+  (...keys: string[]) =>
+  () =>
+    shownExcept(...keys);
+
+const keyed = (key: string, item: ChartItem): ChartItem => ({ ...item, key });
+
 const build = (
   items: Chart,
   layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
-  inRange = true,
+  { inRange = true, stateOf = allShown }: Reads = {},
 ) => {
   const topology = topologyOf(items);
-  const drawnItems = drawnItemsOf(
-    items,
-    layers,
-    () => true,
-    () => inRange,
-  );
+  const drawnItems = drawnItemsOf(items, layers, stateOf, () => inRange);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
   return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
 };
@@ -407,8 +418,8 @@ const routeOf = (layer: StyledLayer, ...at: Position[]) =>
 
 describe('buildChart routes stop short of points', () => {
   const conv = packed('#82573c');
-  const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[], inRange = true) =>
-    instances(build(items, layers, 'normal', inRange).lines)
+  const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[], reads?: Reads) =>
+    instances(build(items, layers, 'normal', reads).lines)
       .filter((i) => i.color.every((c, k) => c === conv[k]))
       .map((i) => i.span);
 
@@ -481,19 +492,19 @@ describe('buildChart routes stop short of points', () => {
   it('writes no cut where no point stands at a vertex, where the point layer is hidden, or the navaid is out of range', () => {
     // Arrange
     const through = routeOf('conv', [0, 0], [1, 0], [2, 0]);
-    const rows: [string, ChartItem[], readonly StyledLayer[], boolean][] = [
-      ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix'], true],
-      ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv'], true],
+    const rows: [string, ChartItem[], readonly StyledLayer[], Reads][] = [
+      ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix'], {}],
+      ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv'], {}],
       [
         'a navaid beyond the range threshold',
         [through, stopAt('navaid', [1, 0])],
         ['conv', 'navaid'],
-        false,
+        { inRange: false },
       ],
     ];
 
     // Act
-    const spans = rows.map(([, items, layers, inRange]) => cutsOf(items, layers, inRange));
+    const spans = rows.map(([, items, layers, reads]) => cutsOf(items, layers, reads));
 
     // Assert
     expect(spans.map((list) => list.every((s) => s.every((v) => v === 0)))).toEqual([
@@ -557,12 +568,7 @@ describe('buildChart routes stop short of points', () => {
       },
       project,
       layers,
-      drawnItems: drawnItemsOf(
-        items,
-        layers,
-        () => true,
-        () => true,
-      ),
+      drawnItems: drawnItemsOf(items, layers, allShown, () => true),
       labelDensity: 'normal' as const,
       atlas,
     }));
@@ -824,5 +830,66 @@ describe('buildChart labels', () => {
 
     // Assert
     expect(colours).toEqual(rows.map(([, hex]) => packed(hex)));
+  });
+});
+
+describe('buildChart hidden items', () => {
+  it('hands an edge to the next owner when the item that owned it is hidden', () => {
+    // Arrange
+    const items = [
+      keyed('fir', itemOf('fir', partOf('fir', line([0, 0], [1, 0], [0, 1])))),
+      keyed('tma', itemOf('tma', partOf('tma', line([0, 0], [1, 0], [1, 1])))),
+    ];
+    const rows: Reads[] = [{}, { stateOf: hiding('fir') }];
+
+    // Act
+    const drawn = rows.map((reads) =>
+      instances(build(items, ['tma', 'fir'], 'normal', reads).lines),
+    );
+
+    // Assert
+    expect(drawn.map((batch) => batch.map((i) => i.color))).toEqual([
+      [packed('#606060'), packed('#5e3a3a'), packed('#5e3a3a')],
+      [packed('#5e3a3a'), packed('#5e3a3a')],
+    ]);
+    expect(drawn[1]?.map((i) => [i.a.x, i.a.y, i.b.x, i.b.y])).toEqual([
+      [0, 0, 1, 0],
+      [1, 0, 1, 1],
+    ]);
+  });
+
+  it('does not stop a route at a hidden fix, and gives it no marker or label', () => {
+    // Arrange
+    const items = [
+      keyed('route', routeOf('conv', [0, 0], [1, 0], [2, 0])),
+      keyed('stop', stopAt('fix', [1, 0])),
+    ];
+    const rows: Reads[] = [{}, { stateOf: hiding('stop') }];
+
+    // Act
+    const built = rows.map((reads) => build(items, ['conv', 'fix'], 'dense', reads));
+
+    // Assert
+    expect(built.map((b) => b.markers.count)).toEqual([1, 0]);
+    expect(built.map((b) => b.labels.count)).toEqual([2, 1]);
+    expect(built.map((b) => instances(b.lines).some((i) => i.span.some((v) => v !== 0)))).toEqual([
+      true,
+      false,
+    ]);
+  });
+
+  it('gives a hidden route or area no label', () => {
+    // Arrange
+    const items = [
+      keyed('route', routeOf('conv', [0, 0], [1, 0])),
+      keyed('area', itemOf('ctr', partOf('ctr', polygon(triangle(0))))),
+    ];
+    const rows: Reads[] = [{}, { stateOf: hiding('route', 'area') }];
+
+    // Act
+    const built = rows.map((reads) => build(items, ['conv', 'ctr'], 'dense', reads));
+
+    // Assert
+    expect(built.map((b) => b.labels.count)).toEqual([2, 0]);
   });
 });

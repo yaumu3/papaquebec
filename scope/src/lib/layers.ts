@@ -1,5 +1,6 @@
 import type { Chart, ChartItem } from './chart';
 import type { Layer } from './mapsetFormat';
+import { isItemShown, type LayerState } from './visibility';
 
 /**
  * Every layer the scope draws, front first: what is listed first is drawn over everything after
@@ -93,19 +94,22 @@ export function navaidsShownAt(rangeNm: number): boolean {
 }
 
 /**
- * The items of the chart that draw: those on the shown `layers`, and the navaids only when the
- * range allows. The range is read at most once, and only for a shown navaid layer, so a rebuild
- * follows it only then.
+ * The items of the chart that draw: of `layers`, those shown, and the navaids only when the range
+ * allows. Each layer's state and the range are read once; the range only for a shown navaid, so a
+ * rebuild follows it only then.
  */
 export function drawnItemsOf(
   chart: Chart,
   layers: readonly Layer[],
-  shown: (layer: Layer) => boolean,
+  stateOf: (layer: Layer) => LayerState,
   navaidsInRange: () => boolean,
 ): ChartItem[] {
-  const on = new Set(layers.filter(shown));
-  const items = chart.filter((item) => on.has(item.layer));
-  return on.has('navaid') && !navaidsInRange()
+  const states = new Map(layers.map((layer) => [layer, stateOf(layer)]));
+  const items = chart.filter((item) => {
+    const state = states.get(item.layer);
+    return state !== undefined && isItemShown(state, item.key);
+  });
+  return items.some((item) => item.layer === 'navaid') && !navaidsInRange()
     ? items.filter((item) => item.layer !== 'navaid')
     : items;
 }

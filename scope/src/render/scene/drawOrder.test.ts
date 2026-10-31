@@ -12,6 +12,7 @@ import {
   ownersOf,
   topologyOf,
 } from '../../lib/topology';
+import { allShown } from '../../lib/visibilityFixture';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../slots';
@@ -46,12 +47,7 @@ function itemAt(layer: StyledLayer): ChartItem {
 /** A slice of the chart built as the scope builds it. */
 function sliceOf(chart: Chart, layers: readonly StyledLayer[], labelDensity: LabelDensity) {
   const topology = topologyOf(chart);
-  const drawnItems = drawnItemsOf(
-    chart,
-    layers,
-    () => true,
-    () => true,
-  );
+  const drawnItems = drawnItemsOf(chart, layers, allShown, () => true);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
   return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
 }

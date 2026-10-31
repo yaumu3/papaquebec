@@ -8,6 +8,8 @@ import { parseMapSet } from '../lib/mapset';
 import { EXAMPLE } from '../lib/mapsetCorpus';
 import type { Layer } from '../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../lib/topology';
+import type { LayerState } from '../lib/visibility';
+import { allShown, shownExcept } from '../lib/visibilityFixture';
 import type { View } from '../render/protocol';
 import { makeTrack } from '../render/scene/trackFixture';
 import { toScreen } from '../render/scene/view';
@@ -97,15 +99,14 @@ describe('fixNear', () => {
     ],
   };
   const topology = topologyOf([...chartOf([parseMapSet(EXAMPLE)]), stepped]);
-  const drawn = (layers: readonly Layer[], inRange = true) =>
+  const drawn = (
+    layers: readonly Layer[],
+    inRange = true,
+    stateOf: (layer: Layer) => LayerState = allShown,
+  ) =>
     drawnPointsOf(
       topology,
-      drawnItemsOf(
-        topology.chart,
-        layers,
-        () => true,
-        () => inRange,
-      ),
+      drawnItemsOf(topology.chart, layers, stateOf, () => inRange),
     );
   it('snaps onto a shown fix, VFR point or navaid, and onto nothing else', () => {
     // Arrange
@@ -173,6 +174,22 @@ describe('fixNear', () => {
 
     // Assert
     expect(found.map((f) => f?.name)).toEqual(rows.map((r) => r.near));
+  });
+
+  it('snaps past a hidden fix onto the next one in reach', () => {
+    // Arrange
+    const reach = 1;
+    const key = drawn(['fix']).find((p) => p.id === 'TAVRO')?.key ?? '';
+    const where = at(130.93, 33.47);
+
+    // Act
+    const found = [() => allShown(), () => shownExcept(key)].map((stateOf) =>
+      fixNear(drawn(['fix'], true, stateOf), where, reach, plane.project),
+    );
+
+    // Assert
+    expect(key).not.toBe('');
+    expect(found.map((f) => f?.name)).toEqual(['TAVRO', 'NIMBA']);
   });
 
   it('reports where the fix is on the plane', () => {

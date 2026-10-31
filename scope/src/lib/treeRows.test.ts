@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { ScopeLayer } from './layers';
+import { drawnItemsOf, type ScopeLayer } from './layers';
 import type { Layer } from './mapsetFormat';
 import type { TreeItem } from './treeItems';
 import {
@@ -64,6 +64,23 @@ describe('rowStateOf', () => {
 
     // Assert
     expect(results).toEqual(rows.map(([, expected]) => expected));
+  });
+});
+
+describe('rowStateOf beyond the navaid range', () => {
+  it('keeps the NAVAIDS row on when the range hides the navaids', () => {
+    // Arrange
+    const stateOf = statesOf({ navaid: shownExcept() });
+    const chart = [item('navaid', 'QDG')];
+    // Precondition
+    const drawnOutOfRange = drawnItemsOf(chart, ['navaid'], stateOf, () => false);
+
+    // Act
+    const row = rowStateOf([withItems('navaid', ['QDG'])], stateOf);
+
+    // Assert
+    expect(drawnOutOfRange).toEqual([]);
+    expect(row).toBe('on');
   });
 });
 

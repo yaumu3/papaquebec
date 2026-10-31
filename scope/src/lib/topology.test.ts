@@ -14,6 +14,7 @@ import {
   type Network,
   topologyOf,
 } from './topology';
+import { allShown } from './visibilityFixture';
 
 const A: LonLat = [130.6, 33.7];
 const B: LonLat = [130.7, 33.7];
@@ -370,12 +371,7 @@ describe('the points of a topology', () => {
       [['navaid', 'fix'], false],
     ];
     const items = rows.map(([layers, inRange]) =>
-      drawnItemsOf(
-        chart,
-        layers,
-        () => true,
-        () => inRange,
-      ),
+      drawnItemsOf(chart, layers, allShown, () => inRange),
     );
 
     // Act
