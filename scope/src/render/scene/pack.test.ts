@@ -18,12 +18,13 @@ describe('parseColor', () => {
   });
 });
 
+const lines = (draw: (b: LineBatch) => void, capacity?: number) => {
+  const b = new LineBatch(capacity);
+  draw(b);
+  return b.finish();
+};
+
 describe('LineBatch', () => {
-  const lines = (draw: (b: LineBatch) => void, capacity?: number) => {
-    const b = new LineBatch(capacity);
-    draw(b);
-    return b.finish();
-  };
   const white = '#ffffff';
 
   it('packs one instance per segment with the documented layout', () => {
@@ -52,10 +53,11 @@ describe('LineBatch', () => {
     });
 
     // Assert
-    const patterns = dashes.map((_, i) => [
-      ...batch.data.subarray(i * LINE_STRIDE + 10, i * LINE_STRIDE + 14),
-    ]);
-    expect(patterns).toEqual([
+    expect(
+      dashes.map((_, i) =>
+        Array.from(batch.data.subarray(i * LINE_STRIDE + 10, i * LINE_STRIDE + 14)),
+      ),
+    ).toEqual([
       [0, 0, 0, 0],
       [0, 0, 0, 0],
       [3, 1, 0, 0],

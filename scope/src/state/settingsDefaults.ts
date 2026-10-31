@@ -1,5 +1,5 @@
 import { type Altimeter, STANDARD_ALTIMETER } from '../lib/altitude';
-import { DRAW_STACK, type ScopeLayer } from '../lib/layers';
+import type { ScopeLayer } from '../lib/layers';
 import { FL_MAX, type Filter } from './filter';
 
 /** Range presets on the Display panel; the wheel zooms continuously between the limits. */
@@ -13,20 +13,6 @@ export const TRAIL_STEPS = [0, 30, 60, 120] as const;
 export type ShownLayers = Record<ScopeLayer, boolean>;
 export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
 
-const HIDDEN_BY_DEFAULT: ReadonlySet<ScopeLayer> = new Set([
-  'adiz',
-  'cta',
-  'advisory',
-  'asr',
-  'tra',
-  'civt',
-  'dct',
-  'sid',
-  'star',
-  'trans',
-  'vfr',
-  'hold',
-]);
 export const LABEL_DENSITIES: readonly LabelDensity[] = ['off', 'sparse', 'normal', 'dense'];
 
 export interface Settings {
@@ -61,9 +47,33 @@ export const DEFAULT_SETTINGS: Settings = {
   vectorMin: 2,
   trailSec: 60,
   filter: { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' },
-  shownLayers: Object.fromEntries(
-    DRAW_STACK.map((layer) => [layer, !HIDDEN_BY_DEFAULT.has(layer)]),
-  ) as ShownLayers,
+  shownLayers: {
+    ad: true,
+    navaid: true,
+    fix: true,
+    vfr: false,
+    sid: false,
+    star: false,
+    trans: false,
+    conv: true,
+    rnav: true,
+    dct: false,
+    hold: false,
+    ctr: true,
+    pr: true,
+    tma: true,
+    sector: true,
+    fir: true,
+    dng: true,
+    tra: false,
+    adiz: false,
+    cta: false,
+    advisory: false,
+    civt: false,
+    asr: false,
+    coast: true,
+    rings: true,
+  },
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },
   qnh: { auto: true, station: '' },

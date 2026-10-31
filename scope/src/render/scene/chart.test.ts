@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ChartItem, ItemPart } from '../../lib/chart';
-import { DRAW_STACK, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, isStyled, type StyledLayer } from '../../lib/layers';
 import { POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
@@ -26,11 +26,21 @@ const triangle = (x: number): Position[] => [
 ];
 
 const has = (layers: readonly string[], layer: string) => layers.includes(layer);
+const isPointLayer = (layer: StyledLayer): layer is (typeof POINT_LAYERS)[number] =>
+  has(POINT_LAYERS, layer);
+
+/** What a test may add to a part: a kind, or for an area a lower limit. */
+interface Extra {
+  kind?: string;
+  lower?: string;
+}
 
 /** The properties each group of layers carries; `extra` adds a kind or a lower limit. */
-function partOf(layer: StyledLayer, geometry: Geometry, extra: object = {}): ItemPart {
-  const named = has(POINT_LAYERS, layer) ? { id: 'Q' } : { name: 'Q' };
-  return { geometry, properties: { layer, ...named, ...extra } as ItemPart['properties'] };
+function partOf(layer: StyledLayer, geometry: Geometry, extra: Extra = {}): ItemPart {
+  const properties = isPointLayer(layer)
+    ? { layer, id: 'Q', ...extra }
+    : { layer, name: 'Q', ...extra };
+  return { geometry, properties };
 }
 
 const itemOf = (layer: StyledLayer, ...parts: ItemPart[]): ChartItem => ({
@@ -44,10 +54,6 @@ const build = (
   layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
 ) => buildChart({ chart: items, project, layers, labelDensity, atlas });
-
-function isStyled(layer: string): layer is StyledLayer {
-  return layer !== 'hold' && layer !== 'coast' && layer !== 'rings';
-}
 
 interface Instance {
   a: { x: number; y: number };
@@ -214,10 +220,11 @@ describe('buildChart markers', () => {
     const items = rows.map(([layer]) => itemOf(layer, partOf(layer, point([139.5, 35.5]))));
 
     // Act
-    const drawn = items.map((item) => build([item]).markers);
+    const read = items.map((item) =>
+      Array.from(build([item]).markers.data.subarray(0, MARKER_STRIDE)),
+    );
 
     // Assert
-    const read = drawn.map((b) => [...b.data.subarray(0, MARKER_STRIDE)]);
     expect(read.map((m) => [m[0], m[1]])).toEqual(rows.map(() => [139.5, 35.5]));
     expect(read.map((m) => [m[4], m[5]])).toEqual(rows.map(([, shape, size]) => [size, shape]));
     expect(read.map((m) => m.slice(6, 10))).toEqual(rows.map(([, , , hex]) => packed(hex)));
@@ -263,7 +270,7 @@ function glyphs(batch: Batch) {
 const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
 
 /** A one-part item whose name is one glyph, so its label is one instance. */
-const onePart = (layer: StyledLayer, geometry: Geometry, extra: object = {}) =>
+const onePart = (layer: StyledLayer, geometry: Geometry, extra: Extra = {}) =>
   itemOf(layer, partOf(layer, geometry, extra));
 
 const placeholder = (layer: StyledLayer): Geometry =>

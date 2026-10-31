@@ -124,7 +124,7 @@ export function rblAt(view: View, cx: number, cy: number): Rbl | null {
 }
 
 /** The layers whose points the range cursor snaps onto. */
-const SNAP_LAYERS: readonly ScopeLayer[] = ['fix', 'vfr', 'navaid'];
+const SNAP_LAYERS: ReadonlySet<ScopeLayer> = new Set(['fix', 'vfr', 'navaid']);
 
 /** The point of a shown fix, VFR point or navaid nearest `at`, if any is within `reach`. */
 export function fixNear(
@@ -137,7 +137,7 @@ export function fixNear(
   let best: { name: string; x: number; y: number } | null = null;
   let bestD = reach * reach;
   for (const item of items) {
-    if (!SNAP_LAYERS.includes(item.layer) || !shown(item.layer)) continue;
+    if (!SNAP_LAYERS.has(item.layer) || !shown(item.layer)) continue;
     for (const { geometry, properties } of item.parts) {
       if (geometry.type !== 'Point' || !('id' in properties)) continue;
       const [lon, lat] = geometry.coordinates;

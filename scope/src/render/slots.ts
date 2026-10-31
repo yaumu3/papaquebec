@@ -1,9 +1,9 @@
-import { DRAW_STACK, type StyledLayer } from '../lib/layers';
+import { DRAW_STACK, isStyled, type StyledLayer } from '../lib/layers';
 import type { Batch } from './protocol';
 
 /** The layers from `first` to `last` of the draw stack, front first. */
 const stackSlice = (first: StyledLayer, last: StyledLayer) =>
-  DRAW_STACK.slice(DRAW_STACK.indexOf(first), DRAW_STACK.indexOf(last) + 1) as StyledLayer[];
+  DRAW_STACK.slice(DRAW_STACK.indexOf(first), DRAW_STACK.indexOf(last) + 1).filter(isStyled);
 
 /**
  * The chart is built in three runs of the draw stack, so a toggle rebuilds one run. Each fills a

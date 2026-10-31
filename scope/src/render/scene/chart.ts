@@ -44,14 +44,13 @@ interface ChartBatches {
 
 /** The outlines of a geometry on the scope plane: a polygon's exterior ring and its holes. */
 function pathsOf(geometry: ItemPart['geometry'], project: ProjectFn): Anchor[][] {
-  switch (geometry.type) {
-    case 'Point':
-      return [route([geometry.coordinates], project)];
-    case 'LineString':
-      return [route(geometry.coordinates, project)];
-    case 'Polygon':
-      return geometry.coordinates.map((ring) => route(ring, project));
-  }
+  const outlines =
+    geometry.type === 'Point'
+      ? [[geometry.coordinates]]
+      : geometry.type === 'LineString'
+        ? [geometry.coordinates]
+        : geometry.coordinates;
+  return outlines.map((outline) => route(outline, project));
 }
 
 /** A line's form in the layer's style, refined by the part's kind and stratum. */

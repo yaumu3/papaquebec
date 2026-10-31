@@ -39,6 +39,10 @@ export type ScopeLayer = (typeof DRAW_STACK)[number];
 /** A map set layer with a style: every one but `hold`, which draws nothing yet. */
 export type StyledLayer = Exclude<Layer, 'hold'>;
 
+/** Whether a layer has a style: not `hold`, and not the two the scope makes itself. */
+export const isStyled = (layer: ScopeLayer) =>
+  layer !== 'hold' && layer !== 'coast' && layer !== 'rings';
+
 /** The groups of the Maps panel, in the order they are listed there, which is not the draw order. */
 export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
   { title: 'POINTS', layers: ['ad', 'navaid', 'fix', 'vfr'] },

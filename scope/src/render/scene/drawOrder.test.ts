@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type ChartItem, chartOf } from '../../lib/chart';
+import { type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
 import { DRAW_STACK, type ScopeLayer, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
@@ -13,23 +13,26 @@ import { buildCoast, buildRings } from './static';
 
 const project = (lat: number, lon: number) => ({ x: lon, y: lat });
 const at = (layer: ScopeLayer) => DRAW_STACK.indexOf(layer);
-const isPoint = (layer: string) => (POINT_LAYERS as readonly string[]).includes(layer);
+const isPoint = (layer: ScopeLayer): layer is (typeof POINT_LAYERS)[number] =>
+  (POINT_LAYERS as readonly string[]).includes(layer);
 const CHART_LAYERS: StyledLayer[] = CHART_SLICES.flatMap((s) => s.layers);
 
 /** An item of `layer`, one glyph in its name, sitting at x = its place in the stack. */
 function itemAt(layer: StyledLayer): ChartItem {
   const x = at(layer);
-  const geometry = isPoint(layer)
-    ? { type: 'Point' as const, coordinates: [x, 0] as [number, number] }
+  const part: ItemPart = isPoint(layer)
+    ? { geometry: { type: 'Point', coordinates: [x, 0] }, properties: { layer, id: 'Q' } }
     : {
-        type: 'LineString' as const,
-        coordinates: [
-          [x, 0],
-          [x + 0.01, 0],
-        ] as [number, number][],
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [x, 0],
+            [x + 0.01, 0],
+          ],
+        },
+        properties: { layer, name: 'Q' },
       };
-  const properties = isPoint(layer) ? { layer, id: 'Q' } : { layer, name: 'Q' };
-  return { key: layer, layer, parts: [{ geometry, properties } as ChartItem['parts'][number]] };
+  return { key: layer, layer, parts: [part] };
 }
 
 /** Everything the scope draws from the map, as the effects post it. */
@@ -74,7 +77,7 @@ function xsInDrawOrder(slots: Slots, kind: Batch['kind']): number[] {
 describe('the draw order of the chart', () => {
   const chart = CHART_LAYERS.map(itemAt);
   const behind = DRAW_STACK.toReversed();
-  const unlabelled: ScopeLayer[] = ['fir', 'adiz', 'dct', 'hold', 'coast'];
+  const unlabelled: ReadonlySet<ScopeLayer> = new Set(['fir', 'adiz', 'dct', 'hold', 'coast']);
 
   it('draws lines back to front through the stack, the base map first', () => {
     // Arrange
@@ -100,7 +103,7 @@ describe('the draw order of the chart', () => {
 
   it('draws every label after every line and marker, back to front, the ring labels first', () => {
     // Arrange
-    const labelled = behind.filter((l) => !unlabelled.includes(l));
+    const labelled = behind.filter((l) => !unlabelled.has(l));
 
     // Act
     const slots = mapSlots(chart);

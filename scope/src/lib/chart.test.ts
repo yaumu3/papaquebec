@@ -144,12 +144,12 @@ describe('chartOf', () => {
   });
 });
 
-describe('isUpperStratum', () => {
-  const area = (lower?: string): ItemPart => ({
-    geometry: { type: 'Polygon', coordinates: [] },
-    properties: { layer: 'sector', name: 'X', ...(lower ? { lower } : {}) },
-  });
+const area = (lower?: string): ItemPart => ({
+  geometry: { type: 'Polygon', coordinates: [] },
+  properties: { layer: 'sector', name: 'X', ...(lower ? { lower } : {}) },
+});
 
+describe('isUpperStratum', () => {
   it('holds for a lower limit above the surface, and for nothing else', () => {
     // Arrange
     const rows: [string | undefined, boolean][] = [

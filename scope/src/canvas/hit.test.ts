@@ -77,9 +77,10 @@ describe('drawnBlockRect', () => {
   });
 });
 
+const at = (lon: number, lat: number) => ({ x: lon, y: lat });
+
 describe('fixNear', () => {
   const chart = chartOf([parseMapSet(EXAMPLE)]);
-  const at = (lon: number, lat: number) => ({ x: lon, y: lat });
   it('snaps onto a shown fix, VFR point or navaid, and onto nothing else', () => {
     // Arrange
     const reach = 0.01;
