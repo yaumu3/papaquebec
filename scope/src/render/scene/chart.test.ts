@@ -3,7 +3,9 @@ import { describe, expect, it } from 'bun:test';
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { DRAW_STACK, type StyledLayer } from '../../lib/layers';
 import { POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
-import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape } from '../protocol';
+import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
+import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
+import { atlas } from './atlasFixture';
 import { buildChart } from './chart';
 import { parseColor } from './pack';
 
@@ -27,7 +29,7 @@ const has = (layers: readonly string[], layer: string) => layers.includes(layer)
 
 /** The properties each group of layers carries; `extra` adds a kind or a lower limit. */
 function partOf(layer: StyledLayer, geometry: Geometry, extra: object = {}): ItemPart {
-  const named = has(POINT_LAYERS, layer) ? { id: 'QID' } : { name: 'QNAME' };
+  const named = has(POINT_LAYERS, layer) ? { id: 'Q' } : { name: 'Q' };
   return { geometry, properties: { layer, ...named, ...extra } as ItemPart['properties'] };
 }
 
@@ -37,8 +39,11 @@ const itemOf = (layer: StyledLayer, ...parts: ItemPart[]): ChartItem => ({
   parts,
 });
 
-const build = (items: ChartItem[], layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled)) =>
-  buildChart({ chart: items, project, layers });
+const build = (
+  items: ChartItem[],
+  layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
+  labelDensity: LabelDensity = 'normal',
+) => buildChart({ chart: items, project, layers, labelDensity, atlas });
 
 function isStyled(layer: string): layer is StyledLayer {
   return layer !== 'hold' && layer !== 'coast' && layer !== 'rings';
@@ -171,10 +176,10 @@ describe('buildChart lines', () => {
     const shown: StyledLayer[] = ['fir', 'sid'];
 
     // Act
-    const batches = build([item], shown);
+    const batches = build([item], shown, 'dense');
 
     // Assert
-    expect([batches.lines.count, batches.markers.count]).toEqual([0, 0]);
+    expect([batches.lines.count, batches.markers.count, batches.labels.count]).toEqual([0, 0, 0]);
   });
 
   it('draws the layers back to front in the stack, each read by where its item sits', () => {
@@ -243,5 +248,133 @@ describe('buildChart markers', () => {
 
     // Assert
     expect([batches.lines.count, batches.markers.count]).toEqual([1, 0]);
+  });
+});
+
+/** The glyph instances of a text batch: where each is anchored and the colour it is drawn in. */
+function glyphs(batch: Batch) {
+  const d = batch.data;
+  return Array.from({ length: batch.count }, (_, i) => ({
+    at: { x: d[i * TEXT_STRIDE] ?? 0, y: d[i * TEXT_STRIDE + 1] ?? 0 },
+    color: Array.from(d.subarray(i * TEXT_STRIDE + 10, i * TEXT_STRIDE + 14)),
+  }));
+}
+
+const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
+
+/** A one-part item whose name is one glyph, so its label is one instance. */
+const onePart = (layer: StyledLayer, geometry: Geometry, extra: object = {}) =>
+  itemOf(layer, partOf(layer, geometry, extra));
+
+const placeholder = (layer: StyledLayer): Geometry =>
+  has(POINT_LAYERS, layer) ? point([0, 0]) : line([0, 0], [0.01, 0]);
+
+describe('buildChart labels', () => {
+  it('labels each layer from its own label density up, and some never', () => {
+    // Arrange
+    const from: [StyledLayer, LabelDensity | null][] = [
+      ['ad', 'sparse'],
+      ['navaid', 'sparse'],
+      ['fix', 'normal'],
+      ['sector', 'normal'],
+      ['conv', 'normal'],
+      ['rnav', 'normal'],
+      ['trans', 'normal'],
+      ['vfr', 'dense'],
+      ['sid', 'dense'],
+      ['star', 'dense'],
+      ['ctr', 'dense'],
+      ['pr', 'dense'],
+      ['tma', 'dense'],
+      ['dng', 'dense'],
+      ['tra', 'dense'],
+      ['cta', 'dense'],
+      ['advisory', 'dense'],
+      ['civt', 'dense'],
+      ['asr', 'dense'],
+      ['fir', null],
+      ['adiz', null],
+      ['dct', null],
+    ];
+
+    // Act
+    const counts = from.map(([layer]) =>
+      LABEL_DENSITIES.map(
+        (d) => build([onePart(layer, placeholder(layer))], [layer], d).labels.count,
+      ),
+    );
+
+    // Assert
+    const expected = from.map(([, first]) =>
+      LABEL_DENSITIES.map((d) => (first !== null && rank(d) >= rank(first) ? 1 : 0)),
+    );
+    expect(counts).toEqual(expected);
+  });
+
+  it('prints an area by its name alone, with no kind before it', () => {
+    // Arrange
+    const item = onePart('ctr', placeholder('ctr'), { kind: 'CTR' });
+
+    // Act
+    const { labels } = build([item], ['ctr'], 'dense');
+
+    // Assert
+    expect(labels.count).toBe(1);
+  });
+
+  it('labels a stepped item once, where its first part starts', () => {
+    // Arrange
+    const first = partOf('tma', polygon(triangle(5), triangle(7)));
+    const second = partOf('tma', polygon(triangle(9)));
+
+    // Act
+    const { labels } = build([itemOf('tma', first, second)], ['tma'], 'dense');
+
+    // Assert
+    expect(glyphs(labels).map((g) => g.at)).toEqual([{ x: 5, y: 0 }]);
+  });
+
+  it('puts a route label at the middle of its path and an area label at its start', () => {
+    // Arrange
+    const path = line([0, 0], [1, 0], [2, 0]);
+    const rows: [StyledLayer, number][] = [
+      ['conv', 1],
+      ['ctr', 0],
+    ];
+
+    // Act
+    const placed = rows.map(([layer]) =>
+      glyphs(build([onePart(layer, path)], [layer], 'dense').labels).map((g) => g.at.x),
+    );
+
+    // Assert
+    expect(placed).toEqual(rows.map(([, x]) => [x]));
+  });
+
+  it('colours each label by its layer', () => {
+    // Arrange
+    const rows: [StyledLayer, string][] = [
+      ['ad', '#a0a0a0'],
+      ['navaid', '#909090'],
+      ['fix', '#7a7a7a'],
+      ['vfr', '#6a6a6a'],
+      ['sector', '#5a7a8a'],
+      ['asr', '#5a7a8a'],
+      ['ctr', '#8a5050'],
+      ['conv', '#9a6a4c'],
+      ['rnav', '#4a8090'],
+      ['sid', '#40707c'],
+      ['star', '#40707c'],
+      ['trans', '#40707c'],
+    ];
+
+    // Act
+    const colours = rows.map(([layer]) => {
+      const { labels } = build([onePart(layer, placeholder(layer))], [layer], 'dense');
+      return glyphs(labels)[0]?.color;
+    });
+
+    // Assert
+    expect(colours).toEqual(rows.map(([, hex]) => packed(hex)));
   });
 });
