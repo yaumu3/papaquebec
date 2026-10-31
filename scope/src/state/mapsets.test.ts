@@ -381,6 +381,31 @@ describe('a chart read before a change', () => {
     expect(rows.map((r) => idsOf(r.sets, 'fix'))).toEqual(rows.map((r) => r.left));
   });
 
+  it('follows a set turned back on', () => {
+    // Arrange
+    const rows = ['my-fixes', BUILTIN_ID].map((identity) => {
+      const { sets, storage } = created();
+      sets.setBuiltinMapSet(parsed(builtIn));
+      importing(sets, fixes);
+      sets.toggleMapSet(identity);
+      sets.chart();
+      return { identity, sets, storage };
+    });
+
+    // Act
+    for (const { sets, identity } of rows) sets.toggleMapSet(identity);
+
+    // Assert
+    expect(rows.map((r) => idsOf(r.sets, 'fix'))).toEqual([
+      ['NIMBA', 'TAVRO'],
+      ['NIMBA', 'TAVRO'],
+    ]);
+    expect(rows.map((r) => r.storage.getItem(MAPSETS_KEY))).toEqual([
+      '{"builtinEnabled":true}',
+      '{"builtinEnabled":true}',
+    ]);
+  });
+
   it('follows the hydration', async () => {
     // Arrange
     const { sets } = created(spyStore([stored(more)]));
