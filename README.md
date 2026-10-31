@@ -159,7 +159,7 @@ and sends them to every scope over the feed:
 The site comes from `PQ_SITE` (`lat,lon`); pass `<lat> <lon>` and optionally a radius to either
 script to override it.
 
-openAIP carries no IFR waypoints or airways, so those layers stay empty. Any other source can be
+openAIP carries no IFR fixes or routes, so those layers stay empty. Any other source can be
 brought in through the Maps panel, as a map set.
 
 ### Map sets
@@ -307,7 +307,7 @@ resolution advisory, and the 10 s of an emergency status, itself.
   lapsed stays in the list and nowhere else.
 
 **Rendering.** WebGPU on an `OffscreenCanvas` in a worker (main-thread fallback when the worker has
-no adapter). The main thread owns all state and sends packed buffers; one draw per layer per frame,
+no adapter). The main thread owns all state and sends packed buffers; one draw per batch per frame,
 drawn only when something changed. Projection is Lambert Conformal Conic on WGS-84 centered on the site;
 positions are projected at ingest. Text is an SDF glyph atlas
 built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
