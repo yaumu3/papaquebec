@@ -3,9 +3,8 @@
  * layer and put in order.
  */
 
-import { type ChartItem, type ItemPart, toGrid } from './chart';
+import { type ChartItem, type ItemPart, gridIdentity } from './chart';
 import { type ScopeLayer, LAYER_NAMES } from './layers';
-import type { LonLat } from './mapdata';
 import { POINT_LAYERS } from './mapsetFormat';
 import { stratumTag } from './stratum';
 import type { ChartPoint, Topology } from './topology';
@@ -28,15 +27,13 @@ export const itemsIn = (items: TreeItems, layer: ScopeLayer): readonly TreeItem[
 const collator = new Intl.Collator('en');
 const collate = (a: string, b: string): number => collator.compare(a, b);
 
-const cellOf = ([lon, lat]: LonLat): string => `${toGrid(lon)},${toGrid(lat)}`;
-
 /** The id of the first point on each grid cell, in point layer order. */
 function idsByCell(points: readonly ChartPoint[]): Map<string, string> {
   const ordered = points.toSorted(
     (a, b) => POINT_LAYERS.indexOf(a.layer) - POINT_LAYERS.indexOf(b.layer),
   );
   const ids = new Map<string, string>();
-  for (const { at, id } of ordered) if (!ids.has(cellOf(at))) ids.set(cellOf(at), id);
+  for (const { at, id } of ordered) if (!ids.has(gridIdentity(at))) ids.set(gridIdentity(at), id);
   return ids;
 }
 
@@ -44,7 +41,7 @@ function idsByCell(points: readonly ChartPoint[]): Map<string, string> {
 function holdName({ geometry }: ItemPart, ids: ReadonlyMap<string, string>): string {
   if (geometry.type !== 'Point') return '';
   const [lon, lat] = geometry.coordinates;
-  return ids.get(cellOf(geometry.coordinates)) ?? `${lat.toFixed(4)} ${lon.toFixed(4)}`;
+  return ids.get(gridIdentity(geometry.coordinates)) ?? `${lat.toFixed(4)} ${lon.toFixed(4)}`;
 }
 
 function nameOf(part: ItemPart, ids: ReadonlyMap<string, string>): string {

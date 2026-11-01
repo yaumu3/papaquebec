@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ItemPart } from './chart';
-import { isUpperStratum, stratumTag } from './stratum';
+import { bandOf, fractionOf, isUpperStratum, limitInHundreds, stratumTag } from './stratum';
 
 const area = (lower?: string): ItemPart => ({
   geometry: { type: 'Polygon', coordinates: [] },
@@ -102,5 +102,69 @@ describe('stratumTag', () => {
 
     // Assert
     expect(tags).toEqual(rows.map(([, , expected]) => expected));
+  });
+});
+
+describe('bandOf', () => {
+  it('takes the lowest lower and the highest upper limit over the parts, in feet', () => {
+    // Arrange
+    const rows: [ItemPart[], { lower: string; upper: string }][] = [
+      [[sector('SFC', 'FL240'), sector('SFC', 'FL160')], { lower: 'SFC', upper: 'FL240' }],
+      [
+        [sector('5000FT', '12000FT'), sector('FL095', 'FL100')],
+        { lower: '5000FT', upper: '12000FT' },
+      ],
+      [[sector(), sector()], { lower: 'SFC', upper: 'UNL' }],
+    ];
+
+    // Act
+    const bands = rows.map(([parts]) => bandOf(parts));
+
+    // Assert
+    expect(bands).toEqual(rows.map(([, expected]) => expected));
+  });
+});
+
+describe('limitInHundreds', () => {
+  it('writes a limit in hundreds of feet, rounded and padded to three digits', () => {
+    // Arrange
+    const rows: [string, string][] = [
+      ['3000FT', '030'],
+      ['12000FT', '120'],
+      ['FL240', '240'],
+      ['FL95', '095'],
+      ['SFC', 'SFC'],
+      ['GND', 'SFC'],
+      ['UNL', 'UNL'],
+      ['1500FT AGL', '015 AGL'],
+      ['35000FT', '350'],
+      ['250FT', '003'],
+    ];
+
+    // Act
+    const written = rows.map(([limit]) => limitInHundreds(limit));
+
+    // Assert
+    expect(written).toEqual(rows.map(([, expected]) => expected));
+  });
+});
+
+describe('fractionOf', () => {
+  it('writes the item band as upper over lower, and nothing for an item with no limits', () => {
+    // Arrange
+    const rows: [ItemPart[], { upper: string; lower: string } | undefined][] = [
+      [[sector('SFC', 'FL240'), sector('SFC', 'FL160')], { upper: '240', lower: 'SFC' }],
+      [[sector('SFC', '3000FT')], { upper: '030', lower: 'SFC' }],
+      [[sector('GND', '12000FT')], { upper: '120', lower: 'SFC' }],
+      [[sector(undefined, 'FL335')], { upper: '335', lower: 'SFC' }],
+      [[sector('FL335')], { upper: 'UNL', lower: '335' }],
+      [[sector(), sector()], undefined],
+    ];
+
+    // Act
+    const fractions = rows.map(([parts]) => fractionOf(parts));
+
+    // Assert
+    expect(fractions).toEqual(rows.map(([, expected]) => expected));
   });
 });

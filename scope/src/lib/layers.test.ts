@@ -3,6 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import type { Chart, ChartItem } from './chart';
 import {
   DRAW_STACK,
+  isAirwayLayer,
+  isProcedureLayer,
   LAYER_GROUPS,
   navaidsShownAt,
   type ScopeLayer,
@@ -250,5 +252,41 @@ describe('drawnItemsOf', () => {
 
     // Assert
     expect(keysOf(kept)).toEqual(['5']);
+  });
+});
+
+describe('isAirwayLayer', () => {
+  it('holds for the conventional and RNAV airways and for no other layer', () => {
+    // Arrange
+    const layers: ScopeLayer[] = [
+      'conv',
+      'rnav',
+      'dct',
+      'hold',
+      'sid',
+      'star',
+      'trans',
+      'ctr',
+      'fix',
+    ];
+
+    // Act
+    const verdicts = layers.map(isAirwayLayer);
+
+    // Assert
+    expect(verdicts).toEqual([true, true, false, false, false, false, false, false, false]);
+  });
+});
+
+describe('isProcedureLayer', () => {
+  it('holds for the departures, arrivals and transitions and for no other layer', () => {
+    // Arrange
+    const layers: ScopeLayer[] = ['sid', 'star', 'trans', 'conv', 'rnav', 'dct', 'hold', 'ctr'];
+
+    // Act
+    const verdicts = layers.map(isProcedureLayer);
+
+    // Assert
+    expect(verdicts).toEqual([true, true, true, false, false, false, false, false]);
   });
 });

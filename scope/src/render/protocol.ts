@@ -29,8 +29,6 @@ export const enum Shape {
   Dot = 6,
   Ring = 7,
   HollowSquare = 8,
-  /** A ring at the marker's radius, 2 CSS px wide, for tracing. */
-  TraceRing = 9,
 }
 
 /** Camera: world NM to CSS pixels. */

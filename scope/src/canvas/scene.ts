@@ -7,19 +7,16 @@ import { applyPlacement, blockSubjects, viewportRect } from '../render/layout/pl
 import { workerPlacer } from '../render/layout/placer';
 import { fixNearest } from '../render/layout/trails';
 import type { AtlasInfo, View } from '../render/protocol';
-import { buildChart } from '../render/scene/chart';
 import { buildHover } from '../render/scene/hover';
 import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
 import { buildCoast, buildRings } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
 import { buildTraces } from '../render/scene/traces';
-import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
-import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
+import { SLOT_ORDER } from '../render/slots';
 import { hoverInstant } from '../state/lanes';
 import { pointedItem, searchedItems } from '../state/layerTree';
 import { declinationAt } from '../state/magnetic';
-import { topology } from '../state/mapsets';
 import {
   canvasSize,
   coast,
@@ -38,6 +35,7 @@ import {
 } from '../state/scope';
 import { settings } from '../state/settings';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
+import { type Show, showChart } from './chartScene';
 import { RBL_SNAP_PX, targetAt } from './hit';
 import { debounce } from './settle';
 import { halfLongEdgeNm } from './view';
@@ -84,8 +82,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
     setAtlas(info);
   });
 
-  /** Hands the renderer the slots `build` returns, again whenever what it reads changes. */
-  const show = (build: (atlas: AtlasInfo) => Slots | null) =>
+  const show: Show = (build) =>
     createEffect(() => {
       const a = atlas();
       const slots = a && build(a);
@@ -120,38 +117,21 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       : null,
   );
 
-  for (const slice of CHART_SLICES) {
-    show((a) =>
-      projected()
-        ? sliceSlots(
-            slice,
-            buildChart({
-              topology: topology(),
-              drawnPoints,
-              project: projectNm,
-              layers: slice.layers,
-              drawnItems: drawnItemsIn(slice.layers),
-              labelDensity: settings.labelDensity,
-              atlas: a,
-            }),
-          )
-        : null,
-    );
-  }
-
-  show(() =>
-    projected()
-      ? {
-          traces: buildTraces({
-            pointedAt: pointedItem(),
-            searched: searchedItems(),
-            project: projectNm,
-          }),
-        }
-      : null,
-  );
-
   const layoutScale = settledScale(view);
+  const pointedHighlight = showChart(show, projected, layoutScale, atlas);
+
+  show(() => {
+    const pointed = pointedItem();
+    return projected()
+      ? buildTraces({
+          pointedAt: pointed,
+          searched: searchedItems(),
+          highlight: pointed ? pointedHighlight(pointed) : [],
+          project: projectNm,
+        })
+      : null;
+  });
+
   /**
    * Bumped once the blocks are placed: on each snapshot, a drop, a settled zoom or a change in
    * what is shown, never on a pan. The targets and the hover over them follow it.

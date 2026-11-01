@@ -1,3 +1,6 @@
+import { PALETTE } from '../../design/palette';
+import { parseColor } from '../scene/pack';
+
 /** Shared uniform: camera and canvas. 8 floats. */
 export const VIEW_UNIFORM_BYTES = 32;
 
@@ -168,7 +171,6 @@ fn sdHexagon(p: vec2f) -> f32 {
     case 5u: { d = min(abs(sdHexagon(p)) - stroke, sdSquare(p * 5.0)); } // hexagon + dot
     case 6u: { d = sdCircle(p, 0.35); }                             // dot
     case 7u: { d = abs(sdCircle(p, 0.85)) - stroke; }               // ring
-    case 9u: { d = abs(sdCircle(p, 1.0)) - cssPx; }                 // ring at the marker's radius, 2 CSS px
     default: { d = abs(sdSquare(p)) - stroke; }                     // hollow square
   }
   let aa = fwidth(d);
@@ -177,6 +179,10 @@ fn sdHexagon(p: vec2f) -> f32 {
   return vec4f(in.color.rgb, in.color.a * alpha);
 }
 `;
+
+/** The scope's background colour, which the clear and the glyph halos paint. */
+export const BG_RGBA = parseColor(PALETTE.bg);
+const [BG_R, BG_G, BG_B] = BG_RGBA;
 
 export const TEXT_SHADER = /* wgsl */ `
 ${COMMON}
@@ -187,28 +193,52 @@ struct In {
   @location(1) size: vec2f,   // CSS px
   @location(2) uv: vec4f,     // u0 v0 u1 v1
   @location(3) color: vec4f,
+  @location(4) extra: vec2f,  // angle (radians, clockwise on the screen), halo (drop in field value)
 };
 struct Out {
   @builtin(position) pos: vec4f,
   @location(0) color: vec4f,
   @location(1) uv: vec2f,
+  @location(2) @interpolate(flat) halo: f32,
 };
-@vertex fn vs(@builtin(vertex_index) vi: u32, in: In) -> Out {
+fn place(vi: u32, in: In) -> Out {
   let c = corner(vi);
-  let topLeft = toDevice(in.at.xy, in.at.zw);
-  let p = topLeft + c * in.size * u.dpr;
+  let offset = in.at.zw + c * in.size;
+  let turn = vec2f(cos(in.extra.x), sin(in.extra.x));
+  let turned = vec2f(offset.x * turn.x - offset.y * turn.y, offset.x * turn.y + offset.y * turn.x);
   var o: Out;
-  o.pos = toClip(p);
+  o.pos = toClip(toDevice(in.at.xy, turned));
   o.color = in.color;
   o.uv = mix(in.uv.xy, in.uv.zw, c);
+  o.halo = in.extra.y;
+  return o;
+}
+@vertex fn vs(@builtin(vertex_index) vi: u32, in: In) -> Out {
+  return place(vi, in);
+}
+// A glyph with no halo collapses to nothing, so it costs no fragments.
+@vertex fn vsHalo(@builtin(vertex_index) vi: u32, in: In) -> Out {
+  var o = place(vi, in);
+  if (in.extra.y <= 0.0) { o.pos = vec4f(2.0, 2.0, 2.0, 1.0); }
   return o;
 }
 const EDGE = 0.74;
-@fragment fn fs(in: Out) -> @location(0) vec4f {
+// The edge is kept off the end of the field, where s is 0, so a halo wider than the field reaches
+// paints nothing beyond it.
+fn coverage(in: Out, edge: f32) -> f32 {
   let s = textureSample(atlas, atlasSampler, in.uv).r;
   let w = clamp(fwidth(s) * 0.8, 0.02, 0.2);
-  let alpha = smoothstep(EDGE - w, EDGE + w, s);
+  let e = max(edge, w);
+  return smoothstep(e - w, e + w, s);
+}
+@fragment fn fs(in: Out) -> @location(0) vec4f {
+  let alpha = coverage(in, EDGE);
   if (alpha <= 0.002) { discard; }
   return vec4f(in.color.rgb, in.color.a * alpha);
+}
+@fragment fn fsHalo(in: Out) -> @location(0) vec4f {
+  let alpha = coverage(in, EDGE - in.halo);
+  if (alpha <= 0.002) { discard; }
+  return vec4f(${BG_R}, ${BG_G}, ${BG_B}, alpha);
 }
 `;

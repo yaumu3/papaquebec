@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
-import { LineBatch, MarkerBatch, parseColor, TextBatch } from './pack';
+import { LineBatch, MarkerBatch, parseColor, TextBatch, type TextStyle } from './pack';
 
 describe('parseColor', () => {
   it('turns #rrggbb and #rrggbbaa into unit floats', () => {
@@ -262,6 +262,50 @@ describe('TextBatch', () => {
     expect([...batch.data.subarray(TEXT_STRIDE + 6, TEXT_STRIDE + 10)]).toEqual([
       0.125, 0, 0.25, 0.125,
     ]);
+  });
+
+  it('packs the angle and the halo in the last two floats of every glyph', () => {
+    // Arrange
+    const rows: [TextStyle, number, number][] = [
+      [{}, 0, 0],
+      [{ angle: 0.5 }, 0.5, 0],
+      [{ halo: true }, 0, 1],
+      [{ angle: -1, halo: true }, -1, 1],
+      [{ halo: false }, 0, 0],
+    ];
+
+    // Act
+    const tails = rows.map(([style]) => {
+      const b = new TextBatch(atlas);
+      b.text('AB', { x: 0, y: 0 }, 20, '#ffffff', style);
+      const { data } = b.finish();
+      return [data.subarray(14, 16), data.subarray(TEXT_STRIDE + 14, TEXT_STRIDE + 16)].map((a) =>
+        Array.from(a),
+      );
+    });
+
+    // Assert
+    expect(tails).toEqual(
+      rows.map(([, angle, halo]) => [
+        [angle, halo],
+        [angle, halo],
+      ]),
+    );
+  });
+
+  it('sizes the halo to a CSS pixel in the atlas field, whatever the text size', () => {
+    // Arrange
+    const sizes = [10, 20, 40];
+
+    // Act
+    const halos = sizes.map((size) => {
+      const b = new TextBatch(atlas);
+      b.text('A', { x: 0, y: 0 }, size, '#ffffff', { halo: true });
+      return b.finish().data[15];
+    });
+
+    // Assert
+    expect(halos).toEqual([2, 1, 0.5]);
   });
 
   it('right-aligns by shifting the run left by its width', () => {

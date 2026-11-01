@@ -5,6 +5,7 @@ import { DRAW_STACK, drawnItemsOf, type ScopeLayer, type StyledLayer } from '../
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { POINT_LAYERS } from '../../lib/mapsetFormat';
+import { areaPlaceOf } from '../../lib/pole';
 import {
   type ChartPath,
   drawnPointsOf,
@@ -15,12 +16,20 @@ import {
 import { allShown } from '../../lib/visibilityFixture';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
-import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../slots';
+import {
+  CHART_SLICES,
+  LABEL_SLOTS,
+  SLOT_ORDER,
+  labelSlots,
+  type Slots,
+  shapeSlots,
+  type SlotName,
+} from '../slots';
 import { atlas } from './atlasFixture';
-import { buildChart } from './chart';
+import { buildShapes, buildSliceLabels } from './chart';
+import { project } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
-const project = (lat: number, lon: number) => ({ x: lon, y: lat });
 const at = (layer: ScopeLayer) => DRAW_STACK.indexOf(layer);
 const isPoint = (layer: ScopeLayer): layer is (typeof POINT_LAYERS)[number] =>
   (POINT_LAYERS as readonly string[]).includes(layer);
@@ -44,20 +53,42 @@ function itemAt(layer: StyledLayer): ChartItem {
   return { key: layer, layer, parts: [part] };
 }
 
-/** A slice of the chart built as the scope builds it. */
-function sliceOf(chart: Chart, layers: readonly StyledLayer[], labelDensity: LabelDensity) {
+/** What the scope reads to draw `layers` of the chart. */
+function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
   const topology = topologyOf(chart);
   const drawnItems = drawnItemsOf(chart, layers, allShown, () => true);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
+  return { topology, drawnItems, drawnPoints, project, layers };
 }
+
+/** A slice's shapes built as the scope builds them. */
+const shapesOf = (chart: Chart, layers: readonly StyledLayer[]) =>
+  buildShapes(drawnOf(chart, layers));
+
+/** A settled scale at which every label of the fixture has room. */
+const ROOMY = 1e6;
+
+/** A slice's labels built as the scope builds them. */
+const labelsOf = (chart: Chart, slice: (typeof CHART_SLICES)[number], labelDensity: LabelDensity) =>
+  buildSliceLabels(slice, {
+    ...drawnOf(chart, slice.layers),
+    labelDensity,
+    atlas,
+    settledScale: () => ROOMY,
+    shown: new Map(),
+    placeOf: (item) => areaPlaceOf(item, project),
+  });
 
 /** Everything the scope draws from the map, as the effects post it. */
 function mapSlots(chart: Chart): Slots {
   const slots: Slots = {};
   for (const slice of CHART_SLICES) {
-    const built = sliceOf(chart, slice.layers, 'dense');
-    Object.assign(slots, sliceSlots(slice, built));
+    const labels = labelsOf(chart, slice, 'dense').batches;
+    Object.assign(
+      slots,
+      shapeSlots(slice, shapesOf(chart, slice.layers)),
+      labelSlots(slice, labels),
+    );
   }
   const coastX = at('coast');
   const coast = {
@@ -78,13 +109,27 @@ function mapSlots(chart: Chart): Slots {
   return slots;
 }
 
+/** The slots of shapes: a route label slot also holds the gaps it cuts in lines. */
+const SHAPE_SLOTS = SLOT_ORDER.filter((name) => !LABEL_SLOTS.includes(name));
+
 /** The x each instance is anchored at, in the order the renderer draws them. */
-function xsInDrawOrder(slots: Slots, kind: Batch['kind']): number[] {
+function xsInDrawOrder(
+  slots: Slots,
+  kind: Batch['kind'],
+  names: readonly SlotName[] = SLOT_ORDER,
+): number[] {
   const stride = { lines: LINE_STRIDE, markers: MARKER_STRIDE, text: TEXT_STRIDE }[kind];
-  return SLOT_ORDER.flatMap((name) => slots[name] ?? [])
+  return names
+    .flatMap((name) => slots[name] ?? [])
     .filter((b) => b.kind === kind)
     .flatMap((b) => Array.from({ length: b.count }, (_, i) => Math.round(b.data[i * stride] ?? 0)));
 }
+
+/** The kind of each non-empty batch, in the order the renderer draws them. */
+const kindsInDrawOrder = (slots: Slots): Batch['kind'][] =>
+  SLOT_ORDER.flatMap((name) => slots[name] ?? [])
+    .filter((b) => b.count > 0)
+    .map((b) => b.kind);
 
 describe('the draw order of the chart', () => {
   const chart = CHART_LAYERS.map(itemAt);
@@ -99,10 +144,10 @@ describe('the draw order of the chart', () => {
     const slots = mapSlots(chart);
 
     // Assert
-    expect(xsInDrawOrder(slots, 'lines')).toEqual(lineLayers.map(at));
+    expect(xsInDrawOrder(slots, 'lines', SHAPE_SLOTS)).toEqual(lineLayers.map(at));
   });
 
-  it('draws the markers after every line, back to front', () => {
+  it('draws the markers back to front', () => {
     // Arrange
     const pointLayers = behind.filter(isPoint);
 
@@ -113,7 +158,7 @@ describe('the draw order of the chart', () => {
     expect(xsInDrawOrder(slots, 'markers')).toEqual(pointLayers.map(at));
   });
 
-  it('draws every label after every line and marker, back to front, the ring labels first', () => {
+  it('draws every label after every line, back to front, the ring labels first', () => {
     // Arrange
     const labelled = behind.filter((l) => !unlabelled.has(l));
 
@@ -122,6 +167,42 @@ describe('the draw order of the chart', () => {
 
     // Assert
     expect(xsInDrawOrder(slots, 'text')).toEqual(labelled.map(at));
+  });
+
+  it('draws the markers after every label, the ring labels included', () => {
+    // Arrange
+    const slots = mapSlots(chart);
+
+    // Act
+    const kinds = kindsInDrawOrder(slots);
+
+    // Assert
+    expect(kinds.indexOf('markers')).toBeGreaterThan(kinds.lastIndexOf('text'));
+  });
+});
+
+/** The halo of every glyph of a slot. */
+const haloOf = (slots: Slots, name: SlotName) =>
+  (slots[name] ?? [])
+    .filter((b) => b.kind === 'text')
+    .flatMap(({ data, count }) =>
+      Array.from({ length: count }, (_, i) => data[i * TEXT_STRIDE + 15] ?? 0),
+    );
+
+describe('the halo of a label', () => {
+  it('is on every map label and on no ring label', () => {
+    // Arrange
+    const slots = mapSlots(CHART_LAYERS.map(itemAt));
+    const mapLabels: SlotName[] = ['areaLabels', 'routeLabels', 'pointLabels'];
+
+    // Act
+    const halos = [...mapLabels, 'ringLabels' as const].map((name) => haloOf(slots, name));
+
+    // Assert
+    const [area = [], route = [], point = [], ring = []] = halos;
+    expect([area.length, route.length, point.length, ring.length].every((n) => n > 0)).toBe(true);
+    expect([...area, ...route, ...point].every((h) => h > 0)).toBe(true);
+    expect(ring.every((h) => h === 0)).toBe(true);
   });
 });
 
@@ -179,7 +260,7 @@ describe('the example map set', () => {
 
     // Act
     const undrawn = CHART_LAYERS.filter((layer) => {
-      const { lines, markers } = sliceOf(items, [layer], 'off');
+      const { lines, markers } = shapesOf(items, [layer]);
       return lines.count + markers.count === 0;
     });
 
@@ -193,7 +274,7 @@ describe('the example map set', () => {
     const slices = [CHART_SLICES[0], CHART_SLICES[1]];
 
     // Act
-    const keys = slices.map((slice) => edgeKeys(sliceOf(items, slice.layers, 'off').lines));
+    const keys = slices.map((slice) => edgeKeys(shapesOf(items, slice.layers).lines));
 
     // Assert
     expect(keys.map((k) => k.length > 0)).toEqual([true, true]);
@@ -244,7 +325,7 @@ describe('the example map set', () => {
     const items = chartOf([parseMapSet(EXAMPLE)]);
 
     // Act
-    const { lines } = sliceOf(items, ['sector'], 'off');
+    const { lines } = shapesOf(items, ['sector']);
 
     // Assert
     expect(lines.count).toBe(6);
@@ -258,7 +339,7 @@ describe('the example map set', () => {
     const items = chartOf([parseMapSet(EXAMPLE)]);
 
     // Act
-    const { lines } = sliceOf(items, ['tma'], 'off');
+    const { lines } = shapesOf(items, ['tma']);
 
     // Assert
     expect(lines.count).toBe(9);
@@ -273,7 +354,7 @@ describe('the example map set', () => {
 
     // Act
     const rows = shown.map((layers) => {
-      const { lines } = sliceOf(items, layers, 'off');
+      const { lines } = shapesOf(items, layers);
       return Array.from({ length: lines.count }, (_, i) =>
         Array.from(lines.data.subarray(i * LINE_STRIDE + 20, i * LINE_STRIDE + 22)),
       );

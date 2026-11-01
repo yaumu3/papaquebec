@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import type { Batch } from '../protocol';
 import { atlas } from './atlasFixture';
+import { project } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
 /** A stand-in ring outline of two segments, its first point north at `(1, r)`. */
@@ -17,8 +18,6 @@ const count = (batches: Batch[] | undefined, kind: Batch['kind']) =>
 /** Where the first glyph of the first text batch is anchored. */
 const firstAt = (batches: Batch[] | undefined) =>
   Array.from(batches?.find((b) => b.kind === 'text')?.data.subarray(0, 2) ?? []);
-
-const project = (lat: number, lon: number) => ({ x: lon, y: lat });
 
 describe('buildRings', () => {
   it('draws each ring along its path, with the radius printed at its first, northern point', () => {

@@ -1,5 +1,5 @@
 import type { StyledLayer } from '../../lib/layers';
-import type { LabelDensity } from '../../state/settingsDefaults';
+import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { Shape } from '../protocol';
 import type { DashPattern, TextStyle } from './pack';
 import { THEME } from './rules';
@@ -9,17 +9,19 @@ interface Refinement {
   dash: DashPattern;
 }
 
-/** How a layer's items are named on the chart: from which label density up, and where. */
+/** How a layer's items are named on the chart: from which label density up, and in what. */
 export interface LabelStyle {
   from: Exclude<LabelDensity, 'off'>;
   color: string;
   size: number;
+}
+
+/** A point's ident hangs off its marker. */
+interface PointLabelStyle extends LabelStyle {
   /** CSS px from the anchor. */
   px: number;
   py: number;
   baseline: NonNullable<TextStyle['baseline']>;
-  /** Where on the item's first path the label hangs. */
-  at: 'first' | 'middle';
 }
 
 /** How a layer of lines is drawn: its colour and form, refined by a part's kind or stratum. */
@@ -37,7 +39,7 @@ export interface PointLayerStyle {
   shape: Shape;
   size: number;
   color: string;
-  label: LabelStyle;
+  label: PointLabelStyle;
 }
 
 /** A layer's style: lines or points. */
@@ -46,39 +48,23 @@ export type LayerStyle = LineLayerStyle | PointLayerStyle;
 const SOLID: Refinement = { dash: [] };
 
 /** A label's form but for its colour, which each layer gives. */
-type LabelPlace = Omit<LabelStyle, 'color'>;
+type PointLabelPlace = Omit<PointLabelStyle, 'color'>;
 
-const AREA_LABEL: LabelPlace = {
-  from: 'dense',
-  size: 9,
-  px: 4,
-  py: 2,
-  baseline: 'top',
-  at: 'first',
-};
-const ROUTE_LABEL: LabelPlace = {
-  from: 'normal',
-  size: 9,
-  px: 4,
-  py: -6,
-  baseline: 'bottom',
-  at: 'middle',
-};
-const FIX_LABEL: LabelPlace = {
+const AREA_LABEL: Omit<LabelStyle, 'color'> = { from: 'dense', size: 9 };
+const ROUTE_LABEL: Omit<LabelStyle, 'color'> = { from: 'normal', size: 9 };
+const FIX_LABEL: PointLabelPlace = {
   from: 'normal',
   size: 9,
   px: 5,
   py: -3,
   baseline: 'bottom',
-  at: 'first',
 };
-const STATION_LABEL: LabelPlace = {
+const STATION_LABEL: PointLabelPlace = {
   from: 'sparse',
   size: 10,
   px: 8,
   py: -1,
   baseline: 'middle',
-  at: 'first',
 };
 
 const line = (color: string, rest: Omit<LineLayerStyle, 'color'> = {}): LineLayerStyle => ({
@@ -143,7 +129,7 @@ export const LAYER_STYLES = {
   sector: line(THEME.sector, {
     dash: [6, 4],
     upper: { dash: [12, 4] },
-    label: { ...AREA_LABEL, from: 'normal', color: THEME.sectorLabel },
+    label: { ...AREA_LABEL, from: 'normal', size: 10, color: THEME.sectorLabel },
   }),
   fir: line(THEME.fir, { dash: [16, 5] }),
   dng: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [4, 3] }),
@@ -156,5 +142,9 @@ export const LAYER_STYLES = {
   civt: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [2, 3] }),
   asr: areaLine(THEME.boundaryDim, THEME.sectorLabel, { dash: [2, 4] }),
 } satisfies Record<StyledLayer, LayerStyle>;
+
+/** Whether a label is drawn at `density`: from its layer's own density up. */
+export const labelReaches = (label: LabelStyle, density: LabelDensity): boolean =>
+  LABEL_DENSITIES.indexOf(density) >= LABEL_DENSITIES.indexOf(label.from);
 
 export const isPointStyle = (style: LayerStyle): style is PointLayerStyle => 'shape' in style;

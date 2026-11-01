@@ -47,11 +47,26 @@ export const isScopeMade = (layer: ScopeLayer) => layer === 'coast' || layer ===
 /** Whether a layer has a style: not `hold`, and not the two the scope makes itself. */
 export const isStyled = (layer: ScopeLayer) => layer !== 'hold' && !isScopeMade(layer);
 
+/**
+ * The layers of the airways, which ENR 3 of the AIP lists: a route a pilot files by its
+ * designator. Direct routes and procedures are not airways.
+ */
+const AIRWAY_LAYERS = ['conv', 'rnav'] as const satisfies readonly Layer[];
+
+export const isAirwayLayer = (layer: ScopeLayer): layer is (typeof AIRWAY_LAYERS)[number] =>
+  (AIRWAY_LAYERS as readonly ScopeLayer[]).includes(layer);
+
+/** The layers of the procedures, which AD 2.22 of the AIP lists: departures, arrivals, transitions. */
+const PROCEDURE_LAYERS = ['sid', 'star', 'trans'] as const satisfies readonly Layer[];
+
+export const isProcedureLayer = (layer: ScopeLayer): layer is (typeof PROCEDURE_LAYERS)[number] =>
+  (PROCEDURE_LAYERS as readonly ScopeLayer[]).includes(layer);
+
 /** The groups of the Maps panel, in the order they are listed there, which is not the draw order. */
 export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
   { title: 'POINTS', layers: ['ad', 'navaid', 'fix', 'vfr'] },
   { title: 'ROUTES', layers: ['conv', 'rnav', 'dct', 'hold'] },
-  { title: 'PROCEDURES', layers: ['sid', 'star', 'trans'] },
+  { title: 'PROCEDURES', layers: PROCEDURE_LAYERS },
   { title: 'RESTRICTIONS', layers: ['pr', 'dng', 'tra', 'adiz', 'civt'] },
   { title: 'AIRSPACE', layers: ['ctr', 'tma', 'cta', 'advisory', 'sector', 'fir', 'asr'] },
   { title: 'BASE MAP', layers: ['coast', 'rings'] },

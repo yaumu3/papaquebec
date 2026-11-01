@@ -1,8 +1,10 @@
 import { type ChartItem, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
-import { type Batch, Shape } from '../protocol';
+import { geodesicLine } from '../../lib/geodesic';
+import { isPointLayer } from '../../lib/mapsetFormat';
+import type { Batch } from '../protocol';
+import { isPointStyle, LAYER_STYLES } from './layerStyles';
 import { LineBatch, MarkerBatch } from './pack';
-import { route } from './paths';
 import { THEME } from './rules';
 
 interface TracesInput {
@@ -10,21 +12,20 @@ interface TracesInput {
   pointedAt: ChartItem | null;
   /** The items the search names on their own rows. */
   searched: readonly ChartItem[];
+  /** The pointed item's label lit, ready to draw over its trace. */
+  highlight: readonly Batch[];
   project: ProjectFn;
 }
 
 const TRACE_WIDTH_PX = 2;
-const POINTED_RING_PX = 9;
-const SEARCH_RING_PX = 8;
 
 /**
- * An item's full geometry: every outline of every part, not cut back at stops, and a point as a
- * ring. A hold has no trace until its racetrack comes with the symbols.
+ * An item's full geometry: every outline of every part, not cut back at stops, and a point as
+ * its layer's own symbol. A hold has no trace until its racetrack comes with the symbols.
  */
 function traceItem(
   item: ChartItem,
   color: string,
-  ringPx: number,
   project: ProjectFn,
   lines: LineBatch,
   markers: MarkerBatch,
@@ -33,39 +34,42 @@ function traceItem(
   for (const { geometry } of item.parts) {
     if (geometry.type === 'Point') {
       const [lon, lat] = geometry.coordinates;
-      markers.marker(project(lat, lon), Shape.TraceRing, ringPx * 2, color);
+      const style = LAYER_STYLES[item.layer];
+      if (isPointStyle(style)) markers.marker(project(lat, lon), style.shape, style.size, color);
       continue;
     }
     for (const outline of outlinesOf(geometry)) {
-      lines.polyline(route(outline, project), color, { width: TRACE_WIDTH_PX });
+      lines.polyline(geodesicLine(outline, project), color, { width: TRACE_WIDTH_PX });
     }
   }
 }
 
 /** One trace of `items`: their lines, then their markers. */
-function trace(
-  items: readonly ChartItem[],
-  color: string,
-  ringPx: number,
-  project: ProjectFn,
-): [Batch, Batch] {
+function trace(items: readonly ChartItem[], color: string, project: ProjectFn): [Batch, Batch] {
   const lines = new LineBatch(1);
   const markers = new MarkerBatch(1);
-  for (const item of items) traceItem(item, color, ringPx, project, lines, markers);
+  for (const item of items) traceItem(item, color, project, lines, markers);
   return [lines.finish(), markers.finish()];
 }
 
+/** The batches of the two slots of the traces. */
+interface TraceSlots {
+  traces: [Batch, Batch, ...Batch[]];
+  tracedPoints: [Batch, Batch, ...Batch[]];
+}
+
 /**
- * What the search names at half strength, then what the tree points at over it at full
- * strength, drawn over the chart's labels and under the targets.
+ * What the search names at half strength, then what the tree points at over it at full strength,
+ * and over that the highlight of its label, in two slots. The traces hold the lines and the
+ * highlight of a route or an area, under the chart's points; the traced points hold the symbols
+ * and the highlight of a point, over the chart's own. The search gets no label.
  */
-export function buildTraces({
-  pointedAt,
-  searched,
-  project,
-}: TracesInput): [Batch, Batch, Batch, Batch] {
-  return [
-    ...trace(searched, THEME.hoverFaint, SEARCH_RING_PX, project),
-    ...trace(pointedAt ? [pointedAt] : [], THEME.hover, POINTED_RING_PX, project),
-  ];
+export function buildTraces({ pointedAt, searched, highlight, project }: TracesInput): TraceSlots {
+  const [searchLines, searchMarkers] = trace(searched, THEME.hoverFaint, project);
+  const [pointedLines, pointedMarkers] = trace(pointedAt ? [pointedAt] : [], THEME.hover, project);
+  const lit = pointedAt && isPointLayer(pointedAt.layer);
+  return {
+    traces: [searchLines, pointedLines, ...(lit ? [] : highlight)],
+    tracedPoints: [searchMarkers, pointedMarkers, ...(lit ? highlight : [])],
+  };
 }
