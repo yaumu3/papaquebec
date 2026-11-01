@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ItemPart } from './chart';
-import { bandOf, isUpperStratum, stratumTag } from './stratum';
+import { bandOf, isUpperStratum, limitInHundreds, stratumTag } from './stratum';
 
 const area = (lower?: string): ItemPart => ({
   geometry: { type: 'Polygon', coordinates: [] },
@@ -122,5 +122,29 @@ describe('bandOf', () => {
 
     // Assert
     expect(bands).toEqual(rows.map(([, expected]) => expected));
+  });
+});
+
+describe('limitInHundreds', () => {
+  it('writes a limit in hundreds of feet, rounded and padded to three digits', () => {
+    // Arrange
+    const rows: [string, string][] = [
+      ['3000FT', '030'],
+      ['12000FT', '120'],
+      ['FL240', '240'],
+      ['FL95', '095'],
+      ['SFC', 'SFC'],
+      ['GND', 'SFC'],
+      ['UNL', 'UNL'],
+      ['1500FT AGL', '015 AGL'],
+      ['35000FT', '350'],
+      ['250FT', '003'],
+    ];
+
+    // Act
+    const written = rows.map(([limit]) => limitInHundreds(limit));
+
+    // Assert
+    expect(written).toEqual(rows.map(([, expected]) => expected));
   });
 });

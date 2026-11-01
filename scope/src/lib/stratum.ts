@@ -26,6 +26,18 @@ export function isUpperStratum({ properties: p }: ItemPart): boolean {
 /** A limit as a reader says it: a flight level by its number, any other as published. */
 const written = (limit: string): string => FLIGHT_LEVEL.exec(limit)?.[1] ?? limit;
 
+/**
+ * A limit in hundreds of feet as a chart prints it: three digits, `SFC` for the surface, `UNL`
+ * for unlimited. The digits come from the limit in feet; ` AGL` is kept as filed.
+ */
+export function limitInHundreds(limit: string): string {
+  const ft = limitFt(limit);
+  if (ft === Infinity) return 'UNL';
+  if (ft <= 0) return 'SFC';
+  const digits = String(Math.round(ft / 100)).padStart(3, '0');
+  return limit.endsWith(' AGL') ? `${digits} AGL` : digits;
+}
+
 /** A part's lower limit as published; none is the surface. */
 const lowerOf = ({ properties: p }: ItemPart): string =>
   ('lower' in p ? p.lower : undefined) ?? 'SFC';
@@ -49,8 +61,7 @@ export function bandOf(parts: readonly ItemPart[]): { lower: string; upper: stri
 /**
  * A sector's stratum written as a tag: `335−` from the surface up to
  * a limit, `335+` from a limit to unlimited, `250–335` between two limits, and no tag for
- * surface to unlimited. The band runs from the lowest lower to the highest upper limit of the
- * parts, compared in feet.
+ * surface to unlimited, over the item's band (`bandOf`).
  */
 export function stratumTag(parts: readonly ItemPart[]): string {
   const { lower, upper } = bandOf(parts);
