@@ -15,14 +15,14 @@ const VSI_SLOPES: readonly (readonly [number, number, number])[] = [
 const vsiHalf = (g: PfdGeometry): number => g.yc - g.yTop - VSI_HALF_MARGIN_PX;
 
 /** How far a vertical rate stands from the centre line, up for a climb; the scale is nonlinear and capped. */
-export function vsiOffset(g: PfdGeometry, vsFpm: number): number {
+function vsiOffset(g: PfdGeometry, vsFpm: number): number {
   const v = Math.min(Math.abs(vsFpm), VSI_RANGE_FPM);
   const [from, base, slope] = VSI_SLOPES.findLast(([start]) => v >= start) ?? [0, 0, 0];
   return Math.sign(vsFpm) * (vsiHalf(g) / VSI_SCALE_UNITS) * (base + (v - from) * slope);
 }
 
 /** Where a vertical rate stands on the scale. */
-export const vsiY = (g: PfdGeometry, vsFpm: number): number => g.yc - vsiOffset(g, vsFpm);
+const vsiY = (g: PfdGeometry, vsFpm: number): number => g.yc - vsiOffset(g, vsFpm);
 
 const VSI_CHAMFER_IN_PX = 10;
 const VSI_CHAMFER_SHORT_PX = 8;

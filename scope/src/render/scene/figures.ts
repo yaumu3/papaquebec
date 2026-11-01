@@ -25,7 +25,7 @@ export interface FigureOut {
  * A figure at a point of the plane, at its own size on the screen: each stroke as segments
  * between anchors that share the point and differ in their px offsets, each disc as a marker.
  */
-export function putFigure(
+function putFigure(
   { lines, markers }: FigureOut,
   at: Vec2,
   { strokes, discs }: Figure,
@@ -42,7 +42,7 @@ export function putFigure(
   }
 }
 
-export const MARKER_SHAPES = { ring: Shape.Ring, triangle: Shape.Triangle } as const;
+const MARKER_SHAPES = { ring: Shape.Ring, triangle: Shape.Triangle } as const;
 
 /** A point's mark: its layer's marker, or the navaid symbol of `kind`. */
 export function putPointMark(

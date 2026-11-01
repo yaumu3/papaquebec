@@ -140,7 +140,7 @@ export function buildTargets(input: TargetInput): Batch[] {
       markers.marker(at, Shape.HollowDiamond, 8, THEME.filtered);
       continue;
     }
-    markers.marker(at, targetShape(d.t, d.visibility), GLYPH_PX, d.color);
+    markers.marker(at, targetShape(d.t), GLYPH_PX, d.color);
     if (d.t.hex === input.selected) drawSelection(lines, d);
     drawDataBlock(lines, text, dataBlock(d.t, input.now, input.altimeter), {
       at,
