@@ -4,8 +4,7 @@ import { CHART_COLORS } from '../../design/palette';
 import { type ChartItem, itemFrequency } from '../../lib/chart';
 import type { LabelDensity, LabelStyle } from '../../lib/layers';
 import { fractionOf, stratumTag } from '../../lib/stratum';
-import { type LabelOut, putStroke, putText } from './drawnLabels';
-import type { Anchor, TextBatch } from './pack';
+import type { Anchor, LineBatch, TextBatch } from './pack';
 
 /** A sector's details are in 9 px, set 6 px apart from the name and from each other. */
 const DETAIL_SIZE_PX = 9;
@@ -37,8 +36,6 @@ interface Row {
 
 /** A rule between two rows, `width` CSS px wide, `y` CSS px below the block's centre. */
 interface Rule {
-  /** The key of the item the rule belongs to. */
-  key: string;
   y: number;
   width: number;
   color: string;
@@ -119,7 +116,6 @@ export function blockOf(
     rowOf(item.key, fraction.lower, FRACTION_SIZE_PX, label.color, top + LOWER_Y, lower ?? 0),
   ];
   const rule = {
-    key: item.key,
     y: top + RULE_Y,
     width: Math.max(upper ?? 0, lower ?? 0),
     color: label.color,
@@ -127,40 +123,52 @@ export function blockOf(
   return { rows, rules: [rule], width: Math.max(...rows.map((row) => row.width)) };
 }
 
-/** Puts a block's rows and rules centred on `at`, shifted by its px offsets. */
-export function putBlock({ rows, rules }: Block, at: Anchor, out: LabelOut) {
+/** Where a block draws: its text and its rules. */
+export interface BlockOut {
+  text: TextBatch;
+  strokes: LineBatch;
+}
+
+/** Puts a block's rows and rules centred on `at`, shifted by its px offsets, in `color` if given. */
+export function putBlock({ rows, rules }: Block, at: Anchor, out: BlockOut, color?: string) {
   const style = { baseline: 'middle', halo: true } as const;
   for (const row of rows) {
     for (const run of row.runs) {
       const anchor = { ...at, px: run.x - row.width / 2 + (at.px ?? 0), py: row.y + (at.py ?? 0) };
-      putText(out, row.key, {
-        text: run.text,
-        at: anchor,
-        size: run.size,
-        color: run.color,
-        style,
-      });
+      out.text.text(run.text, anchor, run.size, color ?? run.color, style);
     }
   }
-  for (const { key, y, width, color } of rules) {
+  for (const rule of rules) {
     const end = (sign: number) => ({
       ...at,
-      px: (sign * width) / 2 + (at.px ?? 0),
-      py: y + (at.py ?? 0),
+      px: (sign * rule.width) / 2 + (at.px ?? 0),
+      py: rule.y + (at.py ?? 0),
     });
-    putStroke(out, key, { from: end(-1), to: end(1), color, width: 1 });
+    out.strokes.segment(end(-1), end(1), color ?? rule.color, { width: 1 });
   }
+}
+
+/** Where a block put at `at` draws the name of each item it holds: the first run of its row. */
+export function namesIn({ rows }: Block, at: Anchor): Map<string, Anchor> {
+  const names = new Map<string, Anchor>();
+  for (const { key, runs, width, y } of rows.toReversed()) {
+    const [first] = runs;
+    if (first) {
+      names.set(key, { ...at, px: first.x - width / 2 + (at.px ?? 0), py: y + (at.py ?? 0) });
+    }
+  }
+  return names;
 }
 
 /**
  * Puts a block with its name, the first run of its first row, at `name`: the rest of the row
  * and the rows below follow it, as a block laid out for DENSE hangs off a name the chart drew.
  */
-export function putBlockAtName(block: Block, name: Anchor, out: LabelOut) {
+export function putBlockAtName(block: Block, name: Anchor, out: BlockOut, color?: string) {
   const [first] = block.rows;
   if (!first) return;
   const at = { ...name, px: (name.px ?? 0) + first.width / 2, py: (name.py ?? 0) - first.y };
-  putBlock(block, at, out);
+  putBlock(block, at, out, color);
 }
 
 /** How much of a stack a block takes: the distance across its rows and a line. */

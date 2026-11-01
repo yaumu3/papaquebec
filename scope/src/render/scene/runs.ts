@@ -1,20 +1,9 @@
 import type { ChartItem, ItemPart } from '../../lib/chart';
-import type { ProjectFn } from '../../lib/geo';
-import { geodesicLine } from '../../lib/geodesic';
-import { type LineLayerStyle, LAYER_TABLE } from '../../lib/layers';
-import { isRouteLayer } from '../../lib/mapsetFormat';
-import { lengthOf } from '../../lib/polyline';
-import { type Cuts, NO_CUTS, type Span, spansOf, stopCuts } from '../../lib/stops';
+import { LAYER_TABLE, type LineLayerStyle } from '../../lib/layers';
+import type { RouteSpan, SpansOf } from '../../lib/routeSpans';
 import { isUpperStratum } from '../../lib/stratum';
-import {
-  type ChartPath,
-  type ChartPoint,
-  type Network,
-  ownersOf,
-  runsOf,
-  type Stretch,
-} from '../../lib/topology';
-import { type Anchor, type LineBatch, type LineStyle, type SpanPlace } from './pack';
+import { type Network, ownersOf, runsOf, type Stretch } from '../../lib/topology';
+import type { LineBatch, LineStyle, SpanPlace } from './pack';
 
 /** A line's form in the layer's style, refined by the part's kind and stratum. */
 function lineLook(style: LineLayerStyle, part: ItemPart): LineStyle {
@@ -24,67 +13,37 @@ function lineLook(style: LineLayerStyle, part: ItemPart): LineStyle {
   return { ...style, ...byKind, ...upper };
 }
 
-/**
- * The polylines of a span's runs, each with its place in the span: the geodesic of every edge of
- * the span is subdivided once, so the distances back and ahead run across vertices and across
- * the runs another part owns.
- */
-function placedRuns(path: ChartPath, span: Span, runs: Stretch[], project: ProjectFn) {
-  const edges = path.coordinates
-    .slice(span.from, span.to)
-    .map((at, i) => geodesicLine([at, path.coordinates[span.from + i + 1] ?? at], project));
-  const reach = [0];
-  for (const e of edges) reach.push((reach.at(-1) ?? 0) + lengthOf(e));
-  const length = reach.at(-1) ?? 0;
-  return runs.map(({ from, to }) => {
-    const pieces = edges.slice(from - span.from, to - span.from);
-    const points = pieces.flatMap((e, i) => (i === 0 ? e : e.slice(1)));
-    const place: SpanPlace = {
-      back: reach[from - span.from] ?? 0,
-      length,
-      cutBack: span.cutBack,
-      cutAhead: span.cutAhead,
-    };
-    return { points, place };
-  });
-}
+/** A run's points, from the edges the span has walked: the dash runs on across its vertices. */
+const runPoints = (span: RouteSpan, { from, to }: Stretch) =>
+  span.edges
+    .slice(from - span.from, to - span.from)
+    .flatMap((edge, i) => (i === 0 ? edge : edge.slice(1)));
 
-/** The polylines a span's runs draw: placed in the span when it is cut back, else just routed. */
-function polylinesOf(
-  path: ChartPath,
-  span: Span,
-  runs: Stretch[],
-  project: ProjectFn,
-): { points: Anchor[]; place?: SpanPlace }[] {
-  if (runs.length === 0) return [];
-  if (span.cutBack === 0 && span.cutAhead === 0) {
-    return runs.map(({ from, to }) => ({
-      points: geodesicLine(path.coordinates.slice(from, to + 1), project),
-    }));
-  }
-  return placedRuns(path, span, runs, project);
+/** Where a run sits in a span cut back at a stop; none in a span that is not. */
+function placeIn(span: RouteSpan, { from }: Stretch): SpanPlace | undefined {
+  const { cutBack, cutAhead, length } = span;
+  if (cutBack === 0 && cutAhead === 0) return undefined;
+  return { back: span.reach[from - span.from] ?? 0, length, cutBack, cutAhead };
 }
 
 /**
  * Draws the drawn parts of a network back to front, each edge once: a part draws its runs, each
- * as one polyline in its layer's style. A route's spans between stops are cut back in the line
- * shader from the stops `cuts` names.
+ * as one polyline in its layer's style, cut back in the line shader at the stops of its spans.
  */
 export function drawRuns(
   network: Network,
   drawn: ReadonlySet<ItemPart>,
-  cuts: Cuts,
-  project: ProjectFn,
+  spansOf: SpansOf,
   lines: LineBatch,
 ): void {
   const owners = ownersOf(network, drawn);
   for (const path of network.paths.toReversed()) {
+    if (!drawn.has(path.part)) continue;
     const style = LAYER_TABLE[path.layer].style;
     const look = lineLook(style, path.part);
-    for (const span of spansOf(path, cuts)) {
-      const runs = runsOf(path, owners, span);
-      for (const { points, place } of polylinesOf(path, span, runs, project)) {
-        lines.polyline(points, style.color, look, place);
+    for (const span of spansOf(path)) {
+      for (const run of runsOf(path, owners, span)) {
+        lines.polyline(runPoints(span, run), style.color, look, placeIn(span, run));
       }
     }
   }
@@ -93,12 +52,3 @@ export function drawRuns(
 /** The parts of the items to draw. */
 export const partsOf = (items: readonly ChartItem[]): Set<ItemPart> =>
   new Set(items.flatMap((item) => item.parts));
-
-/** The stops of the routes: where the drawn points stand, if a route item is among those to draw. */
-export function routeCuts(
-  items: readonly ChartItem[],
-  drawnPoints: () => readonly ChartPoint[],
-): Cuts {
-  const routed = items.some((item) => isRouteLayer(item.layer));
-  return routed ? stopCuts(drawnPoints(), (layer) => LAYER_TABLE[layer].style.size) : NO_CUTS;
-}

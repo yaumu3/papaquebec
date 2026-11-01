@@ -3,9 +3,12 @@
 import { batch, createMemo, createRoot } from 'solid-js';
 
 import type { ChartItem } from '../lib/chart';
+import { LAYER_TABLE } from '../lib/layers';
 import { type Layer, POINT_LAYERS, type ScopeLayer } from '../lib/mapsetFormat';
 import { type AreaPlace, areaPlaceOf } from '../lib/pole';
-import { drawnPointsOf } from '../lib/topology';
+import { pathSpans, type SpansOf } from '../lib/routeSpans';
+import { stopCuts } from '../lib/stops';
+import { type ChartPath, drawnPointsOf } from '../lib/topology';
 import { drawnItemsOf, type LayerState, navaidsShownAt, NO_EXCEPTIONS } from '../lib/visibility';
 import { topology } from './mapsets';
 import { projectionVersion } from './scope';
@@ -29,12 +32,18 @@ export function setLayerState(layer: ScopeLayer, { mode, exceptions }: LayerStat
  * These sit in a root of their own: they live as long as the page, like the state they read, and
  * `canvas/hit.ts` reads them outside the scene.
  */
-export const { drawnItemsIn, drawnPoints, areaPlace } = createRoot(() => {
+export const { drawnItemsIn, drawnPoints, routeSpans, areaPlace } = createRoot(() => {
   /** Zooming reaches the points only when it shows or hides the navaids. */
   const inRange = createMemo(() => navaidsShownAt(settings.rangeNm));
   /** The items of `layers` that draw: those shown, and a navaid only within the range. */
   const drawnItems = (layers: readonly Layer[]) =>
     drawnItemsOf(topology().chart, layers, layerState, inRange);
+  const points = createMemo(() => drawnPointsOf(topology(), drawnItems(POINT_LAYERS)));
+  const spans = createMemo((): SpansOf => {
+    projectionVersion();
+    const cuts = stopCuts(points(), (layer) => LAYER_TABLE[layer].style.size);
+    return pathSpans(cuts, projectNm);
+  });
   const places = createMemo(() => {
     topology();
     projectionVersion();
@@ -43,7 +52,12 @@ export const { drawnItemsIn, drawnPoints, areaPlace } = createRoot(() => {
   return {
     drawnItemsIn: drawnItems,
     /** The points that draw. */
-    drawnPoints: createMemo(() => drawnPointsOf(topology(), drawnItems(POINT_LAYERS))),
+    drawnPoints: points,
+    /**
+     * The spans of a route, stopping at the points that draw. Only a route that draws or is
+     * pointed at reads them, so a build without one does not follow the points.
+     */
+    routeSpans: (path: ChartPath) => spans()(path),
     /**
      * Where each area item's label goes. A place is found the first time an item asks for it and
      * kept until the chart or the projection changes, never renewed by a zoom or a pan.

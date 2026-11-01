@@ -1,33 +1,35 @@
-import type { ChartItem } from '../../lib/chart';
+import type { ChartItem, ItemPart } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
 import {
-  type LabelDensity,
+  DRAW_STACK,
   isPointStyle,
+  type LabelDensity,
   labelReaches,
-  type PointLayerStyle,
   LAYER_TABLE,
+  type PointLayerStyle,
 } from '../../lib/layers';
-import type { Layer } from '../../lib/mapsetFormat';
+import { isChartLayer, type Layer } from '../../lib/mapsetFormat';
 import type { AreaPlace } from '../../lib/pole';
+import { pathSpans, type SpansOf } from '../../lib/routeSpans';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
 import type { Declination } from '../../lib/wmm';
-import type { AtlasInfo } from '../protocol';
-import type { CHART_SLICES, ShapeBatches } from '../slots';
+import type { AtlasInfo, Batch } from '../protocol';
+import type { SlotName, Slots } from '../slots';
 import { buildAreaLabels } from './areaLabels';
-import { type BuiltLabels, type LabelOut, putText } from './drawnLabels';
-import { putPointMark } from './figures';
-import { drawHolds } from './holds';
-import { LineBatch, MarkerBatch, TextBatch } from './pack';
-import { buildRouteLabels } from './routeLabels';
-import { drawRuns, partsOf, routeCuts } from './runs';
+import { putPart, putPointMark } from './figures';
+import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
+import { drawRuns, partsOf } from './runs';
+import { buildRouteLabels, type SpanLabel } from './spanDesignators';
 
 interface ShapesInput {
   topology: Topology;
-  /** The points that draw; read only for a point layer among `layers`, or when a route item draws. */
+  /** The points that draw; read only for a point layer among `layers`. */
   drawnPoints: () => readonly ChartPoint[];
   project: ProjectFn;
+  /** The spans of the routes; reading a drawn route's follows the points that stop it. */
+  routeSpans: SpansOf;
   /** The slice's layers, front first, as in the draw stack. */
   layers: readonly Layer[];
   /** The items to draw, of `layers`. */
@@ -51,6 +53,15 @@ export interface FitInput {
   shown: ShownMemory;
 }
 
+/** A build's batches, back to front, and what the highlight finds its labels by. */
+export interface BuiltLabels {
+  batches: Batch[];
+  /** Where the chart drew each area item's name. */
+  areaNames?: ReadonlyMap<string, Anchor>;
+  /** The span labels a route build drew, by span identity. */
+  spanLabels?: ReadonlyMap<string, SpanLabel>;
+}
+
 /** A point at its place on the plane. */
 export const placedPoint = ({ key, id, kind, at: [lon, lat] }: ChartPoint, project: ProjectFn) => ({
   key,
@@ -65,64 +76,112 @@ const pointsIn = (layer: Layer, drawnPoints: ShapesInput['drawnPoints'], project
     .filter((p) => p.layer === layer)
     .map((p) => placedPoint(p, project));
 
-/** The chart's lines and point markers, each back to front through the stack. */
-export function buildShapes(
-  { topology, drawnPoints, project, layers, drawnItems }: ShapesInput,
-  declinationAt: () => Declination,
-): ShapeBatches {
-  const lines = new LineBatch();
-  const markers = new MarkerBatch();
-  const drawn = partsOf(drawnItems);
-  drawRuns(topology.areas, drawn, NO_CUTS, project, lines);
-  drawHolds(drawnItems, project, declinationAt, { lines, markers });
-  drawRuns(topology.routes, drawn, routeCuts(drawnItems, drawnPoints), project, lines);
-  for (const layer of layers.toReversed()) {
-    const style = LAYER_TABLE[layer].style;
-    if (!isPointStyle(style)) continue;
-    for (const { at, kind } of pointsIn(layer, drawnPoints, project)) {
-      putPointMark({ lines, markers }, at, style, kind, style.color);
-    }
-  }
-  return { lines: lines.finish(), markers: markers.finish() };
-}
-
-/** Puts a point's ident beside its marker, in its layer's label style. */
+/** Puts a point's ident beside its marker, in its layer's label style or in `color`. */
 export function putPointLabel(
-  out: Pick<LabelOut, 'text' | 'drawn'>,
-  { key, id, at }: ReturnType<typeof placedPoint>,
+  text: TextBatch,
+  { id, at }: ReturnType<typeof placedPoint>,
   { px, py, size, color, baseline }: PointLayerStyle['label'],
+  override = color,
 ) {
-  const style = { baseline, halo: true } as const;
-  putText(out, key, { text: id, at: { ...at, px, py }, size, color, style });
+  text.text(id, { ...at, px, py }, size, override, { baseline, halo: true });
 }
 
 /** The idents of the drawn points, each back to front through the stack. */
-export function buildPointLabels({
+function buildPointLabels({
   drawnPoints,
   project,
   layers,
   labelDensity,
   atlas,
 }: LabelsInput): BuiltLabels {
-  const out = { text: new TextBatch(atlas), drawn: new Map() };
+  const text = new TextBatch(atlas);
   for (const layer of layers.toReversed()) {
-    const style = LAYER_TABLE[layer].style;
+    const { style } = LAYER_TABLE[layer];
     if (!isPointStyle(style) || !labelReaches(style.label, labelDensity)) continue;
     for (const point of pointsIn(layer, drawnPoints, project)) {
-      putPointLabel(out, point, style.label);
+      putPointLabel(text, point, style.label);
     }
   }
-  return { batches: [out.text.finish()], drawn: out.drawn };
+  return { batches: [text.finish()] };
+}
+
+/** The layers from `first` to `last` of the draw stack, front first. */
+const stackSlice = (first: Layer, last: Layer) =>
+  DRAW_STACK.slice(LAYER_TABLE[first].rank, LAYER_TABLE[last].rank + 1).filter(isChartLayer);
+
+/** What each slice's labels are built from. */
+type SliceLabelsInput = LabelsInput & FitInput & PlaceInput;
+
+interface Slice {
+  layers: readonly Layer[];
+  /** The slot of its lines and markers. */
+  shapes: SlotName;
+  /** The slot of its labels, each kind placed its own way. */
+  labels: SlotName;
+  buildLabels: (input: SliceLabelsInput) => BuiltLabels;
 }
 
 /**
- * The labels of a slice, each kind as it is placed: routes by span, areas at their pole, points by
- * their marker. Also what each item's label drew.
+ * The chart is built in three slices of the draw stack, so a toggle rebuilds only the slices that
+ * read its layer. Each fills a slot for its lines and markers and one for its labels.
  */
-export function buildSliceLabels(
-  slice: (typeof CHART_SLICES)[number],
-  input: LabelsInput & FitInput & PlaceInput,
-): BuiltLabels {
-  if (slice.labels === 'routeLabels') return buildRouteLabels(input);
-  return slice.labels === 'areaLabels' ? buildAreaLabels(input) : buildPointLabels(input);
+export const CHART_SLICES: readonly Slice[] = [
+  {
+    layers: stackSlice('ctr', 'asr'),
+    shapes: 'areaLines',
+    labels: 'areaLabels',
+    buildLabels: buildAreaLabels,
+  },
+  {
+    layers: stackSlice('sid', 'hold'),
+    shapes: 'routeLines',
+    labels: 'routeLabels',
+    buildLabels: buildRouteLabels,
+  },
+  {
+    layers: stackSlice('ad', 'vfr'),
+    shapes: 'pointMarkers',
+    labels: 'pointLabels',
+    buildLabels: buildPointLabels,
+  },
+];
+
+/** The slice that draws a layer. */
+export function sliceOf(layer: Layer): Slice {
+  const slice = CHART_SLICES.find(({ layers }) => layers.includes(layer));
+  if (!slice) throw new Error(`no slice draws ${layer}`);
+  return slice;
+}
+
+/** The colour of a hold: its kind's. */
+function holdColor({ properties }: ItemPart): string {
+  const { color, rnavColor } = LAYER_TABLE.hold.style;
+  return properties.kind === 'RNAV' ? rnavColor : color;
+}
+
+/** The chart's lines and point markers of a slice, each back to front through the stack. */
+export function buildShapes(
+  { shapes }: Slice,
+  { topology, drawnPoints, project, routeSpans, layers, drawnItems }: ShapesInput,
+  declinationAt: () => Declination,
+): Slots {
+  const lines = new LineBatch();
+  const markers = new MarkerBatch();
+  const symbols = { lines, markers };
+  const drawn = partsOf(drawnItems);
+  drawRuns(topology.areas, drawn, pathSpans(NO_CUTS, project), lines);
+  for (const { layer, parts } of drawnItems.filter((item) => item.layer === 'hold')) {
+    for (const part of parts) {
+      putPart(layer, part, holdColor(part), { project, declinationAt }, { lines, symbols });
+    }
+  }
+  drawRuns(topology.routes, drawn, routeSpans, lines);
+  for (const layer of layers.toReversed()) {
+    const { style } = LAYER_TABLE[layer];
+    if (!isPointStyle(style)) continue;
+    for (const { at, kind } of pointsIn(layer, drawnPoints, project)) {
+      putPointMark(symbols, at, style, kind, style.color);
+    }
+  }
+  return { [shapes]: [lines.finish(), markers.finish()] };
 }

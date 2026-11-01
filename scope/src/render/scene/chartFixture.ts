@@ -1,6 +1,6 @@
 import { type Chart, type ChartItem, type ItemPart } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
-import { DRAW_STACK, type LabelDensity } from '../../lib/layers';
+import { DRAW_STACK, type LabelDensity, LAYER_TABLE } from '../../lib/layers';
 import {
   isChartLayer,
   isPointLayer,
@@ -9,15 +9,16 @@ import {
   POINT_LAYERS,
 } from '../../lib/mapsetFormat';
 import { type AreaPlace, areaPlaceOf } from '../../lib/pole';
+import { pathSpans, type SpansOf } from '../../lib/routeSpans';
+import { stopCuts } from '../../lib/stops';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import { type LayerState, drawnItemsOf } from '../../lib/visibility';
 import { shownExcept } from '../../lib/visibilityFixture';
 import type { Declination } from '../../lib/wmm';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
-import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../slots';
+import type { Slots } from '../slots';
 import { atlas } from './atlasFixture';
-import { buildShapes, buildSliceLabels } from './chart';
-import type { BuiltLabels } from './drawnLabels';
+import { type BuiltLabels, buildShapes, CHART_SLICES, sliceOf } from './chart';
 import { buildHighlight } from './highlight';
 import { parseColor } from './pack';
 import { buildTraces } from './traces';
@@ -301,12 +302,21 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
     onPointsRead();
     return drawnPointsOf(topology, drawnIn(POINT_LAYERS));
   };
+  const spansMade: { spansOf?: SpansOf } = {};
+  const routeSpans: SpansOf = (path) => {
+    spansMade.spansOf ??= pathSpans(
+      stopCuts(drawnPoints(), (layer) => LAYER_TABLE[layer].style.size),
+      plane,
+    );
+    return spansMade.spansOf(path);
+  };
   const inputOf = (slice: Slice, narrowed: readonly Layer[] = layers) => {
     const among = slice.layers.filter((l) => layers.includes(l) && narrowed.includes(l));
     return {
       topology,
       drawnPoints,
       project: plane,
+      routeSpans,
       layers: among,
       drawnItems: drawnIn(among),
     };
@@ -315,7 +325,7 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
   const labelsOf = (slice: Slice): BuiltLabels => {
     const known = labelsMade.get(slice);
     if (known) return known;
-    const made = buildSliceLabels(slice, {
+    const made = slice.buildLabels({
       ...inputOf(slice),
       labelDensity: density,
       atlas,
@@ -326,22 +336,25 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
     labelsMade.set(slice, made);
     return made;
   };
-  const sliceOf = (labels: Slice['labels']) => {
+  const labelled = (labels: Slice['labels']) => {
     const slice = CHART_SLICES.find((s) => s.labels === labels);
     if (!slice) throw new Error(`no slice has ${labels}`);
     return slice;
   };
-  const shapesOf = (slice: Slice, narrowed?: readonly Layer[]) =>
-    buildShapes(inputOf(slice, narrowed), declinationAt);
+  const shapesOf = (slice: Slice, narrowed?: readonly Layer[]) => {
+    const [lines, marks] =
+      buildShapes(slice, inputOf(slice, narrowed), declinationAt)[slice.shapes] ?? [];
+    if (!lines || !marks) throw new Error('a slice built no shapes');
+    return { lines, markers: marks };
+  };
 
   /** The batches that light an item's label: gaps, text, then segments. */
   const highlight = (item: ChartItem) => {
-    const slice = CHART_SLICES.find((s) => s.layers.some((l) => l === item.layer));
-    const record = slice && labelsOf(slice).drawn?.get(item.key);
-    const [gaps, text, strokes] = buildHighlight(item, record, {
-      spanLabels: labelsOf(sliceOf('routeLabels')).spanLabels ?? new Map(),
+    const [gaps, text, strokes] = buildHighlight(item, {
+      spanLabels: labelsOf(labelled('routeLabels')).spanLabels ?? new Map(),
+      areaNames: labelsOf(sliceOf(item.layer)).areaNames ?? new Map(),
       topology,
-      drawnPoints,
+      routeSpans,
       project: plane,
       atlas,
       placeOf,
@@ -366,18 +379,18 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
     },
     /** The idents of the points. */
     pointLabels() {
-      const built = labelsOf(sliceOf('pointLabels')).batches;
+      const built = labelsOf(labelled('pointLabels')).batches;
       return { text: batchAt(built, 0, 'the point labels') };
     },
     /** The route labels: the gaps cut in the lines, the text, the chevrons. */
     routeLabels() {
-      const built = labelsOf(sliceOf('routeLabels')).batches;
+      const built = labelsOf(labelled('routeLabels')).batches;
       const at = (index: number) => batchAt(built, index, 'the route labels');
       return { gaps: at(0), text: at(1), chevrons: at(2) };
     },
     /** The area labels: the text and the rules of the fractions. */
     areaLabels() {
-      const built = labelsOf(sliceOf('areaLabels')).batches;
+      const built = labelsOf(labelled('areaLabels')).batches;
       return {
         text: batchAt(built, 0, 'the area labels'),
         rules: batchAt(built, 1, 'the area labels'),
@@ -393,7 +406,7 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
       searched: readonly ChartItem[];
     }) {
       const lit = pointedAt ? highlight(pointedAt) : undefined;
-      const { traces, tracedPoints } = buildTraces({
+      const { traces = [], tracedPoints = [] } = buildTraces({
         pointedAt,
         searched,
         highlight: lit ? [lit.gaps, lit.text, lit.strokes] : [],
@@ -401,8 +414,16 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
         declinationAt,
       });
       return {
-        searched: { lines: traces[0], strokes: tracedPoints[0], markers: tracedPoints[1] },
-        pointed: { lines: traces[1], strokes: tracedPoints[2], markers: tracedPoints[3] },
+        searched: {
+          lines: batchAt(traces, 0, 'the traces'),
+          strokes: batchAt(tracedPoints, 0, 'the traces'),
+          markers: batchAt(tracedPoints, 1, 'the traces'),
+        },
+        pointed: {
+          lines: batchAt(traces, 1, 'the traces'),
+          strokes: batchAt(tracedPoints, 2, 'the traces'),
+          markers: batchAt(tracedPoints, 3, 'the traces'),
+        },
         /** The highlight a route or an area has among the traces, under the chart's points. */
         litTraces: traces.slice(2),
         /** The highlight a point has among the traced points, over the chart's own. */
@@ -413,8 +434,9 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
     slots(): Slots {
       const slots: Slots = {};
       for (const slice of CHART_SLICES) {
-        Object.assign(slots, shapeSlots(slice, shapesOf(slice)));
-        Object.assign(slots, labelSlots(slice, labelsOf(slice).batches));
+        const shapes = shapesOf(slice);
+        slots[slice.shapes] = [shapes.lines, shapes.markers];
+        slots[slice.labels] = labelsOf(slice).batches;
       }
       return slots;
     },

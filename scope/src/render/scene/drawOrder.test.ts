@@ -4,8 +4,9 @@ import type { Chart, ChartItem } from '../../lib/chart';
 import { DRAW_STACK, LAYER_TABLE } from '../../lib/layers';
 import { type Layer, POINT_LAYERS, type ScopeLayer } from '../../lib/mapsetFormat';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
-import { CHART_SLICES, LABEL_SLOTS, type Slots, SLOT_ORDER, type SlotName } from '../slots';
+import { LABEL_SLOTS, type Slots, SLOT_ORDER, type SlotName } from '../slots';
 import { atlas } from './atlasFixture';
+import { CHART_SLICES } from './chart';
 import { itemOf, line, partOf, point, project, sceneOf } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
