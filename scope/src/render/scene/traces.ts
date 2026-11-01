@@ -1,9 +1,10 @@
 import { type ChartItem, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
-import type { Batch } from '../protocol';
+import type { AtlasInfo, Batch } from '../protocol';
+import { type DrawnLabel, redrawLabel } from './drawnLabels';
 import { isPointStyle, LAYER_STYLES } from './layerStyles';
-import { LineBatch, MarkerBatch } from './pack';
+import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { THEME } from './rules';
 
 interface TracesInput {
@@ -11,7 +12,10 @@ interface TracesInput {
   pointedAt: ChartItem | null;
   /** The items the search names on their own rows. */
   searched: readonly ChartItem[];
+  /** What the label of the pointed item drew on the chart, if it drew. */
+  pointedLabel: DrawnLabel | undefined;
   project: ProjectFn;
+  atlas: AtlasInfo;
 }
 
 const TRACE_WIDTH_PX = 2;
@@ -49,17 +53,28 @@ function trace(items: readonly ChartItem[], color: string, project: ProjectFn): 
   return [lines.finish(), markers.finish()];
 }
 
+/** A label drawn again in the hover grey: its gaps, then its text, then its segments. */
+function highlight(label: DrawnLabel | undefined, atlas: AtlasInfo): [Batch, Batch, Batch] {
+  const out = { gaps: new LineBatch(1), text: new TextBatch(atlas, 1), strokes: new LineBatch(1) };
+  if (label) redrawLabel(label, THEME.hover, out);
+  return [out.gaps.finish(), out.text.finish(), out.strokes.finish()];
+}
+
 /**
- * What the search names at half strength, then what the tree points at over it at full
- * strength, drawn over the chart's labels and under the targets.
+ * What the search names at half strength, then what the tree points at over it at full strength,
+ * and over that its label drawn again as the chart drew it: all over the chart's labels and under
+ * the targets. The search gets no label.
  */
 export function buildTraces({
   pointedAt,
   searched,
+  pointedLabel,
   project,
-}: TracesInput): [Batch, Batch, Batch, Batch] {
+  atlas,
+}: TracesInput): [Batch, Batch, Batch, Batch, Batch, Batch, Batch] {
   return [
     ...trace(searched, THEME.hoverFaint, project),
     ...trace(pointedAt ? [pointedAt] : [], THEME.hover, project),
+    ...highlight(pointedLabel, atlas),
   ];
 }

@@ -2,8 +2,11 @@ import { describe, expect, it } from 'bun:test';
 
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
-import { packed, project } from './chartFixture';
+import { atlas } from './atlasFixture';
+import { glyphs, instances, packed, project, withoutColor } from './chartFixture';
+import type { DrawnLabel } from './drawnLabels';
 import { LAYER_STYLES } from './layerStyles';
+import { LineBatch, TextBatch } from './pack';
 import { THEME } from './rules';
 import { buildTraces } from './traces';
 
@@ -65,6 +68,12 @@ function markers({ data, count }: Batch) {
   });
 }
 
+type Input = Omit<Parameters<typeof buildTraces>[0], 'atlas' | 'pointedLabel'> &
+  Partial<Pick<Parameters<typeof buildTraces>[0], 'pointedLabel'>>;
+
+/** The traces of `input`, with no label of what is pointed at unless it comes with one. */
+const tracesOf = (input: Input) => buildTraces({ atlas, pointedLabel: undefined, ...input });
+
 const grey = packed(THEME.hover);
 const faint = packed(THEME.hoverFaint);
 
@@ -78,7 +87,7 @@ describe('buildTraces', () => {
     const stepped = area(polygon, lineOf([5, 0], [6, 0], [6, 1]));
 
     // Act
-    const [, , lines, dots] = buildTraces({ pointedAt: stepped, searched: [], project });
+    const [, , lines, dots] = tracesOf({ pointedAt: stepped, searched: [], project });
 
     // Assert
     const drawn = segments(lines);
@@ -94,7 +103,7 @@ describe('buildTraces', () => {
     const through = route(lineOf([0, 0], [1, 0], [2, 0]));
 
     // Act
-    const [, , lines] = buildTraces({ pointedAt: through, searched: [], project });
+    const [, , lines] = tracesOf({ pointedAt: through, searched: [], project });
 
     // Assert
     expect(segments(lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
@@ -106,7 +115,7 @@ describe('buildTraces', () => {
     const pointed = layers.map((layer) => point(layer, pointAt([1, 2]), pointAt([3, 4])));
 
     // Act
-    const traced = pointed.map((pointedAt) => buildTraces({ pointedAt, searched: [], project })[3]);
+    const traced = pointed.map((pointedAt) => tracesOf({ pointedAt, searched: [], project })[3]);
 
     // Assert
     const expected = layers.map((layer) => {
@@ -124,7 +133,7 @@ describe('buildTraces', () => {
     const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
 
     // Act
-    const [, , lines, dots] = buildTraces({ pointedAt: hold, searched: [], project });
+    const [, , lines, dots] = tracesOf({ pointedAt: hold, searched: [], project });
 
     // Assert
     expect([lines.count, dots.count]).toEqual([0, 0]);
@@ -135,7 +144,7 @@ describe('buildTraces', () => {
     const none = null;
 
     // Act
-    const [, , lines, dots] = buildTraces({ pointedAt: none, searched: [], project });
+    const [, , lines, dots] = tracesOf({ pointedAt: none, searched: [], project });
 
     // Assert
     expect([lines.count, dots.count]).toEqual([0, 0]);
@@ -146,7 +155,7 @@ describe('buildTraces', () => {
     const found = [area(lineOf([0, 0], [1, 0], [1, 1])), fix(pointAt([5, 6]))];
 
     // Act
-    const [lines, dots] = buildTraces({ pointedAt: null, searched: found, project });
+    const [lines, dots] = tracesOf({ pointedAt: null, searched: found, project });
 
     // Assert
     const drawn = segments(lines);
@@ -162,10 +171,10 @@ describe('buildTraces', () => {
     const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
 
     // Act
-    const batches = buildTraces({ pointedAt: null, searched: [hold], project });
+    const batches = tracesOf({ pointedAt: null, searched: [hold], project });
 
     // Assert
-    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
+    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0, 0]);
   });
 
   it('puts the search first and what is pointed at over it, an item in both drawn in both', () => {
@@ -174,7 +183,7 @@ describe('buildTraces', () => {
     const onlySearched = area(lineOf([0, 0], [1, 0]));
 
     // Act
-    const [searchLines, searchDots, pointedLines, pointedDots] = buildTraces({
+    const [searchLines, searchDots, pointedLines, pointedDots] = tracesOf({
       pointedAt: both,
       searched: [onlySearched, both],
       project,
@@ -192,9 +201,75 @@ describe('buildTraces', () => {
     const none = { pointedAt: null, searched: [], project };
 
     // Act
-    const batches = buildTraces(none);
+    const batches = tracesOf(none);
 
     // Assert
-    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
+    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+  });
+
+  describe('the label of what is pointed at', () => {
+    const label: DrawnLabel = {
+      gaps: [
+        {
+          from: { x: 1, y: 2, px: -9, py: 0 },
+          to: { x: 1, y: 2, px: 20, py: 0 },
+          color: THEME.bg,
+          width: 12,
+        },
+      ],
+      texts: [
+        {
+          text: 'V901',
+          at: { x: 1, y: 2, px: -5, py: 0 },
+          size: 9,
+          color: '#9a6a4c',
+          style: { baseline: 'middle', angle: 0.5, halo: true },
+        },
+      ],
+      strokes: [
+        {
+          from: { x: 1, y: 2, px: 12, py: -3 },
+          to: { x: 1, y: 2, px: 15, py: 0 },
+          color: '#9a6a4c',
+          width: 1.3,
+        },
+      ],
+    };
+
+    const pointed = { pointedAt: route(lineOf([0, 0], [1, 0])), searched: [], project };
+
+    it('draws its text again in the hover grey, as the chart drew it', () => {
+      // Arrange
+      const [run] = label.texts;
+      const expected = new TextBatch(atlas);
+      if (run) expected.text(run.text, run.at, run.size, run.color, run.style);
+      const input = { ...pointed, pointedLabel: label };
+
+      // Act
+      const [, , , , , text] = tracesOf(input);
+
+      // Assert
+      const drawn = glyphs(text);
+      expect(drawn.length).toBeGreaterThan(0);
+      expect(withoutColor(drawn)).toEqual(withoutColor(glyphs(expected.finish())));
+      expect(drawn.map((g) => g.color)).toEqual(drawn.map(() => grey));
+    });
+
+    it('draws its segments again in the hover grey, and its gaps in the background', () => {
+      // Arrange
+      const [arm] = label.strokes;
+      const [gap] = label.gaps;
+      const [wantedArm, wantedGap] = [new LineBatch(), new LineBatch()];
+      if (arm) wantedArm.segment(arm.from, arm.to, THEME.hover, { width: arm.width });
+      if (gap) wantedGap.segment(gap.from, gap.to, THEME.bg, { width: gap.width });
+      const input = { ...pointed, pointedLabel: label };
+
+      // Act
+      const [, , , , gaps, , strokes] = tracesOf(input);
+
+      // Assert
+      expect(instances(gaps)).toEqual(instances(wantedGap.finish()));
+      expect(instances(strokes)).toEqual(instances(wantedArm.finish()));
+    });
   });
 });

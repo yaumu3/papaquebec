@@ -118,19 +118,22 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   );
 
   const layoutScale = settledScale(view);
-  showChart(show, projected, layoutScale);
+  const pointedLabelOf = showChart(show, projected, layoutScale, atlas);
 
-  show(() =>
-    projected()
+  show((a) => {
+    const pointed = pointedItem();
+    return projected()
       ? {
           traces: buildTraces({
-            pointedAt: pointedItem(),
+            pointedAt: pointed,
             searched: searchedItems(),
+            pointedLabel: pointed ? pointedLabelOf(pointed) : undefined,
             project: projectNm,
+            atlas: a,
           }),
         }
-      : null,
-  );
+      : null;
+  });
 
   /**
    * Bumped once the blocks are placed: on each snapshot, a drop, a settled zoom or a change in
