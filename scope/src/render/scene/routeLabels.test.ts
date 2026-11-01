@@ -200,11 +200,14 @@ describe('buildRouteLabels', () => {
     expect(text.count).toBe(0);
   });
 
-  it('labels airways from their density and never a direct route', () => {
+  it('labels a route from its density, a procedure too, and never a direct route', () => {
     // Arrange
     const rows: [StyledLayer, number[]][] = [
       ['conv', [0, 0, 1, 1]],
       ['rnav', [0, 0, 1, 1]],
+      ['trans', [0, 0, 1, 1]],
+      ['sid', [0, 0, 0, 1]],
+      ['star', [0, 0, 0, 1]],
       ['dct', [0, 0, 0, 0]],
     ];
 
@@ -252,5 +255,71 @@ describe('buildRouteLabels', () => {
 
     // Assert
     expect(drawn).toEqual(rows.map(([, expected]) => expected));
+  });
+
+  describe('a procedure', () => {
+    const sid = airway('sid', 'SID1', [0, 0], [0.5, 0], [2, 0], [4, 0]);
+    const fixes = [stops('fix', 0.5), stops('fix', 2)];
+    const layers: StyledLayer[] = ['sid', 'fix'];
+    const named = (scale: number) =>
+      labelsIn(
+        build([sid, ...fixes], layers, 'dense', allShown, {
+          settledScale: () => scale,
+          shown: new Map(),
+        }).text,
+      );
+
+    it('is named once, on the first of its spans that has room', () => {
+      // Arrange
+      const roomyFrom2 = 40;
+
+      // Act
+      const labels = named(roomyFrom2);
+
+      // Assert
+      expect(labels.map((l) => l.text)).toEqual(['SID1']);
+      expect(labels[0]?.at.x).toBeCloseTo(1.25, 6);
+    });
+
+    it('is not named when no span has room', () => {
+      // Arrange
+      const tight = 10;
+
+      // Act
+      const labels = named(tight);
+
+      // Assert
+      expect(labels).toEqual([]);
+    });
+
+    it('joins the label of an airway on the same span, in draw-stack order', () => {
+      // Arrange
+      const items = chartOf([parseMapSet(EXAMPLE)]);
+
+      // Act
+      const { text } = build(items, ALL_LAYERS);
+
+      // Assert
+      const joined = labelsIn(text).find((l) => l.text === 'TAVRO2.ZOLEKA901');
+      expect(joined?.glyphs.map((g) => g.color)).toEqual([
+        ...Array(12).fill(packed('#40707c')),
+        ...Array(4).fill(packed('#9a6a4c')),
+      ]);
+    });
+
+    it('does not take the room of an airway label that already fits', () => {
+      // Arrange
+      const items = [airway('conv', 'V901', [0, 0], [2, 0]), airway('sid', 'SID1', [0, 0], [2, 0])];
+      const scale = (2 * widthOf(4) + 9 + 28 - 1) / 2;
+
+      // Act
+      const { text } = build(items, ['conv', 'sid'], 'dense', allShown, {
+        settledScale: () => scale,
+        shown: new Map(),
+      });
+
+      // Assert
+      expect(labelsIn(text).map((l) => l.text)).toEqual(['V901']);
+    });
   });
 });

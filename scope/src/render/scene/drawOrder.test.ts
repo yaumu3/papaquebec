@@ -132,17 +132,7 @@ const kindsInDrawOrder = (slots: Slots): Batch['kind'][] =>
 describe('the draw order of the chart', () => {
   const chart = CHART_LAYERS.map(itemAt);
   const behind = DRAW_STACK.toReversed();
-  const unlabelled: ReadonlySet<ScopeLayer> = new Set([
-    'fir',
-    'adiz',
-    'dct',
-    'hold',
-    'coast',
-    // A procedure is named once, on a span that fits, not where it is drawn.
-    'sid',
-    'star',
-    'trans',
-  ]);
+  const unlabelled: ReadonlySet<ScopeLayer> = new Set(['fir', 'adiz', 'dct', 'hold', 'coast']);
 
   it('draws lines back to front through the stack, the base map first', () => {
     // Arrange

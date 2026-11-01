@@ -56,11 +56,17 @@ export const AIRWAY_LAYERS = ['conv', 'rnav'] as const satisfies readonly Layer[
 export const isAirwayLayer = (layer: ScopeLayer): layer is (typeof AIRWAY_LAYERS)[number] =>
   (AIRWAY_LAYERS as readonly ScopeLayer[]).includes(layer);
 
+/** The layers of the procedures, which AD 2.22 of the AIP lists: departures, arrivals, transitions. */
+export const PROCEDURE_LAYERS = ['sid', 'star', 'trans'] as const satisfies readonly Layer[];
+
+export const isProcedureLayer = (layer: ScopeLayer): layer is (typeof PROCEDURE_LAYERS)[number] =>
+  (PROCEDURE_LAYERS as readonly ScopeLayer[]).includes(layer);
+
 /** The groups of the Maps panel, in the order they are listed there, which is not the draw order. */
 export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
   { title: 'POINTS', layers: ['ad', 'navaid', 'fix', 'vfr'] },
   { title: 'ROUTES', layers: ['conv', 'rnav', 'dct', 'hold'] },
-  { title: 'PROCEDURES', layers: ['sid', 'star', 'trans'] },
+  { title: 'PROCEDURES', layers: PROCEDURE_LAYERS },
   { title: 'RESTRICTIONS', layers: ['pr', 'dng', 'tra', 'adiz', 'civt'] },
   { title: 'AIRSPACE', layers: ['ctr', 'tma', 'cta', 'advisory', 'sector', 'fir', 'asr'] },
   { title: 'BASE MAP', layers: ['coast', 'rings'] },

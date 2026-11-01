@@ -1,10 +1,10 @@
 /** Which designators label which span of the routes. */
 
-import { nameOf } from '../../lib/chart';
-import { rememberFits, type ShownMemory } from '../../lib/fits';
+import { type ChartItem, nameOf } from '../../lib/chart';
+import { fits, rememberFits, type ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
-import { DRAW_STACK, isAirwayLayer } from '../../lib/layers';
+import { DRAW_STACK, isAirwayLayer, isProcedureLayer } from '../../lib/layers';
 import { lengthOf, type Midpoint, midpointOf, readingAngle } from '../../lib/polyline';
 import { type Cuts, type Span, spanIdentity, spansOf } from '../../lib/stops';
 import type { ChartPath } from '../../lib/topology';
@@ -52,7 +52,9 @@ export interface Stage extends LabelsInput {
   text: TextBatch;
 }
 
-const byStack = (a: Designator, b: Designator) => a.rank - b.rank || a.name.localeCompare(b.name);
+/** Draw-stack order, then by name. */
+const byStack = (a: { rank: number; name: string }, b: { rank: number; name: string }) =>
+  a.rank - b.rank || a.name.localeCompare(b.name);
 
 /** The designator of a path's part in its layer's label style, if the density reaches it. */
 function designatorOf(path: ChartPath, density: LabelsInput['labelDensity']) {
@@ -115,14 +117,61 @@ function settleAirways(entries: Entries, stage: Stage) {
   }
 }
 
+const nameOfItem = (item: ChartItem) => (item.parts[0] && nameOf(item.parts[0])) ?? '';
+
+/** The drawn procedure items, in draw-stack order and then by name. */
+function procedureItems(items: readonly ChartItem[]): ChartItem[] {
+  return items
+    .filter((item) => isProcedureLayer(item.layer))
+    .map((item) => ({ item, rank: DRAW_STACK.indexOf(item.layer), name: nameOfItem(item) }))
+    .toSorted(byStack)
+    .map(({ item }) => item);
+}
+
+/** The spans of an item, taking its parts in order and the spans of each in path order. */
+function* spansOfItem(item: ChartItem, { topology, cuts }: Stage) {
+  for (const part of item.parts) {
+    for (const path of topology.routes.paths.filter((p) => p.part === part)) {
+      for (const span of spansOf(path, cuts)) yield { path, span };
+    }
+  }
+}
+
 /**
- * The spans that draw a label, the rearmost first, each with its designators in draw-stack
- * order: every airway that fits its span.
+ * Names a procedure on the first span where its label with the procedure added still fits. A
+ * span that draws no label and fails the test is remembered as hidden; one that draws a label
+ * keeps its state.
+ */
+function nameProcedure(item: ChartItem, entries: Entries, stage: Stage) {
+  const { project, labelDensity, shown, scale, text } = stage;
+  for (const { path, span } of spansOfItem(item, stage)) {
+    const designator = designatorOf(path, labelDensity);
+    const entry = designator && entryOf(entries, path, span, project);
+    if (!entry) continue;
+    const named = [...entry.designators, designator];
+    if (fits(roomOf(entry, scale), widthOf(named, text) + MARGIN_PX, shown.get(entry.id))) {
+      entry.designators = named;
+      shown.set(entry.id, true);
+      return;
+    }
+    if (entry.designators.length === 0) shown.set(entry.id, false);
+  }
+}
+
+/** What a label's rank in the draw stack is: that of its front designator. */
+const frontRank = ({ designators }: Entry) => Math.min(...designators.map((d) => d.rank));
+
+/**
+ * The spans that draw a label, the one with the rearmost front designator first, each with its
+ * designators in draw-stack order: every airway that fits its span, and each procedure on the
+ * first span that has room for it as well. A procedure's span may come after an airway's in
+ * the entries, so the order is by rank, not by insertion.
  */
 export function designatedSpans(stage: Stage): Entry[] {
   const entries = airwayEntries(stage);
   settleAirways(entries, stage);
+  for (const item of procedureItems(stage.drawnItems)) nameProcedure(item, entries, stage);
   const drawn = [...entries.values()].filter((entry) => entry.designators.length > 0);
   for (const entry of drawn) entry.designators = entry.designators.toSorted(byStack);
-  return drawn.toReversed();
+  return drawn.toReversed().toSorted((a, b) => frontRank(b) - frontRank(a));
 }

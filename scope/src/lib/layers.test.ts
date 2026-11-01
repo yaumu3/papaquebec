@@ -4,6 +4,7 @@ import type { Chart, ChartItem } from './chart';
 import {
   DRAW_STACK,
   isAirwayLayer,
+  isProcedureLayer,
   LAYER_GROUPS,
   navaidsShownAt,
   type ScopeLayer,
@@ -274,5 +275,18 @@ describe('isAirwayLayer', () => {
 
     // Assert
     expect(verdicts).toEqual([true, true, false, false, false, false, false, false, false]);
+  });
+});
+
+describe('isProcedureLayer', () => {
+  it('holds for the departures, arrivals and transitions and for no other layer', () => {
+    // Arrange
+    const layers: ScopeLayer[] = ['sid', 'star', 'trans', 'conv', 'rnav', 'dct', 'hold', 'ctr'];
+
+    // Act
+    const verdicts = layers.map(isProcedureLayer);
+
+    // Assert
+    expect(verdicts).toEqual([true, true, true, false, false, false, false, false]);
   });
 });
