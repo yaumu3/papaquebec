@@ -40,6 +40,10 @@ export const nameOf = ({ properties: p }: ItemPart): string | undefined =>
 export const itemName = ({ parts: [first] }: ChartItem): string | undefined =>
   first && nameOf(first);
 
+/** The first frequency of the first part, in chart order, that has one. */
+export const itemFrequency = ({ parts }: ChartItem): string | undefined =>
+  parts.flatMap(({ properties: p }) => ('freqs' in p ? (p.freqs ?? []) : []))[0];
+
 /** What names an item within its layer: a designator, an id, or for a hold its pattern. */
 function naming({ properties: p, geometry: g }: MapSetFeature): unknown[] {
   if ('turn' in p) {

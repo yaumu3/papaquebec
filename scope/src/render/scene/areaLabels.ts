@@ -1,10 +1,17 @@
-import { itemName } from '../../lib/chart';
+import { type ChartItem, itemFrequency, itemName } from '../../lib/chart';
 import { rememberFits } from '../../lib/fits';
 import type { Vec2 } from '../../lib/geo';
+import { stratumTag } from '../../lib/stratum';
+import type { LabelDensity } from '../../state/settingsDefaults';
 import type { Batch } from '../protocol';
 import type { FitInput, LabelsInput, PlaceInput } from './chart';
 import { LAYER_STYLES, type LabelStyle, labelReaches } from './layerStyles';
 import { TextBatch } from './pack';
+import { THEME } from './rules';
+
+/** A sector's details are in 9 px, set 6 px apart from the name and from each other. */
+const DETAIL_SIZE_PX = 9;
+const DETAIL_GAP_PX = 6;
 
 /** A piece of text on a row of a block, `x` CSS px from the row's start. */
 interface Run {
@@ -27,13 +34,31 @@ interface Block {
   width: number;
 }
 
-/** The block of an item: its name on one row. */
-function blockOf(name: string, label: LabelStyle, text: TextBatch): Block {
-  const width = text.measure(name, label.size);
-  return {
-    rows: [{ runs: [{ text: name, size: label.size, color: label.color, x: 0 }], width, y: 0 }],
-    width,
-  };
+/** What a sector adds to its name at DENSE: its first frequency and its stratum, as it has them. */
+const detailsOf = (item: ChartItem): string[] =>
+  [itemFrequency(item) ?? '', stratumTag(item.parts)].filter((detail) => detail !== '');
+
+/** The block of an item: its name on one row, and a sector's details after it at DENSE. */
+function blockOf(
+  item: ChartItem,
+  name: string,
+  label: LabelStyle,
+  density: LabelDensity,
+  text: TextBatch,
+): Block {
+  const details = item.layer === 'sector' && density === 'dense' ? detailsOf(item) : [];
+  const runs: Run[] = [{ text: name, size: label.size, color: label.color, x: 0 }];
+  let width = text.measure(name, label.size);
+  for (const detail of details) {
+    runs.push({
+      text: detail,
+      size: DETAIL_SIZE_PX,
+      color: THEME.sectorDetail,
+      x: width + DETAIL_GAP_PX,
+    });
+    width += DETAIL_GAP_PX + text.measure(detail, DETAIL_SIZE_PX);
+  }
+  return { rows: [{ runs, width, y: 0 }], width };
 }
 
 /** Puts a block's rows centred on `at`. */
@@ -70,7 +95,7 @@ export function buildAreaLabels({
       const name = itemName(item);
       const place = placeOf(item);
       if (name === undefined || !place) continue;
-      const block = blockOf(name, label, text);
+      const block = blockOf(item, name, label, labelDensity, text);
       if (
         place.room !== undefined &&
         !rememberFits(shown, item.key, place.room * scale, block.width / 2)

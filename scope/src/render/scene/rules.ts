@@ -22,6 +22,7 @@ export const THEME = {
   airspaceLabel: '#8a5050',
   sector: '#4a6878',
   sectorLabel: '#5a7a8a',
+  sectorDetail: '#4c6470',
   conv: '#82573c',
   convLabel: '#9a6a4c',
   procedure: '#33606c',

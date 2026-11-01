@@ -5,6 +5,7 @@ import {
   chartOf,
   gridIdentity,
   type ItemPart,
+  itemFrequency,
   itemName,
   outlinesOf,
 } from './chart';
@@ -389,5 +390,30 @@ describe('itemName', () => {
 
     // Assert
     expect(names).toEqual(['PAPAQ', undefined]);
+  });
+});
+
+const part = (freqs?: string[]): ItemPart => ({
+  geometry: { type: 'LineString', coordinates: [] },
+  properties: { layer: 'sector', name: 'Z55', ...(freqs ? { freqs } : {}) },
+});
+
+const item = (...parts: ItemPart[]): ChartItem => ({ key: 'K', layer: 'sector', parts });
+
+describe('itemFrequency', () => {
+  it('is the first frequency of the first part that has one, and none without', () => {
+    // Arrange
+    const items = [
+      item(part(['134.65', '120.5']), part(['127.35'])),
+      item(part(), part(['127.35', '118.0'])),
+      item(part(), part()),
+      item(),
+    ];
+
+    // Act
+    const frequencies = items.map(itemFrequency);
+
+    // Assert
+    expect(frequencies).toEqual(['134.65', '127.35', undefined, undefined]);
   });
 });

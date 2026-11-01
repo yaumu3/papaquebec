@@ -24,6 +24,7 @@ import {
   type Position,
   project,
 } from './chartFixture';
+import { THEME } from './rules';
 
 /** The area labels of `items` as the scope builds them. */
 function build(
@@ -108,17 +109,18 @@ const place = (shape: ReturnType<typeof polygon>) => [
 const drawn = (shape: ReturnType<typeof polygon>, scale: number, shown: ShownMemory) =>
   build(place(shape), ['tma'], 'dense', [], { settledScale: () => scale, shown }).count > 0;
 
-describe('buildAreaLabels', () => {
-  const el: Position[] = [
-    [0, 0],
-    [6, 0],
-    [6, 2],
-    [2, 2],
-    [2, 6],
-    [0, 6],
-    [0, 0],
-  ];
+/** An L-shaped ring. */
+const el: Position[] = [
+  [0, 0],
+  [6, 0],
+  [6, 2],
+  [2, 2],
+  [2, 6],
+  [0, 6],
+  [0, 0],
+];
 
+describe('buildAreaLabels', () => {
   it('puts the name at the pole of the area, inside it and off its boundary', () => {
     // Arrange
     const items = [itemOf('ctr', partOf('ctr', polygon(el)))];
@@ -279,5 +281,92 @@ describe('buildAreaLabels', () => {
       // Assert
       expect(shown).toEqual([true, true]);
     });
+  });
+});
+
+const sector = (...parts: Parameters<typeof partOf>[2][]) =>
+  itemOf(
+    'sector',
+    ...parts.map((extra) => partOf('sector', polygon(el), { name: 'Z55', ...extra })),
+  );
+
+describe('the sector row of buildAreaLabels', () => {
+  const z55 = sector({ freqs: ['134.65'], upper: 'FL375' }, { freqs: ['127.35'], lower: 'FL375' });
+  const textOf = (item: ReturnType<typeof sector>, density: LabelDensity) =>
+    glyphs(build([item], ['sector'], density));
+
+  it('adds the first frequency of the item at DENSE, in the detail colour and 9 px', () => {
+    // Arrange
+    const item = z55;
+
+    // Act
+    const rows = textOf(item, 'dense');
+
+    // Assert
+    expect(rows.map((g) => g.char).join('')).toBe('Z55134.65');
+    expect(rows.slice(0, 3).every((g) => g.h === (atlas.cellH * 10) / atlas.fontSize)).toBe(true);
+    expect(rows.slice(3).every((g) => g.h === (atlas.cellH * 9) / atlas.fontSize)).toBe(true);
+    expect(rows[3]?.color).toEqual(packed(THEME.sectorDetail));
+    expect(rows[0]?.color).toEqual(packed(THEME.sectorLabel));
+  });
+
+  it('sets the frequency 6 px after the name, the whole row centred', () => {
+    // Arrange
+    const item = z55;
+    const name = (3 * atlas.advance * 10) / atlas.fontSize;
+    const detail = (6 * atlas.advance * 9) / atlas.fontSize;
+
+    // Act
+    const rows = textOf(item, 'dense');
+
+    // Assert
+    const first = rows[0];
+    const freq = rows[3];
+    expect(
+      (freq?.px ?? 0) +
+        (atlas.buffer * 9) / atlas.fontSize -
+        ((first?.px ?? 0) + (atlas.buffer * 10) / atlas.fontSize),
+    ).toBeCloseTo(name + 6, 6);
+    expect((first?.px ?? 0) + (atlas.buffer * 10) / atlas.fontSize).toBeCloseTo(
+      -(name + 6 + detail) / 2,
+      6,
+    );
+  });
+
+  it('adds the stratum, with its minus drawn, and leaves out what the item lacks', () => {
+    // Arrange
+    const below = sector({ upper: 'FL335' });
+    const both = sector({ freqs: ['118.05'], upper: 'FL335' });
+
+    // Act
+    const [only, withFreq] = [below, both].map((item) => textOf(item, 'dense'));
+
+    // Assert
+    expect(only?.map((g) => g.char).join('')).toBe('Z55335−');
+    expect(withFreq?.map((g) => g.char).join('')).toBe('Z55118.05335−');
+  });
+
+  it('writes the name alone below DENSE, and for an area that is not a sector', () => {
+    // Arrange
+    const ctr = itemOf('ctr', partOf('ctr', polygon(el), { name: 'Z55' }));
+
+    // Act
+    const normal = textOf(z55, 'normal');
+    const other = glyphs(build([ctr], ['ctr'], 'dense'));
+
+    // Assert
+    expect(normal.map((g) => g.char).join('')).toBe('Z55');
+    expect(other.map((g) => g.char).join('')).toBe('Z55');
+  });
+
+  it('takes the frequency of the first part that has one', () => {
+    // Arrange
+    const item = sector({}, { freqs: ['127.35'] }, { freqs: ['134.65'] });
+
+    // Act
+    const rows = textOf(item, 'dense');
+
+    // Assert
+    expect(rows.map((g) => g.char).join('')).toBe('Z55127.35');
   });
 });
