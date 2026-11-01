@@ -54,7 +54,7 @@ export const LABEL_SLOTS: readonly SlotName[] = [
  * The slots whose text rims its own glyphs just before them, over what the slot drew first: a
  * pointed label's highlight over its trace.
  */
-const HIGHLIGHT_SLOTS: readonly SlotName[] = ['traces'];
+const HIGHLIGHT_SLOTS: ReadonlySet<SlotName> = new Set(['traces']);
 
 /** The batches a builder hands the renderer, by the slots it fills. */
 export type Slots = Partial<Record<SlotName, Batch[]>>;
@@ -108,8 +108,7 @@ export function drawSteps(
       }
     }
     batchesOf(slot).forEach(({ kind }, index) => {
-      if (kind === 'text' && HIGHLIGHT_SLOTS.includes(slot))
-        steps.push({ slot, index, pass: 'halo' });
+      if (kind === 'text' && HIGHLIGHT_SLOTS.has(slot)) steps.push({ slot, index, pass: 'halo' });
       steps.push({ slot, index, pass: kind });
     });
   }
