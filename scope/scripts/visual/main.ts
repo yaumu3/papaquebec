@@ -1,5 +1,6 @@
 /**
- * Screenshots of the map against the baselines in `visual/`, each from a fresh browser: the built
+ * Screenshots of the map against the baselines in `visual/`, a folder for each subject, each from
+ * a fresh browser: the built
  * scope with no feed, no built-in set and no coastline, the example set imported through the Maps
  * panel. On a difference the actual image and a diff are written next to the baseline.
  *
@@ -64,48 +65,48 @@ const pointAt =
 const NEAR_NORMAL = { rangeNm: NEAR_NM, labelDensity: 'normal' };
 
 const SHOTS: readonly Shot[] = [
-  { name: 'default', settings: NEAR_NORMAL },
+  { name: 'map/default', settings: NEAR_NORMAL },
   {
-    name: 'every-layer',
+    name: 'map/every-layer',
     settings: { rangeNm: NEAR_NM, labelDensity: 'dense', shownLayers: EVERY_LAYER },
   },
   {
-    name: 'wide',
+    name: 'map/wide',
     settings: { rangeNm: WIDE_NM, labelDensity: 'dense', shownLayers: EVERY_LAYER },
   },
   {
-    name: 'search',
+    name: 'map/search',
     settings: NEAR_NORMAL,
     act: pointAt('Q', 'QDG'),
   },
   {
-    name: 'pointed-airway',
+    name: 'map/pointed-airway',
     settings: NEAR_NORMAL,
     act: pointAt('V901', 'V901'),
   },
   {
-    name: 'pointed-procedure',
+    name: 'map/pointed-procedure',
     settings: NEAR_NORMAL,
     act: pointAt('TAVRO2', 'TAVRO2'),
   },
   {
-    name: 'pointed-area',
+    name: 'map/pointed-area',
     settings: NEAR_NORMAL,
     act: pointAt('PAPAQ', 'PAPAQ', 1),
   },
   {
-    name: 'pointed-hold',
+    name: 'map/pointed-hold',
     settings: NEAR_NORMAL,
     act: pointAt('NIMBA', 'NIMBA', 1),
   },
   {
-    name: 'tree-search',
+    name: 'tree/search',
     settings: { rangeNm: NEAR_NM, openGroups: ['ROUTES'], openLayers: ['conv'] },
     act: (page) => search(page, 'A9'),
     of: mapsPanel,
   },
   {
-    name: 'tree-swatches',
+    name: 'tree/swatches',
     settings: { rangeNm: NEAR_NM, openGroups: GROUPS, openLayers: ['navaid'] },
     act: async () => {},
     of: mapsPanel,
