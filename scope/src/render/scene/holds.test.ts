@@ -234,6 +234,8 @@ describe('buildShapes holds', () => {
   it('draws nothing for a hidden hold item', () => {
     // Arrange
     const stateOf = HIDING_RNAV;
+    const shown = linesOf([RNAV_HOLD], WEST_DECLINATION);
+    if (shown.length === 0) throw new Error('precondition: the shown hold draws');
 
     // Act
     const segments = linesOf([RNAV_HOLD], WEST_DECLINATION, { stateOf });
@@ -268,6 +270,7 @@ describe('buildShapes holds', () => {
   it('draws two racetracks for two holds at one fix', () => {
     // Arrange
     const one = linesOf([RNAV_HOLD]).length;
+    if (one === 0) throw new Error('precondition: a hold draws');
 
     // Act
     const both = linesOf([RNAV_HOLD, CONV_HOLD]);
