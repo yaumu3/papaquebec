@@ -33,6 +33,8 @@ const SETTLE_TRIES = 100;
 const VISITS_AT_ONCE = 4;
 /** The feed's status and the clock depend on when the shot is taken. */
 const UNSTABLE = '#top-bar { visibility: hidden }';
+/** A panel lets the canvas show through, which draws in its own time: the panel's image leaves it out. */
+const NO_CANVAS = 'canvas { visibility: hidden }';
 
 interface Taken {
   name: string;
@@ -54,7 +56,11 @@ const pngOf = (image: Image): Buffer =>
 async function taken(page: Page, step: Step): Promise<Taken[]> {
   await step.act?.(page);
   const target = step.of?.(page) ?? page;
-  const shoot = () => target.screenshot({ animations: 'disabled', style: UNSTABLE });
+  const look = {
+    animations: 'disabled',
+    style: step.of ? `${UNSTABLE} ${NO_CANVAS}` : UNSTABLE,
+  } as const;
+  const shoot = () => target.screenshot(look);
   const png = await settled(shoot, { pause: () => Bun.sleep(SETTLE_MS), tries: SETTLE_TRIES });
   await drawing(page);
   return [{ name: step.name, png }];
