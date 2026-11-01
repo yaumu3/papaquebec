@@ -1,14 +1,43 @@
-import { itemName } from '../../lib/chart';
+import { type ChartItem, itemName } from '../../lib/chart';
 import { rememberFits } from '../../lib/fits';
+import { stacksOf } from '../../lib/labelStacks';
+import type { AreaPlace } from '../../lib/pole';
+import { limitFt, bandOf } from '../../lib/stratum';
 import type { Batch } from '../protocol';
-import { blockOf, putBlock } from './areaBlocks';
+import { blockOf, putBlock, stackedBlock } from './areaBlocks';
 import type { FitInput, LabelsInput, PlaceInput } from './chart';
 import { LAYER_STYLES, labelReaches } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 
+/** A named item and where its label goes. */
+interface Member {
+  item: ChartItem;
+  name: string;
+  place: AreaPlace;
+}
+
+/** The labelled members of a layer's items: those with a name and a place. */
+function membersOf(items: readonly ChartItem[], placeOf: PlaceInput['placeOf']): Member[] {
+  return items.flatMap((item) => {
+    const name = itemName(item);
+    const place = placeOf(item);
+    return name !== undefined && place ? [{ item, name, place }] : [];
+  });
+}
+
+/** The members that share a footprint, the lowest stratum first; a member alone is a stack of one. */
+const stacksOfMembers = (members: Member[]): Member[][] =>
+  stacksOf(
+    members,
+    (m) => m.place.footprint,
+    (m) => limitFt(bandOf(m.item.parts).lower),
+    (m) => m.name,
+  );
+
 /**
  * The labels of the drawn area items, each block centred on its place, back to front through
- * the stack. A layer with no label style, or whose density the label density has not reached,
+ * the stack; items of one footprint stack, the lowest stratum on top, and are shown or hidden
+ * as one. A layer with no label style, or whose density the label density has not reached,
  * says nothing. A block needs half its width between the pole and the nearest edge, in px at
  * the settled scale; a line area has no edge to test and is always labelled. Returns the text,
  * then the rules of the fractions.
@@ -27,18 +56,19 @@ export function buildAreaLabels({
   for (const layer of layers.toReversed()) {
     const label = LAYER_STYLES[layer].label;
     if (!label || !labelReaches(label, labelDensity)) continue;
-    for (const item of drawnItems.filter((i) => i.layer === layer)) {
-      const name = itemName(item);
-      const place = placeOf(item);
-      if (name === undefined || !place) continue;
-      const block = blockOf(item, name, label, labelDensity, out.text);
-      if (
-        place.room !== undefined &&
-        !rememberFits(shown, item.key, place.room * scale, block.width / 2)
-      ) {
-        continue;
-      }
-      putBlock(block, place.at, out);
+    const items = drawnItems.filter((i) => i.layer === layer);
+    for (const stack of stacksOfMembers(membersOf(items, placeOf))) {
+      const [first] = stack;
+      if (!first) continue;
+      const blocks = stack.map((m) => blockOf(m.item, m.name, label, labelDensity, out.text));
+      const block = stackedBlock(blocks);
+      const key = stack
+        .map((m) => m.item.key)
+        .toSorted()
+        .join('\n');
+      const { room } = first.place;
+      if (room !== undefined && !rememberFits(shown, key, room * scale, block.width / 2)) continue;
+      putBlock(block, first.place.at, out);
     }
   }
   return [out.text.finish(), out.rules.finish()];

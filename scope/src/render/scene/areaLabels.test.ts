@@ -486,3 +486,85 @@ describe('the fraction of buildAreaLabels', () => {
     expect(rules.count).toBe(0);
   });
 });
+
+/** A one-part sector item of a ring and limits. */
+const stratum = (name: string, ring: Position[], extra: { lower?: string; upper?: string }) =>
+  keyed(name, itemOf('sector', partOf('sector', polygon(ring), { name, ...extra })));
+
+describe('the stacks of buildAreaLabels', () => {
+  /** The same L ring, listed from another vertex. */
+  const turnedEl = [...el.slice(2, -1), ...el.slice(0, 2), el[2] ?? [0, 0]];
+  const low = stratum('LOW', el, { upper: 'FL335' });
+  const high = stratum('HIGH', turnedEl, { lower: 'FL335' });
+  const rows = (items: ReturnType<typeof stratum>[], density: LabelDensity = 'normal') =>
+    glyphs(build(items, ['sector'], density));
+
+  it('puts the strata of one footprint one over the other, the lowest on top, centred on the pole', () => {
+    // Arrange
+    const items = [high, low];
+
+    // Act
+    const glyphsOf = rows(items);
+
+    // Assert
+    expect(glyphsOf.map((g) => g.char).join('')).toBe('LOWHIGH');
+    const lowRow = glyphsOf[0];
+    const highRow = glyphsOf[3];
+    expect(centreOf(lowRow ?? { py: NaN }, 10)).toBeCloseTo(-6, 6);
+    expect(centreOf(highRow ?? { py: NaN }, 10)).toBeCloseTo(6, 6);
+    expect(lowRow?.at).toEqual(highRow?.at);
+  });
+
+  it('orders them by their lower limit, whatever their upper limits are', () => {
+    // Arrange
+    const wide = stratum('WIDE', el, { upper: 'FL400' });
+    const narrow = stratum('NARROW', el, { lower: 'FL100', upper: 'FL200' });
+
+    // Act
+    const glyphsOf = rows([narrow, wide]);
+
+    // Assert
+    expect(glyphsOf.map((g) => g.char).join('')).toBe('WIDENARROW');
+  });
+
+  it('leaves a stratum of another footprint where it stands', () => {
+    // Arrange
+    const apart = stratum(
+      'APART',
+      [
+        [10, 10],
+        [14, 10],
+        [14, 14],
+        [10, 14],
+        [10, 10],
+      ],
+      {},
+    );
+
+    // Act
+    const glyphsOf = rows([low, high, apart]);
+
+    // Assert
+    const apartRow = glyphsOf.filter((g) => g.at.x > 5);
+    expect(apartRow.map((g) => g.char).join('')).toBe('APART');
+    expect(centreOf(apartRow[0] ?? { py: NaN }, 10)).toBeCloseTo(0, 6);
+  });
+
+  it('shows or hides the pair as one, on the width of the widest', () => {
+    // Arrange
+    const long = stratum('LONGNAME', el, { upper: 'FL335' });
+    const short = stratum('S2', turnedEl, { lower: 'FL335' });
+    const fit = { settledScale: () => 2, shown: new Map() };
+
+    // Act
+    const alone = build([short], ['sector'], 'normal', [], fit).count;
+    const stacked = build([long, short], ['sector'], 'normal', [], {
+      ...fit,
+      shown: new Map(),
+    }).count;
+
+    // Assert
+    expect(alone).toBeGreaterThan(0);
+    expect(stacked).toBe(0);
+  });
+});

@@ -16,6 +16,8 @@ const FRACTION_SIZE_PX = 8;
 const UPPER_Y = 10;
 const RULE_Y = 15.5;
 const LOWER_Y = 21;
+/** The height of a line of text, CSS px: what a row takes in a stack. */
+const ROW_PX = 12;
 
 /** A piece of text on a row of a block, `x` CSS px from the row's start. */
 interface Run {
@@ -125,4 +127,29 @@ export function putBlock(
     const end = (sign: number) => ({ ...at, px: (sign * width) / 2, py: y });
     out.rules.segment(end(-1), end(1), color, { width: 1 });
   }
+}
+
+/** How much of a stack a block takes: the distance across its rows and a line. */
+const heightOf = ({ rows }: Block): number => {
+  const ys = rows.map((row) => row.y);
+  return Math.max(...ys) - Math.min(...ys) + ROW_PX;
+};
+
+/** Blocks one under another, each centred in its own height, the whole centred on the origin. */
+export function stackedBlock(blocks: readonly Block[]): Block {
+  const heights = blocks.map(heightOf);
+  let top = -heights.reduce((sum, h) => sum + h, 0) / 2;
+  const placed = blocks.map((block, i) => {
+    const shift = top + (heights[i] ?? 0) / 2;
+    top += heights[i] ?? 0;
+    return {
+      rows: block.rows.map((row) => ({ ...row, y: row.y + shift })),
+      rules: block.rules.map((rule) => ({ ...rule, y: rule.y + shift })),
+    };
+  });
+  return {
+    rows: placed.flatMap((b) => b.rows),
+    rules: placed.flatMap((b) => b.rules),
+    width: Math.max(...blocks.map((b) => b.width)),
+  };
 }
