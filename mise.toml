@@ -42,9 +42,21 @@ depends = ["wasm"]
 dir = "scope"
 run = ["bun run format:check", "bun run lint", "bun run test", "bun run build"]
 
+[tasks."check:visual"]
+description = "The map's screenshots against their baselines, in the pinned container"
+depends = ["wasm"]
+dir = "scope"
+run = "bun run visual"
+
+[tasks."update:visual"]
+description = "Rewrite the map's baselines, in the pinned container"
+depends = ["wasm"]
+dir = "scope"
+run = "bun run visual --update"
+
 [tasks.check]
 description = "Every check CI runs"
-depends = ["check:server", "check:scope"]
+depends = ["check:server", "check:scope", "check:visual"]
 
 [tasks.bench]
 description = "Load test the scope with the sim's extra traffic; flags follow"

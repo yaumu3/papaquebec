@@ -1,5 +1,7 @@
 node_modules/
 scope/dist/
+scope/visual/*.actual.png
+scope/visual/*.diff.png
 scope/src/feed/gen/
 .DS_Store
 *.log
