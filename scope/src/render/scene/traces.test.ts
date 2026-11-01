@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { navaidSymbol } from '../../lib/navaidSymbol';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
-import { packed, project } from './chartFixture';
+import { instances, packed, project } from './chartFixture';
 import { putFigure } from './figures';
 import { LAYER_STYLES } from './layerStyles';
 import { LineBatch, MarkerBatch } from './pack';
@@ -68,11 +68,12 @@ function markers({ data, count }: Batch) {
   });
 }
 
-type Input = Omit<Parameters<typeof buildTraces>[0], 'highlight'> &
-  Partial<Pick<Parameters<typeof buildTraces>[0], 'highlight'>>;
+type Input = Omit<Parameters<typeof buildTraces>[0], 'highlight' | 'declinationAt'> &
+  Partial<Pick<Parameters<typeof buildTraces>[0], 'highlight' | 'declinationAt'>>;
 
-/** The traces of `input`, with no highlight unless it comes with one. */
-const tracesOf = (input: Input) => buildTraces({ highlight: [], ...input });
+/** The traces of `input`, with no highlight and no declination unless it comes with them. */
+const tracesOf = (input: Input) =>
+  buildTraces({ highlight: [], declinationAt: () => () => 0, ...input });
 
 const batchOf = (kind: Batch['kind']): Batch => ({ kind, data: new Float32Array(), count: 0 });
 
@@ -176,18 +177,40 @@ describe('buildTraces', () => {
     expect(Array.from(dots.data)).toEqual(Array.from(expectedMarkers.finish().data));
   });
 
-  it('draws nothing for a hold, whose racetrack comes later', () => {
+  it('draws a pointed hold as its racetrack outline, without chevrons', () => {
     // Arrange
-    const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
+    const hold = item('hold', { layer: 'hold', turn: 'R', inboundTrue: 90 }, pointAt([1, 2]));
 
     // Act
     const {
       traces: [, lines],
-      tracedPoints: [, , , dots],
     } = tracesOf({ pointedAt: hold, searched: [], project });
 
     // Assert
-    expect([lines.count, dots.count]).toEqual([0, 0]);
+    const drawn = instances(lines);
+    expect(drawn).toHaveLength(18);
+    expect(drawn.map((s) => [s.width, s.color])).toEqual(drawn.map(() => [2, grey]));
+    expect(drawn.map((s) => s.a)).toEqual(drawn.map(() => ({ x: 1, y: 2 })));
+    const inbound = drawn.at(-1);
+    expect(inbound?.offsetA.x).toBeCloseTo(-18);
+    expect(inbound?.offsetA.y).toBeCloseTo(0);
+    expect(inbound?.offsetB.x).toBeCloseTo(0);
+    expect(inbound?.offsetB.y).toBeCloseTo(0);
+  });
+
+  it('turns a pointed hold without inboundTrue by the declination at its fix', () => {
+    // Arrange
+    const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 97 }, pointAt([1, 2]));
+
+    // Act
+    const {
+      traces: [, lines],
+    } = tracesOf({ pointedAt: hold, searched: [], project, declinationAt: () => () => -7 });
+
+    // Assert
+    const inbound = instances(lines).at(-1);
+    expect(inbound?.offsetA.x).toBeCloseTo(-18);
+    expect(inbound?.offsetA.y).toBeCloseTo(0);
   });
 
   it('draws nothing when nothing is pointed at', () => {
@@ -223,15 +246,19 @@ describe('buildTraces', () => {
     expect(faint[3]).toBeCloseTo(128 / 255, 2);
   });
 
-  it('draws a hold the search names as nothing', () => {
+  it('draws a hold the search names as its racetrack at half strength', () => {
     // Arrange
-    const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
+    const hold = item('hold', { layer: 'hold', turn: 'L', inboundTrue: 0 }, pointAt([1, 2]));
 
     // Act
-    const { traces, tracedPoints } = tracesOf({ pointedAt: null, searched: [hold], project });
+    const {
+      traces: [lines],
+    } = tracesOf({ pointedAt: null, searched: [hold], project });
 
     // Assert
-    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0]);
+    const drawn = instances(lines);
+    expect(drawn).toHaveLength(18);
+    expect(drawn.map((s) => [s.width, s.color])).toEqual(drawn.map(() => [2, faint]));
   });
 
   it('puts the search first and what is pointed at over it, an item in both drawn in both', () => {

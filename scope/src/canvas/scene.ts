@@ -128,6 +128,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
           searched: searchedItems(),
           highlight: pointed ? pointedHighlight(pointed) : [],
           project: projectNm,
+          declinationAt,
         })
       : null;
   });
