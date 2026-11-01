@@ -11,9 +11,23 @@ import type { LabelDensity } from '../../state/settingsDefaults';
 import { CHART_SLICES } from '../slots';
 import { atlas } from './atlasFixture';
 import { buildSliceLabels } from './chart';
-import { airway, itemOf, keyed, partOf, point, polygon, project } from './chartFixture';
+import {
+  airway,
+  glyphs,
+  instances,
+  itemOf,
+  keyed,
+  packed,
+  partOf,
+  point,
+  polygon,
+  project,
+  withoutColor,
+} from './chartFixture';
 import type { DrawnLabel } from './drawnLabels';
-import { highlightOf } from './highlight';
+import { buildHighlight, highlightOf } from './highlight';
+import { LineBatch, TextBatch } from './pack';
+import { THEME } from './rules';
 
 const ALL_LAYERS = DRAW_STACK.filter(isStyled);
 
@@ -85,6 +99,8 @@ const inOrder = (label: DrawnLabel | undefined) =>
   };
 
 const stopped = [airway('conv', 'V901', [0, 0], [8, 0], [10, 0]), navaid(8)];
+
+const grey = packed(THEME.hover);
 
 const square: [number, number][] = [
   [0, 0],
@@ -200,5 +216,71 @@ describe('highlightOf', () => {
 
     // Assert
     expect(highlight).toBeUndefined();
+  });
+});
+
+describe('buildHighlight', () => {
+  const label: DrawnLabel = {
+    spans: ['S'],
+    gaps: [
+      {
+        from: { x: 1, y: 2, px: -9, py: 0 },
+        to: { x: 1, y: 2, px: 20, py: 0 },
+        color: THEME.bg,
+        width: 12,
+      },
+    ],
+    texts: [
+      {
+        text: 'V901',
+        at: { x: 1, y: 2, px: -5, py: 0 },
+        size: 9,
+        color: '#9a6a4c',
+        style: { baseline: 'middle', angle: 0.5, halo: true },
+      },
+    ],
+    strokes: [
+      {
+        from: { x: 1, y: 2, px: 12, py: -3 },
+        to: { x: 1, y: 2, px: 15, py: 0 },
+        color: '#9a6a4c',
+        width: 1.3,
+      },
+    ],
+  };
+
+  const fix = keyed('F1', itemOf('fix', partOf('fix', point([1, 2]))));
+  const input = inputWithout([fix]);
+
+  it('draws its text again in the hover grey, as the chart drew it', () => {
+    // Arrange
+    const [run] = label.texts;
+    const expected = new TextBatch(atlas);
+    if (run) expected.text(run.text, run.at, run.size, run.color, run.style);
+
+    // Act
+    const [, text] = buildHighlight(fix, label, input);
+
+    // Assert
+    const drawn = glyphs(text);
+    expect(drawn.length).toBeGreaterThan(0);
+    expect(withoutColor(drawn)).toEqual(withoutColor(glyphs(expected.finish())));
+    expect(drawn.map((g) => g.color)).toEqual(drawn.map(() => grey));
+  });
+
+  it('draws its segments again in the hover grey, and its gaps in the background', () => {
+    // Arrange
+    const [arm] = label.strokes;
+    const [gap] = label.gaps;
+    const [wantedArm, wantedGap] = [new LineBatch(), new LineBatch()];
+    if (arm) wantedArm.segment(arm.from, arm.to, THEME.hover, { width: arm.width });
+    if (gap) wantedGap.segment(gap.from, gap.to, THEME.bg, { width: gap.width });
+
+    // Act
+    const [gaps, , strokes] = buildHighlight(fix, label, input);
+
+    // Assert
+    expect(instances(gaps)).toEqual(instances(wantedGap.finish()));
+    expect(instances(strokes)).toEqual(instances(wantedArm.finish()));
   });
 });

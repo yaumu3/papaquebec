@@ -118,18 +118,17 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   );
 
   const layoutScale = settledScale(view);
-  const pointedLabelOf = showChart(show, projected, layoutScale, atlas);
+  const pointedHighlight = showChart(show, projected, layoutScale, atlas);
 
-  show((a) => {
+  show(() => {
     const pointed = pointedItem();
     return projected()
       ? {
           traces: buildTraces({
             pointedAt: pointed,
             searched: searchedItems(),
-            pointedLabel: pointed ? pointedLabelOf(pointed) : undefined,
+            highlight: pointed ? pointedHighlight(pointed) : [],
             project: projectNm,
-            atlas: a,
           }),
         }
       : null;

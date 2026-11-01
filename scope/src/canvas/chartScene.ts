@@ -2,10 +2,10 @@ import { createMemo } from 'solid-js';
 
 import type { ChartItem } from '../lib/chart';
 import type { ShownMemory } from '../lib/fits';
-import type { AtlasInfo } from '../render/protocol';
+import type { AtlasInfo, Batch } from '../render/protocol';
 import { buildShapes, buildSliceLabels } from '../render/scene/chart';
-import type { BuiltLabels, DrawnLabel } from '../render/scene/drawnLabels';
-import { highlightOf } from '../render/scene/highlight';
+import type { BuiltLabels } from '../render/scene/drawnLabels';
+import { buildHighlight } from '../render/scene/highlight';
 import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../render/slots';
 import { areaPlace } from '../state/areaPlaces';
 import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
@@ -21,7 +21,7 @@ export type Show = (build: (atlas: AtlasInfo) => Slots | null) => void;
  * only the labels read does not rebuild the lines. The route and area labels also follow the
  * settled scale, so a zoom that settles builds them again to test whether they still fit, and
  * they remember what they showed between builds. Each slice's labels are built once, in a memo
- * that also keeps what they drew; the returned reader gives the label to light up for an item,
+ * that also keeps what they drew; the returned reader gives the batches that light an item's label,
  * so a hover reads cached state and never builds the labels.
  */
 export function showChart(
@@ -29,7 +29,7 @@ export function showChart(
   projected: () => boolean,
   settledScale: () => number,
   atlas: () => AtlasInfo | null,
-): (item: ChartItem) => DrawnLabel | undefined {
+): (item: ChartItem) => Batch[] {
   const labels = new Map<(typeof CHART_SLICES)[number], () => BuiltLabels | null>();
   for (const slice of CHART_SLICES) {
     const shown: ShownMemory = new Map();
@@ -72,10 +72,10 @@ export function showChart(
   }
   return (item) => {
     const info = atlas();
-    if (!info) return undefined;
+    if (!info) return [];
     const slice = CHART_SLICES.find(({ layers }) => layers.some((l) => l === item.layer));
     const drawn = slice && labels.get(slice)?.()?.drawn.get(item.key);
-    return highlightOf(item, drawn, {
+    return buildHighlight(item, drawn, {
       topology: topology(),
       drawnPoints,
       project: projectNm,

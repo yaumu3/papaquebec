@@ -3,13 +3,15 @@
 import type { ChartItem } from '../../lib/chart';
 import { isProcedureLayer, isStyled } from '../../lib/layers';
 import { isPointLayer, isRouteLayer } from '../../lib/mapsetFormat';
+import type { Batch } from '../protocol';
 import { putAreaLabel } from './areaLabels';
 import { placedPoint, putPointLabel } from './chart';
 import type { LabelsInput, PlaceInput } from './chart';
-import { copyOf, type DrawnLabel, type LabelOut } from './drawnLabels';
+import { copyOf, type DrawnLabel, type LabelOut, redrawLabel } from './drawnLabels';
 import { isPointStyle, LAYER_STYLES, type LayerStyle } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 import { putLabel, type RouteLabelOut } from './routeLabels';
+import { THEME } from './rules';
 import { routeCuts } from './runs';
 import { soleLabels } from './spanDesignators';
 
@@ -77,4 +79,20 @@ function putPointLabels(
   for (const point of topology.points.filter((p) => p.key === item.key)) {
     putPointLabel(out, placedPoint(point, project), style.label);
   }
+}
+
+/** The batches that light an item's label in the hover grey: gaps, then text, then segments. */
+export function buildHighlight(
+  item: ChartItem,
+  drawn: DrawnLabel | undefined,
+  input: HighlightInput,
+): [Batch, Batch, Batch] {
+  const out = {
+    gaps: new LineBatch(1),
+    text: new TextBatch(input.atlas, 1),
+    strokes: new LineBatch(1),
+  };
+  const label = highlightOf(item, drawn, input);
+  if (label) redrawLabel(label, THEME.hover, out);
+  return [out.gaps.finish(), out.text.finish(), out.strokes.finish()];
 }

@@ -2,11 +2,8 @@ import { describe, expect, it } from 'bun:test';
 
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
-import { atlas } from './atlasFixture';
-import { glyphs, instances, packed, project, withoutColor } from './chartFixture';
-import type { DrawnLabel } from './drawnLabels';
+import { packed, project } from './chartFixture';
 import { LAYER_STYLES } from './layerStyles';
-import { LineBatch, TextBatch } from './pack';
 import { THEME } from './rules';
 import { buildTraces } from './traces';
 
@@ -68,11 +65,13 @@ function markers({ data, count }: Batch) {
   });
 }
 
-type Input = Omit<Parameters<typeof buildTraces>[0], 'atlas' | 'pointedLabel'> &
-  Partial<Pick<Parameters<typeof buildTraces>[0], 'pointedLabel'>>;
+type Input = Omit<Parameters<typeof buildTraces>[0], 'highlight'> &
+  Partial<Pick<Parameters<typeof buildTraces>[0], 'highlight'>>;
 
-/** The traces of `input`, with no label of what is pointed at unless it comes with one. */
-const tracesOf = (input: Input) => buildTraces({ atlas, pointedLabel: undefined, ...input });
+/** The traces of `input`, with no highlight unless it comes with one. */
+const tracesOf = (input: Input) => buildTraces({ highlight: [], ...input });
+
+const batchOf = (kind: Batch['kind']): Batch => ({ kind, data: new Float32Array(), count: 0 });
 
 const grey = packed(THEME.hover);
 const faint = packed(THEME.hoverFaint);
@@ -174,7 +173,7 @@ describe('buildTraces', () => {
     const batches = tracesOf({ pointedAt: null, searched: [hold], project });
 
     // Assert
-    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
   });
 
   it('puts the search first and what is pointed at over it, an item in both drawn in both', () => {
@@ -204,73 +203,19 @@ describe('buildTraces', () => {
     const batches = tracesOf(none);
 
     // Assert
-    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
   });
 
-  describe('the label of what is pointed at', () => {
-    const label: DrawnLabel = {
-      spans: ['S'],
-      gaps: [
-        {
-          from: { x: 1, y: 2, px: -9, py: 0 },
-          to: { x: 1, y: 2, px: 20, py: 0 },
-          color: THEME.bg,
-          width: 12,
-        },
-      ],
-      texts: [
-        {
-          text: 'V901',
-          at: { x: 1, y: 2, px: -5, py: 0 },
-          size: 9,
-          color: '#9a6a4c',
-          style: { baseline: 'middle', angle: 0.5, halo: true },
-        },
-      ],
-      strokes: [
-        {
-          from: { x: 1, y: 2, px: 12, py: -3 },
-          to: { x: 1, y: 2, px: 15, py: 0 },
-          color: '#9a6a4c',
-          width: 1.3,
-        },
-      ],
-    };
+  it('puts the highlight batches last, as they were given', () => {
+    // Arrange
+    const highlight = [batchOf('lines'), batchOf('text'), batchOf('lines')];
+    const input = { pointedAt: null, searched: [], project, highlight };
 
-    const pointed = { pointedAt: route(lineOf([0, 0], [1, 0])), searched: [], project };
+    // Act
+    const batches = tracesOf(input);
 
-    it('draws its text again in the hover grey, as the chart drew it', () => {
-      // Arrange
-      const [run] = label.texts;
-      const expected = new TextBatch(atlas);
-      if (run) expected.text(run.text, run.at, run.size, run.color, run.style);
-      const input = { ...pointed, pointedLabel: label };
-
-      // Act
-      const [, , , , , text] = tracesOf(input);
-
-      // Assert
-      const drawn = glyphs(text);
-      expect(drawn.length).toBeGreaterThan(0);
-      expect(withoutColor(drawn)).toEqual(withoutColor(glyphs(expected.finish())));
-      expect(drawn.map((g) => g.color)).toEqual(drawn.map(() => grey));
-    });
-
-    it('draws its segments again in the hover grey, and its gaps in the background', () => {
-      // Arrange
-      const [arm] = label.strokes;
-      const [gap] = label.gaps;
-      const [wantedArm, wantedGap] = [new LineBatch(), new LineBatch()];
-      if (arm) wantedArm.segment(arm.from, arm.to, THEME.hover, { width: arm.width });
-      if (gap) wantedGap.segment(gap.from, gap.to, THEME.bg, { width: gap.width });
-      const input = { ...pointed, pointedLabel: label };
-
-      // Act
-      const [, , , , gaps, , strokes] = tracesOf(input);
-
-      // Assert
-      expect(instances(gaps)).toEqual(instances(wantedGap.finish()));
-      expect(instances(strokes)).toEqual(instances(wantedArm.finish()));
-    });
+    // Assert
+    expect(batches.slice(4)).toEqual(highlight);
+    expect(batches.slice(4).every((b, i) => b === highlight[i])).toBe(true);
   });
 });
