@@ -1,5 +1,6 @@
-import { createStore } from 'solid-js/store';
+import { createStore, unwrap } from 'solid-js/store';
 
+import { isRecord } from '../lib/guards';
 import { loadPersisted, type Persisted, savePersisted } from './persist';
 import { DEFAULT_PLOTTED } from './plotted';
 import {
@@ -30,20 +31,20 @@ export const persisted: Persisted = storage ? loadPersisted(storage, DEFAULTS) :
 
 export const [settings, setSettings] = createStore<Settings>(structuredClone(persisted.settings));
 
-/** Writes the current settings and the rest of the persisted state to local storage. */
+/** Reads every field of a store, so that an effect calling this follows them all. */
+function readThrough(value: unknown): void {
+  if (Array.isArray(value)) value.forEach(readThrough);
+  else if (isRecord(value)) Object.values(value).forEach(readThrough);
+}
+
+/**
+ * Writes the current settings and the rest of the persisted state to local storage. An effect
+ * calling this runs again on any change to the settings: `unwrap` alone would track none.
+ */
 export function persist(rest: Omit<Persisted, 'settings'>): void {
   if (!storage) return;
-  const snapshot: Settings = {
-    ...settings,
-    filter: { ...settings.filter },
-    shownLayers: { ...settings.shownLayers },
-    exceptions: { ...settings.exceptions },
-    openGroups: [...settings.openGroups],
-    openLayers: [...settings.openLayers],
-    altimeter: { ...settings.altimeter },
-    qnh: { ...settings.qnh },
-  };
-  savePersisted(storage, { settings: snapshot, ...rest });
+  readThrough(settings);
+  savePersisted(storage, { settings: structuredClone(unwrap(settings)), ...rest });
 }
 
 /** Jump to the next preset above or below the current range. */

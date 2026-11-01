@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { feat, itemOf, line, partOf } from '../render/scene/chartFixture';
 import {
   type ChartItem,
   chartOf,
@@ -133,7 +134,6 @@ const RING: Position[] = [
   [139.8, 35.5],
 ];
 
-const feat = (properties: object, geometry: object) => ({ type: 'Feature', properties, geometry });
 const areaFeature = (name: string, kind: string, ring: Position[] = RING) =>
   feat({ layer: 'tma', name, kind }, { type: 'Polygon', coordinates: [ring] });
 const routeFeature = (name: string, kind: string) =>
@@ -335,13 +335,13 @@ describe('outlinesOf', () => {
       [1, 1],
       [0.5, 0.5],
     ] as [number, number][];
-    const line = [
+    const open = [
       [0, 0],
       [1, 1],
     ] as [number, number][];
     const geometries: ItemPart['geometry'][] = [
       { type: 'Point', coordinates: [3, 4] },
-      { type: 'LineString', coordinates: line },
+      { type: 'LineString', coordinates: open },
       { type: 'Polygon', coordinates: [ring, hole] },
     ];
 
@@ -349,7 +349,7 @@ describe('outlinesOf', () => {
     const outlines = geometries.map(outlinesOf);
 
     // Assert
-    expect(outlines).toEqual([[[[3, 4]]], [line], [ring, hole]]);
+    expect(outlines).toEqual([[[[3, 4]]], [open], [ring, hole]]);
   });
 });
 
@@ -372,16 +372,15 @@ describe('gridIdentity', () => {
   });
 });
 
-const named = (name: string): ItemPart => ({
-  geometry: { type: 'LineString', coordinates: [] },
-  properties: { layer: 'tma', name },
-});
-
 describe('itemName', () => {
   it('is the name of the first part of an item, and none for an item with no parts', () => {
     // Arrange
     const items: ChartItem[] = [
-      { key: 'A', layer: 'tma', parts: [named('PAPAQ'), named('OTHER')] },
+      {
+        key: 'A',
+        layer: 'tma',
+        parts: [partOf('tma', line(), { name: 'PAPAQ' }), partOf('tma', line(), { name: 'OTHER' })],
+      },
       { key: 'B', layer: 'tma', parts: [] },
     ];
 
@@ -393,21 +392,22 @@ describe('itemName', () => {
   });
 });
 
-const part = (freqs?: string[]): ItemPart => ({
-  geometry: { type: 'LineString', coordinates: [] },
-  properties: { layer: 'sector', name: 'Z55', ...(freqs ? { freqs } : {}) },
-});
-
-const item = (...parts: ItemPart[]): ChartItem => ({ key: 'K', layer: 'sector', parts });
-
 describe('itemFrequency', () => {
   it('is the first frequency of the first part that has one, and none without', () => {
     // Arrange
     const items = [
-      item(part(['134.65', '120.5']), part(['127.35'])),
-      item(part(), part(['127.35', '118.0'])),
-      item(part(), part()),
-      item(),
+      itemOf(
+        'sector',
+        partOf('sector', line(), { freqs: ['134.65', '120.5'] }),
+        partOf('sector', line(), { freqs: ['127.35'] }),
+      ),
+      itemOf(
+        'sector',
+        partOf('sector', line()),
+        partOf('sector', line(), { freqs: ['127.35', '118.0'] }),
+      ),
+      itemOf('sector', partOf('sector', line()), partOf('sector', line())),
+      itemOf('sector'),
     ];
 
     // Act

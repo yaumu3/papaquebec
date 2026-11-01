@@ -1,13 +1,11 @@
 import type { Altimeter } from '../lib/altitude';
 import { isRecord } from '../lib/guards';
-import { DRAW_STACK, LAYER_GROUPS } from '../lib/layers';
+import { DRAW_STACK, LABEL_DENSITIES, LAYER_GROUPS } from '../lib/layers';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { isLaneKey, type LaneKey } from './plotted';
 import {
-  LABEL_DENSITIES,
   ND_RANGES_NM,
   type NdRangeNm,
-  PANEL_IDS,
   type Panels,
   QNH_MAX_INHG,
   type QnhSetting,
@@ -39,37 +37,71 @@ export interface Persisted {
   ndRangeNm: NdRangeNm;
 }
 
-const oneOf = <T>(steps: readonly T[], v: unknown, fallback: T): T =>
-  steps.find((s) => s === v) ?? fallback;
-const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback);
+/** A stored value read back; what is unexpected in it gives way to the fallback. */
+type Loader<T> = (raw: unknown, fallback: T) => T;
 
-const SQUAWK_FILTERS: readonly SquawkFilter[] = ['all', 'nonvfr', 'emergency'];
+const flag: Loader<boolean> = (raw, fallback) => (typeof raw === 'boolean' ? raw : fallback);
 
-function filterFrom(raw: unknown, fallback: Filter): Filter {
-  if (!isRecord(raw)) return fallback;
-  const lower = typeof raw.lowerFl === 'number' ? raw.lowerFl : fallback.lowerFl;
-  const upper = typeof raw.upperFl === 'number' ? raw.upperFl : fallback.upperFl;
-  const band =
-    lower >= FL_MIN && lower < upper && upper <= FL_MAX
-      ? { lowerFl: lower, upperFl: upper }
-      : fallback;
-  return {
-    ...band,
-    ground: bool(raw.ground, fallback.ground),
-    squawk: oneOf(SQUAWK_FILTERS, raw.squawk, fallback.squawk),
+const anyNumber: Loader<number> = (raw, fallback) => (typeof raw === 'number' ? raw : fallback);
+
+const numberIn =
+  (min: number, max: number): Loader<number> =>
+  (raw, fallback) =>
+    typeof raw === 'number' && raw >= min && raw <= max ? raw : fallback;
+
+const oneOf =
+  <T>(values: readonly T[]): Loader<T> =>
+  (raw, fallback) =>
+    values.find((value) => value === raw) ?? fallback;
+
+/** The members of `among` the list holds; an empty list is a choice to hold nothing. */
+const known =
+  <T>(among: readonly T[]): Loader<readonly T[]> =>
+  (raw, fallback) =>
+    Array.isArray(raw) ? among.filter((x) => raw.includes(x)) : fallback;
+
+/** A list of strings; anything else in it, or no list at all, is junk. */
+const strings: Loader<readonly string[]> = (raw, fallback) =>
+  Array.isArray(raw) && raw.every((x) => typeof x === 'string') ? raw : fallback;
+
+/** Each field by its own loader, so junk in one costs only that one. */
+const fields =
+  <T extends object>(loaders: { [K in keyof T]: Loader<T[K]> }): Loader<T> =>
+  (raw, fallback) => {
+    if (!isRecord(raw)) return fallback;
+    const out = { ...fallback };
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the keys of `loaders` are those of T
+    for (const key of Object.keys(loaders) as (keyof T & string)[]) {
+      out[key] = loaders[key](raw[key], fallback[key]);
+    }
+    return out;
   };
-}
 
-/** The flags saved for each layer; failing those, the old object's coast and rings, nothing else. */
-function shownLayersFrom(raw: Record<string, unknown>, fallback: ShownLayers): ShownLayers {
-  const saved = isRecord(raw.shownLayers) ? raw.shownLayers : carried(raw.layers);
+const looseFilter = fields<Filter>({
+  ground: flag,
+  squawk: oneOf<SquawkFilter>(['all', 'nonvfr', 'emergency']),
+  lowerFl: anyNumber,
+  upperFl: anyNumber,
+});
+
+/** The edges of the band stand or fall together. */
+const filter: Loader<Filter> = (raw, fallback) => {
+  const read = looseFilter(raw, fallback);
+  const { lowerFl, upperFl } = read;
+  return lowerFl >= FL_MIN && lowerFl < upperFl && upperFl <= FL_MAX
+    ? read
+    : { ...read, lowerFl: fallback.lowerFl, upperFl: fallback.upperFl };
+};
+
+const shownLayers: Loader<ShownLayers> = (raw, fallback) => {
+  const saved = isRecord(raw) ? raw : {};
   const out = { ...fallback };
-  for (const k of DRAW_STACK) out[k] = bool(saved[k], fallback[k]);
+  for (const layer of DRAW_STACK) out[layer] = flag(saved[layer], fallback[layer]);
   return out;
-}
+};
 
 /** The exceptions saved for each layer, in order; layers and values not known are dropped. */
-function exceptionsFrom(raw: unknown, fallback: Exceptions): Exceptions {
+const exceptions: Loader<Exceptions> = (raw, fallback) => {
   if (!isRecord(raw)) return fallback;
   const out: Exceptions = {};
   for (const layer of DRAW_STACK) {
@@ -77,108 +109,55 @@ function exceptionsFrom(raw: unknown, fallback: Exceptions): Exceptions {
     if (Array.isArray(keys)) out[layer] = new Set(keys.filter((k) => typeof k === 'string'));
   }
   return out;
-}
+};
 
-/** The members of `among` the list holds; an empty list is a choice to open nothing. */
-function knownOf<T>(raw: unknown, among: readonly T[], fallback: readonly T[]): readonly T[] {
-  return Array.isArray(raw) ? among.filter((x) => raw.includes(x)) : fallback;
-}
+const station: Loader<string> = (raw, fallback) =>
+  typeof raw === 'string' && (raw === '' || STATION_RE.test(raw)) ? raw : fallback;
 
-const GROUP_TITLES = LAYER_GROUPS.map((group) => group.title);
-
-function carried(old: unknown): Record<string, unknown> {
-  return isRecord(old) ? { coast: old.coast, rings: old.rings } : {};
-}
-
-const numberIn = (v: unknown, min: number, max: number, fallback: number): number =>
-  typeof v === 'number' && v >= min && v <= max ? v : fallback;
-
-function altimeterFrom(raw: unknown, fallback: Altimeter): Altimeter {
-  if (!isRecord(raw)) return fallback;
-  return {
-    transitionAltFt: numberIn(
-      raw.transitionAltFt,
-      0,
-      TRANSITION_ALT_MAX_FT,
-      fallback.transitionAltFt,
-    ),
-    qnhInHg: numberIn(raw.qnhInHg, QNH_MIN_INHG, QNH_MAX_INHG, fallback.qnhInHg),
-  };
-}
-
-function qnhFrom(raw: unknown, fallback: QnhSetting): QnhSetting {
-  if (!isRecord(raw)) return fallback;
-  const station = raw.station;
-  return {
-    auto: bool(raw.auto, fallback.auto),
-    station:
-      typeof station === 'string' && (station === '' || STATION_RE.test(station))
-        ? station
-        : fallback.station,
-  };
-}
-
-function settingsFrom(raw: unknown, fallback: Settings): Settings {
-  if (!isRecord(raw)) return fallback;
-  return {
-    rangeNm:
-      typeof raw.rangeNm === 'number' && raw.rangeNm >= RANGE_MIN_NM && raw.rangeNm <= RANGE_MAX_NM
-        ? raw.rangeNm
-        : fallback.rangeNm,
-    vectorMin: oneOf<number>(VECTOR_STEPS, raw.vectorMin, fallback.vectorMin),
-    trailSec: oneOf<number>(TRAIL_STEPS, raw.trailSec, fallback.trailSec),
-    filter: filterFrom(raw.filter, fallback.filter),
-    shownLayers: shownLayersFrom(raw, fallback.shownLayers),
-    exceptions: exceptionsFrom(raw.exceptions, fallback.exceptions),
-    openGroups: knownOf(raw.openGroups, GROUP_TITLES, fallback.openGroups),
-    openLayers: knownOf<string>(raw.openLayers, DRAW_STACK, fallback.openLayers),
-    labelDensity: oneOf(LABEL_DENSITIES, raw.labelDensity, fallback.labelDensity),
-    altimeter: altimeterFrom(raw.altimeter, fallback.altimeter),
-    qnh: qnhFrom(raw.qnh, fallback.qnh),
-  };
-}
-
-function panelsFrom(raw: unknown, fallback: Panels): Panels {
-  const out = { ...fallback };
-  if (isRecord(raw)) for (const k of PANEL_IDS) out[k] = bool(raw[k], fallback[k]);
-  return out;
-}
-
-function sortFrom(raw: unknown, fallback: ListSort): ListSort {
-  if (!isRecord(raw)) return fallback;
-  return {
-    key: oneOf(SORT_KEYS, raw.key, fallback.key),
-    dir: oneOf(SORT_DIRS, raw.dir, fallback.dir),
-  };
-}
+const settings = fields<Settings>({
+  rangeNm: numberIn(RANGE_MIN_NM, RANGE_MAX_NM),
+  vectorMin: oneOf<number>(VECTOR_STEPS),
+  trailSec: oneOf<number>(TRAIL_STEPS),
+  filter,
+  shownLayers,
+  exceptions,
+  disabledSets: strings,
+  openGroups: known(LAYER_GROUPS.map((group) => group.title)),
+  openLayers: known<string>(DRAW_STACK),
+  labelDensity: oneOf(LABEL_DENSITIES),
+  altimeter: fields<Altimeter>({
+    transitionAltFt: numberIn(0, TRANSITION_ALT_MAX_FT),
+    qnhInHg: numberIn(QNH_MIN_INHG, QNH_MAX_INHG),
+  }),
+  qnh: fields<QnhSetting>({ auto: flag, station }),
+});
 
 /** The lanes known, each once; an empty list is a choice to plot nothing. */
-function plottedFrom(raw: unknown, fallback: readonly LaneKey[]): readonly LaneKey[] {
-  return Array.isArray(raw) ? [...new Set(raw.filter(isLaneKey))] : fallback;
-}
+const plotted: Loader<readonly LaneKey[]> = (raw, fallback) =>
+  Array.isArray(raw) ? [...new Set(raw.filter(isLaneKey))] : fallback;
+
+const persisted = fields<Persisted>({
+  settings,
+  panels: fields<Panels>({ display: flag, maps: flag, list: flag, detail: flag }),
+  listSort: fields<ListSort>({ key: oneOf(SORT_KEYS), dir: oneOf(SORT_DIRS) }),
+  plotted,
+  ndRangeNm: oneOf(ND_RANGES_NM),
+});
 
 /** Field-by-field validation: anything unexpected falls back to the default for that field. */
 export function loadPersisted(storage: Storage, defaults: Persisted): Persisted {
   const raw = readJson(storage, PERSIST_KEY);
-  const r = isRecord(raw) ? raw : {};
-  return {
-    settings: settingsFrom(r.settings, defaults.settings),
-    panels: panelsFrom(r.panels, defaults.panels),
-    listSort: sortFrom(r.listSort, defaults.listSort),
-    plotted: plottedFrom(r.plotted, defaults.plotted),
-    ndRangeNm: oneOf(ND_RANGES_NM, r.ndRangeNm, defaults.ndRangeNm),
-  };
+  return persisted(isRecord(raw) ? raw : {}, defaults);
 }
 
 /** Sets are written as lists; JSON has no set. */
-const asArrays = (exceptions: Exceptions) =>
-  Object.fromEntries(Object.entries(exceptions).map(([layer, keys]) => [layer, [...keys]]));
+const asArrays = (byLayer: Exceptions) =>
+  Object.fromEntries(Object.entries(byLayer).map(([layer, keys]) => [layer, [...keys]]));
 
 /** Best effort: the scope works without storage. */
 export function savePersisted(storage: Storage, state: Persisted): void {
-  const { settings } = state;
   writeJson(storage, PERSIST_KEY, {
     ...state,
-    settings: { ...settings, exceptions: asArrays(settings.exceptions) },
+    settings: { ...state.settings, exceptions: asArrays(state.settings.exceptions) },
   });
 }

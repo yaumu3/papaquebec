@@ -1,5 +1,6 @@
 import { type Altimeter, STANDARD_ALTIMETER } from '../lib/altitude';
-import type { ScopeLayer } from '../lib/layers';
+import { DEFAULT_SHOWN, type LabelDensity } from '../lib/layers';
+import type { ScopeLayer } from '../lib/mapsetFormat';
 import { FL_MAX, type Filter } from './filter';
 
 /** Range presets on the Display panel; the wheel zooms continuously between the limits. */
@@ -13,9 +14,6 @@ export const TRAIL_STEPS = [0, 30, 60, 120] as const;
 export type ShownLayers = Record<ScopeLayer, boolean>;
 /** The item keys of each layer that go against its `shownLayers` flag, oldest first. */
 export type Exceptions = Partial<Record<ScopeLayer, ReadonlySet<string>>>;
-export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
-
-export const LABEL_DENSITIES: readonly LabelDensity[] = ['off', 'sparse', 'normal', 'dense'];
 
 export interface Settings {
   /** Radius shown by the shorter canvas edge, NM. */
@@ -27,6 +25,8 @@ export interface Settings {
   filter: Filter;
   shownLayers: ShownLayers;
   exceptions: Exceptions;
+  /** The identities of the map sets switched off, the built-in one among them. */
+  disabledSets: readonly string[];
   /** Titles of the tree's open groups. */
   openGroups: readonly string[];
   /** The tree's open layers. */
@@ -54,34 +54,9 @@ export const DEFAULT_SETTINGS: Settings = {
   vectorMin: 2,
   trailSec: 60,
   filter: { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' },
-  shownLayers: {
-    ad: true,
-    navaid: true,
-    fix: true,
-    vfr: false,
-    sid: false,
-    star: false,
-    trans: false,
-    conv: true,
-    rnav: true,
-    dct: false,
-    hold: false,
-    ctr: true,
-    pr: true,
-    tma: true,
-    sector: true,
-    fir: true,
-    dng: true,
-    tra: false,
-    adiz: false,
-    cta: false,
-    advisory: false,
-    civt: false,
-    asr: false,
-    coast: true,
-    rings: true,
-  },
+  shownLayers: DEFAULT_SHOWN,
   exceptions: {},
+  disabledSets: [],
   openGroups: [],
   openLayers: [],
   labelDensity: 'normal',

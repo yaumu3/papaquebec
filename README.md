@@ -98,6 +98,8 @@ export PQ_BEAST=<host>:30005 PQ_SITE=<lat>,<lon>
 mise run dev                # the scope and its server, on real traffic
 mise run sim                # the same on the synthetic fleet; PQ_SITE=lat,lon moves it
 mise run check              # everything CI runs
+mise run check:visual       # the map's screenshots against their baselines
+mise run update:visual      # rewrite those baselines
 mise run bench              # a load test, see below
 mise run bench:blocks       # score the data block placer on the sim's scenarios
 ```
@@ -122,6 +124,9 @@ request. Two headless scripts describe their flags in their headers:
   plus the console log; with `--sim` it starts a server of its own that flies the sim and serves
   the build. `bun run screenshot` regenerates the README picture that way.
 - `mise run bench` is a load test with extra sim traffic, always on a server of its own.
+
+The visual tests run in a pinned Playwright container, with Apple's `container` where it is
+installed and Docker elsewhere, so a Mac and CI compare the same pixels.
 
 Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight;
 the sim's tests enforce this for the fleet.

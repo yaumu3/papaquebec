@@ -1,17 +1,19 @@
 import { createSignal, For, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
+import type { LabelDensity } from '../lib/layers';
 import { setQuery } from '../state/layerTree';
 import {
   armRemoval,
   importMapSet,
   importNote,
+  isSetEnabled,
   type MapSet,
   mapSets,
   removeMapSet,
   toggleMapSet,
 } from '../state/mapsets';
-import { type LabelDensity, setSettings, settings } from '../state/settings';
+import { setSettings, settings } from '../state/settings';
 import { Button } from '../ui/Button';
 import { Pills } from '../ui/Pills';
 import { Divider, SectionTitle } from '../ui/Section';
@@ -69,7 +71,7 @@ function MapSetRow(props: {
     <div class={s.set}>
       <Button
         class={s.setToggle}
-        on={props.set.enabled}
+        on={isSetEnabled(props.set.identity)}
         onClick={() => toggleMapSet(props.set.identity)}
       >
         {props.set.data.title}

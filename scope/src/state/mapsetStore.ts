@@ -3,7 +3,6 @@ import type { MapSetData } from '../lib/mapset';
 /** One imported map set as kept in the browser: its identity is the key. */
 export interface StoredMapSet {
   identity: string;
-  enabled: boolean;
   /** When it was imported, in ms since the epoch: the newest import takes precedence. */
   imported: number;
   data: MapSetData;

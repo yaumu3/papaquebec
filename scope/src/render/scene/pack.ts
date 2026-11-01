@@ -1,3 +1,4 @@
+import { DEFAULT_LINE_WIDTH, type DashPattern } from '../../lib/layers';
 import { chordOf } from '../../lib/polyline';
 import {
   type AtlasInfo,
@@ -70,15 +71,6 @@ class InstanceBuffer {
     return { kind, data: this.data.slice(0, this.used), count: this.used / this.stride };
   }
 }
-
-/** Alternating on and off lengths in CSS px, up to two pairs; empty is solid. */
-export type DashPattern =
-  | readonly []
-  | readonly [number, number]
-  | readonly [number, number, number, number];
-
-/** The width of a line whose style names none, CSS px. */
-export const DEFAULT_LINE_WIDTH = 1;
 
 export interface LineStyle {
   /** CSS px. */

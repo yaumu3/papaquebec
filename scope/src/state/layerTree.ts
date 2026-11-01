@@ -3,12 +3,19 @@
 import { batch, createMemo, createRoot, createSignal } from 'solid-js';
 
 import type { ChartItem } from '../lib/chart';
-import { LAYER_GROUPS, type ScopeLayer } from '../lib/layers';
-import { type TreeItem, itemsIn, treeItemsOf } from '../lib/treeItems';
-import { afterDot, type LayerLeaves } from '../lib/treeRows';
-import { searchTree, termsOf } from '../lib/treeSearch';
+import { LAYER_GROUPS } from '../lib/layers';
+import type { ScopeLayer } from '../lib/mapsetFormat';
+import {
+  type TreeItem,
+  itemsIn,
+  treeItemsOf,
+  afterDot,
+  type LayerLeaves,
+  searchTree,
+  termsOf,
+} from '../lib/tree';
 import { isItemShown, itemsSetTo } from '../lib/visibility';
-import { layerState, setLayerState } from './layerVisibility';
+import { layerState, setLayerState } from './drawn';
 import { topology } from './mapsets';
 import { setSettings, settings } from './settings';
 

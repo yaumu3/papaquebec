@@ -9,34 +9,69 @@ export const MAPSET_VERSION = 2;
 /** The set generated around the site at container start; a preset that cannot be removed. */
 export const BUILTIN_ID = 'openaip';
 
-export const POINT_LAYERS = ['ad', 'navaid', 'fix', 'vfr'] as const;
-export const ROUTE_LAYERS = ['conv', 'rnav', 'dct', 'sid', 'star', 'trans'] as const;
-export const AREA_LAYERS = [
-  'ctr',
-  'tma',
-  'cta',
-  'advisory',
-  'sector',
-  'fir',
-  'asr',
-  'pr',
-  'dng',
-  'tra',
-  'adiz',
-  'civt',
-] as const;
-export const LAYERS = [...POINT_LAYERS, ...ROUTE_LAYERS, 'hold', ...AREA_LAYERS] as const;
+/**
+ * Every layer by the geometry of its features. The format defines all but the last two, which the
+ * scope makes itself from no map set. The display side of a layer is in `layers.ts`.
+ */
+const GEOMETRY = {
+  ad: 'point',
+  navaid: 'point',
+  fix: 'point',
+  vfr: 'point',
+  conv: 'route',
+  rnav: 'route',
+  dct: 'route',
+  sid: 'route',
+  star: 'route',
+  trans: 'route',
+  hold: 'hold',
+  ctr: 'area',
+  tma: 'area',
+  cta: 'area',
+  advisory: 'area',
+  sector: 'area',
+  fir: 'area',
+  asr: 'area',
+  pr: 'area',
+  dng: 'area',
+  tra: 'area',
+  adiz: 'area',
+  civt: 'area',
+  coast: 'scope',
+  rings: 'scope',
+} as const;
 
-export type PointLayer = (typeof POINT_LAYERS)[number];
-export type AreaLayer = (typeof AREA_LAYERS)[number];
-export type RouteLayer = (typeof ROUTE_LAYERS)[number];
-export type Layer = (typeof LAYERS)[number];
+type Geometry = (typeof GEOMETRY)[ScopeLayer];
 
-const POINTS: ReadonlySet<Layer> = new Set(POINT_LAYERS);
-const ROUTES: ReadonlySet<Layer> = new Set(ROUTE_LAYERS);
+/** The map set layers plus the two the scope makes itself. */
+export type ScopeLayer = keyof typeof GEOMETRY;
+type LayerOf<G extends Geometry> = {
+  [L in ScopeLayer]: (typeof GEOMETRY)[L] extends G ? L : never;
+}[ScopeLayer];
 
-export const isPointLayer = (layer: Layer): layer is PointLayer => POINTS.has(layer);
-export const isRouteLayer = (layer: Layer): layer is RouteLayer => ROUTES.has(layer);
+export type PointLayer = LayerOf<'point'>;
+export type AreaLayer = LayerOf<'area'>;
+export type RouteLayer = LayerOf<'route'>;
+export type Layer = LayerOf<'point' | 'route' | 'hold' | 'area'>;
+
+const layersOf = <G extends Geometry>(...geometries: readonly G[]): readonly LayerOf<G>[] =>
+  Object.entries(GEOMETRY)
+    .filter((entry): entry is [LayerOf<G>, G] => geometries.some((g) => g === entry[1]))
+    .map(([layer]) => layer);
+
+export const POINT_LAYERS = layersOf('point');
+export const ROUTE_LAYERS = layersOf('route');
+export const AREA_LAYERS = layersOf('area');
+export const LAYERS = layersOf('point', 'route', 'hold', 'area');
+
+export const isScopeLayer = (name: string): name is ScopeLayer => name in GEOMETRY;
+export const isPointLayer = (layer: ScopeLayer): layer is PointLayer => GEOMETRY[layer] === 'point';
+export const isRouteLayer = (layer: ScopeLayer): layer is RouteLayer => GEOMETRY[layer] === 'route';
+/** Whether a layer comes from a map set, not from the scope itself. */
+export const isChartLayer = (layer: ScopeLayer): layer is Layer => GEOMETRY[layer] !== 'scope';
+
+/** The point layers whose ids are unique within a set. */
+export const POINT_ID_LAYERS: ReadonlySet<string> = new Set<Layer>(['ad', 'navaid', 'fix']);
 
 /** The area layers that divide airspace among control units: an ACC sector, a FIR or UIR. */
 export const SECTOR_LAYERS: ReadonlySet<Layer> = new Set<Layer>(['sector', 'fir']);

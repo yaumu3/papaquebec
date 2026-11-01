@@ -6,7 +6,7 @@
  */
 
 import { type Chart, type ChartItem, type ItemPart, itemKind, outlinesOf, toGrid } from './chart';
-import { DRAW_STACK } from './layers';
+import { LAYER_TABLE } from './layers';
 import type { LonLat } from './mapdata';
 import {
   type AreaLayer,
@@ -96,7 +96,7 @@ function distinctVertices(outline: LonLat[], vertexOf: VertexOf) {
   return { coordinates, vertices };
 }
 
-const stackIndex = (layer: Layer) => DRAW_STACK.indexOf(layer);
+const stackIndex = (layer: Layer) => LAYER_TABLE[layer].rank;
 
 const byFront = (a: Outline, b: Outline) =>
   stackIndex(a.layer) - stackIndex(b.layer) ||

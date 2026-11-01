@@ -6,16 +6,15 @@ import { isRecord } from '../lib/guards';
 import { type MapSetData, setIdentity, validateMapSet } from '../lib/mapset';
 import { BUILTIN_ID, MAPSET_VERSION } from '../lib/mapsetFormat';
 import { type Topology, topologyOf } from '../lib/topology';
-import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
-import { type MapSetStore, openMapSetStore, type StoredMapSet } from './mapsetStore';
-import { versioned } from './versioned';
+import { type MapSetStore, openMapSetStore } from './mapsetStore';
+import { setSettings, settings } from './settings';
+import { readJson } from './storageJson';
 
 export interface MapSet {
   identity: string;
   data: MapSetData;
-  enabled: boolean;
   builtin: boolean;
-  /** When it was imported, in ms since the epoch; 0 for the built-in set and for a set stored before imports were timed. */
+  /** When it was imported, in ms since the epoch; 0 for the built-in set. */
   imported: number;
 }
 
@@ -24,6 +23,7 @@ export type ImportResult = { ok: true; kept: Promise<boolean> } | { ok: false; m
 
 export interface MapSets {
   mapSets: Accessor<MapSet[]>;
+  isEnabled: (identity: string) => boolean;
   /** The enabled sets merged into a chart, with its shared edges. */
   topology: Accessor<Topology>;
   /** Settles once the stored sets are merged in, or the store proved unavailable. */
@@ -34,26 +34,60 @@ export interface MapSets {
   removeMapSet: (identity: string) => void;
 }
 
+/**
+ * The last result of `compute`, kept while `inputs` gives the same references in order: a memo
+ * that also holds under `bun test`, where `createMemo` never runs again, and that no change to
+ * the inputs can forget to renew.
+ */
+function byReference<I, T>(inputs: () => readonly I[], compute: (inputs: readonly I[]) => T) {
+  let cached: { inputs: readonly I[]; value: T } | null = null;
+  return (): T => {
+    const now = inputs();
+    const known = cached?.inputs;
+    if (cached && known?.length === now.length && now.every((input, i) => input === known[i])) {
+      return cached.value;
+    }
+    cached = { inputs: now, value: compute(now) };
+    return cached.value;
+  };
+}
+
 /** A stored record as a set, if it is one: its data passes the strict parse. */
 function setFrom(record: unknown): MapSet | null {
   if (!isRecord(record) || typeof record.identity !== 'string') return null;
-  if (typeof record.enabled !== 'boolean') return null;
+  const { identity, imported } = record;
+  if (typeof imported !== 'number') return null;
   const valid = validateMapSet(record.data);
-  const { identity, enabled } = record;
-  const imported = typeof record.imported === 'number' ? record.imported : 0;
-  return valid.ok ? { identity, data: valid.data, enabled, builtin: false, imported } : null;
+  return valid.ok ? { identity, data: valid.data, builtin: false, imported } : null;
 }
+
+/** Where an earlier version kept the built-in set's flag; the imported sets' were on their records. */
+const OLD_FLAG_KEY = 'papaquebec.mapsets';
+
+/** Which of the stored records an earlier version had switched off. */
+const offInRecords = (records: readonly unknown[]): string[] =>
+  records.flatMap((record) =>
+    isRecord(record) && record.enabled === false && typeof record.identity === 'string'
+      ? [record.identity]
+      : [],
+  );
 
 /** The built-in set last, the imports newest first; a stable sort keeps ties as they were. */
 const byPrecedence = (sets: readonly MapSet[]): MapSet[] =>
   sets.toSorted((a, b) => Number(a.builtin) - Number(b.builtin) || b.imported - a.imported);
 
+/** The list of sets switched off, held by the settings. */
+export interface SetFlags {
+  disabled: () => readonly string[];
+  setDisabled: (identities: readonly string[]) => void;
+}
+
 export function createMapSets(
+  flags: SetFlags,
   storage: Storage | null,
   opening: Promise<MapSetStore>,
   now: () => number = Date.now,
 ): MapSets {
-  const persisted = storage ? loadMapSets(storage) : DEFAULT_MAPSETS;
   const placeholder: MapSetData = {
     type: 'FeatureCollection',
     version: MAPSET_VERSION,
@@ -65,24 +99,26 @@ export function createMapSets(
       {
         identity: BUILTIN_ID,
         data: placeholder,
-        enabled: persisted.builtinEnabled,
         builtin: true,
         imported: 0,
       },
     ],
   });
 
-  /** Read as plain data: a rebuild through store proxies tracks every coordinate. */
-  const topology = versioned(() =>
-    topologyOf(chartOf(store.sets.filter((s) => s.enabled).map((s) => unwrap(s.data)))),
-  );
-
-  /** After a change to the sets: the merge is stale, and the built-in flag goes to storage. */
-  const commit = () => {
-    topology.invalidate();
-    const builtin = store.sets.find((s) => s.builtin);
-    if (storage) saveMapSets(storage, { builtinEnabled: builtin?.enabled ?? true });
+  const isEnabled = (identity: string) => !flags.disabled().includes(identity);
+  /** Takes a set off the list; a set not on it changes nothing, so no reader runs again. */
+  const enable = (identity: string) => {
+    if (isEnabled(identity)) return;
+    flags.setDisabled(flags.disabled().filter((id) => id !== identity));
   };
+  const adoptOff = (identities: readonly string[]) =>
+    flags.setDisabled([...new Set([...flags.disabled(), ...identities])]);
+
+  /** Read as plain data: a rebuild through store proxies tracks every coordinate. */
+  const topology = byReference(
+    () => store.sets.filter((s) => isEnabled(s.identity)).map((s) => unwrap(s.data)),
+    (data) => topologyOf(chartOf(data)),
+  );
 
   /** Runs a write on the store once it is open; false when it cannot be opened or refuses. */
   const stored = (write: (open: MapSetStore) => Promise<void>): Promise<boolean> =>
@@ -90,21 +126,13 @@ export function createMapSets(
       () => true,
       () => false,
     );
-  /** The record for the store: IndexedDB clones what it is given, and a store proxy cannot be cloned. */
-  const recordOf = (identity: string): StoredMapSet | undefined => {
-    const set = store.sets.find((s) => s.identity === identity);
-    return set && !set.builtin
-      ? { identity, enabled: set.enabled, imported: set.imported, data: unwrap(set.data) }
-      : undefined;
-  };
-  const rewrite = (identity: string) => {
-    const record = recordOf(identity);
-    return record ? stored((open) => open.put(record)) : Promise.resolve(true);
-  };
+  const oldFlag = storage && readJson(storage, OLD_FLAG_KEY);
+  if (isRecord(oldFlag) && oldFlag.builtinEnabled === false) adoptOff([BUILTIN_ID]);
 
   const hydrated = opening
     .then((open) => open.all())
     .then((records) => {
+      if (oldFlag) adoptOff(offInRecords(records));
       const loaded = records.map(setFrom).filter((s) => s !== null);
       setStore('sets', (sets) =>
         byPrecedence([
@@ -112,18 +140,18 @@ export function createMapSets(
           ...loaded.filter((s) => !sets.some((own) => own.identity === s.identity)),
         ]),
       );
-      topology.invalidate();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .then(() => storage?.removeItem(OLD_FLAG_KEY));
 
   return {
     mapSets: () => store.sets,
-    topology: topology.get,
+    isEnabled,
+    topology,
     hydrated,
     setBuiltinMapSet(data) {
       // Assigned whole, since a value set at its `data` path would merge into the placeholder.
       setStore('sets', (sets) => sets.map((set) => (set.builtin ? { ...set, data } : set)));
-      topology.invalidate();
     },
     importMapSet(text) {
       let raw: unknown;
@@ -136,33 +164,23 @@ export function createMapSets(
       if (!valid.ok) return valid;
       const identity = setIdentity(valid.data);
       if (identity === BUILTIN_ID) return { ok: false, message: `already built in: ${identity}` };
-      const set: MapSet = {
-        identity,
-        data: valid.data,
-        enabled: true,
-        builtin: false,
-        imported: now(),
-      };
+      const { data } = valid;
+      const imported = now();
+      const set: MapSet = { identity, data, builtin: false, imported };
       setStore('sets', (sets) => [set, ...sets.filter((s) => s.identity !== identity)]);
-      commit();
-      return { ok: true, kept: rewrite(identity) };
+      enable(identity);
+      return { ok: true, kept: stored((open) => open.put({ identity, imported, data })) };
     },
     toggleMapSet(identity) {
-      setStore(
-        'sets',
-        (s) => s.identity === identity,
-        'enabled',
-        (v) => !v,
-      );
-      commit();
-      void rewrite(identity);
+      if (isEnabled(identity)) flags.setDisabled([...flags.disabled(), identity]);
+      else enable(identity);
     },
     removeMapSet(identity) {
       if (store.sets.some((s) => s.identity === identity && !s.builtin)) {
         void stored((open) => open.delete(identity));
       }
       setStore('sets', (sets) => sets.filter((s) => s.identity !== identity || s.builtin));
-      topology.invalidate();
+      enable(identity);
     },
   };
 }
@@ -182,8 +200,19 @@ export function armRemoval(
 }
 
 const sets = createMapSets(
+  {
+    disabled: () => settings.disabledSets,
+    setDisabled: (identities) => setSettings('disabledSets', [...identities]),
+  },
   typeof localStorage === 'undefined' ? null : localStorage,
   openMapSetStore(globalThis.indexedDB),
 );
-export const { mapSets, topology, setBuiltinMapSet, importMapSet, toggleMapSet, removeMapSet } =
-  sets;
+export const {
+  mapSets,
+  isEnabled: isSetEnabled,
+  topology,
+  setBuiltinMapSet,
+  importMapSet,
+  toggleMapSet,
+  removeMapSet,
+} = sets;

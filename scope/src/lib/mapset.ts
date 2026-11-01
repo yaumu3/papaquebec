@@ -24,6 +24,7 @@ import {
   MAPSET_VERSION,
   NAME_MAX,
   NOTE_MAX,
+  POINT_ID_LAYERS,
   POINT_LAYERS,
   ROUTE_LAYERS,
   SET_ID_PATTERN,
@@ -192,8 +193,6 @@ function parseFeature(raw: unknown): Parsed<MapSetFeature> {
     ? { ok: true, data: parsed.data }
     : { ok: false, issues: parsed.error.issues };
 }
-
-const POINT_ID_LAYERS = new Set<string>(['ad', 'navaid', 'fix']);
 
 /** The Features repeating the id of an earlier ad, navaid or fix, each with that earlier index. */
 function repeatedIds(features: readonly MapSetFeature[]): { later: number; earlier: number }[] {

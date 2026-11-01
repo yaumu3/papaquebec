@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 import { parseMapSet } from '../lib/mapset';
 import { EXAMPLE } from '../lib/mapsetCorpus';
 import { everyItemSet, isItemShown } from '../lib/visibility';
+import { layerState, setLayerState } from './drawn';
 import {
   blurRow,
   enterRow,
@@ -18,7 +19,6 @@ import {
   toggleOpen,
   typeQuery,
 } from './layerTree';
-import { layerState, setLayerState } from './layerVisibility';
 import { mapSets, setBuiltinMapSet, topology } from './mapsets';
 import { setSettings, settings } from './settings';
 

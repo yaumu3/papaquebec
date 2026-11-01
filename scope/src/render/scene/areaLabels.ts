@@ -1,14 +1,19 @@
 import { type ChartItem, itemName } from '../../lib/chart';
 import { rememberFits } from '../../lib/fits';
 import { stacksOf } from '../../lib/labelStacks';
-import { isStyled } from '../../lib/layers';
+import { labelReaches, LAYER_TABLE } from '../../lib/layers';
 import type { AreaPlace } from '../../lib/pole';
 import { limitFt, bandOf } from '../../lib/stratum';
-import { blockOf, putBlock, putBlockAtName, stackedBlock } from './areaBlocks';
-import type { FitInput, LabelsInput, PlaceInput } from './chart';
-import type { BuiltLabels, DrawnLabel, LabelOut } from './drawnLabels';
-import { LAYER_STYLES, labelReaches } from './layerStyles';
-import { LineBatch, TextBatch } from './pack';
+import {
+  blockOf,
+  type BlockOut,
+  namesIn,
+  putBlock,
+  putBlockAtName,
+  stackedBlock,
+} from './areaBlocks';
+import type { BuiltLabels, FitInput, LabelsInput, PlaceInput } from './chart';
+import { type Anchor, LineBatch, TextBatch } from './pack';
 
 /** A named item and where its label goes. */
 interface Member {
@@ -42,18 +47,18 @@ const stacksOfMembers = (members: Member[]): Member[][] =>
  */
 export function putAreaLabel(
   item: ChartItem,
-  drawn: DrawnLabel | undefined,
+  drawnName: Anchor | undefined,
   placeOf: PlaceInput['placeOf'],
-  out: LabelOut,
+  out: BlockOut,
+  color: string,
 ) {
-  const label = isStyled(item.layer) ? LAYER_STYLES[item.layer].label : undefined;
+  const { label } = LAYER_TABLE[item.layer].style;
   const name = itemName(item);
   const place = placeOf(item);
   if (!label || name === undefined || !place) return;
   const block = blockOf(item, name, label, 'dense', out.text);
-  const drawnName = drawn?.texts[0]?.at;
-  if (drawnName) putBlockAtName(block, drawnName, out);
-  else putBlock(block, place.at, out);
+  if (drawnName) putBlockAtName(block, drawnName, out, color);
+  else putBlock(block, place.at, out, color);
 }
 
 /**
@@ -62,7 +67,7 @@ export function putAreaLabel(
  * as one. A layer with no label style, or whose density the label density has not reached,
  * says nothing. A block needs half its width between the pole and the nearest edge, in px at
  * the settled scale; a line area has no edge to test and is always labelled. Returns the text,
- * then the rules of the fractions, and what each item's label drew.
+ * then the rules of the fractions, and where each item's name went.
  */
 export function buildAreaLabels({
   drawnItems,
@@ -73,10 +78,11 @@ export function buildAreaLabels({
   settledScale,
   shown,
 }: LabelsInput & PlaceInput & FitInput): BuiltLabels {
-  const out = { text: new TextBatch(atlas), strokes: new LineBatch(), drawn: new Map() };
+  const out = { text: new TextBatch(atlas), strokes: new LineBatch() };
+  const areaNames = new Map<string, Anchor>();
   const scale = settledScale();
   for (const layer of layers.toReversed()) {
-    const label = LAYER_STYLES[layer].label;
+    const label = LAYER_TABLE[layer].style.label;
     if (!label || !labelReaches(label, labelDensity)) continue;
     const items = drawnItems.filter((i) => i.layer === layer);
     for (const stack of stacksOfMembers(membersOf(items, placeOf))) {
@@ -91,7 +97,8 @@ export function buildAreaLabels({
       const { room } = first.place;
       if (room !== undefined && !rememberFits(shown, key, room * scale, block.width / 2)) continue;
       putBlock(block, first.place.at, out);
+      for (const [item, at] of namesIn(block, first.place.at)) areaNames.set(item, at);
     }
   }
-  return { batches: [out.text.finish(), out.strokes.finish()], drawn: out.drawn };
+  return { batches: [out.text.finish(), out.strokes.finish()], areaNames };
 }

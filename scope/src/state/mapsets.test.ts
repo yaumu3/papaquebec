@@ -3,7 +3,6 @@ import { describe, expect, it } from 'bun:test';
 import { validateMapSet } from '../lib/mapset';
 import { BUILTIN_ID } from '../lib/mapsetFormat';
 import { armRemoval, createMapSets, importNote } from './mapsets';
-import { MAPSETS_KEY } from './mapsetsPersist';
 import type { MapSetStore, StoredMapSet } from './mapsetStore';
 import { memoryStorage } from './memoryStorage';
 
@@ -29,15 +28,15 @@ const parsed = (document: object) => {
   if (!verdict.ok) throw new Error(verdict.message);
   return verdict.data;
 };
-const stored = (document: object, enabled = true, imported = 0): StoredMapSet => {
+const stored = (document: object, imported = 0): StoredMapSet => {
   const data = parsed(document);
-  return { identity: data.id ?? data.title, enabled, imported, data };
+  return { identity: data.id ?? data.title, imported, data };
 };
-/** A record as stored before sets carried the time of their import. */
-const legacy = (document: object): StoredMapSet => {
-  const { identity, enabled, data } = stored(document);
-  return JSON.parse(JSON.stringify({ identity, enabled, data }));
-};
+/** A record as an earlier version wrote it, with its flag in it. */
+const flagged = (document: object, enabled: boolean, imported = 0): StoredMapSet =>
+  JSON.parse(JSON.stringify({ ...stored(document, imported), enabled }));
+/** Where an earlier version kept the built-in set's flag. */
+const OLD_KEY = 'papaquebec.mapsets';
 /** A clock that reads 101, 102 ... so each import is later than the last, and than any record. */
 const ticking = () => {
   let now = 100;
@@ -54,7 +53,7 @@ function spyStore(initial: StoredMapSet[] = [], refusing = false) {
         [...records.values()].toSorted((a, b) => a.identity.localeCompare(b.identity)),
       ),
     put(set) {
-      writes.push(`put ${set.identity} ${set.enabled}`);
+      writes.push(`put ${set.identity}`);
       if (refusing) return Promise.reject(new Error('refused'));
       records.set(set.identity, set);
       return Promise.resolve();
@@ -68,10 +67,22 @@ function spyStore(initial: StoredMapSet[] = [], refusing = false) {
   return { store, records, writes };
 }
 
-const created = (spy = spyStore(), storage = memoryStorage()) => ({
+/** The list of disabled sets, as the settings hold it. */
+function flagsOf(initial: readonly string[] = []) {
+  let list = initial;
+  return {
+    disabled: () => list,
+    setDisabled(next: readonly string[]) {
+      list = next;
+    },
+  };
+}
+
+const created = (spy = spyStore(), storage = memoryStorage(), flags = flagsOf()) => ({
   ...spy,
   storage,
-  sets: createMapSets(storage, Promise.resolve(spy.store), ticking()),
+  flags,
+  sets: createMapSets(flags, storage, Promise.resolve(spy.store), ticking()),
 });
 /** The ids of the points the chart holds on a layer. */
 const idsOf = (sets: ReturnType<typeof createMapSets>, layer: string) =>
@@ -91,19 +102,22 @@ describe('createMapSets', () => {
     const [list, chart] = [sets.mapSets(), sets.topology().chart];
 
     // Assert
-    expect(list.map((s) => [s.identity, s.builtin, s.enabled])).toEqual([[BUILTIN_ID, true, true]]);
+    expect(list.map((s) => [s.identity, s.builtin])).toEqual([[BUILTIN_ID, true]]);
+    expect(sets.isEnabled(BUILTIN_ID)).toBe(true);
     expect(chart).toEqual([]);
   });
 
-  it('starts the built-in set as the stored flag left it', () => {
+  it('leaves out of the chart a set the list of disabled sets names', () => {
     // Arrange
-    const storage = memoryStorage({ [MAPSETS_KEY]: '{"builtinEnabled":false}' });
+    const flags = flagsOf([BUILTIN_ID]);
+    const { sets } = created(spyStore(), memoryStorage(), flags);
 
     // Act
-    const { sets } = created(spyStore(), storage);
+    sets.setBuiltinMapSet(parsed(builtIn));
 
     // Assert
-    expect(sets.mapSets().map((s) => [s.identity, s.enabled])).toEqual([[BUILTIN_ID, false]]);
+    expect(sets.isEnabled(BUILTIN_ID)).toBe(false);
+    expect(idsOf(sets, 'fix')).toEqual([]);
   });
 
   it('draws the built-in set once it arrives', () => {
@@ -218,9 +232,9 @@ describe('createMapSets', () => {
 });
 
 describe('storage of imported sets', () => {
-  it('puts the one record again to toggle a set', async () => {
+  it('writes no record to toggle a set, only the list of disabled sets', async () => {
     // Arrange
-    const { sets, writes } = created();
+    const { sets, writes, flags } = created();
     importing(sets, fixes);
 
     // Act
@@ -228,7 +242,54 @@ describe('storage of imported sets', () => {
     await sets.hydrated;
 
     // Assert
-    expect(writes).toEqual(['put my-fixes true', 'put my-fixes false']);
+    expect(writes).toEqual(['put my-fixes']);
+    expect(flags.disabled()).toEqual(['my-fixes']);
+  });
+
+  it('writes a record without a flag', async () => {
+    // Arrange
+    const { sets, records } = created();
+
+    // Act
+    importing(sets, fixes);
+    await sets.hydrated;
+
+    // Assert
+    expect(Object.keys(records.get('my-fixes') ?? {}).toSorted()).toEqual([
+      'data',
+      'identity',
+      'imported',
+    ]);
+  });
+
+  it('leaves the list of disabled sets alone when importing or removing a set not on it', () => {
+    // Arrange
+    const flags = flagsOf();
+    const { sets } = created(spyStore(), memoryStorage(), flags);
+    const before = flags.disabled();
+
+    // Act
+    importing(sets, fixes);
+    sets.removeMapSet('my-fixes');
+
+    // Assert
+    expect(flags.disabled()).toBe(before);
+  });
+
+  it('forgets a removed set, so importing it again brings it back enabled', () => {
+    // Arrange
+    const { sets, flags } = created();
+    importing(sets, fixes);
+    sets.toggleMapSet('my-fixes');
+
+    // Act
+    sets.removeMapSet('my-fixes');
+    const listed = flags.disabled();
+    importing(sets, fixes);
+
+    // Assert
+    expect(listed).toEqual([]);
+    expect(sets.isEnabled('my-fixes')).toBe(true);
   });
 
   it('deletes the one record to remove a set', async () => {
@@ -242,60 +303,26 @@ describe('storage of imported sets', () => {
     await sets.hydrated;
 
     // Assert
-    expect(writes).toEqual(['put my-fixes true', 'put more-fixes true', 'delete more-fixes']);
+    expect(writes).toEqual(['put my-fixes', 'put more-fixes', 'delete more-fixes']);
     expect([...records.keys()]).toEqual(['my-fixes']);
-  });
-
-  it('keeps the built-in flag in browser storage and writes no record for it', async () => {
-    // Arrange
-    const { sets, writes, storage } = created();
-
-    // Act
-    sets.toggleMapSet(BUILTIN_ID);
-    await sets.hydrated;
-
-    // Assert
-    expect(writes).toEqual([]);
-    expect(storage.getItem(MAPSETS_KEY)).toBe('{"builtinEnabled":false}');
   });
 
   it('merges the stored sets newest import first, the built-in set last, once hydrated', async () => {
     // Arrange
-    const { sets } = created(spyStore([stored(more, true, 10), stored(fixes, false, 20)]));
+    const { sets } = created(spyStore([stored(more, 10), stored(fixes, 20)]));
 
     // Act
     await sets.hydrated;
 
     // Assert
-    expect(sets.mapSets().map((s) => [s.identity, s.enabled])).toEqual([
-      ['my-fixes', false],
-      ['more-fixes', true],
-      [BUILTIN_ID, true],
-    ]);
+    expect(sets.mapSets().map((s) => s.identity)).toEqual(['my-fixes', 'more-fixes', BUILTIN_ID]);
     expect(idsOf(sets, 'navaid')).toEqual(['QDG']);
-  });
-
-  it('puts a record stored without a time behind the timed ones, in identity order, ahead of the built-in set', async () => {
-    // Arrange
-    const old = setOf('Old', [], 'old-set');
-    const { sets } = created(spyStore([legacy(more), legacy(fixes), stored(old, true, 5)]));
-
-    // Act
-    await sets.hydrated;
-
-    // Assert
-    expect(sets.mapSets().map((s) => s.identity)).toEqual([
-      'old-set',
-      'more-fixes',
-      'my-fixes',
-      BUILTIN_ID,
-    ]);
   });
 
   it('keeps an import made before hydration finishes, ahead of the stored ones', async () => {
     // Arrange
     const { sets } = created(
-      spyStore([stored(more, true, 10), stored(setOf('Old', [], 'my-fixes'), true, 20)]),
+      spyStore([stored(more, 10), stored(setOf('Old', [], 'my-fixes'), 20)]),
     );
     importing(sets, fixes);
 
@@ -310,12 +337,13 @@ describe('storage of imported sets', () => {
     ]);
   });
 
-  it('skips a stored record that no longer passes the strict parse', async () => {
+  it('skips a stored record that no longer passes the strict parse, or has no time', async () => {
     // Arrange
-    const broken: StoredMapSet = JSON.parse(
-      '{"identity":"broken","enabled":true,"data":{"title":"no type"}}',
+    const broken: StoredMapSet = JSON.parse('{"identity":"broken","data":{"title":"no type"}}');
+    const { imported: _, ...untimed } = stored(more);
+    const { sets } = created(
+      spyStore([broken, JSON.parse(JSON.stringify(untimed)), stored(fixes)]),
     );
-    const { sets } = created(spyStore([broken, stored(fixes)]));
 
     // Act
     await sets.hydrated;
@@ -339,7 +367,11 @@ describe('storage of imported sets', () => {
 
   it('draws an import for the session when the store cannot be opened, and says so', async () => {
     // Arrange
-    const sets = createMapSets(memoryStorage(), Promise.reject(new Error('no IndexedDB')));
+    const sets = createMapSets(
+      flagsOf(),
+      memoryStorage(),
+      Promise.reject(new Error('no IndexedDB')),
+    );
 
     // Act
     const out = importing(sets, fixes);
@@ -374,117 +406,48 @@ describe('the time of an import', () => {
       ['more-fixes', 102],
     ]);
   });
-
-  it('is kept when a set is toggled', async () => {
-    // Arrange
-    const { sets, records } = created();
-    importing(sets, fixes);
-    await sets.hydrated;
-
-    // Act
-    await writing(sets, () => sets.toggleMapSet('my-fixes'));
-
-    // Assert
-    expect([...records.values()].map((r) => [r.identity, r.enabled, r.imported])).toEqual([
-      ['my-fixes', false, 101],
-    ]);
-  });
 });
 
-describe('a chart read before a change', () => {
-  it('follows the built-in set arriving', () => {
+describe('flags an earlier version kept', () => {
+  it("moves the built-in flag and the records' flags into the list, once", async () => {
     // Arrange
-    const { sets } = created();
-    sets.topology();
+    const storage = memoryStorage({ [OLD_KEY]: '{"builtinEnabled":false}' });
+    const spy = spyStore([flagged(fixes, false), flagged(more, true)]);
 
     // Act
-    sets.setBuiltinMapSet(parsed(builtIn));
+    const { flags, sets } = created(spy, storage);
+    await sets.hydrated;
 
     // Assert
-    expect(idsOf(sets, 'fix')).toEqual(['NIMBA']);
+    expect(flags.disabled().toSorted()).toEqual([BUILTIN_ID, 'my-fixes'].toSorted());
+    expect(storage.getItem(OLD_KEY)).toBeNull();
   });
 
-  it('follows an import', () => {
+  it('ignores the flag on a record once the old key is gone', async () => {
     // Arrange
-    const { sets } = created();
-    sets.topology();
-
-    // Act
-    const out = importing(sets, fixes);
-
-    // Assert
-    expect(out.ok).toBe(true);
-    expect(idsOf(sets, 'fix')).toEqual(['TAVRO']);
-  });
-
-  it('follows a removal', () => {
-    // Arrange
-    const { sets } = created();
-    importing(sets, fixes);
-    sets.topology();
-
-    // Act
-    sets.removeMapSet('my-fixes');
-
-    // Assert
-    expect(idsOf(sets, 'fix')).toEqual([]);
-  });
-
-  it('follows a toggle', () => {
-    // Arrange
-    const rows = [
-      { identity: 'my-fixes', left: ['NIMBA'] },
-      { identity: BUILTIN_ID, left: ['TAVRO'] },
-    ].map(({ identity, left }) => {
-      const { sets } = created();
-      sets.setBuiltinMapSet(parsed(builtIn));
-      importing(sets, fixes);
-      sets.topology();
-      return { identity, left, sets };
-    });
-
-    // Act
-    for (const { sets, identity } of rows) sets.toggleMapSet(identity);
-
-    // Assert
-    expect(rows.map((r) => idsOf(r.sets, 'fix'))).toEqual(rows.map((r) => r.left));
-  });
-
-  it('follows a set turned back on', () => {
-    // Arrange
-    const rows = ['my-fixes', BUILTIN_ID].map((identity) => {
-      const { sets, storage } = created();
-      sets.setBuiltinMapSet(parsed(builtIn));
-      importing(sets, fixes);
-      sets.toggleMapSet(identity);
-      sets.topology();
-      return { identity, sets, storage };
-    });
-
-    // Act
-    for (const { sets, identity } of rows) sets.toggleMapSet(identity);
-
-    // Assert
-    expect(rows.map((r) => idsOf(r.sets, 'fix'))).toEqual([
-      ['TAVRO', 'NIMBA'],
-      ['TAVRO', 'NIMBA'],
-    ]);
-    expect(rows.map((r) => r.storage.getItem(MAPSETS_KEY))).toEqual([
-      '{"builtinEnabled":true}',
-      '{"builtinEnabled":true}',
-    ]);
-  });
-
-  it('follows the hydration', async () => {
-    // Arrange
-    const { sets } = created(spyStore([stored(more)]));
-    sets.topology();
+    const { sets, flags } = created(spyStore([flagged(fixes, false)]));
 
     // Act
     await sets.hydrated;
 
     // Assert
-    expect(idsOf(sets, 'navaid')).toEqual(['QDG']);
+    expect(flags.disabled()).toEqual([]);
+    expect(sets.isEnabled('my-fixes')).toBe(true);
+  });
+
+  it('drops the old key even when the store cannot be opened', async () => {
+    // Arrange
+    const storage = memoryStorage({ [OLD_KEY]: '{"builtinEnabled":false}' });
+    const flags = flagsOf();
+    const refused = Promise.reject(new Error('no store'));
+
+    // Act
+    const sets = createMapSets(flags, storage, refused, ticking());
+    await sets.hydrated;
+
+    // Assert
+    expect(flags.disabled()).toEqual([BUILTIN_ID]);
+    expect(storage.getItem(OLD_KEY)).toBeNull();
   });
 });
 
@@ -544,16 +507,43 @@ describe('the topology of the chart', () => {
     expect(first.chart.map((item) => item.layer)).toEqual(['fix']);
   });
 
-  it('is rebuilt with the chart after a change to the sets', () => {
+  it('follows the sets through every change, read just before it', async () => {
     // Arrange
-    const { sets } = created();
-    importing(sets, fixes);
-    const before = sets.topology();
+    const withBoth = () => {
+      const made = created();
+      made.sets.setBuiltinMapSet(parsed(builtIn));
+      importing(made.sets, fixes);
+      return made.sets;
+    };
+    const offThenOn = (identity: string) => {
+      const sets = withBoth();
+      sets.toggleMapSet(identity);
+      return sets;
+    };
+    const stale = created(spyStore([stored(fixes)])).sets;
+    const arriving = created().sets;
+    const importingInto = created().sets;
+    const removingFrom = withBoth();
+    const switchedOff = withBoth();
+    const builtinOff = withBoth();
+    const backOn = offThenOn('my-fixes');
+    const builtinBackOn = offThenOn(BUILTIN_ID);
+    const rows: [ReturnType<typeof createMapSets>, () => unknown, string[]][] = [
+      [arriving, () => arriving.setBuiltinMapSet(parsed(builtIn)), ['NIMBA']],
+      [importingInto, () => importing(importingInto, fixes), ['TAVRO']],
+      [removingFrom, () => removingFrom.removeMapSet('my-fixes'), ['NIMBA']],
+      [switchedOff, () => switchedOff.toggleMapSet('my-fixes'), ['NIMBA']],
+      [builtinOff, () => builtinOff.toggleMapSet(BUILTIN_ID), ['TAVRO']],
+      [backOn, () => backOn.toggleMapSet('my-fixes'), ['TAVRO', 'NIMBA']],
+      [builtinBackOn, () => builtinBackOn.toggleMapSet(BUILTIN_ID), ['TAVRO', 'NIMBA']],
+      [stale, () => stale.hydrated, ['TAVRO']],
+    ];
+    for (const [sets] of rows) sets.topology();
 
     // Act
-    sets.toggleMapSet('my-fixes');
+    await Promise.all(rows.map(([, change]) => change()));
 
     // Assert
-    expect(sets.topology()).not.toBe(before);
+    expect(rows.map(([sets]) => idsOf(sets, 'fix'))).toEqual(rows.map(([, , ids]) => ids));
   });
 });

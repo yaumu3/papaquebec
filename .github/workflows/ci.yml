@@ -25,6 +25,29 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: mise run check:scope
 
+  visual:
+    # arm64, as the Macs the baselines are written on: one image, one set of pixels.
+    runs-on: ubuntu-26.04-arm
+    defaults:
+      run:
+        working-directory: scope
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v4
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scope/bun.lock') }}
+      - run: bun install --frozen-lockfile
+      - run: mise run check:visual
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: visual-differences
+          path: |
+            scope/visual/*.actual.png
+            scope/visual/*.diff.png
+
   server:
     runs-on: ubuntu-26.04
     steps:

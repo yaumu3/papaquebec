@@ -3,6 +3,9 @@
  * items that go against it; an item is shown when exactly one of the two says so.
  */
 
+import type { Chart, ChartItem } from './chart';
+import type { Layer } from './mapsetFormat';
+
 export interface LayerState {
   mode: boolean;
   /** Keys of the items that go against the mode. */
@@ -60,4 +63,32 @@ export function itemsSetTo(
   }
   if (present.every((key) => next.has(key))) return everyItemSet(!mode);
   return { mode, exceptions: capped(next, new Set(present), max) };
+}
+
+const NAVAID_MAX_RANGE = 120;
+
+/** Navaids clutter a wide range; they show only out to `NAVAID_MAX_RANGE`. */
+export function navaidsShownAt(rangeNm: number): boolean {
+  return rangeNm <= NAVAID_MAX_RANGE;
+}
+
+/**
+ * The items of the chart that draw: of `layers`, those shown, and the navaids only when the range
+ * allows. Each layer's state and the range are read once; the range only for a shown navaid, so a
+ * rebuild follows it only then.
+ */
+export function drawnItemsOf(
+  chart: Chart,
+  layers: readonly Layer[],
+  stateOf: (layer: Layer) => LayerState,
+  navaidsInRange: () => boolean,
+): ChartItem[] {
+  const states = new Map(layers.map((layer) => [layer, stateOf(layer)]));
+  const items = chart.filter((item) => {
+    const state = states.get(item.layer);
+    return state !== undefined && isItemShown(state, item.key);
+  });
+  return items.some((item) => item.layer === 'navaid') && !navaidsInRange()
+    ? items.filter((item) => item.layer !== 'navaid')
+    : items;
 }

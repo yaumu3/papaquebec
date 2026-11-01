@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { ChartItem, ItemPart } from './chart';
+import { box, itemOf, line, partOf, point, polygon, project } from '../render/scene/chartFixture';
 import { distanceToSegment, type Vec2 } from './geo';
 import { footprintOf } from './labelStacks';
-import type { LonLat } from './mapdata';
 import { areaPlaceOf, poleOf, ringArea } from './pole';
 
 const ring = (...points: [number, number][]): Vec2[] => points.map(([x, y]) => ({ x, y }));
@@ -91,31 +90,14 @@ describe('ringArea', () => {
   });
 });
 
-const project = (lat: number, lon: number): Vec2 => ({ x: lon, y: lat });
-
-const square = (from: number, to: number): LonLat[] => [
-  [from, from],
-  [to, from],
-  [to, to],
-  [from, to],
-  [from, from],
-];
-
-const areaPart = (...rings: LonLat[][]): ItemPart => ({
-  geometry: { type: 'Polygon', coordinates: rings },
-  properties: { layer: 'tma', name: 'X' },
-});
-
-const itemOf = (layer: 'tma' | 'ad', ...parts: ItemPart[]): ChartItem => ({
-  key: 'K',
-  layer,
-  parts,
-});
-
 describe('areaPlaceOf', () => {
   it('puts the pole in the largest polygon part, whichever part comes first', () => {
     // Arrange
-    const item = itemOf('tma', areaPart(square(0, 1)), areaPart(square(10, 20)));
+    const item = itemOf(
+      'tma',
+      partOf('tma', polygon(box(0, 1))),
+      partOf('tma', polygon(box(10, 20))),
+    );
 
     // Act
     const place = areaPlaceOf(item, project);
@@ -124,22 +106,12 @@ describe('areaPlaceOf', () => {
     expect(place?.at.x).toBeCloseTo(15, 0);
     expect(place?.at.y).toBeCloseTo(15, 0);
     expect(place?.room).toBeCloseTo(5, 0);
-    expect(place?.footprint).toBe(footprintOf(square(10, 20)));
+    expect(place?.footprint).toBe(footprintOf(box(10, 20)));
   });
 
   it('puts a line area at the middle of its first part, with no room or footprint', () => {
     // Arrange
-    const line: ItemPart = {
-      geometry: {
-        type: 'LineString',
-        coordinates: [
-          [0, 0],
-          [4, 0],
-        ],
-      },
-      properties: { layer: 'tma', name: 'X' },
-    };
-    const item = itemOf('tma', line);
+    const item = itemOf('tma', partOf('tma', line([0, 0], [4, 0])));
 
     // Act
     const place = areaPlaceOf(item, project);
@@ -153,11 +125,7 @@ describe('areaPlaceOf', () => {
 
   it('has no place for an item of points', () => {
     // Arrange
-    const point: ItemPart = {
-      geometry: { type: 'Point', coordinates: [1, 1] },
-      properties: { layer: 'ad', id: 'XQPA' },
-    };
-    const item = itemOf('ad', point);
+    const item = itemOf('ad', partOf('ad', point([1, 1])));
 
     // Act
     const place = areaPlaceOf(item, project);

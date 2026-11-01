@@ -1,8 +1,8 @@
 /**
  * The built scope in headless Chromium with WebGPU, optionally served by a server flying the sim.
- * Chromium is launched on Metal; change `--use-angle` below on other platforms.
+ * Chromium draws on Metal on macOS, and on SwiftShader, in software, elsewhere.
  */
-import { type Browser, chromium, type Page } from 'playwright';
+import { type Browser, type BrowserContext, chromium, type Page } from 'playwright';
 
 /** The synthetic fleet a server started for the purpose flies, serving the build itself. */
 export interface Sim {
@@ -22,6 +22,8 @@ export interface ScopeBrowserOptions {
   scale: number;
   /** Settings stored before the page loads, as if saved by an earlier visit; the rest default. */
   settings?: Record<string, unknown> | undefined;
+  /** Readies the context before the page loads. */
+  prepare?: ((context: BrowserContext) => Promise<void>) | undefined;
 }
 
 export interface ScopeBrowser {
@@ -70,15 +72,15 @@ function spawned(command: string[], env: Record<string, string | undefined> = pr
 }
 
 /** A page being served, and how to stop serving it. */
-interface Served {
+export interface Served {
   url: string;
   stop: () => void;
 }
 
-/** `vite preview` on the URL's port, resolved once it answers. */
-async function startPreview(url: string): Promise<Served> {
+/** `vite preview` of `outDir` on the URL's port, resolved once it answers. */
+export async function startPreview(url: string, outDir = 'dist'): Promise<Served> {
   const port = new URL(url).port || '4173';
-  const preview = spawned(['bunx', '--bun', 'vite', 'preview', '--port', port]);
+  const preview = spawned(['bunx', '--bun', 'vite', 'preview', '--port', port, '--outDir', outDir]);
   await stoppedOnFailure(preview.stop, () => untilUp(url, 50, preview.running));
   return { url, stop: preview.stop };
 }
@@ -109,6 +111,17 @@ function serve(from: Source): Promise<Served> {
   return Promise.resolve({ url: from.url, stop: () => {} });
 }
 
+const GPU_ARGS =
+  process.platform === 'darwin'
+    ? ['--use-angle=metal']
+    : [
+        '--use-vulkan=swiftshader',
+        '--use-angle=swiftshader',
+        '--use-webgpu-adapter=swiftshader',
+        // Without it no shared image backs a WebGPU canvas, and the device is lost on first use.
+        '--use-gpu-in-tests',
+      ];
+
 function launch(): Promise<Browser> {
   return chromium.launch({
     headless: true,
@@ -116,7 +129,7 @@ function launch(): Promise<Browser> {
       '--enable-unsafe-webgpu',
       '--enable-features=Vulkan,WebGPU',
       '--ignore-gpu-blocklist',
-      '--use-angle=metal',
+      ...GPU_ARGS,
     ],
   });
 }
@@ -134,6 +147,7 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
         localStorage.setItem('papaquebec.settings', JSON.stringify({ settings }));
       }, opt.settings);
     }
+    await opt.prepare?.(context);
     const page = await context.newPage();
     const log: string[] = [];
     page.on('console', (m) => log.push(`[${m.type()}] ${m.text()}`));

@@ -1,324 +1,239 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { ChartItem, ItemPart } from '../../lib/chart';
-import { navaidSymbol } from '../../lib/navaidSymbol';
-import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
-import { instances, packed, project } from './chartFixture';
-import { putFigure } from './figures';
-import { LAYER_STYLES } from './layerStyles';
-import { LineBatch, MarkerBatch } from './pack';
-import { THEME } from './rules';
-import { buildTraces } from './traces';
+import { CHART_COLORS, PALETTE } from '../../design/palette';
+import {
+  airway,
+  box,
+  itemOf,
+  line,
+  markers,
+  packed,
+  partOf,
+  point,
+  polygon,
+  type Position,
+  sceneOf,
+  type SceneOptions,
+  segments,
+  single,
+  spelled,
+  stopAt,
+} from './chartFixture';
 
-type Position = [number, number];
+const navaid = (kind: string, at: Position) =>
+  itemOf('navaid', partOf('navaid', point(at), { kind }));
+const WEST = () => () => -7;
 
-const lineOf = (...at: Position[]): ItemPart['geometry'] => ({
-  type: 'LineString',
-  coordinates: at,
-});
-const pointAt = (at: Position): ItemPart['geometry'] => ({ type: 'Point', coordinates: at });
+/** A marker without its colour. */
+const shapeOf = ({ at, size, shape }: ReturnType<typeof markers>[number]) => ({ at, size, shape });
 
-const item = (
-  layer: ChartItem['layer'],
-  properties: ItemPart['properties'],
-  ...parts: ItemPart['geometry'][]
-): ChartItem => ({ key: layer, layer, parts: parts.map((geometry) => ({ geometry, properties })) });
+const grey = packed(PALETTE.hover);
+const faint = packed(CHART_COLORS.hoverFaint);
 
-const area = (...parts: ItemPart['geometry'][]) =>
-  item('tma', { layer: 'tma', name: 'Q' }, ...parts);
-const route = (...parts: ItemPart['geometry'][]) =>
-  item('conv', { layer: 'conv', name: 'Q' }, ...parts);
-const point = (layer: 'ad' | 'navaid' | 'fix' | 'vfr', ...parts: ItemPart['geometry'][]) =>
-  item(layer, { layer, id: 'Q' }, ...parts);
-const fix = (...parts: ItemPart['geometry'][]) => point('fix', ...parts);
+const area = (...parts: ReturnType<typeof line>[]) =>
+  itemOf('tma', ...parts.map((geometry) => partOf('tma', geometry)));
+const fix = (...at: Position[]) => itemOf('fix', ...at.map((p) => partOf('fix', point(p))));
+const hold = (at: Position, extra: Parameters<typeof partOf>[2] = { inboundTrue: 90 }) =>
+  itemOf('hold', partOf('hold', point(at), extra));
 
-const square = (x: number, size: number): Position[] => [
-  [x, 0],
-  [x + size, 0],
-  [x + size, size],
-  [x, size],
-  [x, 0],
-];
+type Pointing = Parameters<ReturnType<typeof sceneOf>['traces']>[0];
 
-/** The segments of a lines batch as packed: where from and to, how wide, how dashed, in what colour. */
-function segments({ data, count }: Batch) {
-  return Array.from({ length: count }, (_, i) => {
-    const o = i * LINE_STRIDE;
-    return {
-      from: [data[o], data[o + 1]],
-      to: [data[o + 4], data[o + 5]],
-      width: data[o + 8],
-      pattern: Array.from(data.subarray(o + 10, o + 14)),
-      color: Array.from(data.subarray(o + 14, o + 18)),
-      span: Array.from(data.subarray(o + 18, o + 22)),
-    };
-  });
-}
+/** The traces of what is pointed at and searched, in a scene of the items they name. */
+const tracesOf = (pointing: Pointing, options: SceneOptions = {}) =>
+  sceneOf(
+    [...(pointing.pointedAt ? [pointing.pointedAt] : []), ...pointing.searched],
+    options,
+  ).traces(pointing);
 
-/** The markers of a markers batch as packed. */
-function markers({ data, count }: Batch) {
-  return Array.from({ length: count }, (_, i) => {
-    const o = i * MARKER_STRIDE;
-    return {
-      at: [data[o], data[o + 1]],
-      size: data[o + 4],
-      shape: data[o + 5],
-      color: Array.from(data.subarray(o + 6, o + 10)),
-    };
-  });
-}
-
-type Input = Omit<Parameters<typeof buildTraces>[0], 'highlight' | 'declinationAt'> &
-  Partial<Pick<Parameters<typeof buildTraces>[0], 'highlight' | 'declinationAt'>>;
-
-/** The traces of `input`, with no highlight and no declination unless it comes with them. */
-const tracesOf = (input: Input) =>
-  buildTraces({ highlight: [], declinationAt: () => () => 0, ...input });
-
-const batchOf = (kind: Batch['kind']): Batch => ({ kind, data: new Float32Array(), count: 0 });
-
-const grey = packed(THEME.hover);
-const faint = packed(THEME.hoverFaint);
-
-describe('buildTraces', () => {
+describe('the traces', () => {
   it('draws every outline of every part, 2 px wide and solid in the hover grey', () => {
     // Arrange
-    const polygon: ItemPart['geometry'] = {
-      type: 'Polygon',
-      coordinates: [square(0, 1), square(0.25, 0.5)],
-    };
-    const stepped = area(polygon, lineOf([5, 0], [6, 0], [6, 1]));
+    const stepped = area(polygon(box(0, 1), box(0.25, 0.75)), line([5, 0], [6, 0], [6, 1]));
 
     // Act
-    const {
-      traces: [, lines],
-      tracedPoints: [, , , dots],
-    } = tracesOf({ pointedAt: stepped, searched: [], project });
+    const { pointed } = tracesOf({ pointedAt: stepped, searched: [] });
 
     // Assert
-    const drawn = segments(lines);
+    const drawn = segments(pointed.lines);
     expect(drawn).toHaveLength(4 + 4 + 2);
     expect(drawn.map((s) => s.width)).toEqual(drawn.map(() => 2));
     expect(drawn.map((s) => s.pattern)).toEqual(drawn.map(() => [0, 0, 0, 0]));
     expect(drawn.map((s) => s.color)).toEqual(drawn.map(() => grey));
-    expect(dots.count).toBe(0);
+    expect(pointed.markers.count).toBe(0);
   });
 
   it('does not cut a route back at the points it passes', () => {
     // Arrange
-    const through = route(lineOf([0, 0], [1, 0], [2, 0]));
+    const route = airway('conv', 'R', [0, 0], [1, 0], [2, 0]);
+    const chart = [route, stopAt('fix', [1, 0])];
 
     // Act
-    const {
-      traces: [, lines],
-    } = tracesOf({ pointedAt: through, searched: [], project });
+    const { pointed } = sceneOf(chart).traces({ pointedAt: route, searched: [] });
 
     // Assert
-    expect(segments(lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(segments(pointed.lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  it("draws a point as its layer's own symbol, one for each part", () => {
+  it('draws a point as the chart draws it, one for each part, in the hover grey', () => {
     // Arrange
     const layers = ['ad', 'fix', 'vfr'] as const;
-    const pointed = layers.map((layer) => point(layer, pointAt([1, 2]), pointAt([3, 4])));
+    const items = layers.map((layer) =>
+      itemOf(layer, partOf(layer, point([1, 2])), partOf(layer, point([3, 4]))),
+    );
+    const chartMarkers = items.map((item) => markers(sceneOf([item]).shapes().markers));
 
     // Act
-    const traced = pointed.map(
-      (pointedAt) => tracesOf({ pointedAt, searched: [], project }).tracedPoints[3],
-    );
+    const traced = items.map((pointedAt) => tracesOf({ pointedAt, searched: [] }).pointed.markers);
 
     // Assert
-    const expected = layers.map((layer) => {
-      const { shape, size } = LAYER_STYLES[layer];
-      return [
-        { at: [1, 2], size, shape, color: grey },
-        { at: [3, 4], size, shape, color: grey },
-      ];
-    });
-    expect(traced.map(markers)).toEqual(expected);
+    expect(traced.map((batch) => markers(batch).map(shapeOf))).toEqual(
+      chartMarkers.map((rows) => rows.map(shapeOf)),
+    );
+    expect(traced.flatMap((batch) => markers(batch).map((m) => m.color))).toEqual(
+      traced.flatMap((batch) => markers(batch).map(() => grey)),
+    );
   });
 
   it('draws a navaid as its own symbol, each part its own kind', () => {
     // Arrange
-    const kinds = ['VORTAC', 'NDB'];
-    const at: Position[] = [
-      [1, 2],
-      [3, 4],
-    ];
-    const navaid: ChartItem = {
-      key: 'navaid',
-      layer: 'navaid',
-      parts: kinds.map((kind, i) => ({
-        geometry: pointAt(at[i] ?? [0, 0]),
-        properties: { layer: 'navaid', id: 'Q', kind },
-      })),
-    };
-    const expectedLines = new LineBatch();
-    const expectedMarkers = new MarkerBatch();
-    kinds.forEach((kind, i) => {
-      const [x, y] = at[i] ?? [0, 0];
-      putFigure(
-        { lines: expectedLines, markers: expectedMarkers },
-        { x, y },
-        navaidSymbol(kind, 12),
-        THEME.hover,
-      );
-    });
+    const mixed = itemOf(
+      'navaid',
+      partOf('navaid', point([1, 2]), { kind: 'VORTAC' }),
+      partOf('navaid', point([3, 4]), { kind: 'NDB' }),
+    );
+    const alone = (item: ReturnType<typeof navaid>) =>
+      tracesOf({ pointedAt: item, searched: [] }).pointed;
+    const first = alone(navaid('VORTAC', [1, 2]));
+    const second = alone(navaid('NDB', [3, 4]));
 
     // Act
-    const { tracedPoints } = tracesOf({ pointedAt: navaid, searched: [], project });
+    const { pointed } = tracesOf({ pointedAt: mixed, searched: [] });
 
     // Assert
-    const [, , lines, dots] = tracedPoints;
-    expect([lines.kind, Array.from(lines.data)]).toEqual([
-      'lines',
-      Array.from(expectedLines.finish().data),
+    expect(first.strokes.count).not.toBe(second.strokes.count);
+    expect(segments(pointed.strokes)).toEqual([
+      ...segments(first.strokes),
+      ...segments(second.strokes),
     ]);
-    expect(Array.from(dots.data)).toEqual(Array.from(expectedMarkers.finish().data));
+    expect(markers(pointed.markers)).toEqual([
+      ...markers(first.markers),
+      ...markers(second.markers),
+    ]);
   });
 
-  it('draws a pointed hold as its racetrack outline, without chevrons', () => {
+  it("draws a pointed hold as the chart's racetrack outline, without its chevrons", () => {
     // Arrange
-    const hold = item('hold', { layer: 'hold', turn: 'R', inboundTrue: 90 }, pointAt([1, 2]));
+    const pointedAt = hold([1, 2]);
+    const chart = segments(sceneOf([pointedAt]).shapes().lines);
+    const outline = chart.filter((s) => s.width === 1);
 
     // Act
-    const {
-      traces: [, lines],
-    } = tracesOf({ pointedAt: hold, searched: [], project });
+    const { pointed } = tracesOf({ pointedAt, searched: [] });
 
     // Assert
-    const drawn = instances(lines);
-    expect(drawn).toHaveLength(18);
+    const drawn = segments(pointed.lines);
+    expect(chart.length).toBeGreaterThan(outline.length);
+    expect(drawn.map((s) => [s.offsetA, s.offsetB])).toEqual(
+      outline.map((s) => [s.offsetA, s.offsetB]),
+    );
     expect(drawn.map((s) => [s.width, s.color])).toEqual(drawn.map(() => [2, grey]));
     expect(drawn.map((s) => s.a)).toEqual(drawn.map(() => ({ x: 1, y: 2 })));
-    const inbound = drawn.at(-1);
-    expect(inbound?.offsetA.x).toBeCloseTo(-18);
-    expect(inbound?.offsetA.y).toBeCloseTo(0);
-    expect(inbound?.offsetB.x).toBeCloseTo(0);
-    expect(inbound?.offsetB.y).toBeCloseTo(0);
   });
 
   it('turns a pointed hold without inboundTrue by the declination at its fix', () => {
     // Arrange
-    const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 97 }, pointAt([1, 2]));
+    const pointedAt = hold([1, 2], { inboundMag: 97 });
 
     // Act
-    const {
-      traces: [, lines],
-    } = tracesOf({ pointedAt: hold, searched: [], project, declinationAt: () => () => -7 });
+    const { pointed } = tracesOf({ pointedAt, searched: [] }, { declinationAt: WEST });
 
     // Assert
-    const inbound = instances(lines).at(-1);
+    const inbound = segments(pointed.lines).at(-1);
     expect(inbound?.offsetA.x).toBeCloseTo(-18);
     expect(inbound?.offsetA.y).toBeCloseTo(0);
   });
 
-  it('draws nothing when nothing is pointed at', () => {
-    // Arrange
-    const none = null;
-
-    // Act
-    const {
-      traces: [, lines],
-      tracedPoints: [, , , dots],
-    } = tracesOf({ pointedAt: none, searched: [], project });
-
-    // Assert
-    expect([lines.count, dots.count]).toEqual([0, 0]);
-  });
-
   it('draws what the search names at half strength, a point as its own symbol', () => {
     // Arrange
-    const found = [area(lineOf([0, 0], [1, 0], [1, 1])), fix(pointAt([5, 6]))];
+    const searched = [area(line([0, 0], [1, 0], [1, 1])), fix([5, 6])];
+    const chartMarkers = markers(sceneOf([fix([5, 6])]).shapes().markers);
 
     // Act
-    const {
-      traces: [lines],
-      tracedPoints: [, dots],
-    } = tracesOf({ pointedAt: null, searched: found, project });
+    const { searched: found } = tracesOf({ pointedAt: null, searched });
 
     // Assert
-    const drawn = segments(lines);
+    const drawn = segments(found.lines);
     expect(drawn.map((x) => x.color)).toEqual(drawn.map(() => faint));
     expect(drawn.map((x) => [x.width, x.pattern])).toEqual(drawn.map(() => [2, [0, 0, 0, 0]]));
-    const { shape, size } = LAYER_STYLES.fix;
-    expect(markers(dots)).toEqual([{ at: [5, 6], size, shape, color: faint }]);
+    expect(markers(found.markers).map(shapeOf)).toEqual(chartMarkers.map(shapeOf));
+    expect(markers(found.markers).map((m) => m.color)).toEqual([faint]);
     expect(faint[3]).toBeCloseTo(128 / 255, 2);
   });
 
   it('draws a hold the search names as its racetrack at half strength', () => {
     // Arrange
-    const hold = item('hold', { layer: 'hold', turn: 'L', inboundTrue: 0 }, pointAt([1, 2]));
+    const searched = [hold([1, 2], { turn: 'L', inboundTrue: 0 })];
 
     // Act
-    const {
-      traces: [lines],
-    } = tracesOf({ pointedAt: null, searched: [hold], project });
+    const { searched: found } = tracesOf({ pointedAt: null, searched });
 
     // Assert
-    const drawn = instances(lines);
-    expect(drawn).toHaveLength(18);
+    const drawn = segments(found.lines);
+    expect(drawn.length).toBeGreaterThan(0);
     expect(drawn.map((s) => [s.width, s.color])).toEqual(drawn.map(() => [2, faint]));
   });
 
   it('puts the search first and what is pointed at over it, an item in both drawn in both', () => {
     // Arrange
-    const both = fix(pointAt([1, 2]));
-    const onlySearched = area(lineOf([0, 0], [1, 0]));
+    const both = fix([1, 2]);
+    const onlySearched = area(line([0, 0], [1, 0]));
 
     // Act
-    const {
-      traces: [searchLines, pointedLines],
-      tracedPoints: [, searchDots, , pointedDots],
-    } = tracesOf({
-      pointedAt: both,
-      searched: [onlySearched, both],
-      project,
-    });
+    const { searched, pointed } = tracesOf({ pointedAt: both, searched: [onlySearched, both] });
 
     // Assert
-    expect(segments(searchLines)).toHaveLength(1);
-    expect(markers(searchDots).map((m) => m.color)).toEqual([faint]);
-    expect(pointedLines.count).toBe(0);
-    expect(markers(pointedDots).map((m) => m.color)).toEqual([grey]);
+    expect(segments(searched.lines)).toHaveLength(1);
+    expect(markers(searched.markers).map((m) => m.color)).toEqual([faint]);
+    expect(pointed.lines.count).toBe(0);
+    expect(markers(pointed.markers).map((m) => m.color)).toEqual([grey]);
   });
 
   it('gives only empty batches when nothing is searched or pointed at', () => {
     // Arrange
-    const none = { pointedAt: null, searched: [], project };
+    const nothing = { pointedAt: null, searched: [] };
 
     // Act
-    const { traces, tracedPoints } = tracesOf(none);
+    const { searched, pointed, litTraces, litPoints } = tracesOf(nothing);
 
     // Assert
-    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0]);
+    const batches = [...Object.values(searched), ...Object.values(pointed)];
+    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0]);
+    expect([litTraces.length, litPoints.length]).toEqual([0, 0]);
   });
 
-  it("puts a route's highlight in traces, after its lines, and none in tracedPoints", () => {
+  it("puts a route's highlight in the traces, and none among the traced points", () => {
     // Arrange
-    const highlight = [batchOf('lines'), batchOf('text'), batchOf('lines')];
-    const input = { pointedAt: route(lineOf([0, 0], [1, 0])), searched: [], project, highlight };
+    const route = airway('conv', 'V901', [0, 0], [2, 0]);
 
     // Act
-    const { traces, tracedPoints } = tracesOf(input);
+    const { litTraces, litPoints } = tracesOf({ pointedAt: route, searched: [] });
 
     // Assert
-    expect(traces.slice(2)).toEqual(highlight);
-    expect(traces.slice(2).every((b, i) => b === highlight[i])).toBe(true);
-    expect(tracedPoints).toHaveLength(4);
+    expect(litTraces.map((b) => b.kind)).toEqual(['lines', 'text', 'lines']);
+    expect(litTraces.filter((b) => b.kind === 'text').map(spelled)).toEqual(['V901']);
+    expect(litPoints).toHaveLength(0);
   });
 
-  it("puts a point's highlight in tracedPoints, after its symbol, and none in traces", () => {
+  it("puts a point's highlight among the traced points, and none in the traces", () => {
     // Arrange
-    const highlight = [batchOf('lines'), batchOf('text'), batchOf('lines')];
-    const input = { pointedAt: fix(pointAt([1, 2])), searched: [], project, highlight };
+    const pointedAt = single('fix', point([1, 2]));
 
     // Act
-    const { traces, tracedPoints } = tracesOf(input);
+    const { litTraces, litPoints } = tracesOf({ pointedAt, searched: [] });
 
     // Assert
-    expect(tracedPoints.slice(4)).toEqual(highlight);
-    expect(tracedPoints.slice(4).every((b, i) => b === highlight[i])).toBe(true);
-    expect(traces).toHaveLength(2);
+    expect(litPoints.map((b) => b.kind)).toEqual(['lines', 'text', 'lines']);
+    expect(litPoints.filter((b) => b.kind === 'text').map(spelled)).toEqual(['Q']);
+    expect(litTraces).toHaveLength(0);
   });
 });

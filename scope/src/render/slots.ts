@@ -1,20 +1,4 @@
-import { DRAW_STACK, isStyled } from '../lib/layers';
-import type { Layer } from '../lib/mapsetFormat';
 import type { Batch, BatchKind } from './protocol';
-
-/** The layers from `first` to `last` of the draw stack, front first. */
-const stackSlice = (first: Layer, last: Layer) =>
-  DRAW_STACK.slice(DRAW_STACK.indexOf(first), DRAW_STACK.indexOf(last) + 1).filter(isStyled);
-
-/**
- * The chart is built in three slices of the draw stack, so a toggle rebuilds only the slices that
- * read its layer. Each fills a slot for its lines and markers and one for its labels.
- */
-export const CHART_SLICES = [
-  { layers: stackSlice('ctr', 'asr'), shapes: 'areaLines', labels: 'areaLabels' },
-  { layers: stackSlice('sid', 'hold'), shapes: 'routeLines', labels: 'routeLabels' },
-  { layers: stackSlice('ad', 'vfr'), shapes: 'pointMarkers', labels: 'pointLabels' },
-] as const;
 
 /**
  * Every slot the scope draws, back to front: the base map, the lines of the chart, its route and
@@ -61,25 +45,6 @@ const HIGHLIGHT_SLOTS: ReadonlySet<SlotName> = new Set(['traces', 'tracedPoints'
 
 /** The batches a builder hands the renderer, by the slots it fills. */
 export type Slots = Partial<Record<SlotName, Batch[]>>;
-
-/** What a slice builds of its shapes: its lines and its markers. */
-export interface ShapeBatches {
-  lines: Batch;
-  markers: Batch;
-}
-
-/** A slice's built shapes as the slots they go to. */
-export function shapeSlots(
-  slice: (typeof CHART_SLICES)[number],
-  { lines, markers }: ShapeBatches,
-): Slots {
-  return { [slice.shapes]: [lines, markers] };
-}
-
-/** A slice's built labels as the slot they go to. */
-export function labelSlots(slice: (typeof CHART_SLICES)[number], labels: Batch[]): Slots {
-  return { [slice.labels]: labels };
-}
 
 /** A pipeline: one per batch kind, and the halo pass of text. */
 export type Pass = BatchKind | 'halo';
