@@ -1,6 +1,7 @@
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { isRouteLayer } from '../../lib/mapsetFormat';
+import { lengthOf } from '../../lib/polyline';
 import { type Cuts, NO_CUTS, type Span, spansOf, stopCuts } from '../../lib/stops';
 import { isUpperStratum } from '../../lib/stratum';
 import {
@@ -12,7 +13,7 @@ import {
   type Stretch,
 } from '../../lib/topology';
 import { LAYER_STYLES, type LineLayerStyle } from './layerStyles';
-import { type Anchor, chordOf, type LineBatch, type LineStyle, type SpanPlace } from './pack';
+import { type Anchor, type LineBatch, type LineStyle, type SpanPlace } from './pack';
 import { route } from './paths';
 
 /** A line's form in the layer's style, refined by the part's kind and stratum. */
@@ -22,9 +23,6 @@ function lineLook(style: LineLayerStyle, part: ItemPart): LineStyle {
   const upper = isUpperStratum(part) ? style.upper : undefined;
   return { ...style, ...byKind, ...upper };
 }
-
-const lengthOf = (points: readonly Anchor[]): number =>
-  points.slice(1).reduce((sum, p, i) => sum + chordOf(points[i] ?? p, p), 0);
 
 /**
  * The polylines of a span's runs, each with its place in the span: the geodesic of every edge of

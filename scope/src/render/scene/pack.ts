@@ -1,3 +1,4 @@
+import { chordOf } from '../../lib/polyline';
 import {
   type AtlasInfo,
   type Batch,
@@ -14,9 +15,6 @@ export interface Anchor {
   px?: number;
   py?: number;
 }
-
-/** The distance between two anchors on the world plane. */
-export const chordOf = (a: Anchor, b: Anchor): number => Math.hypot(b.x - a.x, b.y - a.y);
 
 export type Rgba = [number, number, number, number];
 
