@@ -17,6 +17,7 @@ import type { LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
 import {
   CHART_SLICES,
+  LABEL_SLOTS,
   SLOT_ORDER,
   labelSlots,
   type Slots,
@@ -24,7 +25,7 @@ import {
   type SlotName,
 } from '../slots';
 import { atlas } from './atlasFixture';
-import { buildLabels, buildShapes } from './chart';
+import { buildShapes, buildSliceLabels } from './chart';
 import { project } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
@@ -64,14 +65,14 @@ const shapesOf = (chart: Chart, layers: readonly StyledLayer[]) =>
   buildShapes(drawnOf(chart, layers));
 
 /** A slice's labels built as the scope builds them. */
-const labelsOf = (chart: Chart, layers: readonly StyledLayer[], labelDensity: LabelDensity) =>
-  buildLabels({ ...drawnOf(chart, layers), labelDensity, atlas });
+const labelsOf = (chart: Chart, slice: (typeof CHART_SLICES)[number], labelDensity: LabelDensity) =>
+  buildSliceLabels(slice, { ...drawnOf(chart, slice.layers), labelDensity, atlas });
 
 /** Everything the scope draws from the map, as the effects post it. */
 function mapSlots(chart: Chart): Slots {
   const slots: Slots = {};
   for (const slice of CHART_SLICES) {
-    const labels = labelsOf(chart, slice.layers, 'dense');
+    const labels = labelsOf(chart, slice, 'dense');
     Object.assign(
       slots,
       shapeSlots(slice, shapesOf(chart, slice.layers)),
@@ -97,10 +98,18 @@ function mapSlots(chart: Chart): Slots {
   return slots;
 }
 
+/** The slots of shapes: a route label slot also holds the gaps it cuts in lines. */
+const SHAPE_SLOTS = SLOT_ORDER.filter((name) => !LABEL_SLOTS.includes(name));
+
 /** The x each instance is anchored at, in the order the renderer draws them. */
-function xsInDrawOrder(slots: Slots, kind: Batch['kind']): number[] {
+function xsInDrawOrder(
+  slots: Slots,
+  kind: Batch['kind'],
+  names: readonly SlotName[] = SLOT_ORDER,
+): number[] {
   const stride = { lines: LINE_STRIDE, markers: MARKER_STRIDE, text: TEXT_STRIDE }[kind];
-  return SLOT_ORDER.flatMap((name) => slots[name] ?? [])
+  return names
+    .flatMap((name) => slots[name] ?? [])
     .filter((b) => b.kind === kind)
     .flatMap((b) => Array.from({ length: b.count }, (_, i) => Math.round(b.data[i * stride] ?? 0)));
 }
@@ -114,7 +123,17 @@ const kindsInDrawOrder = (slots: Slots): Batch['kind'][] =>
 describe('the draw order of the chart', () => {
   const chart = CHART_LAYERS.map(itemAt);
   const behind = DRAW_STACK.toReversed();
-  const unlabelled: ReadonlySet<ScopeLayer> = new Set(['fir', 'adiz', 'dct', 'hold', 'coast']);
+  const unlabelled: ReadonlySet<ScopeLayer> = new Set([
+    'fir',
+    'adiz',
+    'dct',
+    'hold',
+    'coast',
+    // A procedure is named once, on a span that fits, not where it is drawn.
+    'sid',
+    'star',
+    'trans',
+  ]);
 
   it('draws lines back to front through the stack, the base map first', () => {
     // Arrange
@@ -124,7 +143,7 @@ describe('the draw order of the chart', () => {
     const slots = mapSlots(chart);
 
     // Assert
-    expect(xsInDrawOrder(slots, 'lines')).toEqual(lineLayers.map(at));
+    expect(xsInDrawOrder(slots, 'lines', SHAPE_SLOTS)).toEqual(lineLayers.map(at));
   });
 
   it('draws the markers back to front', () => {
@@ -158,15 +177,16 @@ describe('the draw order of the chart', () => {
 
     // Assert
     expect(kinds.indexOf('markers')).toBeGreaterThan(kinds.lastIndexOf('text'));
-    expect(kinds.lastIndexOf('lines')).toBeLessThan(kinds.indexOf('text'));
   });
 });
 
 /** The halo of every glyph of a slot. */
 const haloOf = (slots: Slots, name: SlotName) =>
-  (slots[name] ?? []).flatMap(({ data, count }) =>
-    Array.from({ length: count }, (_, i) => data[i * TEXT_STRIDE + 15] ?? 0),
-  );
+  (slots[name] ?? [])
+    .filter((b) => b.kind === 'text')
+    .flatMap(({ data, count }) =>
+      Array.from({ length: count }, (_, i) => data[i * TEXT_STRIDE + 15] ?? 0),
+    );
 
 describe('the halo of a label', () => {
   it('is on every map label and on no ring label', () => {

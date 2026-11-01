@@ -90,6 +90,10 @@ export function drawRuns(
   }
 }
 
+/** The parts of the items to draw. */
+export const partsOf = (items: readonly ChartItem[]): Set<ItemPart> =>
+  new Set(items.flatMap((item) => item.parts));
+
 /** The stops of the routes: where the drawn points stand, if a route item is among those to draw. */
 export function routeCuts(
   items: readonly ChartItem[],

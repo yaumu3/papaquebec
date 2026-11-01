@@ -9,17 +9,19 @@ interface Refinement {
   dash: DashPattern;
 }
 
-/** How a layer's items are named on the chart: from which label density up, and where. */
+/** How a layer's items are named on the chart: from which label density up, and in what. */
 export interface LabelStyle {
   from: Exclude<LabelDensity, 'off'>;
   color: string;
   size: number;
+}
+
+/** A label that hangs off an anchor: a point's ident, or an area's name for now. */
+export interface PointLabelStyle extends LabelStyle {
   /** CSS px from the anchor. */
   px: number;
   py: number;
   baseline: NonNullable<TextStyle['baseline']>;
-  /** Where on the item's first path the label hangs. */
-  at: 'first' | 'middle';
 }
 
 /** How a layer of lines is drawn: its colour and form, refined by a part's kind or stratum. */
@@ -29,7 +31,7 @@ export interface LineLayerStyle {
   dash?: DashPattern;
   kinds?: ReadonlyMap<string, Refinement>;
   upper?: Refinement;
-  label?: LabelStyle;
+  label?: LabelStyle | PointLabelStyle;
 }
 
 /** How a layer of points is drawn. */
@@ -37,7 +39,7 @@ export interface PointLayerStyle {
   shape: Shape;
   size: number;
   color: string;
-  label: LabelStyle;
+  label: PointLabelStyle;
 }
 
 /** A layer's style: lines or points. */
@@ -46,31 +48,16 @@ export type LayerStyle = LineLayerStyle | PointLayerStyle;
 const SOLID: Refinement = { dash: [] };
 
 /** A label's form but for its colour, which each layer gives. */
-type LabelPlace = Omit<LabelStyle, 'color'>;
+type LabelPlace = Omit<PointLabelStyle, 'color'>;
 
-const AREA_LABEL: LabelPlace = {
-  from: 'dense',
-  size: 9,
-  px: 4,
-  py: 2,
-  baseline: 'top',
-  at: 'first',
-};
-const ROUTE_LABEL: LabelPlace = {
-  from: 'normal',
-  size: 9,
-  px: 4,
-  py: -6,
-  baseline: 'bottom',
-  at: 'middle',
-};
+const AREA_LABEL: LabelPlace = { from: 'dense', size: 9, px: 4, py: 2, baseline: 'top' };
+const ROUTE_LABEL: Omit<LabelStyle, 'color'> = { from: 'normal', size: 9 };
 const FIX_LABEL: LabelPlace = {
   from: 'normal',
   size: 9,
   px: 5,
   py: -3,
   baseline: 'bottom',
-  at: 'first',
 };
 const STATION_LABEL: LabelPlace = {
   from: 'sparse',
@@ -78,7 +65,6 @@ const STATION_LABEL: LabelPlace = {
   px: 8,
   py: -1,
   baseline: 'middle',
-  at: 'first',
 };
 
 const line = (color: string, rest: Omit<LineLayerStyle, 'color'> = {}): LineLayerStyle => ({

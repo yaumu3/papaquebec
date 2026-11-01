@@ -349,20 +349,6 @@ describe('buildShapes shared edges', () => {
     // Assert
     expect(lines.count).toBe(2);
   });
-
-  it('labels an item from its whole path even when it owns none of its edges', () => {
-    // Arrange
-    const items = [
-      itemOf('conv', partOf('conv', line([0, 0], [1, 0], [2, 0]))),
-      itemOf('rnav', partOf('rnav', line([0, 0], [1, 0], [2, 0]))),
-    ];
-
-    // Act
-    const { labels } = build(items, ['conv', 'rnav'], 'dense');
-
-    // Assert
-    expect(glyphs(labels).map((g) => g.at.x)).toEqual([1, 1]);
-  });
 });
 
 const chord = ({ a, b }: Instance) => Math.hypot(b.x - a.x, b.y - a.y);
@@ -645,12 +631,7 @@ describe('buildLabels', () => {
       ['navaid', 'sparse'],
       ['fix', 'normal'],
       ['sector', 'normal'],
-      ['conv', 'normal'],
-      ['rnav', 'normal'],
-      ['trans', 'normal'],
       ['vfr', 'dense'],
-      ['sid', 'dense'],
-      ['star', 'dense'],
       ['ctr', 'dense'],
       ['pr', 'dense'],
       ['tma', 'dense'],
@@ -662,7 +643,6 @@ describe('buildLabels', () => {
       ['asr', 'dense'],
       ['fir', null],
       ['adiz', null],
-      ['dct', null],
     ];
     const expected = from.map(([, first]) =>
       LABEL_DENSITIES.map((d) => (first !== null && rank(d) >= rank(first) ? 1 : 0)),
@@ -727,21 +707,17 @@ describe('buildLabels', () => {
     expect(glyphs(labels).map((g) => g.at.x)).toEqual([0, 5]);
   });
 
-  it('puts a route label at the middle of its path and an area label at its start', () => {
+  it('puts an area label at the start of its path', () => {
     // Arrange
     const path = line([0, 0], [1, 0], [2, 0]);
-    const rows: [StyledLayer, number][] = [
-      ['conv', 1],
-      ['ctr', 0],
-    ];
 
     // Act
-    const placed = rows.map(([layer]) =>
-      glyphs(build([onePart(layer, path)], [layer], 'dense').labels).map((g) => g.at.x),
+    const placed = glyphs(build([onePart('ctr', path)], ['ctr'], 'dense').labels).map(
+      (g) => g.at.x,
     );
 
     // Assert
-    expect(placed).toEqual(rows.map(([, x]) => [x]));
+    expect(placed).toEqual([0]);
   });
 
   it('colours each label by its layer', () => {
@@ -754,11 +730,6 @@ describe('buildLabels', () => {
       ['sector', '#5a7a8a'],
       ['asr', '#5a7a8a'],
       ['ctr', '#8a5050'],
-      ['conv', '#9a6a4c'],
-      ['rnav', '#4a8090'],
-      ['sid', '#40707c'],
-      ['star', '#40707c'],
-      ['trans', '#40707c'],
     ];
 
     // Act
@@ -797,7 +768,7 @@ describe('the chart hidden items', () => {
     ]);
   });
 
-  it('does not stop a route at a hidden fix, and gives it no marker or label', () => {
+  it('does not stop a route at a hidden fix, and gives the fix no marker or label', () => {
     // Arrange
     const items = [
       keyed('route', routeOf('conv', [0, 0], [1, 0], [2, 0])),
@@ -810,25 +781,22 @@ describe('the chart hidden items', () => {
 
     // Assert
     expect(built.map((b) => b.markers.count)).toEqual([1, 0]);
-    expect(built.map((b) => b.labels.count)).toEqual([2, 1]);
+    expect(built.map((b) => b.labels.count)).toEqual([1, 0]);
     expect(built.map((b) => instances(b.lines).some((i) => i.span.some((v) => v !== 0)))).toEqual([
       true,
       false,
     ]);
   });
 
-  it('gives a hidden route or area no label', () => {
+  it('gives a hidden area no label', () => {
     // Arrange
-    const items = [
-      keyed('route', routeOf('conv', [0, 0], [1, 0])),
-      keyed('area', itemOf('ctr', partOf('ctr', polygon(triangle(0))))),
-    ];
-    const rows: Reads[] = [{}, { stateOf: hiding('route', 'area') }];
+    const items = [keyed('area', itemOf('ctr', partOf('ctr', polygon(triangle(0)))))];
+    const rows: Reads[] = [{}, { stateOf: hiding('area') }];
 
     // Act
-    const built = rows.map((reads) => build(items, ['conv', 'ctr'], 'dense', reads));
+    const built = rows.map((reads) => build(items, ['ctr'], 'dense', reads));
 
     // Assert
-    expect(built.map((b) => b.labels.count)).toEqual([2, 0]);
+    expect(built.map((b) => b.labels.count)).toEqual([1, 0]);
   });
 });

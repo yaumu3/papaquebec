@@ -1,5 +1,5 @@
 import type { AtlasInfo } from '../render/protocol';
-import { buildLabels, buildShapes } from '../render/scene/chart';
+import { buildShapes, buildSliceLabels } from '../render/scene/chart';
 import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../render/slots';
 import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
 import { topology } from '../state/mapsets';
@@ -33,7 +33,8 @@ export function showChart(show: Show, projected: () => boolean): void {
       projected()
         ? labelSlots(
             slice,
-            buildLabels({
+            buildSliceLabels(slice, {
+              topology: topology(),
               drawnPoints,
               project: projectNm,
               layers: slice.layers,

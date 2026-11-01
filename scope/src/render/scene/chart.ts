@@ -1,4 +1,4 @@
-import { type ChartItem, type ItemPart, nameOf, outlinesOf } from '../../lib/chart';
+import { type ChartItem, nameOf, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
 import type { StyledLayer } from '../../lib/layers';
@@ -6,16 +6,17 @@ import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo, Batch } from '../protocol';
-import type { ShapeBatches } from '../slots';
+import type { CHART_SLICES, ShapeBatches } from '../slots';
 import {
   isPointStyle,
   LAYER_STYLES,
-  type LabelStyle,
   labelReaches,
   type LineLayerStyle,
+  type PointLabelStyle,
 } from './layerStyles';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
-import { drawRuns, routeCuts } from './runs';
+import { buildRouteLabels } from './routeLabels';
+import { drawRuns, partsOf, routeCuts } from './runs';
 
 export interface ShapesInput {
   topology: Topology;
@@ -28,17 +29,17 @@ export interface ShapesInput {
   drawnItems: readonly ChartItem[];
 }
 
-export interface LabelsInput extends Omit<ShapesInput, 'topology'> {
+export interface LabelsInput extends ShapesInput {
   labelDensity: LabelDensity;
   atlas: AtlasInfo;
 }
 
-function putLabel(name: string, at: Anchor, label: LabelStyle, labels: TextBatch) {
+function putLabel(name: string, at: Anchor, label: PointLabelStyle, labels: TextBatch) {
   const { px, py, size, color, baseline } = label;
   labels.text(name, { ...at, px, py }, size, color, { baseline, halo: true });
 }
 
-/** Names a line item once, from the first outline of its first part, if the density reaches it. */
+/** Names an area item once, at the start of the first outline of its first part, if the density reaches it. */
 function labelItem(
   item: ChartItem,
   style: LineLayerStyle,
@@ -49,9 +50,9 @@ function labelItem(
   const { label } = style;
   const [first] = item.parts;
   const name = first && nameOf(first);
-  if (!label || !first || name === undefined || !labelReaches(label, density)) return;
-  const path = geodesicLine(outlinesOf(first.geometry)[0] ?? [], project);
-  const at = label.at === 'middle' ? path[Math.floor(path.length / 2)] : path[0];
+  if (!label || !('px' in label) || !first || name === undefined) return;
+  if (!labelReaches(label, density)) return;
+  const [at] = geodesicLine(outlinesOf(first.geometry)[0] ?? [], project);
   if (at) putLabel(name, at, label, labels);
 }
 
@@ -64,10 +65,6 @@ const pointsIn = (
   drawnPoints()
     .filter((p) => p.layer === layer)
     .map(({ id, at: [lon, lat] }) => ({ id, at: project(lat, lon) }));
-
-/** The parts of the items to draw. */
-const partsOf = (items: readonly ChartItem[]): Set<ItemPart> =>
-  new Set(items.flatMap((item) => item.parts));
 
 /** The chart's lines and point markers, each back to front through the stack. */
 export function buildShapes({
@@ -116,4 +113,12 @@ export function buildLabels({
     }
   }
   return [labels.finish()];
+}
+
+/** The labels of a slice, each kind as it is placed: routes by span, areas and points as named. */
+export function buildSliceLabels(
+  slice: (typeof CHART_SLICES)[number],
+  input: LabelsInput,
+): Batch[] {
+  return slice.labels === 'routeLabels' ? buildRouteLabels(input) : buildLabels(input);
 }

@@ -47,6 +47,15 @@ export const isScopeMade = (layer: ScopeLayer) => layer === 'coast' || layer ===
 /** Whether a layer has a style: not `hold`, and not the two the scope makes itself. */
 export const isStyled = (layer: ScopeLayer) => layer !== 'hold' && !isScopeMade(layer);
 
+/**
+ * The layers of the airways, which ENR 3 of the AIP lists: a route a pilot files by its
+ * designator. Direct routes and procedures are not airways.
+ */
+export const AIRWAY_LAYERS = ['conv', 'rnav'] as const satisfies readonly Layer[];
+
+export const isAirwayLayer = (layer: ScopeLayer): layer is (typeof AIRWAY_LAYERS)[number] =>
+  (AIRWAY_LAYERS as readonly ScopeLayer[]).includes(layer);
+
 /** The groups of the Maps panel, in the order they are listed there, which is not the draw order. */
 export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
   { title: 'POINTS', layers: ['ad', 'navaid', 'fix', 'vfr'] },

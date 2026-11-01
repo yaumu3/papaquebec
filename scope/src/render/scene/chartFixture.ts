@@ -2,6 +2,7 @@ import { type ChartItem, type ItemPart } from '../../lib/chart';
 import type { StyledLayer } from '../../lib/layers';
 import { isPointLayer } from '../../lib/mapsetFormat';
 import { type Batch, LINE_STRIDE, TEXT_STRIDE } from '../protocol';
+import { atlas } from './atlasFixture';
 import { parseColor } from './pack';
 
 /** The scope plane for tests: x is the longitude and y the latitude. */
@@ -50,6 +51,9 @@ export const keyed = (key: string, item: ChartItem): ChartItem => ({ ...item, ke
 export interface Instance {
   a: { x: number; y: number };
   b: { x: number; y: number };
+  /** The CSS px offsets of the two ends from their world points. */
+  offsetA: { x: number; y: number };
+  offsetB: { x: number; y: number };
   width: number;
   along: number;
   pattern: number[];
@@ -67,6 +71,8 @@ export function instances(batch: Batch): Instance[] {
     return {
       a: at(0),
       b: at(4),
+      offsetA: at(2),
+      offsetB: at(6),
       width: d[o + 8] ?? 0,
       along: d[o + 9] ?? 0,
       pattern: Array.from(d.subarray(o + 10, o + 14)),
@@ -79,11 +85,21 @@ export function instances(batch: Batch): Instance[] {
 /** The unit floats a hex colour packs to. */
 export const packed = (hex: string) => parseColor(hex).map((c) => Math.fround(c));
 
-/** The glyph instances of a text batch: where each is anchored and the colour it is drawn in. */
+/** The glyph instances of a text batch, as they were packed. */
 export function glyphs(batch: Batch) {
   const d = batch.data;
-  return Array.from({ length: batch.count }, (_, i) => ({
-    at: { x: d[i * TEXT_STRIDE] ?? 0, y: d[i * TEXT_STRIDE + 1] ?? 0 },
-    color: Array.from(d.subarray(i * TEXT_STRIDE + 10, i * TEXT_STRIDE + 14)),
-  }));
+  return Array.from({ length: batch.count }, (_, i) => {
+    const o = i * TEXT_STRIDE;
+    const column = Math.round(((d[o + 6] ?? 0) * atlas.width) / atlas.cellW);
+    const row = Math.round(((d[o + 7] ?? 0) * atlas.height) / atlas.cellH);
+    return {
+      char: Array.from(atlas.chars)[row * atlas.columns + column] ?? '',
+      at: { x: d[o] ?? 0, y: d[o + 1] ?? 0 },
+      px: d[o + 2] ?? 0,
+      py: d[o + 3] ?? 0,
+      color: Array.from(d.subarray(o + 10, o + 14)),
+      angle: d[o + 14] ?? 0,
+      halo: d[o + 15] ?? 0,
+    };
+  });
 }
