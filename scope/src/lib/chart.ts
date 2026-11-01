@@ -29,6 +29,9 @@ const GRID_PER_DEGREE = 1e5;
 /** A coordinate's grid cell, an integer. */
 export const toGrid = (degrees: number): number => Math.round(degrees * GRID_PER_DEGREE);
 
+/** What names a position: the cells of its longitude and latitude, as one string. */
+export const gridIdentity = ([lon, lat]: LonLat): string => `${toGrid(lon)},${toGrid(lat)}`;
+
 /** What names an item within its layer: a designator, an id, or for a hold its pattern. */
 function naming({ properties: p, geometry: g }: MapSetFeature): unknown[] {
   if ('turn' in p) {
@@ -73,7 +76,7 @@ function isSameThing(a: ChartItem, b: ChartItem): boolean {
 function keyed(name: string, item: ChartItem): ChartItem {
   const [first] = positionsOf(item);
   return first && isPointLayer(item.layer)
-    ? { ...item, key: `${name}@${toGrid(first.lon)},${toGrid(first.lat)}` }
+    ? { ...item, key: `${name}@${gridIdentity([first.lon, first.lat])}` }
     : item;
 }
 

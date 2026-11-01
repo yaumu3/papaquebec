@@ -3,7 +3,7 @@
  * and the route's spans between stops are cut back from them.
  */
 
-import { toGrid } from './chart';
+import { gridIdentity } from './chart';
 import type { PointLayer } from './mapsetFormat';
 import type { ChartPath, ChartPoint, Stretch } from './topology';
 
@@ -53,9 +53,7 @@ export function spansOf(path: ChartPath, cuts: Cuts): Span[] {
  * direction sorts first. Made of positions, not vertex numbers, so it outlives a new topology.
  */
 export function spanIdentity(path: ChartPath, { from, to }: Stretch): string {
-  const ids = path.coordinates
-    .slice(from, to + 1)
-    .map(([lon, lat]) => `${toGrid(lon)},${toGrid(lat)}`);
+  const ids = path.coordinates.slice(from, to + 1).map(gridIdentity);
   const forward = ids.join(' ');
   const backward = ids.toReversed().join(' ');
   return forward < backward ? forward : backward;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { chartOf, type ItemPart, outlinesOf } from './chart';
+import { chartOf, gridIdentity, type ItemPart, outlinesOf } from './chart';
 import { direct } from './geodesic';
 import { type MapSetData, validateMapSet } from './mapset';
 import { EXAMPLE, EXAMPLE_LAYERS, feature, variant } from './mapsetCorpus';
@@ -342,5 +342,24 @@ describe('outlinesOf', () => {
 
     // Assert
     expect(outlines).toEqual([[[[3, 4]]], [line], [ring, hole]]);
+  });
+});
+
+describe('gridIdentity', () => {
+  it('names positions in one grid cell alike and others apart', () => {
+    // Arrange
+    const positions: [number, number][] = [
+      [130.123456, 33.7],
+      [130.123457, 33.7],
+      [130.12346, 33.70001],
+    ];
+
+    // Act
+    const [a, b, c] = positions.map(gridIdentity);
+
+    // Assert
+    expect(a).toBe('13012346,3370000');
+    expect(b).toBe(a);
+    expect(c).not.toBe(a);
   });
 });
