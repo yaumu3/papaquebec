@@ -1,56 +1,51 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
+import { type Chart, type ChartItem, chartOf } from '../../lib/chart';
 import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
-import { isPointLayer, type Layer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
+import { type Layer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import type { LayerState } from '../../lib/visibility';
 import { allShown, shownExcept } from '../../lib/visibilityFixture';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
-import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
+import { type Batch, MARKER_STRIDE, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildChart } from './chart';
-import { parseColor } from './pack';
-
-const project = (lat: number, lon: number) => ({ x: lon, y: lat });
-
-type Geometry = ItemPart['geometry'];
-type Position = [number, number];
-
-const line = (...at: Position[]): Geometry => ({ type: 'LineString', coordinates: at });
-const polygon = (...rings: Position[][]): Geometry => ({ type: 'Polygon', coordinates: rings });
-const point = (at: Position): Geometry => ({ type: 'Point', coordinates: at });
-/** A closed triangle, so its ring has three edges. */
-const triangle = (x: number): Position[] => [
-  [x, 0],
-  [x + 0.01, 0],
-  [x + 0.01, 0.01],
-  [x, 0],
-];
+import {
+  type Extra,
+  type Geometry,
+  glyphs,
+  type Instance,
+  instances,
+  itemOf,
+  keyed,
+  line,
+  packed,
+  partOf,
+  point,
+  polygon,
+  type Position,
+  project,
+  triangle,
+} from './chartFixture';
 
 const has = (layers: readonly string[], layer: string) => layers.includes(layer);
 
-/** What a test may add to a part: a kind, a name, or for an area a lower limit. */
-interface Extra {
-  kind?: string;
-  name?: string;
-  lower?: string;
-}
-
-/** The properties each group of layers carries; `extra` adds a kind, a name or a lower limit. */
-function partOf(layer: StyledLayer, geometry: Geometry, extra: Extra = {}): ItemPart {
-  const properties = isPointLayer(layer)
-    ? { layer, id: 'Q', ...extra }
-    : { layer, name: 'Q', ...extra };
-  return { geometry, properties };
-}
-
-const itemOf = (layer: StyledLayer, ...parts: ItemPart[]): ChartItem => ({
-  key: layer,
-  layer,
-  parts,
-});
+/** A map set holding one navaid. */
+const navaidSet = (id: string, at: Position) =>
+  parseMapSet({
+    type: 'FeatureCollection',
+    version: 2,
+    id,
+    title: id,
+    features: [
+      {
+        type: 'Feature',
+        properties: { layer: 'navaid', id: 'Q' },
+        geometry: { type: 'Point', coordinates: at },
+      },
+    ],
+  });
 
 /** What the scope reads to decide what draws: the navaid range and each layer's state. */
 interface Reads {
@@ -64,8 +59,6 @@ const hiding =
   () =>
     shownExcept(...keys);
 
-const keyed = (key: string, item: ChartItem): ChartItem => ({ ...item, key });
-
 const build = (
   items: Chart,
   layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
@@ -77,38 +70,6 @@ const build = (
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
   return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
 };
-
-interface Instance {
-  a: { x: number; y: number };
-  b: { x: number; y: number };
-  width: number;
-  along: number;
-  pattern: number[];
-  color: number[];
-  /** The distance back to the span's first stop and ahead to its last, and the two cuts. */
-  span: number[];
-}
-
-/** The instances of a lines batch, as they were packed. */
-function instances(batch: Batch): Instance[] {
-  const d = batch.data;
-  return Array.from({ length: batch.count }, (_, i) => {
-    const o = i * LINE_STRIDE;
-    const at = (k: number) => ({ x: d[o + k] ?? 0, y: d[o + k + 1] ?? 0 });
-    return {
-      a: at(0),
-      b: at(4),
-      width: d[o + 8] ?? 0,
-      along: d[o + 9] ?? 0,
-      pattern: Array.from(d.subarray(o + 10, o + 14)),
-      color: Array.from(d.subarray(o + 14, o + 18)),
-      span: Array.from(d.subarray(o + 18, o + 22)),
-    };
-  });
-}
-
-/** The unit floats a hex colour packs to. */
-const packed = (hex: string) => parseColor(hex).map((c) => Math.fround(c));
 
 describe('buildChart lines', () => {
   it('styles each layer, refined by the kind or the stratum of the part', () => {
@@ -635,20 +596,6 @@ describe('buildChart markers', () => {
 
   it('draws the same navaid of two sets once, with its label, and one elsewhere twice', () => {
     // Arrange
-    const navaidSet = (id: string, at: Position) =>
-      parseMapSet({
-        type: 'FeatureCollection',
-        version: 2,
-        id,
-        title: id,
-        features: [
-          {
-            type: 'Feature',
-            properties: { layer: 'navaid', id: 'Q' },
-            geometry: { type: 'Point', coordinates: at },
-          },
-        ],
-      });
     const rows: Position[] = [
       [139.8, 35.5],
       [139.8, 35.7],
@@ -679,15 +626,6 @@ describe('buildChart markers', () => {
     expect([batches.lines.count, batches.markers.count]).toEqual([1, 0]);
   });
 });
-
-/** The glyph instances of a text batch: where each is anchored and the colour it is drawn in. */
-function glyphs(batch: Batch) {
-  const d = batch.data;
-  return Array.from({ length: batch.count }, (_, i) => ({
-    at: { x: d[i * TEXT_STRIDE] ?? 0, y: d[i * TEXT_STRIDE + 1] ?? 0 },
-    color: Array.from(d.subarray(i * TEXT_STRIDE + 10, i * TEXT_STRIDE + 14)),
-  }));
-}
 
 const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
 

@@ -2,11 +2,9 @@ import { describe, expect, it } from 'bun:test';
 
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape } from '../protocol';
-import { parseColor } from './pack';
+import { packed, project } from './chartFixture';
 import { THEME } from './rules';
 import { buildTraces } from './traces';
-
-const project = (lat: number, lon: number) => ({ x: lon, y: lat });
 
 type Position = [number, number];
 
@@ -59,7 +57,6 @@ function markers({ data, count }: Batch) {
   });
 }
 
-const packed = (hex: string) => parseColor(hex).map((c) => Math.fround(c));
 const grey = packed(THEME.hover);
 const faint = packed(THEME.hoverFaint);
 

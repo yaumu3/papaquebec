@@ -18,9 +18,9 @@ import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../slots';
 import { atlas } from './atlasFixture';
 import { buildChart } from './chart';
+import { project } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
-const project = (lat: number, lon: number) => ({ x: lon, y: lat });
 const at = (layer: ScopeLayer) => DRAW_STACK.indexOf(layer);
 const isPoint = (layer: ScopeLayer): layer is (typeof POINT_LAYERS)[number] =>
   (POINT_LAYERS as readonly string[]).includes(layer);
