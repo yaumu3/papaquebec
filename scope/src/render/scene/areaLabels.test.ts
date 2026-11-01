@@ -212,7 +212,7 @@ describe('buildAreaLabels', () => {
     expect(counts).toEqual(expected);
   });
 
-  it('colours each name by its layer, and gives a hidden area none', () => {
+  it('colours each name by its layer', () => {
     // Arrange
     const rows: [StyledLayer, string][] = [
       ['ctr', '#8a5050'],
@@ -223,10 +223,19 @@ describe('buildAreaLabels', () => {
 
     // Act
     const colours = rows.map(([layer]) => glyphs(build(items, [layer]))[0]?.color);
-    const hidden = build(items, ['ctr'], 'dense', ['ctr']);
 
     // Assert
     expect(colours).toEqual(rows.map(([, hex]) => packed(hex)));
+  });
+
+  it('gives a hidden area no name', () => {
+    // Arrange
+    const items = [keyed('ctr', itemOf('ctr', partOf('ctr', polygon(el))))];
+
+    // Act
+    const hidden = build(items, ['ctr'], 'dense', ['ctr']);
+
+    // Assert
     expect(hidden.count).toBe(0);
   });
 
@@ -353,14 +362,20 @@ describe('the sector row of buildAreaLabels', () => {
   it('writes the name alone below DENSE, and for an area that is not a sector', () => {
     // Arrange
     const ctr = itemOf('ctr', partOf('ctr', polygon(el), { name: 'Z55' }));
+    const rows: [ReturnType<typeof sector>, StyledLayer, LabelDensity][] = [
+      [z55, 'sector', 'normal'],
+      [ctr, 'ctr', 'dense'],
+    ];
 
     // Act
-    const normal = textOf(z55, 'normal');
-    const other = glyphs(build([ctr], ['ctr'], 'dense'));
+    const names = rows.map(([item, layer, density]) =>
+      glyphs(build([item], [layer], density))
+        .map((g) => g.char)
+        .join(''),
+    );
 
     // Assert
-    expect(normal.map((g) => g.char).join('')).toBe('Z55');
-    expect(other.map((g) => g.char).join('')).toBe('Z55');
+    expect(names).toEqual(['Z55', 'Z55']);
   });
 
   it('takes the frequency of the first part that has one', () => {
