@@ -8,6 +8,7 @@ import { DRAW_STACK, LAYER_GROUPS } from '../../src/lib/layers';
 import { FL_MAX } from '../../src/state/filter';
 import { cellOf, onScope, type Place, type Sheet } from './grid';
 import type { Clip } from './imageDiff';
+import { SPECIMEN_TITLE, specimenSheet } from './specimens';
 import { DRIFTING, FLEET, type Flight, LONE, LONE_FLIGHTS, placeOf } from './traffic';
 
 /** XQPA, the example set's aerodrome. */
@@ -143,6 +144,8 @@ const heldBlock = (name: string, dx: number, dy: number): Visit => ({
   ],
 });
 
+const { set: specimens, crops: elementCrops } = specimenSheet(EXAMPLE_SET, SITE);
+
 export const VISITS: readonly Visit[] = [
   {
     settings: NEAR_NORMAL,
@@ -175,6 +178,27 @@ export const VISITS: readonly Visit[] = [
     settings: { rangeNm: NEAR_NM, openGroups: GROUPS, openLayers: ['navaid'] },
     chart: EXAMPLE,
     steps: [{ name: 'tree/swatches', of: mapsPanel }],
+  },
+  {
+    settings: { rangeNm: NEAR_NM, openGroups: GROUPS, shownLayers: EVERY_LAYER },
+    chart: EXAMPLE,
+    steps: [{ name: 'tree/every-layer', of: mapsPanel }],
+  },
+  {
+    settings: {
+      rangeNm: NEAR_NM,
+      labelDensity: 'dense',
+      shownLayers: { ...EVERY_LAYER, rings: false },
+    },
+    chart: {
+      title: SPECIMEN_TITLE,
+      file: {
+        name: 'specimens.mapset.geojson',
+        mimeType: 'application/json',
+        buffer: Buffer.from(JSON.stringify(specimens)),
+      },
+    },
+    steps: [{ act: togglePanels, crops: elementCrops }],
   },
   {
     settings: {
