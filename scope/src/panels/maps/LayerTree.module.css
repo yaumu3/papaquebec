@@ -92,7 +92,8 @@
   grid-template-columns: var(--dot-w) 14px 12px var(--swatch-w) 1fr auto;
   padding-right: var(--space-4);
 }
-.itemRow > .drawing {
+.itemRow > .drawing,
+.itemRow > .swatch {
   justify-self: center;
 }
 .itemRow > .guide:nth-of-type(3) {

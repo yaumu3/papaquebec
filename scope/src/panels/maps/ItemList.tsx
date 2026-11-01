@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 
 import { isMouse } from '../../canvas/input/devices/mouse';
 import { cx } from '../../design/cx';
+import { itemKind } from '../../lib/chart';
 import { LAYER_NAMES, type ScopeLayer } from '../../lib/layers';
 import { itemsIn, type TreeItem } from '../../lib/treeItems';
 import { isItemShown, type LayerState } from '../../lib/visibility';
@@ -17,6 +18,7 @@ import {
 import { layerState } from '../../state/layerVisibility';
 import { scrollView } from '../lanes/scroll';
 import { Marked } from './Marked';
+import { NavaidSymbol } from './NavaidSymbol';
 
 import s from './LayerTree.module.css';
 
@@ -52,7 +54,11 @@ function ItemRow(props: {
               <span class={s.drawing} aria-hidden="true" />
               <span class={s.guide} aria-hidden="true" />
               <span class={s.guide} aria-hidden="true" />
-              <span />
+              <span class={s.swatch}>
+                <Show when={row().layer === 'navaid'}>
+                  <NavaidSymbol kind={itemKind(row())} />
+                </Show>
+              </span>
               <span class={s.name}>
                 <Marked text={row().name} />
               </span>
