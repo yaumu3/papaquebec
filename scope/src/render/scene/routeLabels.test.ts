@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, chartOf } from '../../lib/chart';
+import type { ShownMemory } from '../../lib/fits';
 import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
@@ -10,6 +11,7 @@ import type { LayerState } from '../../lib/visibility';
 import { allShown, shownExcept } from '../../lib/visibilityFixture';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { atlas } from './atlasFixture';
+import type { FitInput } from './chart';
 import {
   glyphs,
   instances,
@@ -32,6 +34,7 @@ function build(
   layers: readonly StyledLayer[],
   labelDensity: LabelDensity = 'dense',
   stateOf: (layer: Layer) => LayerState = allShown,
+  fit: FitInput = { settledScale: () => 1000, shown: new Map() },
 ) {
   const topology = topologyOf(items);
   const drawnItems = drawnItemsOf(items, layers, stateOf, () => true);
@@ -44,6 +47,7 @@ function build(
     drawnItems,
     labelDensity,
     atlas,
+    ...fit,
   });
   if (!gaps || !text) throw new Error('buildRouteLabels returned too few batches');
   return { gaps, text };
@@ -198,5 +202,39 @@ describe('buildRouteLabels', () => {
 
     // Assert
     expect(counts).toEqual(rows.map(([, expected]) => expected));
+  });
+
+  it('shows a label from its threshold, hides it below, and keeps its state between', () => {
+    // Arrange
+    const items = [stops('navaid', 0), airway('conv', 'V901', [0, 0], [2, 0])];
+    const layers: StyledLayer[] = ['conv', 'navaid'];
+    const threshold = widthOf(4) + 28;
+    const cut = 10 / 2 + 3;
+    const scaleOf = (multiple: number) => (multiple * threshold + cut) / 2;
+    const rows: [number[], boolean][] = [
+      [[1.01], true],
+      [[0.99], false],
+      [[1.2, 1.05], true],
+      [[1.2, 1.05, 0.99], false],
+      [[0.99, 1.05], false],
+      [[0.99, 1.05, 1.2], true],
+    ];
+    const memories = rows.map(([multiples]) => {
+      const shown: ShownMemory = new Map();
+      for (const multiple of multiples.slice(0, -1)) {
+        build(items, layers, 'dense', allShown, { settledScale: () => scaleOf(multiple), shown });
+      }
+      return shown;
+    });
+
+    // Act
+    const drawn = rows.map(([multiples], i) => {
+      const settledScale = () => scaleOf(multiples.at(-1) ?? 0);
+      const shown = memories[i] ?? new Map();
+      return build(items, layers, 'dense', allShown, { settledScale, shown }).text.count > 0;
+    });
+
+    // Assert
+    expect(drawn).toEqual(rows.map(([, expected]) => expected));
   });
 });

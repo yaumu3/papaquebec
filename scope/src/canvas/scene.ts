@@ -117,7 +117,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       : null,
   );
 
-  showChart(show, projected);
+  const layoutScale = settledScale(view);
+  showChart(show, projected, layoutScale);
 
   show(() =>
     projected()
@@ -131,7 +132,6 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       : null,
   );
 
-  const layoutScale = settledScale(view);
   /**
    * Bumped once the blocks are placed: on each snapshot, a drop, a settled zoom or a change in
    * what is shown, never on a pan. The targets and the hover over them follow it.

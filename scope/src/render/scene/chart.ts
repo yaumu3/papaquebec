@@ -1,4 +1,5 @@
 import { type ChartItem, nameOf, outlinesOf } from '../../lib/chart';
+import type { ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
 import type { StyledLayer } from '../../lib/layers';
@@ -32,6 +33,13 @@ export interface ShapesInput {
 export interface LabelsInput extends ShapesInput {
   labelDensity: LabelDensity;
   atlas: AtlasInfo;
+}
+
+/** What a label that must fit reads: the settled scale (px per NM) and what was shown before. */
+export interface FitInput {
+  /** Read only by labels that test their room, so only they follow a settled zoom. */
+  settledScale: () => number;
+  shown: ShownMemory;
 }
 
 function putLabel(name: string, at: Anchor, label: PointLabelStyle, labels: TextBatch) {
@@ -118,7 +126,7 @@ export function buildLabels({
 /** The labels of a slice, each kind as it is placed: routes by span, areas and points as named. */
 export function buildSliceLabels(
   slice: (typeof CHART_SLICES)[number],
-  input: LabelsInput,
+  input: LabelsInput & FitInput,
 ): Batch[] {
   return slice.labels === 'routeLabels' ? buildRouteLabels(input) : buildLabels(input);
 }

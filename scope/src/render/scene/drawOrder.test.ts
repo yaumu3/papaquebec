@@ -64,9 +64,18 @@ function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
 const shapesOf = (chart: Chart, layers: readonly StyledLayer[]) =>
   buildShapes(drawnOf(chart, layers));
 
+/** A settled scale at which every label of the fixture has room. */
+const ROOMY = 1e6;
+
 /** A slice's labels built as the scope builds them. */
 const labelsOf = (chart: Chart, slice: (typeof CHART_SLICES)[number], labelDensity: LabelDensity) =>
-  buildSliceLabels(slice, { ...drawnOf(chart, slice.layers), labelDensity, atlas });
+  buildSliceLabels(slice, {
+    ...drawnOf(chart, slice.layers),
+    labelDensity,
+    atlas,
+    settledScale: () => ROOMY,
+    shown: new Map(),
+  });
 
 /** Everything the scope draws from the map, as the effects post it. */
 function mapSlots(chart: Chart): Slots {
