@@ -15,7 +15,14 @@ import {
 import { allShown } from '../../lib/visibilityFixture';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
-import { CHART_SLICES, SLOT_ORDER, labelSlots, type Slots, shapeSlots } from '../slots';
+import {
+  CHART_SLICES,
+  SLOT_ORDER,
+  labelSlots,
+  type Slots,
+  shapeSlots,
+  type SlotName,
+} from '../slots';
 import { atlas } from './atlasFixture';
 import { buildLabels, buildShapes } from './chart';
 import { project } from './chartFixture';
@@ -152,6 +159,29 @@ describe('the draw order of the chart', () => {
     // Assert
     expect(kinds.indexOf('markers')).toBeGreaterThan(kinds.lastIndexOf('text'));
     expect(kinds.lastIndexOf('lines')).toBeLessThan(kinds.indexOf('text'));
+  });
+});
+
+/** The halo of every glyph of a slot. */
+const haloOf = (slots: Slots, name: SlotName) =>
+  (slots[name] ?? []).flatMap(({ data, count }) =>
+    Array.from({ length: count }, (_, i) => data[i * TEXT_STRIDE + 15] ?? 0),
+  );
+
+describe('the halo of a label', () => {
+  it('is on every map label and on no ring label', () => {
+    // Arrange
+    const slots = mapSlots(CHART_LAYERS.map(itemAt));
+    const mapLabels: SlotName[] = ['areaLabels', 'routeLabels', 'pointLabels'];
+
+    // Act
+    const halos = [...mapLabels, 'ringLabels' as const].map((name) => haloOf(slots, name));
+
+    // Assert
+    const [area = [], route = [], point = [], ring = []] = halos;
+    expect([area.length, route.length, point.length, ring.length].every((n) => n > 0)).toBe(true);
+    expect([...area, ...route, ...point].every((h) => h > 0)).toBe(true);
+    expect(ring.every((h) => h === 0)).toBe(true);
   });
 });
 

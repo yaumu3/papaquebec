@@ -35,7 +35,7 @@ export interface LabelsInput extends Omit<ShapesInput, 'topology'> {
 
 function putLabel(name: string, at: Anchor, label: LabelStyle, labels: TextBatch) {
   const { px, py, size, color, baseline } = label;
-  labels.text(name, { ...at, px, py }, size, color, { baseline });
+  labels.text(name, { ...at, px, py }, size, color, { baseline, halo: true });
 }
 
 /** Names a line item once, from the first outline of its first part, if the density reaches it. */
