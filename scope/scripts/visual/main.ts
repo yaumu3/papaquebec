@@ -17,7 +17,7 @@ import type { Browser, BrowserContext, Page, Route } from 'playwright';
 import { PNG } from 'pngjs';
 
 import { launch, openScope, startPreview } from '../headless/browser';
-import { compareImages, type Image, type Limits } from './imageDiff';
+import { compareImages, cropImage, type Image, type Limits } from './imageDiff';
 import { filterOf, settled } from './run';
 import { SITE, type Step, type Visit, VISITS } from './shots';
 import { fixedPlacer, type Flight, listedAs, replayWorker, trafficEvents } from './traffic';
@@ -65,7 +65,7 @@ function replayOf(fleet: readonly Flight[]): string {
 /** Stands in for the feed worker and the placer's: the build flies `fleet`, its blocks fixed. */
 async function fly(context: BrowserContext, fleet: readonly Flight[]): Promise<void> {
   await context.route(FEED_WORKER, workerOf(replayOf(fleet)));
-  await context.route(PLACER_WORKER, workerOf(fixedPlacer()));
+  await context.route(PLACER_WORKER, workerOf(fixedPlacer(fleet)));
 }
 
 const imageOf = (png: Buffer): Image => PNG.sync.read(png);
@@ -84,7 +84,12 @@ async function taken(page: Page, step: Step, style: string): Promise<Taken[]> {
   const shoot = () => target.screenshot(look);
   const png = await settled(shoot, { pause: () => Bun.sleep(SETTLE_MS), tries: SETTLE_TRIES });
   await drawing(page);
-  return [{ name: step.name, png }];
+  if (step.name) return [{ name: step.name, png }];
+  const whole = imageOf(png);
+  return (step.crops ?? []).map(({ name, clip }) => ({
+    name,
+    png: pngOf(cropImage(whole, clip)),
+  }));
 }
 
 /** Waits for what the page starts from: the fleet in the list, or the chart in the Maps panel. */
@@ -160,7 +165,8 @@ const { values: opt } = parseArgs({
   },
 });
 
-const namesOf = ({ steps }: Visit) => steps.map((step) => step.name);
+const namesOf = ({ steps }: Visit) =>
+  steps.flatMap((step) => (step.name ? [step.name] : (step.crops ?? []).map((c) => c.name)));
 const chosen = filterOf(opt.only);
 const visits = VISITS.filter((visit) => namesOf(visit).some(chosen));
 

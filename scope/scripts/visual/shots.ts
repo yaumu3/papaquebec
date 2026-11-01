@@ -1,13 +1,14 @@
 /**
  * What the visual tests shoot. A visit is one page load, the costly part, so as many images as can
- * share a state of the page come from one, in steps taken in turn.
+ * share a state of the page come from one: steps taken in turn, or crops of a single screenshot.
  */
 import type { Locator, Page } from 'playwright';
 
 import { DRAW_STACK, LAYER_GROUPS } from '../../src/lib/layers';
 import { FL_MAX } from '../../src/state/filter';
-import { onScope, type Place } from './grid';
-import { DRIFTING, FLEET, type Flight, placeOf } from './traffic';
+import { cellOf, onScope, type Place, type Sheet } from './grid';
+import type { Clip } from './imageDiff';
+import { DRIFTING, FLEET, type Flight, LONE, LONE_FLIGHTS, placeOf } from './traffic';
 
 /** XQPA, the example set's aerodrome. */
 export const SITE = { lat: 33.5859, lon: 130.4508 };
@@ -16,12 +17,19 @@ const EXAMPLE_TITLE = 'Example map set (fictional)';
 const NEAR_NM = 40;
 const WIDE_NM = 200;
 
+/** The parts of a screenshot, each with an image of its own. */
+export interface Crop {
+  name: string;
+  clip: Clip;
+}
+
 export interface Step {
   /** Puts the page in the state to shoot, from where the last step left it. */
   act?: (page: Page) => Promise<void>;
-  /** The image of the whole page or of `of`. */
-  name: string;
+  /** The image of the whole page or of `of`; `crops` in place of it for several. */
+  name?: string;
   of?: (page: Page) => Locator;
+  crops?: readonly Crop[];
 }
 
 /** What a page imports through the Maps panel before its steps. */
@@ -92,6 +100,49 @@ async function startRbl(page: Page, at: Place): Promise<void> {
   await endRbl(page, at);
 }
 
+/** Shows only the flights, on a vector short enough to stay in a cell of a sheet. */
+const ALONE = { ...NEAR_NORMAL, vectorMin: 1, shownLayers: { rings: false } };
+const AROUND_SITE = { x: 620, y: 380, width: 360, height: 240 };
+/** From a target to the middle of its block, north-east of it. */
+const BLOCK = { dx: 50, dy: -35 };
+const BLOCK_CELLS: Sheet = { cols: 6, width: 250, height: 130 };
+
+/** Each lone flight in a cell of its own, with an address and a callsign of its own. */
+const BLOCKS = Object.entries(LONE_FLIGHTS).map(([name, flight], i) => {
+  const { place, clip } = cellOf(i, BLOCK_CELLS);
+  const hex = `d2${(i + 16).toString(16).padStart(4, '0')}`;
+  const callsign = flight.id.flight && { flight: `TEST${20 + i}` };
+  return { name, flight: { ...flight, at: place, id: { ...flight.id, ...callsign, hex } }, clip };
+});
+
+const blockNamed = (name: string) => {
+  const block = BLOCKS.find((b) => b.name === name);
+  if (!block) throw new Error(`no block ${name}`);
+  return block.flight;
+};
+
+/** Takes the block of the flight at `at` and moves it by `dx` and `dy`, still held. */
+async function dragBlock(page: Page, at: Place, dx: number, dy: number): Promise<void> {
+  const [x, y] = onScope(at);
+  await page.mouse.move(x + BLOCK.dx, y + BLOCK.dy);
+  await page.mouse.down();
+  await page.mouse.move(x + BLOCK.dx + dx, y + BLOCK.dy + dy, { steps: 4 });
+}
+
+const heldBlock = (name: string, dx: number, dy: number): Visit => ({
+  settings: ALONE,
+  fleet: [LONE],
+  steps: [
+    {
+      act: async (page) => {
+        await togglePanels(page);
+        await dragBlock(page, LONE.at, dx, dy);
+      },
+      crops: [{ name: `block/${name}`, clip: AROUND_SITE }],
+    },
+  ],
+});
+
 export const VISITS: readonly Visit[] = [
   {
     settings: NEAR_NORMAL,
@@ -125,6 +176,27 @@ export const VISITS: readonly Visit[] = [
     chart: EXAMPLE,
     steps: [{ name: 'tree/swatches', of: mapsPanel }],
   },
+  {
+    settings: {
+      ...ALONE,
+      filter: { ground: true, lowerFl: 50, upperFl: FL_MAX, squawk: 'all' },
+    },
+    fleet: BLOCKS.map(({ flight }) => flight),
+    steps: [
+      {
+        act: async (page) => {
+          await select(blockNamed('selected').id.flight ?? '')(page);
+          await togglePanels(page);
+          await dragBlock(page, blockNamed('dropped').at, -120, 30);
+          await page.mouse.up();
+          await page.mouse.move(...onScope(blockNamed('hovered').at));
+        },
+        crops: BLOCKS.map(({ name, clip }) => ({ name: `block/${name}`, clip })),
+      },
+    ],
+  },
+  heldBlock('dragged', 40, -25),
+  heldBlock('straddling', -30, -10),
   {
     settings: NEAR_NORMAL,
     fleet: FLEET,

@@ -26,6 +26,8 @@ export interface Flight {
   silentSec?: number;
   /** How much older than the rest of a report these readings are. */
   lagSec?: Partial<Record<HeardKey, number>>;
+  /** Where its block sits, if not north-east. */
+  bearing?: number;
 }
 
 const level = (alt: number | 'ground', track: number, gs: number): Reading => ({
@@ -290,6 +292,79 @@ export const DRIFTING: Flight = {
   }),
 };
 
+/** The bearing of a block due west of its target. */
+const WEST = 4;
+
+const LONE_ID: Flight['id'] = {
+  hex: 'd20001',
+  flight: 'TEST01',
+  type: 'B789',
+  registration: 'TEST-01',
+  category: 'A3',
+  squawk: '2431',
+};
+const LONE_LEVEL = level(11_000, 135, 290);
+const ADVISORY = threat(undefined);
+
+/** A flight alone at the site reporting `reads` over a level flight; `id` in place of its own. */
+const lone = (reads: Reading, id: Flight['id'] = LONE_ID): Flight => ({
+  id,
+  at: [0, 0],
+  reads: () => ({ ...LONE_LEVEL, ...reads }),
+});
+
+/** A level flight alone at the site, with a block as plain as they come. */
+export const LONE = lone({});
+
+/** One flight for each state of a data block or a target, by the name of its image. */
+export const LONE_FLIGHTS: Readonly<Record<string, Flight>> = {
+  level: LONE,
+  ...Object.fromEntries(
+    [0, 1, 2, 3, 4, 5, 6, 7].map((bearing) => [`bearing-${bearing}`, { ...LONE, bearing }]),
+  ),
+  'all-tags-west': {
+    ...lone({ emergency: 'lifeguard', ra: ADVISORY, ident: true }, { ...LONE_ID, squawk: '7700' }),
+    bearing: WEST,
+  },
+  'climbing-west': { ...lone({ verticalRate: 1500, selAlt: 16_000 }), bearing: WEST },
+  selected: { ...LONE, reads: (age) => (age > 90 ? null : LONE.reads(age)) },
+  hovered: LONE,
+  dropped: LONE,
+  'filtered-low': lone({ alt: 3000 }),
+  climbing: lone({ verticalRate: 1500, selAlt: 16_000 }),
+  descending: lone({ verticalRate: -1500, selAlt: 8000 }),
+  'level-held': lone({ alt: 34_860, selAlt: 35_000, navQnh: 1013.2 }),
+  heading: lone({ selHeading: 95, navModes: ['autopilot'] }),
+  general: lone({}, { ...LONE_ID, squawk: '7700' }),
+  radio: lone({}, { ...LONE_ID, squawk: '7600' }),
+  hijack: lone({}, { ...LONE_ID, squawk: '7500' }),
+  'min-fuel': lone({ emergency: 'minfuel' }),
+  lifeguard: lone({ emergency: 'lifeguard' }),
+  ident: lone({ ident: true }),
+  advisory: lone({ ra: ADVISORY }),
+  'all-tags': lone(
+    { emergency: 'lifeguard', ra: ADVISORY, ident: true },
+    { ...LONE_ID, squawk: '7700' },
+  ),
+  'tags-cut': lone(
+    { emergency: 'minfuel', ra: ADVISORY, ident: true },
+    { ...LONE_ID, squawk: '7700' },
+  ),
+  'tags-and-heading': lone(
+    { selHeading: 95, navModes: ['autopilot'] },
+    { ...LONE_ID, squawk: '7700' },
+  ),
+  'hex-only': {
+    ...lone({}, { hex: 'd20002', category: 'A1' }),
+    reads: () => ({ ...LONE_LEVEL, gs: 0 }),
+  },
+  registration: lone({}, { hex: 'd20003', registration: 'TEST-03', category: 'A1' }),
+  ground: lone({ alt: 'ground', gs: 12, track: 160 }),
+  mlat: lone({ source: 'mlat' }),
+  tisb: lone({ source: 'tisb' }),
+  stale: { ...lone({}), lagSec: { position: 30 } },
+};
+
 /** The text a list row of `flight` opens with. */
 export const listedAs = ({ id }: Flight): string =>
   id.flight ?? id.registration ?? id.hex.toUpperCase();
@@ -362,12 +437,15 @@ export function trafficEvents(fleet: readonly Flight[], site: LatLon, clock: Dat
 }
 
 /**
- * A worker that gives each new block the north-east bearing and leaves it there. The placer proper
+ * A worker that gives each new block its flight's bearing and leaves it there. The placer proper
  * searches from a random seed for as long as a clock allows, so its bearings differ by the run.
  */
-export function fixedPlacer(): string {
+export function fixedPlacer(fleet: readonly Flight[]): string {
+  const bearings = Object.fromEntries(fleet.map(({ id, bearing }) => [id.hex, bearing ?? NE]));
   return `self.addEventListener('message', ({ data: { scene } }) => {
-    self.postMessage({ dirs: new Map(scene.subjects.map((s) => [s.hex, s.dir ?? ${NE}])) });
+    const bearings = ${JSON.stringify(bearings)};
+    const dirs = new Map(scene.subjects.map((s) => [s.hex, s.dir ?? bearings[s.hex]]));
+    self.postMessage({ dirs });
   });`;
 }
 

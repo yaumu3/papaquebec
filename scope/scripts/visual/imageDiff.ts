@@ -53,3 +53,22 @@ export function compareImages(baseline: Image, actual: Image, limits: Limits): C
   const share = differing / (width * height);
   return { passed: share <= limits.share, differing, share, diff: { width, height, data } };
 }
+
+/** A part of an image, in whole pixels. */
+export interface Clip {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The part of `whole` under `clip`. */
+export function cropImage(whole: Image, { x, y, width, height }: Clip): Image {
+  const data = new Uint8Array(width * height * 4);
+  const rowBytes = width * 4;
+  for (let row = 0; row < height; row += 1) {
+    const from = ((y + row) * whole.width + x) * 4;
+    data.set(whole.data.subarray(from, from + rowBytes), row * rowBytes);
+  }
+  return { width, height, data };
+}

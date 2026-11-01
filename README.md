@@ -98,7 +98,7 @@ export PQ_BEAST=<host>:30005 PQ_SITE=<lat>,<lon>
 mise run dev                # the scope and its server, on real traffic
 mise run sim                # the same on the synthetic fleet; PQ_SITE=lat,lon moves it
 mise run check              # everything CI runs
-mise run check:visual       # the map's screenshots against their baselines
+mise run check:visual       # the scope's screenshots against their baselines
 mise run update:visual      # rewrite those baselines
 mise run bench              # a load test, see below
 mise run bench:blocks       # score the data block placer on the sim's scenarios
@@ -126,7 +126,9 @@ request. Two headless scripts describe their flags in their headers:
 - `mise run bench` is a load test with extra sim traffic, always on a server of its own.
 
 The visual tests run in a pinned Playwright container, with Apple's `container` where it is
-installed and Docker elsewhere, so a Mac and CI compare the same pixels.
+installed and Docker elsewhere, so a Mac and CI compare the same pixels. Each image is a baseline in
+`scope/visual/`, in a folder for its subject; `bun run visual --only block` takes one folder. They
+fly a fixed fleet in place of the feed, with block bearings fixed in place of the placer's search.
 
 Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight;
 the sim's tests enforce this for the fleet.

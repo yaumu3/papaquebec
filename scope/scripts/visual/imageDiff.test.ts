@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { compareImages, type Image } from './imageDiff';
+import { compareImages, cropImage, type Image } from './imageDiff';
 
 /** An image of `width` × 1 from its pixels' grey levels, opaque. */
 const row = (...greys: number[]): Image => ({
@@ -61,5 +61,23 @@ describe('compareImages', () => {
     // Assert
     expect(passed).toBe(false);
     expect(share).toBe(1);
+  });
+});
+
+describe('cropImage', () => {
+  test('takes the pixels under the clip, row by row', () => {
+    // Arrange
+    const whole: Image = {
+      width: 3,
+      height: 2,
+      data: Uint8Array.from([1, 2, 3, 4, 5, 6].flatMap((grey) => [grey, grey, grey, 255])),
+    };
+
+    // Act
+    const part = cropImage(whole, { x: 1, y: 0, width: 2, height: 2 });
+
+    // Assert
+    expect([part.width, part.height]).toEqual([2, 2]);
+    expect(Array.from(part.data).filter((_, i) => i % 4 === 0)).toEqual([2, 3, 5, 6]);
   });
 });
