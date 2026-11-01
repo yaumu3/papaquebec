@@ -1,6 +1,7 @@
 import { type ChartItem, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
+import { isPointLayer } from '../../lib/mapsetFormat';
 import type { Batch } from '../protocol';
 import { isPointStyle, LAYER_STYLES } from './layerStyles';
 import { LineBatch, MarkerBatch } from './pack';
@@ -51,20 +52,24 @@ function trace(items: readonly ChartItem[], color: string, project: ProjectFn): 
   return [lines.finish(), markers.finish()];
 }
 
+/** The batches of the two slots of the traces. */
+interface TraceSlots {
+  traces: [Batch, Batch, ...Batch[]];
+  tracedPoints: [Batch, Batch, ...Batch[]];
+}
+
 /**
  * What the search names at half strength, then what the tree points at over it at full strength,
- * and over that the highlight of its label: all over the chart's labels and under the targets.
- * The search gets no label.
+ * and over that the highlight of its label, in two slots. The traces hold the lines and the
+ * highlight of a route or an area, under the chart's points; the traced points hold the symbols
+ * and the highlight of a point, over the chart's own. The search gets no label.
  */
-export function buildTraces({
-  pointedAt,
-  searched,
-  highlight,
-  project,
-}: TracesInput): [Batch, Batch, Batch, Batch, ...Batch[]] {
-  return [
-    ...trace(searched, THEME.hoverFaint, project),
-    ...trace(pointedAt ? [pointedAt] : [], THEME.hover, project),
-    ...highlight,
-  ];
+export function buildTraces({ pointedAt, searched, highlight, project }: TracesInput): TraceSlots {
+  const [searchLines, searchMarkers] = trace(searched, THEME.hoverFaint, project);
+  const [pointedLines, pointedMarkers] = trace(pointedAt ? [pointedAt] : [], THEME.hover, project);
+  const lit = pointedAt && isPointLayer(pointedAt.layer);
+  return {
+    traces: [searchLines, pointedLines, ...(lit ? [] : highlight)],
+    tracedPoints: [searchMarkers, pointedMarkers, ...(lit ? highlight : [])],
+  };
 }

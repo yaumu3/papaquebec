@@ -86,7 +86,10 @@ describe('buildTraces', () => {
     const stepped = area(polygon, lineOf([5, 0], [6, 0], [6, 1]));
 
     // Act
-    const [, , lines, dots] = tracesOf({ pointedAt: stepped, searched: [], project });
+    const {
+      traces: [, lines],
+      tracedPoints: [, dots],
+    } = tracesOf({ pointedAt: stepped, searched: [], project });
 
     // Assert
     const drawn = segments(lines);
@@ -102,7 +105,9 @@ describe('buildTraces', () => {
     const through = route(lineOf([0, 0], [1, 0], [2, 0]));
 
     // Act
-    const [, , lines] = tracesOf({ pointedAt: through, searched: [], project });
+    const {
+      traces: [, lines],
+    } = tracesOf({ pointedAt: through, searched: [], project });
 
     // Assert
     expect(segments(lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
@@ -114,7 +119,9 @@ describe('buildTraces', () => {
     const pointed = layers.map((layer) => point(layer, pointAt([1, 2]), pointAt([3, 4])));
 
     // Act
-    const traced = pointed.map((pointedAt) => tracesOf({ pointedAt, searched: [], project })[3]);
+    const traced = pointed.map(
+      (pointedAt) => tracesOf({ pointedAt, searched: [], project }).tracedPoints[1],
+    );
 
     // Assert
     const expected = layers.map((layer) => {
@@ -132,7 +139,10 @@ describe('buildTraces', () => {
     const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
 
     // Act
-    const [, , lines, dots] = tracesOf({ pointedAt: hold, searched: [], project });
+    const {
+      traces: [, lines],
+      tracedPoints: [, dots],
+    } = tracesOf({ pointedAt: hold, searched: [], project });
 
     // Assert
     expect([lines.count, dots.count]).toEqual([0, 0]);
@@ -143,7 +153,10 @@ describe('buildTraces', () => {
     const none = null;
 
     // Act
-    const [, , lines, dots] = tracesOf({ pointedAt: none, searched: [], project });
+    const {
+      traces: [, lines],
+      tracedPoints: [, dots],
+    } = tracesOf({ pointedAt: none, searched: [], project });
 
     // Assert
     expect([lines.count, dots.count]).toEqual([0, 0]);
@@ -154,7 +167,10 @@ describe('buildTraces', () => {
     const found = [area(lineOf([0, 0], [1, 0], [1, 1])), fix(pointAt([5, 6]))];
 
     // Act
-    const [lines, dots] = tracesOf({ pointedAt: null, searched: found, project });
+    const {
+      traces: [lines],
+      tracedPoints: [dots],
+    } = tracesOf({ pointedAt: null, searched: found, project });
 
     // Assert
     const drawn = segments(lines);
@@ -170,10 +186,10 @@ describe('buildTraces', () => {
     const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
 
     // Act
-    const batches = tracesOf({ pointedAt: null, searched: [hold], project });
+    const { traces, tracedPoints } = tracesOf({ pointedAt: null, searched: [hold], project });
 
     // Assert
-    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
+    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0]);
   });
 
   it('puts the search first and what is pointed at over it, an item in both drawn in both', () => {
@@ -182,7 +198,10 @@ describe('buildTraces', () => {
     const onlySearched = area(lineOf([0, 0], [1, 0]));
 
     // Act
-    const [searchLines, searchDots, pointedLines, pointedDots] = tracesOf({
+    const {
+      traces: [searchLines, pointedLines],
+      tracedPoints: [searchDots, pointedDots],
+    } = tracesOf({
       pointedAt: both,
       searched: [onlySearched, both],
       project,
@@ -200,22 +219,37 @@ describe('buildTraces', () => {
     const none = { pointedAt: null, searched: [], project };
 
     // Act
-    const batches = tracesOf(none);
+    const { traces, tracedPoints } = tracesOf(none);
 
     // Assert
-    expect(batches.map((b) => b.count)).toEqual([0, 0, 0, 0]);
+    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0]);
   });
 
-  it('puts the highlight batches last, as they were given', () => {
+  it("puts a route's highlight in traces, after its lines, and none in tracedPoints", () => {
     // Arrange
     const highlight = [batchOf('lines'), batchOf('text'), batchOf('lines')];
-    const input = { pointedAt: null, searched: [], project, highlight };
+    const input = { pointedAt: route(lineOf([0, 0], [1, 0])), searched: [], project, highlight };
 
     // Act
-    const batches = tracesOf(input);
+    const { traces, tracedPoints } = tracesOf(input);
 
     // Assert
-    expect(batches.slice(4)).toEqual(highlight);
-    expect(batches.slice(4).every((b, i) => b === highlight[i])).toBe(true);
+    expect(traces.slice(2)).toEqual(highlight);
+    expect(traces.slice(2).every((b, i) => b === highlight[i])).toBe(true);
+    expect(tracedPoints).toHaveLength(2);
+  });
+
+  it("puts a point's highlight in tracedPoints, after its symbol, and none in traces", () => {
+    // Arrange
+    const highlight = [batchOf('lines'), batchOf('text'), batchOf('lines')];
+    const input = { pointedAt: fix(pointAt([1, 2])), searched: [], project, highlight };
+
+    // Act
+    const { traces, tracedPoints } = tracesOf(input);
+
+    // Assert
+    expect(tracedPoints.slice(2)).toEqual(highlight);
+    expect(tracedPoints.slice(2).every((b, i) => b === highlight[i])).toBe(true);
+    expect(traces).toHaveLength(2);
   });
 });

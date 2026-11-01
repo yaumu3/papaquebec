@@ -17,9 +17,11 @@ export const CHART_SLICES = [
 ] as const;
 
 /**
- * Every slot the scope draws, back to front: the base map, the lines of the chart, its labels,
- * its point markers, the traces of what the tree points at, then what moves. Markers sit over
- * the labels so that a label's halo or gap cuts the lines behind it but never a symbol.
+ * Every slot the scope draws, back to front: the base map, the lines of the chart, its route and
+ * area labels, the traces of what the tree points at, the point labels and markers, the traced
+ * points, then what moves. A gap or halo cuts the lines behind it but never a symbol: the traces
+ * hold the lit route and area labels with their gaps, so they come before the points, and the
+ * traced points, a lit point's symbol and ident, come over the chart's own.
  */
 export const SLOT_ORDER = [
   'ringLines',
@@ -29,9 +31,10 @@ export const SLOT_ORDER = [
   'ringLabels',
   'areaLabels',
   'routeLabels',
+  'traces',
   'pointLabels',
   'pointMarkers',
-  'traces',
+  'tracedPoints',
   'targets',
   'hover',
   'overlays',
@@ -54,7 +57,7 @@ export const LABEL_SLOTS: readonly SlotName[] = [
  * The slots whose text rims its own glyphs just before them, over what the slot drew first: a
  * pointed label's highlight over its trace.
  */
-const HIGHLIGHT_SLOTS: ReadonlySet<SlotName> = new Set(['traces']);
+const HIGHLIGHT_SLOTS: ReadonlySet<SlotName> = new Set(['traces', 'tracedPoints']);
 
 /** The batches a builder hands the renderer, by the slots it fills. */
 export type Slots = Partial<Record<SlotName, Batch[]>>;

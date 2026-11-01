@@ -123,14 +123,12 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
   show(() => {
     const pointed = pointedItem();
     return projected()
-      ? {
-          traces: buildTraces({
-            pointedAt: pointed,
-            searched: searchedItems(),
-            highlight: pointed ? pointedHighlight(pointed) : [],
-            project: projectNm,
-          }),
-        }
+      ? buildTraces({
+          pointedAt: pointed,
+          searched: searchedItems(),
+          highlight: pointed ? pointedHighlight(pointed) : [],
+          project: projectNm,
+        })
       : null;
   });
 

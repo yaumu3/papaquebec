@@ -14,7 +14,7 @@ import {
 const batch = (kind: Batch['kind']): Batch => ({ kind, data: new Float32Array(), count: 0 });
 
 describe('SLOT_ORDER', () => {
-  it('draws the base map, then the chart, its markers over its labels, then the traces, then what moves', () => {
+  it('draws the base map, the chart with the traces between its route labels and its points, then what moves', () => {
     // Arrange
     const expected = [
       'ringLines',
@@ -24,9 +24,10 @@ describe('SLOT_ORDER', () => {
       'ringLabels',
       'areaLabels',
       'routeLabels',
+      'traces',
       'pointLabels',
       'pointMarkers',
-      'traces',
+      'tracedPoints',
       'targets',
       'hover',
       'overlays',
@@ -37,6 +38,26 @@ describe('SLOT_ORDER', () => {
 
     // Assert
     expect(order).toEqual(expected);
+  });
+});
+
+describe('SLOT_ORDER of the traces', () => {
+  it("keeps a lit gap from covering a symbol, and a traced symbol over the chart's", () => {
+    // Arrange
+    const stack: SlotName[] = [
+      'routeLabels',
+      'traces',
+      'pointLabels',
+      'pointMarkers',
+      'tracedPoints',
+    ];
+
+    // Act
+    const positions = stack.map((slot) => SLOT_ORDER.indexOf(slot));
+
+    // Assert
+    expect(positions).toEqual(positions.toSorted((a, b) => a - b));
+    expect(positions[4]).toBe((positions[3] ?? NaN) + 1);
   });
 });
 
@@ -145,6 +166,7 @@ describe('drawSteps', () => {
     // Arrange
     const highlighted = held([
       ['traces', ['lines', 'markers', 'text', 'lines']],
+      ['tracedPoints', ['markers', 'text']],
       ['targets', ['text']],
     ]);
     const expected = [
@@ -153,6 +175,9 @@ describe('drawSteps', () => {
       'traces/2/halo',
       'traces/2/text',
       'traces/3/lines',
+      'tracedPoints/0/markers',
+      'tracedPoints/1/halo',
+      'tracedPoints/1/text',
       'targets/0/text',
     ];
 
