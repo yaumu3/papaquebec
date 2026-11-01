@@ -28,8 +28,8 @@ const FEED_WORKER = '**/assets/feedWorker-*.js';
 const PLACER_WORKER = '**/assets/placerWorker-*.js';
 const SERVED = '/tmp/visual-dist';
 const URL_SERVED = 'http://localhost:4173/';
-/** Tight enough to fail a label moved 1 px, a removed halo or a wider chevron. */
-const LIMITS: Limits = { channel: 24, share: 0.00002 };
+/** Runs differ by no pixel, on a Mac and on CI alike, so one pixel past a step of anti-aliasing fails. */
+const LIMITS: Limits = { channel: 24, share: 0 };
 const SETTLE_MS = 300;
 const SETTLE_TRIES = 100;
 /** The pages open at once. */
