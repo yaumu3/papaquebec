@@ -15,9 +15,9 @@ import {
 import { allShown } from '../../lib/visibilityFixture';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
-import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../slots';
+import { CHART_SLICES, SLOT_ORDER, labelSlots, type Slots, shapeSlots } from '../slots';
 import { atlas } from './atlasFixture';
-import { buildChart } from './chart';
+import { buildLabels, buildShapes } from './chart';
 import { project } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
@@ -44,20 +44,32 @@ function itemAt(layer: StyledLayer): ChartItem {
   return { key: layer, layer, parts: [part] };
 }
 
-/** A slice of the chart built as the scope builds it. */
-function sliceOf(chart: Chart, layers: readonly StyledLayer[], labelDensity: LabelDensity) {
+/** What the scope reads to draw `layers` of the chart. */
+function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
   const topology = topologyOf(chart);
   const drawnItems = drawnItemsOf(chart, layers, allShown, () => true);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
+  return { topology, drawnItems, drawnPoints, project, layers };
 }
+
+/** A slice's shapes built as the scope builds them. */
+const shapesOf = (chart: Chart, layers: readonly StyledLayer[]) =>
+  buildShapes(drawnOf(chart, layers));
+
+/** A slice's labels built as the scope builds them. */
+const labelsOf = (chart: Chart, layers: readonly StyledLayer[], labelDensity: LabelDensity) =>
+  buildLabels({ ...drawnOf(chart, layers), labelDensity, atlas });
 
 /** Everything the scope draws from the map, as the effects post it. */
 function mapSlots(chart: Chart): Slots {
   const slots: Slots = {};
   for (const slice of CHART_SLICES) {
-    const built = sliceOf(chart, slice.layers, 'dense');
-    Object.assign(slots, sliceSlots(slice, built));
+    const labels = labelsOf(chart, slice.layers, 'dense');
+    Object.assign(
+      slots,
+      shapeSlots(slice, shapesOf(chart, slice.layers)),
+      labelSlots(slice, labels),
+    );
   }
   const coastX = at('coast');
   const coast = {
@@ -179,7 +191,7 @@ describe('the example map set', () => {
 
     // Act
     const undrawn = CHART_LAYERS.filter((layer) => {
-      const { lines, markers } = sliceOf(items, [layer], 'off');
+      const { lines, markers } = shapesOf(items, [layer]);
       return lines.count + markers.count === 0;
     });
 
@@ -193,7 +205,7 @@ describe('the example map set', () => {
     const slices = [CHART_SLICES[0], CHART_SLICES[1]];
 
     // Act
-    const keys = slices.map((slice) => edgeKeys(sliceOf(items, slice.layers, 'off').lines));
+    const keys = slices.map((slice) => edgeKeys(shapesOf(items, slice.layers).lines));
 
     // Assert
     expect(keys.map((k) => k.length > 0)).toEqual([true, true]);
@@ -244,7 +256,7 @@ describe('the example map set', () => {
     const items = chartOf([parseMapSet(EXAMPLE)]);
 
     // Act
-    const { lines } = sliceOf(items, ['sector'], 'off');
+    const { lines } = shapesOf(items, ['sector']);
 
     // Assert
     expect(lines.count).toBe(6);
@@ -258,7 +270,7 @@ describe('the example map set', () => {
     const items = chartOf([parseMapSet(EXAMPLE)]);
 
     // Act
-    const { lines } = sliceOf(items, ['tma'], 'off');
+    const { lines } = shapesOf(items, ['tma']);
 
     // Assert
     expect(lines.count).toBe(9);
@@ -273,7 +285,7 @@ describe('the example map set', () => {
 
     // Act
     const rows = shown.map((layers) => {
-      const { lines } = sliceOf(items, layers, 'off');
+      const { lines } = shapesOf(items, layers);
       return Array.from({ length: lines.count }, (_, i) =>
         Array.from(lines.data.subarray(i * LINE_STRIDE + 20, i * LINE_STRIDE + 22)),
       );

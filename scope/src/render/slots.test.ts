@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Batch } from './protocol';
-import { CHART_SLICES, SLOT_ORDER, sliceSlots } from './slots';
+import { CHART_SLICES, labelSlots, shapeSlots, SLOT_ORDER } from './slots';
 
 const batch = (kind: Batch['kind']): Batch => ({ kind, data: new Float32Array(), count: 0 });
 
@@ -52,19 +52,30 @@ describe('CHART_SLICES', () => {
   });
 });
 
-describe('sliceSlots', () => {
-  it('files the lines and markers under the slice and the labels under its label slot', () => {
+describe('shapeSlots', () => {
+  it('files the lines and markers under the slice', () => {
     // Arrange
-    const batches = { lines: batch('lines'), markers: batch('markers'), labels: batch('text') };
+    const shapes = { lines: batch('lines'), markers: batch('markers') };
     const [areas] = CHART_SLICES;
 
     // Act
-    const slots = sliceSlots(areas, batches);
+    const slots = shapeSlots(areas, shapes);
 
     // Assert
-    expect(slots).toEqual({
-      areaLines: [batches.lines, batches.markers],
-      areaLabels: [batches.labels],
-    });
+    expect(slots).toEqual({ areaLines: [shapes.lines, shapes.markers] });
+  });
+});
+
+describe('labelSlots', () => {
+  it('files the labels under the slice label slot', () => {
+    // Arrange
+    const labels = [batch('text')];
+    const [areas] = CHART_SLICES;
+
+    // Act
+    const slots = labelSlots(areas, labels);
+
+    // Assert
+    expect(slots).toEqual({ areaLabels: labels });
   });
 });

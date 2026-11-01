@@ -40,17 +40,21 @@ export type SlotName = (typeof SLOT_ORDER)[number];
 /** The batches a builder hands the renderer, by the slots it fills. */
 export type Slots = Partial<Record<SlotName, Batch[]>>;
 
-/** What a slice builds: its lines, its markers and its labels. */
-export interface SliceBatches {
+/** What a slice builds of its shapes: its lines and its markers. */
+export interface ShapeBatches {
   lines: Batch;
   markers: Batch;
-  labels: Batch;
 }
 
-/** A slice's built batches as the slots they go to. */
-export function sliceSlots(
+/** A slice's built shapes as the slots they go to. */
+export function shapeSlots(
   slice: (typeof CHART_SLICES)[number],
-  { lines, markers, labels }: SliceBatches,
+  { lines, markers }: ShapeBatches,
 ): Slots {
-  return { [slice.shapes]: [lines, markers], [slice.labels]: [labels] };
+  return { [slice.shapes]: [lines, markers] };
+}
+
+/** A slice's built labels as the slot they go to. */
+export function labelSlots(slice: (typeof CHART_SLICES)[number], labels: Batch[]): Slots {
+  return { [slice.labels]: labels };
 }

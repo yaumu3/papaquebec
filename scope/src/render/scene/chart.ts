@@ -1,23 +1,23 @@
-import { type ChartItem, type ItemPart, outlinesOf } from '../../lib/chart';
+import { type ChartItem, type ItemPart, nameOf, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import type { StyledLayer } from '../../lib/layers';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
-import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
-import type { AtlasInfo } from '../protocol';
-import type { SliceBatches } from '../slots';
+import type { LabelDensity } from '../../state/settingsDefaults';
+import type { AtlasInfo, Batch } from '../protocol';
+import type { ShapeBatches } from '../slots';
 import {
   isPointStyle,
   LAYER_STYLES,
   type LabelStyle,
+  labelReaches,
   type LineLayerStyle,
-  type PointLayerStyle,
 } from './layerStyles';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { route } from './paths';
 import { drawRuns, routeCuts } from './runs';
 
-export interface ChartInput {
+export interface ShapesInput {
   topology: Topology;
   /** The points that draw; read only for a point layer among `layers`, or when a route item draws. */
   drawnPoints: () => readonly ChartPoint[];
@@ -26,21 +26,12 @@ export interface ChartInput {
   layers: readonly StyledLayer[];
   /** The items to draw, of `layers`. */
   drawnItems: readonly ChartItem[];
+}
+
+export interface LabelsInput extends Omit<ShapesInput, 'topology'> {
   labelDensity: LabelDensity;
   atlas: AtlasInfo;
 }
-
-interface ChartBatches {
-  lines: LineBatch;
-  markers: MarkerBatch;
-  labels: TextBatch;
-}
-
-const nameOf = ({ properties: p }: ItemPart): string | undefined =>
-  'name' in p ? p.name : undefined;
-
-const reaches = (label: LabelStyle, density: LabelDensity) =>
-  LABEL_DENSITIES.indexOf(density) >= LABEL_DENSITIES.indexOf(label.from);
 
 function putLabel(name: string, at: Anchor, label: LabelStyle, labels: TextBatch) {
   const { px, py, size, color, baseline } = label;
@@ -58,54 +49,71 @@ function labelItem(
   const { label } = style;
   const [first] = item.parts;
   const name = first && nameOf(first);
-  if (!label || !first || name === undefined || !reaches(label, density)) return;
+  if (!label || !first || name === undefined || !labelReaches(label, density)) return;
   const path = route(outlinesOf(first.geometry)[0] ?? [], project);
   const at = label.at === 'middle' ? path[Math.floor(path.length / 2)] : path[0];
   if (at) putLabel(name, at, label, labels);
 }
 
-/** A point's marker and, if the density reaches its layer, its ident. */
-function drawPoint(
-  { id, at: [lon, lat] }: ChartPoint,
-  style: PointLayerStyle,
+/** The drawn points of a layer, each at its place on the plane. */
+const pointsIn = (
+  layer: StyledLayer,
+  drawnPoints: ShapesInput['drawnPoints'],
   project: ProjectFn,
-  density: LabelDensity,
-  out: ChartBatches,
-) {
-  const anchor = project(lat, lon);
-  out.markers.marker(anchor, style.shape, style.size, style.color);
-  if (reaches(style.label, density)) putLabel(id, anchor, style.label, out.labels);
-}
+) =>
+  drawnPoints()
+    .filter((p) => p.layer === layer)
+    .map(({ id, at: [lon, lat] }) => ({ id, at: project(lat, lon) }));
 
 /** The parts of the items to draw. */
 const partsOf = (items: readonly ChartItem[]): Set<ItemPart> =>
   new Set(items.flatMap((item) => item.parts));
 
-/** The chart's lines, point markers and labels, each back to front through the stack. */
-export function buildChart({
+/** The chart's lines and point markers, each back to front through the stack. */
+export function buildShapes({
   topology,
+  drawnPoints,
+  project,
+  layers,
+  drawnItems,
+}: ShapesInput): ShapeBatches {
+  const lines = new LineBatch();
+  const markers = new MarkerBatch();
+  const drawn = partsOf(drawnItems);
+  drawRuns(topology.areas, drawn, NO_CUTS, project, lines);
+  drawRuns(topology.routes, drawn, routeCuts(drawnItems, drawnPoints), project, lines);
+  for (const layer of layers.toReversed()) {
+    const style = LAYER_STYLES[layer];
+    if (!isPointStyle(style)) continue;
+    for (const { at } of pointsIn(layer, drawnPoints, project)) {
+      markers.marker(at, style.shape, style.size, style.color);
+    }
+  }
+  return { lines: lines.finish(), markers: markers.finish() };
+}
+
+/** The chart's labels, each back to front through the stack. */
+export function buildLabels({
   drawnPoints,
   project,
   layers,
   drawnItems,
   labelDensity,
   atlas,
-}: ChartInput): SliceBatches {
-  const out = { lines: new LineBatch(), markers: new MarkerBatch(), labels: new TextBatch(atlas) };
-  const drawn = partsOf(drawnItems);
-  drawRuns(topology.areas, drawn, NO_CUTS, project, out.lines);
-  drawRuns(topology.routes, drawn, routeCuts(drawnItems, drawnPoints), project, out.lines);
+}: LabelsInput): Batch[] {
+  const labels = new TextBatch(atlas);
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
     if (isPointStyle(style)) {
-      for (const point of drawnPoints().filter((p) => p.layer === layer)) {
-        drawPoint(point, style, project, labelDensity, out);
+      if (!labelReaches(style.label, labelDensity)) continue;
+      for (const { id, at } of pointsIn(layer, drawnPoints, project)) {
+        putLabel(id, at, style.label, labels);
       }
     } else {
       for (const item of drawnItems.filter((i) => i.layer === layer)) {
-        labelItem(item, style, project, labelDensity, out.labels);
+        labelItem(item, style, project, labelDensity, labels);
       }
     }
   }
-  return { lines: out.lines.finish(), markers: out.markers.finish(), labels: out.labels.finish() };
+  return [labels.finish()];
 }

@@ -10,7 +10,7 @@ import { allShown, shownExcept } from '../../lib/visibilityFixture';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, MARKER_STRIDE, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
-import { buildChart } from './chart';
+import { buildLabels, buildShapes } from './chart';
 import {
   type Extra,
   type Geometry,
@@ -68,10 +68,13 @@ const build = (
   const topology = topologyOf(items);
   const drawnItems = drawnItemsOf(items, layers, stateOf, () => inRange);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  return buildChart({ topology, drawnPoints, project, layers, drawnItems, labelDensity, atlas });
+  const input = { topology, drawnPoints, project, layers, drawnItems };
+  const [labels] = buildLabels({ ...input, labelDensity, atlas });
+  if (!labels) throw new Error('buildLabels returned no batch');
+  return { ...buildShapes(input), labels };
 };
 
-describe('buildChart lines', () => {
+describe('buildShapes lines', () => {
   it('styles each layer, refined by the kind or the stratum of the part', () => {
     // Arrange
     const dim = '#5e3a3a';
@@ -195,7 +198,7 @@ describe('buildChart lines', () => {
   });
 });
 
-describe('buildChart shared edges', () => {
+describe('buildShapes shared edges', () => {
   it("draws an edge two layers share once, in the front layer's colour, and hands it down when the front layer is hidden", () => {
     // Arrange
     const items = [
@@ -377,7 +380,7 @@ const stopAt = (layer: StyledLayer, at: Position) => itemOf(layer, partOf(layer,
 const routeOf = (layer: StyledLayer, ...at: Position[]) =>
   itemOf(layer, partOf(layer, line(...at)));
 
-describe('buildChart routes stop short of points', () => {
+describe('buildShapes routes stop short of points', () => {
   const conv = packed('#82573c');
   const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[], reads?: Reads) =>
     instances(build(items, layers, 'normal', reads).lines)
@@ -530,12 +533,10 @@ describe('buildChart routes stop short of points', () => {
       project,
       layers,
       drawnItems: drawnItemsOf(items, layers, allShown, () => true),
-      labelDensity: 'normal' as const,
-      atlas,
     }));
 
     // Act
-    for (const input of inputs) buildChart(input);
+    for (const input of inputs) buildShapes(input);
 
     // Assert
     expect(reads.map((n) => n > 0)).toEqual([false, false, true, true]);
@@ -557,7 +558,7 @@ describe('buildChart routes stop short of points', () => {
 const markerXs = ({ count, data }: Batch) =>
   Array.from({ length: count }, (_, i) => data[i * MARKER_STRIDE]);
 
-describe('buildChart markers', () => {
+describe('buildShapes markers', () => {
   it('draws each kind of point with its own glyph, size and colour', () => {
     // Arrange
     const rows: [StyledLayer, Shape, number, string][] = [
@@ -636,7 +637,7 @@ const onePart = (layer: StyledLayer, geometry: Geometry, extra: Extra = {}) =>
 const placeholder = (layer: StyledLayer): Geometry =>
   has(POINT_LAYERS, layer) ? point([0, 0]) : line([0, 0], [0.01, 0]);
 
-describe('buildChart labels', () => {
+describe('buildLabels', () => {
   it('labels each layer from its own label density up, and some never', () => {
     // Arrange
     const from: [StyledLayer, LabelDensity | null][] = [
@@ -771,7 +772,7 @@ describe('buildChart labels', () => {
   });
 });
 
-describe('buildChart hidden items', () => {
+describe('the chart hidden items', () => {
   it('hands an edge to the next owner when the item that owned it is hidden', () => {
     // Arrange
     const items = [

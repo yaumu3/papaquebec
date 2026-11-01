@@ -32,6 +32,10 @@ export const toGrid = (degrees: number): number => Math.round(degrees * GRID_PER
 /** What names a position: the cells of its longitude and latitude, as one string. */
 export const gridIdentity = ([lon, lat]: LonLat): string => `${toGrid(lon)},${toGrid(lat)}`;
 
+/** The name a part is filed under, if its layer gives one. */
+export const nameOf = ({ properties: p }: ItemPart): string | undefined =>
+  'name' in p ? p.name : undefined;
+
 /** What names an item within its layer: a designator, an id, or for a hold its pattern. */
 function naming({ properties: p, geometry: g }: MapSetFeature): unknown[] {
   if ('turn' in p) {
