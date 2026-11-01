@@ -21,11 +21,11 @@ export function putFigure(
   { strokes, discs }: Figure,
   color: string,
 ): void {
-  for (const { points, closed, width } of strokes) {
+  for (const { points, closed, width, dash } of strokes) {
     const anchors = (closed ? [...points, points[0]] : points).flatMap((p) =>
       p ? [{ ...at, px: p.x, py: p.y }] : [],
     );
-    lines.polyline(anchors, color, { width });
+    lines.polyline(anchors, color, { width, ...(dash && { dash }) });
   }
   for (const { at: offset, radius } of discs) {
     markers.marker({ ...at, px: offset.x, py: offset.y }, Shape.Disc, 2 * radius, color);

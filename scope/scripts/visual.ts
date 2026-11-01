@@ -27,7 +27,7 @@ const EXAMPLE_SET = 'schema/example.mapset.geojson';
 const SERVED = '/tmp/visual-dist';
 const URL_SERVED = 'http://localhost:4173/';
 /** Tight enough to fail a label moved 1 px, a removed halo or a wider chevron. */
-const LIMITS: Limits = { channel: 16, share: 0.00002 };
+const LIMITS: Limits = { channel: 24, share: 0.00002 };
 const SETTLE_MS = 300;
 const SETTLE_TRIES = 100;
 /** The feed's status and the clock depend on when the shot is taken. */

@@ -4,12 +4,14 @@
  */
 
 import type { Vec2 } from './geo';
+import type { DashPattern } from './layers';
 
 /** A polyline, closed back to its first point or open, `width` CSS px wide. */
 export interface Stroke {
   points: readonly Vec2[];
   closed: boolean;
   width: number;
+  dash?: DashPattern;
 }
 
 /** A filled circle. */
