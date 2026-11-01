@@ -215,23 +215,34 @@ function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
 }
 
 /**
- * The label of each span of an item with its designator alone, in the item's span order: what
- * the item would say with no room test and no density gate.
+ * The label of each span of an item with its designator on it: the chart's label of the span
+ * where it has one, with the designator joined in draw-stack order, else the designator alone.
+ * No room test and no density gate. The chart's labels are copied, not changed.
  */
-export function soleLabels(
+export function itemLabels(
   item: ChartItem,
   stage: Pick<Stage, 'topology' | 'cuts' | 'project'>,
+  chartLabels: ReadonlyMap<string, SpanLabel>,
 ): SpanLabel[] {
-  const sole: SpanLabels = new Map();
+  const known: SpanLabels = new Map(
+    [...chartLabels].map(([id, label]) => [id, { ...label, designators: [...label.designators] }]),
+  );
+  const labels: SpanLabels = new Map();
   for (const { path, span } of spansOfItem(item, stage)) {
     const designator = designatorOf(path, item.key);
     if (!designator) continue;
-    const spanLabel = spanLabelOf(sole, path, span, stage.project);
-    if (spanLabel?.designators.length === 0) {
-      spanLabel.designators.push(placedOn(designator, path, span, spanLabel));
+    const spanLabel = spanLabelOf(known, path, span, stage.project);
+    if (!spanLabel) continue;
+    if (!spanLabel.designators.some((d) => d.key === item.key)) {
+      spanLabel.designators = [
+        ...spanLabel.designators,
+        placedOn(designator, path, span, spanLabel),
+      ];
     }
+    spanLabel.designators = spanLabel.designators.toSorted(byStack);
+    labels.set(spanLabel.id, spanLabel);
   }
-  return [...sole.values()];
+  return [...labels.values()];
 }
 
 /** What a label's rank in the draw stack is: that of its front designator. */

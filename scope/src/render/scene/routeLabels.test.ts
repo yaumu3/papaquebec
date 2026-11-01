@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type Chart, chartOf, itemName } from '../../lib/chart';
+import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
@@ -23,8 +23,6 @@ import {
   partOf,
   point,
   project,
-  redrawn,
-  withoutColor,
 } from './chartFixture';
 import { buildRouteLabels } from './routeLabels';
 import { THEME } from './rules';
@@ -44,7 +42,6 @@ function build(
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
   const {
     batches: [gaps, text, chevrons],
-    drawn,
   } = buildRouteLabels({
     topology,
     drawnPoints,
@@ -56,7 +53,7 @@ function build(
     ...fit,
   });
   if (!gaps || !text || !chevrons) throw new Error('buildRouteLabels returned too few batches');
-  return { gaps, text, chevrons, drawn };
+  return { gaps, text, chevrons };
 }
 
 /** The labels of a text batch: the glyphs that share an anchor, read in order. */
@@ -496,83 +493,5 @@ describe('buildRouteLabels', () => {
       // Assert
       expect(drawn.map((n) => n > 0)).toEqual([true, false]);
     });
-  });
-});
-
-describe('what buildRouteLabels records', () => {
-  const shared = [airway('conv', 'V901', [0, 0], [2, 0]), airway('rnav', 'Y902', [0, 0], [2, 0])];
-
-  it('redraws exactly the text and the chevrons it drew', () => {
-    // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
-    const { text, chevrons, drawn } = build(items, ALL_LAYERS);
-
-    // Act
-    const again = redrawn(drawn);
-
-    // Assert
-    expect(chevrons.count).toBeGreaterThan(0);
-    expect(withoutColor(glyphs(again.text))).toEqual(withoutColor(glyphs(text)));
-    expect(withoutColor(instances(again.strokes))).toEqual(withoutColor(instances(chevrons)));
-  });
-
-  it('keeps each designator of a shared span under its own item, at its own pen', () => {
-    // Arrange
-    const { drawn } = build(shared, ['conv', 'rnav']);
-
-    // Act
-    const [conv, rnav] = ['V901', 'Y902'].map((key) => drawn.get(key));
-
-    // Assert
-    expect(conv?.texts.map((t) => t.text)).toEqual(['V901']);
-    expect(rnav?.texts.map((t) => t.text)).toEqual(['Y902']);
-    expect(conv?.texts[0]?.at).toMatchObject({ x: 1, y: 0 });
-    expect(rnav?.texts[0]?.at).toMatchObject({ x: 1, y: 0 });
-    expect(conv?.texts[0]?.at.px).toBeLessThan(rnav?.texts[0]?.at.px ?? NaN);
-  });
-
-  it("keeps a procedure's name and both arms of its chevron under its item", () => {
-    // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
-    const key = items.find((item) => itemName(item) === 'TAVRO2.ZOLEK')?.key ?? '';
-    const { drawn } = build(items, ALL_LAYERS);
-
-    // Act
-    const record = drawn.get(key);
-
-    // Assert
-    expect(record?.texts.map((t) => t.text)).toEqual(['TAVRO2.ZOLEK']);
-    expect(record?.strokes).toHaveLength(2);
-  });
-
-  it("keeps a designator's own gap, the chart's for a lone one", () => {
-    // Arrange
-    const { gaps, drawn } = build([airway('conv', 'V901', [3, 1], [1, 0.5], [0, 0.25])], ['conv']);
-
-    // Act
-    const [kept] = drawn.get('V901')?.gaps ?? [];
-
-    // Assert
-    const [cut] = instances(gaps);
-    expect(kept?.width).toBe(cut?.width ?? NaN);
-    expect(kept?.color).toBe(THEME.bg);
-    expect(kept?.from.x).toBeCloseTo(cut?.a.x ?? NaN, 9);
-    expect(kept?.from.px).toBeCloseTo(cut?.offsetA.x ?? NaN, 4);
-    expect(kept?.from.py).toBeCloseTo(cut?.offsetA.y ?? NaN, 4);
-    expect(kept?.to.px).toBeCloseTo(cut?.offsetB.x ?? NaN, 4);
-    expect(kept?.to.py).toBeCloseTo(cut?.offsetB.y ?? NaN, 4);
-  });
-
-  it("ends a designator's gap before the next designator's text", () => {
-    // Arrange
-    const { drawn } = build(shared, ['conv', 'rnav']);
-
-    // Act
-    const [conv, rnav] = ['V901', 'Y902'].map((key) => drawn.get(key));
-
-    // Assert
-    expect(conv?.gaps).toHaveLength(1);
-    expect(conv?.gaps[0]?.to.px).toBeLessThan(rnav?.texts[0]?.at.px ?? NaN);
-    expect(rnav?.gaps[0]?.from.px).toBeGreaterThan(conv?.texts[0]?.at.px ?? NaN);
   });
 });

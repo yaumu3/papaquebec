@@ -2,6 +2,7 @@
 
 import type { Batch } from '../protocol';
 import type { Anchor, LineBatch, TextBatch, TextStyle } from './pack';
+import type { SpanLabel } from './spanDesignators';
 
 /** A run of text as it was drawn. */
 export interface DrawnText {
@@ -20,11 +21,8 @@ export interface DrawnStroke {
   width: number;
 }
 
-/** What one item's label drew. A gap is kept, not drawn: the chart cuts one box per label. */
+/** What one area or point item's label drew. */
 export interface DrawnLabel {
-  gaps: DrawnStroke[];
-  /** The identities of the spans a route designator was drawn on, one for each gap. */
-  spans: string[];
   texts: DrawnText[];
   strokes: DrawnStroke[];
 }
@@ -42,13 +40,16 @@ export interface LabelOut {
 /** A build's batches, back to front, and what its labels drew. */
 export interface BuiltLabels {
   batches: Batch[];
-  drawn: DrawnLabels;
+  /** What each area or point item's label drew. */
+  drawn?: DrawnLabels;
+  /** The span labels a route build drew, by span identity. */
+  spanLabels?: ReadonlyMap<string, SpanLabel>;
 }
 
 const recordOf = (drawn: DrawnLabels, key: string): DrawnLabel => {
   const known = drawn.get(key);
   if (known) return known;
-  const made: DrawnLabel = { gaps: [], spans: [], texts: [], strokes: [] };
+  const made: DrawnLabel = { texts: [], strokes: [] };
   drawn.set(key, made);
   return made;
 };
@@ -75,28 +76,12 @@ export function putStroke(
   recordOf(out.drawn, key).strokes.push(stroke);
 }
 
-/** Keeps the gap the item `key`'s designator takes in the line of `span`, without drawing it. */
-export function keepGap(drawn: DrawnLabels, key: string, span: string, gap: DrawnStroke) {
-  const label = recordOf(drawn, key);
-  label.gaps.push(gap);
-  label.spans.push(span);
-}
-
-/** A label to add to without changing the one it copies. */
-export const copyOf = ({ gaps, spans, texts, strokes }: DrawnLabel): DrawnLabel => ({
-  gaps: [...gaps],
-  spans: [...spans],
-  texts: [...texts],
-  strokes: [...strokes],
-});
-
-/** Draws a label again: its gaps as they were, then its text and segments in `color`. */
+/** Draws a label again: its text and its segments in `color`. */
 export function redrawLabel(
-  { gaps, texts, strokes }: DrawnLabel,
+  { texts, strokes }: DrawnLabel,
   color: string,
-  out: { gaps: LineBatch; text: TextBatch; strokes: LineBatch },
+  out: { text: TextBatch; strokes: LineBatch },
 ) {
-  for (const gap of gaps) drawStroke(out.gaps, gap, gap.color);
   for (const run of texts) drawText(out.text, run, color);
   for (const stroke of strokes) drawStroke(out.strokes, stroke, color);
 }

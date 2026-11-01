@@ -70,12 +70,15 @@ export function showChart(
       return made ? labelSlots(slice, made.batches) : null;
     });
   }
+  const routeSlice = CHART_SLICES.find((slice) => slice.labels === 'routeLabels');
+  const routeSpanLabels = () => (routeSlice && labels.get(routeSlice)?.()?.spanLabels) || new Map();
   return (item) => {
     const info = atlas();
     if (!info) return [];
     const slice = CHART_SLICES.find(({ layers }) => layers.some((l) => l === item.layer));
-    const drawn = slice && labels.get(slice)?.()?.drawn.get(item.key);
+    const drawn = slice && labels.get(slice)?.()?.drawn?.get(item.key);
     return buildHighlight(item, drawn, {
+      spanLabels: routeSpanLabels(),
       topology: topology(),
       drawnPoints,
       project: projectNm,

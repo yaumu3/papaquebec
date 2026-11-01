@@ -27,6 +27,7 @@ import {
   redrawn,
   withoutColor,
 } from './chartFixture';
+import type { DrawnLabel } from './drawnLabels';
 import { THEME } from './rules';
 
 /** The text and the rules of the area labels of `items` as the scope builds them. */
@@ -60,7 +61,7 @@ function built(
     ...fit,
   });
   if (!text || !rules) throw new Error('buildAreaLabels returned too few batches');
-  return { text, rules, drawn };
+  return { text, rules, drawn: drawn ?? new Map<string, DrawnLabel>() };
 }
 
 /** The text of the area labels of `items`. */

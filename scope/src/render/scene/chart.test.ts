@@ -28,6 +28,7 @@ import {
   project,
   triangle,
 } from './chartFixture';
+import type { DrawnLabel } from './drawnLabels';
 
 const has = (layers: readonly string[], layer: string) => layers.includes(layer);
 
@@ -74,7 +75,7 @@ const build = (
     drawn,
   } = buildPointLabels({ ...input, labelDensity, atlas });
   if (!labels) throw new Error('buildPointLabels returned no batch');
-  return { ...buildShapes(input), labels, drawn };
+  return { ...buildShapes(input), labels, drawn: drawn ?? new Map<string, DrawnLabel>() };
 };
 
 describe('buildShapes lines', () => {

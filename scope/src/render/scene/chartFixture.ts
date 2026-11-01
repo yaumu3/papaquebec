@@ -115,12 +115,12 @@ export function glyphs(batch: Batch) {
 
 /** The batches `redrawLabel` draws for the labels of these item keys, all of them by default. */
 export function redrawn(drawn: DrawnLabels, keys: readonly string[] = [...drawn.keys()]) {
-  const out = { gaps: new LineBatch(), text: new TextBatch(atlas), strokes: new LineBatch() };
+  const out = { text: new TextBatch(atlas), strokes: new LineBatch() };
   for (const key of keys) {
     const label = drawn.get(key);
     if (label) redrawLabel(label, '#ffffff', out);
   }
-  return { gaps: out.gaps.finish(), text: out.text.finish(), strokes: out.strokes.finish() };
+  return { text: out.text.finish(), strokes: out.strokes.finish() };
 }
 
 /** Rows without their colour, in one order whatever order they were drawn in. */
