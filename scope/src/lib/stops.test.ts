@@ -3,7 +3,7 @@ import { describe, expect, it } from 'bun:test';
 import type { Chart } from './chart';
 import type { LonLat } from './mapdata';
 import type { PointLayer } from './mapsetFormat';
-import { type Cuts, NO_CUTS, spansOf, STOP_CLEARANCE_PX, stopCuts } from './stops';
+import { type Cuts, NO_CUTS, spanIdentity, spansOf, STOP_CLEARANCE_PX, stopCuts } from './stops';
 import { type ChartPoint, topologyOf } from './topology';
 
 const SIZES: Record<PointLayer, number> = { ad: 9, navaid: 10, fix: 8, vfr: 6 };
@@ -126,5 +126,45 @@ describe('spansOf', () => {
 
     // Assert
     expect(spans).toEqual([]);
+  });
+});
+
+describe('spanIdentity', () => {
+  it('names a span by its positions in either direction, and tells partial overlaps apart', () => {
+    // Arrange
+    const a: LonLat = [130.1, 33.7];
+    const b: LonLat = [130.2, 33.7];
+    const c: LonLat = [130.3, 33.7];
+    const d: LonLat = [130.4, 33.7];
+    const routes: LonLat[][] = [
+      [a, b, c],
+      [c, b, a],
+      [a, b, c, d],
+      [a, c, b],
+      [d, c, b],
+      [a, b, c],
+    ];
+    const chart: Chart = routes.map((coordinates, i) => ({
+      key: `R${i}`,
+      layer: 'conv',
+      parts: [
+        {
+          geometry: { type: 'LineString', coordinates },
+          properties: { layer: 'conv', name: `R${i}` },
+        },
+      ],
+    }));
+    const { paths } = topologyOf(chart).routes;
+    const whole = (i: number) => ({ from: 0, to: (paths[i]?.vertices.length ?? 1) - 1 });
+
+    // Act
+    const identity = paths.map((path, i) => spanIdentity(path, whole(i)));
+
+    // Assert
+    expect(identity[0]).toBe(identity[1]);
+    expect(identity[0]).not.toBe(identity[2]);
+    expect(identity[0]).not.toBe(identity[3]);
+    expect(identity[0]).not.toBe(identity[4]);
+    expect(identity[0]).toBe(identity[5]);
   });
 });
