@@ -98,6 +98,12 @@ function xsInDrawOrder(slots: Slots, kind: Batch['kind']): number[] {
     .flatMap((b) => Array.from({ length: b.count }, (_, i) => Math.round(b.data[i * stride] ?? 0)));
 }
 
+/** The kind of each non-empty batch, in the order the renderer draws them. */
+const kindsInDrawOrder = (slots: Slots): Batch['kind'][] =>
+  SLOT_ORDER.flatMap((name) => slots[name] ?? [])
+    .filter((b) => b.count > 0)
+    .map((b) => b.kind);
+
 describe('the draw order of the chart', () => {
   const chart = CHART_LAYERS.map(itemAt);
   const behind = DRAW_STACK.toReversed();
@@ -114,7 +120,7 @@ describe('the draw order of the chart', () => {
     expect(xsInDrawOrder(slots, 'lines')).toEqual(lineLayers.map(at));
   });
 
-  it('draws the markers after every line, back to front', () => {
+  it('draws the markers back to front', () => {
     // Arrange
     const pointLayers = behind.filter(isPoint);
 
@@ -125,7 +131,7 @@ describe('the draw order of the chart', () => {
     expect(xsInDrawOrder(slots, 'markers')).toEqual(pointLayers.map(at));
   });
 
-  it('draws every label after every line and marker, back to front, the ring labels first', () => {
+  it('draws every label after every line, back to front, the ring labels first', () => {
     // Arrange
     const labelled = behind.filter((l) => !unlabelled.has(l));
 
@@ -134,6 +140,18 @@ describe('the draw order of the chart', () => {
 
     // Assert
     expect(xsInDrawOrder(slots, 'text')).toEqual(labelled.map(at));
+  });
+
+  it('draws the markers after every label, the ring labels included', () => {
+    // Arrange
+    const slots = mapSlots(chart);
+
+    // Act
+    const kinds = kindsInDrawOrder(slots);
+
+    // Assert
+    expect(kinds.indexOf('markers')).toBeGreaterThan(kinds.lastIndexOf('text'));
+    expect(kinds.lastIndexOf('lines')).toBeLessThan(kinds.indexOf('text'));
   });
 });
 

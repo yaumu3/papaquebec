@@ -6,18 +6,18 @@ import { CHART_SLICES, labelSlots, shapeSlots, SLOT_ORDER } from './slots';
 const batch = (kind: Batch['kind']): Batch => ({ kind, data: new Float32Array(), count: 0 });
 
 describe('SLOT_ORDER', () => {
-  it('draws the base map, then the chart, then the traces over its labels, then what moves', () => {
+  it('draws the base map, then the chart, its markers over its labels, then the traces, then what moves', () => {
     // Arrange
     const expected = [
       'ringLines',
       'coastLines',
       'areaLines',
       'routeLines',
-      'pointMarkers',
       'ringLabels',
       'areaLabels',
       'routeLabels',
       'pointLabels',
+      'pointMarkers',
       'traces',
       'targets',
       'hover',

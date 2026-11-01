@@ -17,19 +17,20 @@ export const CHART_SLICES = [
 ] as const;
 
 /**
- * Every slot the scope draws, back to front: the base map, the lines and markers of the chart
- * with all its labels over them, the traces of what the tree points at, then what moves.
+ * Every slot the scope draws, back to front: the base map, the lines of the chart, its labels,
+ * its point markers, the traces of what the tree points at, then what moves. Markers sit over
+ * the labels so that a label's halo or gap cuts the lines behind it but never a symbol.
  */
 export const SLOT_ORDER = [
   'ringLines',
   'coastLines',
   'areaLines',
   'routeLines',
-  'pointMarkers',
   'ringLabels',
   'areaLabels',
   'routeLabels',
   'pointLabels',
+  'pointMarkers',
   'traces',
   'targets',
   'hover',
