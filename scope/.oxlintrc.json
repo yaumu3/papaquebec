@@ -11,6 +11,83 @@
     "typescript/no-explicit-any": "error",
     "unicorn/require-post-message-target-origin": "off"
   },
+  // Which way the map code may depend: canvas is where state and render meet. The target-drawing
+  // modules of render (rules, readout, targets, datablock, hover, rbl, overlays, layout,
+  // trackFixture) read state/track and state/filter types: older code, a known exception, which
+  // is why render/scene is listed by module and not as a whole.
+  "overrides": [
+    {
+      "files": ["src/lib/**"],
+      "excludeFiles": ["**/*.test.ts", "**/*Fixture.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "**/canvas/**",
+                  "**/feed/**",
+                  "**/panels/**",
+                  "**/render/**",
+                  "**/state/**",
+                  "**/ui/**"
+                ],
+                "message": "lib imports only lib and design."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/render/slots.ts",
+        "src/render/scene/areaBlocks.ts",
+        "src/render/scene/areaLabels.ts",
+        "src/render/scene/chart.ts",
+        "src/render/scene/drawnLabels.ts",
+        "src/render/scene/figures.ts",
+        "src/render/scene/highlight.ts",
+        "src/render/scene/holds.ts",
+        "src/render/scene/routeLabels.ts",
+        "src/render/scene/runs.ts",
+        "src/render/scene/spanDesignators.ts",
+        "src/render/scene/static.ts",
+        "src/render/scene/traces.ts"
+      ],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/canvas/**", "**/panels/**", "**/state/**"],
+                "message": "The map modules of render import lib, design and render."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/panels/maps/**"],
+      "excludeFiles": ["**/*.test.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/render/**"],
+                "message": "The tree draws from lib's figures and the layer table."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
   "ignorePatterns": [
     "dist",
     "node_modules",
