@@ -82,7 +82,6 @@ export function showChart(
       topology: topology(),
       drawnPoints,
       project: projectNm,
-      labelDensity: settings.labelDensity,
       atlas: info,
       placeOf: areaPlace,
     });

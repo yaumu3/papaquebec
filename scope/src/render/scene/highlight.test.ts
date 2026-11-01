@@ -165,6 +165,42 @@ describe('highlightOf', () => {
     expect(highlight?.texts.map((t) => t.text)).toEqual(['SEC']);
     expect(highlight?.texts[0]?.at).toMatchObject({ x: place?.at.x, y: place?.at.y });
   });
+
+  it("says what DENSE says, on the chart's name, for a sector the chart named at NORMAL", () => {
+    // Arrange
+    const sector = keyed(
+      'SEC',
+      itemOf('sector', partOf('sector', polygon(square), { name: 'SEC', freqs: ['118.50'] })),
+    );
+    const drawn = chartLabels([sector], 'sector', [], ROOMY, 'normal').drawn?.get('SEC');
+    const input = inputOf([sector], [], 'normal');
+
+    // Act
+    const highlight = highlightOf(sector, drawn, input);
+
+    // Assert
+    expect(drawn?.texts.map((t) => t.text)).toEqual(['SEC']);
+    expect(highlight?.texts.map((t) => t.text)).toEqual(['SEC', '118.50']);
+    expect([highlight?.texts[0]?.at]).toEqual([drawn?.texts[0]?.at]);
+  });
+
+  it('says what DENSE says, centred on its place, for an area the chart does not name', () => {
+    // Arrange
+    const area = keyed(
+      'CTR',
+      itemOf('ctr', partOf('ctr', polygon(square), { name: 'CTR', lower: 'SFC', upper: '3000FT' })),
+    );
+    const input = inputOf([area], [], 'normal');
+    const place = areaPlaceOf(area, project);
+
+    // Act
+    const highlight = highlightOf(area, undefined, input);
+
+    // Assert
+    expect(highlight?.texts.map((t) => t.text)).toEqual(['CTR', '030', 'SFC']);
+    expect(highlight?.strokes).toHaveLength(1);
+    expect(highlight?.texts[0]?.at).toMatchObject({ x: place?.at.x, y: place?.at.y });
+  });
 });
 
 describe('buildHighlight of a route', () => {

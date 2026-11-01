@@ -1,12 +1,11 @@
 /** How an area item's label is laid out: its rows of text and the rules between them. */
 
 import { type ChartItem, itemFrequency } from '../../lib/chart';
-import type { Vec2 } from '../../lib/geo';
 import { fractionOf, stratumTag } from '../../lib/stratum';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import { type LabelOut, putStroke, putText } from './drawnLabels';
 import type { LabelStyle } from './layerStyles';
-import type { TextBatch } from './pack';
+import type { Anchor, TextBatch } from './pack';
 import { THEME } from './rules';
 
 /** A sector's details are in 9 px, set 6 px apart from the name and from each other. */
@@ -129,12 +128,12 @@ export function blockOf(
   return { rows, rules: [rule], width: Math.max(...rows.map((row) => row.width)) };
 }
 
-/** Puts a block's rows and rules centred on `at`. */
-export function putBlock({ rows, rules }: Block, at: Vec2, out: LabelOut) {
+/** Puts a block's rows and rules centred on `at`, shifted by its px offsets. */
+export function putBlock({ rows, rules }: Block, at: Anchor, out: LabelOut) {
   const style = { baseline: 'middle', halo: true } as const;
   for (const row of rows) {
     for (const run of row.runs) {
-      const anchor = { ...at, px: run.x - row.width / 2, py: row.y };
+      const anchor = { ...at, px: run.x - row.width / 2 + (at.px ?? 0), py: row.y + (at.py ?? 0) };
       putText(out, row.key, {
         text: run.text,
         at: anchor,
@@ -145,9 +144,24 @@ export function putBlock({ rows, rules }: Block, at: Vec2, out: LabelOut) {
     }
   }
   for (const { key, y, width, color } of rules) {
-    const end = (sign: number) => ({ ...at, px: (sign * width) / 2, py: y });
+    const end = (sign: number) => ({
+      ...at,
+      px: (sign * width) / 2 + (at.px ?? 0),
+      py: y + (at.py ?? 0),
+    });
     putStroke(out, key, { from: end(-1), to: end(1), color, width: 1 });
   }
+}
+
+/**
+ * Puts a block with its name, the first run of its first row, at `name`: the rest of the row
+ * and the rows below follow it, as a block laid out for DENSE hangs off a name the chart drew.
+ */
+export function putBlockAtName(block: Block, name: Anchor, out: LabelOut) {
+  const [first] = block.rows;
+  if (!first) return;
+  const at = { ...name, px: (name.px ?? 0) + first.width / 2, py: (name.py ?? 0) - first.y };
+  putBlock(block, at, out);
 }
 
 /** How much of a stack a block takes: the distance across its rows and a line. */

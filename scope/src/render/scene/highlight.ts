@@ -16,19 +16,16 @@ import { routeCuts } from './runs';
 import { itemLabels, type SpanLabel } from './spanDesignators';
 
 /** What the highlight reads: the chart as the scene holds it, and where an area's label goes. */
-type HighlightInput = Pick<
-  LabelsInput,
-  'topology' | 'drawnPoints' | 'project' | 'labelDensity' | 'atlas'
-> &
+type HighlightInput = Pick<LabelsInput, 'topology' | 'drawnPoints' | 'project' | 'atlas'> &
   PlaceInput & {
     /** The span labels the chart draws for routes, by span identity. */
     spanLabels: ReadonlyMap<string, SpanLabel>;
   };
 
 /**
- * An area's or a point's label as the highlight draws it. Where the chart drew the label that is
- * its record; elsewhere the label is placed as the chart would place it, with no room test and no
- * density gate, its rows those of the label density.
+ * An area's or a point's label as the highlight draws it. A point's is the chart's record, or
+ * its ident placed as the chart would place it. An area's says what DENSE says at any density:
+ * on the name the chart drew, else centred on its place, with no room test and no density gate.
  */
 export function highlightOf(
   item: ChartItem,
@@ -36,10 +33,11 @@ export function highlightOf(
   input: HighlightInput,
 ): DrawnLabel | undefined {
   if (!isStyled(item.layer)) return undefined;
-  if (drawn) return drawn;
   const out = { text: new TextBatch(input.atlas), strokes: new LineBatch(), drawn: new Map() };
-  if (isPointLayer(item.layer)) putPointLabels(item, LAYER_STYLES[item.layer], input, out);
-  else putAreaLabel(item, input.labelDensity, input.placeOf, out);
+  if (isPointLayer(item.layer)) {
+    if (drawn) return drawn;
+    putPointLabels(item, LAYER_STYLES[item.layer], input, out);
+  } else putAreaLabel(item, drawn, input.placeOf, out);
   return out.drawn.get(item.key);
 }
 
