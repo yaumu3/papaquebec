@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { feat } from '../render/scene/chartFixture';
 import { chartOf } from './chart';
 import { type MapSetData, validateMapSet } from './mapset';
 import type { Layer, ScopeLayer } from './mapsetFormat';
@@ -37,7 +38,6 @@ type Position = [number, number];
 const HERE: Position = [130.6, 33.7];
 const RING: Position[] = [HERE, [130.7, 33.7], [130.7, 33.8], HERE];
 
-const feat = (properties: object, geometry: object) => ({ type: 'Feature', properties, geometry });
 const area = (properties: object) => feat(properties, { type: 'Polygon', coordinates: [RING] });
 const route = (properties: object) =>
   feat(properties, { type: 'LineString', coordinates: [HERE, [130.8, 33.7]] });

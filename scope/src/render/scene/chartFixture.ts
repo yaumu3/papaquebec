@@ -51,6 +51,13 @@ export const box = (from: number, to: number): Position[] => [
   [from, from],
 ];
 
+/** A Feature of a map set document, as a file holds it. */
+export const feat = (properties: object, geometry: object) => ({
+  type: 'Feature',
+  properties,
+  geometry,
+});
+
 /** What a test may add to a part: a kind, a name, the limits and frequencies of an area or the one-way flag of a route. */
 export interface Extra {
   kind?: string;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { itemOf, line, partOf } from '../render/scene/chartFixture';
+import { feat, itemOf, line, partOf } from '../render/scene/chartFixture';
 import {
   type ChartItem,
   chartOf,
@@ -134,7 +134,6 @@ const RING: Position[] = [
   [139.8, 35.5],
 ];
 
-const feat = (properties: object, geometry: object) => ({ type: 'Feature', properties, geometry });
 const areaFeature = (name: string, kind: string, ring: Position[] = RING) =>
   feat({ layer: 'tma', name, kind }, { type: 'Polygon', coordinates: [ring] });
 const routeFeature = (name: string, kind: string) =>
