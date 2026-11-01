@@ -52,7 +52,7 @@ interface Geometry {
   length: number;
 }
 
-/** A span, and the designators its label lists: none while it draws no label. */
+/** A span, the designators along it, and whether it draws its label. */
 export interface Entry {
   id: string;
   span: Span;
@@ -60,6 +60,8 @@ export interface Entry {
   /** The grid identity where the span's first path starts. */
   start: string;
   designators: Placed[];
+  /** The span draws its label: its airways fit, or a procedure joined it. */
+  shown: boolean;
 }
 
 type Entries = Map<string, Entry>;
@@ -103,7 +105,7 @@ function entryOf(entries: Entries, path: ChartPath, span: Span, project: Project
   const { angle, flipped } = readingAngle(middle.direction);
   const geometry = { middle, angle, flipped, length: lengthOf(line) };
   const start = startOf(path, span);
-  const made: Entry = { id, span, geometry, start, designators: [] };
+  const made: Entry = { id, span, geometry, start, designators: [], shown: false };
   entries.set(id, made);
   return made;
 }
@@ -140,13 +142,11 @@ function airwayEntries(stage: Stage): Entries {
   return entries;
 }
 
-/** Empties the entries whose labels do not fit; the rest stay as they are. */
+/** Tests each airway label for room at the settled scale, remembering the outcome per span. */
 function settleAirways(entries: Entries, stage: Stage) {
   for (const entry of entries.values()) {
     const threshold = widthOf(entry.designators, stage.text) + MARGIN_PX;
-    if (!rememberFits(stage.shown, entry.id, roomOf(entry, stage.scale), threshold)) {
-      entry.designators = [];
-    }
+    entry.shown = rememberFits(stage.shown, entry.id, roomOf(entry, stage.scale), threshold);
   }
 }
 
@@ -169,9 +169,9 @@ function* spansOfItem(item: ChartItem, { topology, cuts }: Stage) {
 }
 
 /**
- * Names a procedure on the first span where its label with the procedure added still fits. A
- * span that draws no label and fails the test is remembered as hidden; one that draws a label
- * keeps its state.
+ * Names a procedure on the first span where the label with its designator added, every airway
+ * along the span included, passes the room test with the span's remembered state; the whole
+ * label is then drawn. A span it fails keeps whether it draws its label.
  */
 function nameProcedure(item: ChartItem, entries: Entries, stage: Stage) {
   const { project, labelDensity, shown, scale, text } = stage;
@@ -182,10 +182,11 @@ function nameProcedure(item: ChartItem, entries: Entries, stage: Stage) {
     const named = [...entry.designators, placedOn(designator, path, span, entry)];
     if (fits(roomOf(entry, scale), widthOf(named, text) + MARGIN_PX, shown.get(entry.id))) {
       entry.designators = named;
+      entry.shown = true;
       shown.set(entry.id, true);
       return;
     }
-    if (entry.designators.length === 0) shown.set(entry.id, false);
+    shown.set(entry.id, entry.shown);
   }
 }
 
@@ -202,7 +203,7 @@ export function designatedSpans(stage: Stage): Entry[] {
   const entries = airwayEntries(stage);
   settleAirways(entries, stage);
   for (const item of procedureItems(stage.drawnItems)) nameProcedure(item, entries, stage);
-  const drawn = [...entries.values()].filter((entry) => entry.designators.length > 0);
+  const drawn = [...entries.values()].filter((entry) => entry.shown);
   for (const entry of drawn) entry.designators = entry.designators.toSorted(byStack);
   return drawn.toReversed().toSorted((a, b) => frontRank(b) - frontRank(a));
 }

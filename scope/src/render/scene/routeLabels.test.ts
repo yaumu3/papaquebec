@@ -348,6 +348,58 @@ describe('buildRouteLabels', () => {
       // Assert
       expect(labelsIn(text).map((l) => l.text)).toEqual(['V901']);
     });
+
+    describe('on a span of airways', () => {
+      const items = [
+        airway('conv', 'V901', [0, 0], [2, 0]),
+        airway('conv', 'V902', [0, 0], [2, 0]),
+        airway('sid', 'S1', [0, 0], [2, 0]),
+      ];
+      const airwayT = 2 * widthOf(4) + 9 + 28;
+      const textAt = (multiple: number, shown: ShownMemory) =>
+        labelsIn(
+          build(items, ['conv', 'sid'], 'dense', allShown, {
+            settledScale: () => (multiple * airwayT) / 2,
+            shown,
+          }).text,
+        ).map((l) => l.text);
+
+      it('is not named alone where the airways do not fit', () => {
+        // Arrange
+        const shown: ShownMemory = new Map();
+
+        // Act
+        const drawn = textAt(0.9, shown);
+
+        // Assert
+        expect(drawn).toEqual([]);
+      });
+
+      it('draws the same label on every build at one settled scale, airway or not', () => {
+        // Arrange
+        const rows: [number[], string[]][] = [
+          [[0.5, 1.05, 1.05], []],
+          [[1.2, 1.05, 1.05], ['V901V902']],
+        ];
+        const memories = rows.map((): ShownMemory => new Map());
+        const firsts = rows.map(([history], i) =>
+          history
+            .slice(0, -1)
+            .map((multiple) => textAt(multiple, memories[i] ?? new Map()))
+            .at(-1),
+        );
+
+        // Act
+        const drawn = rows.map(([history], i) =>
+          textAt(history.at(-1) ?? NaN, memories[i] ?? new Map()),
+        );
+
+        // Assert
+        const expected = rows.map(([, e]) => e);
+        expect(firsts).toEqual(expected);
+        expect(drawn).toEqual(expected);
+      });
+    });
   });
 
   describe('a one-way designator', () => {
