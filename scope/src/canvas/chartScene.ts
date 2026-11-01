@@ -13,9 +13,9 @@ export type Show = (build: (atlas: AtlasInfo) => Slots | null) => void;
 
 /**
  * Shows each slice of the chart: its shapes and its labels are built apart, so a change that
- * only the labels read does not rebuild the lines. The route labels also follow the settled
- * scale, so a zoom that settles builds them again to test whether they still fit, and they
- * remember what they showed between builds.
+ * only the labels read does not rebuild the lines. The route and area labels also follow the
+ * settled scale, so a zoom that settles builds them again to test whether they still fit, and
+ * they remember what they showed between builds.
  */
 export function showChart(show: Show, projected: () => boolean, settledScale: () => number): void {
   for (const slice of CHART_SLICES) {
