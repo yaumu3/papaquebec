@@ -98,7 +98,7 @@ export PQ_BEAST=<host>:30005 PQ_SITE=<lat>,<lon>
 mise run dev                # the scope and its server, on real traffic
 mise run sim                # the same on the synthetic fleet; PQ_SITE=lat,lon moves it
 mise run check              # everything CI runs
-mise run check:visual       # the map's screenshots against their baselines
+mise run check:visual       # the scope's screenshots against their baselines
 mise run update:visual      # rewrite those baselines
 mise run bench              # a load test, see below
 mise run bench:blocks       # score the data block placer on the sim's scenarios
@@ -120,13 +120,15 @@ Query parameters:
 GitHub Actions runs the same checks and builds the image on every push to `main` and every pull
 request. Two headless scripts describe their flags in their headers:
 
-- `bun scripts/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a frame
+- `bun scripts/headless/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a frame
   plus the console log; with `--sim` it starts a server of its own that flies the sim and serves
   the build. `bun run screenshot` regenerates the README picture that way.
 - `mise run bench` is a load test with extra sim traffic, always on a server of its own.
 
 The visual tests run in a pinned Playwright container, with Apple's `container` where it is
-installed and Docker elsewhere, so a Mac and CI compare the same pixels.
+installed and Docker elsewhere, so a Mac and CI compare the same pixels. Each image is a baseline in
+`scope/visual/`, in a folder for its subject; `bun run visual --only block` takes one folder. They
+fly a fixed fleet in place of the feed, with block bearings fixed in place of the placer's search.
 
 Tests and the synthetic fleet use made-up identities, so nothing names a real aircraft or flight;
 the sim's tests enforce this for the fleet.
@@ -333,9 +335,9 @@ built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
 **Layout.** `scope/src/` is split by role: pure library, shared state, feed, renderer, canvas input,
 panels and UI, design tokens. The rules: `state/` is the only shared state, `lib/` imports no
 framework, worker code never imports Solid or touches the DOM, and components are styled only
-through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
-`proto/` holds the schema both sides generate their types from. `crates/` holds the server's Rust
-crates:
+through the design tokens. `scripts/` holds the map data tools, the icons, the headless browser
+scripts and the visual tests, a folder each. `proto/` holds the schema both sides generate their
+types from. `crates/` holds the server's Rust crates:
 
 - `web/`: the server, the `papaquebec` binary.
 - `authority/`: the server's local certificate authority.

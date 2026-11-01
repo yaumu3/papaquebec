@@ -124,7 +124,7 @@ export function dataBlock(t: Track, nowSec: number, altimeter: Altimeter): DataB
 }
 
 /** Brightness of downlinked intent against the block's own color. */
-export const INTENT_TONE = 0.65;
+const INTENT_TONE = 0.65;
 /** Brightness of a leader against the block's color, unless emphasised. */
 const LEADER_TONE = 0.5;
 
@@ -138,7 +138,7 @@ function dim(hex: string, f: number): string {
 }
 
 /** Where a block sits and how it reads. */
-export interface BlockPlacement {
+interface BlockPlacement {
   /** The target's world position. */
   at: Anchor;
   /** Offset from the target to the block's top-left corner, CSS px. */

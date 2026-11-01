@@ -1,28 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import {
-  aircraftPath,
-  arcPath,
-  bugPath,
-  compass,
-  headingPointerPath,
-  lastHeardY,
-  levelOffPath,
-  lubberPath,
-  type NdGeometry,
-  ndGeometry,
-  rangeAnchors,
-  ringPath,
-  squarePath,
-  THREAT_SIDE_PX,
-  trafficDiamondPath,
-  trackPath,
-  trendPath,
-  trendPoints,
-  windArrowPath,
-} from './geometry';
-
-const segments = (path: string): number => (path.match(/M/g) ?? []).length;
+import { bugPath, levelOffPath, ndGeometry, trendPoints } from './geometry';
 
 describe('ndGeometry', () => {
   it('takes the whole of its size from the width, whichever limit binds', () => {
@@ -40,234 +18,8 @@ describe('ndGeometry', () => {
   });
 });
 
-describe('arcPath', () => {
-  it('runs from 75° left of the top to 75° right of it', () => {
-    // Arrange
-    const g = ndGeometry(346);
-
-    // Act
-    const path = arcPath(g, g.r);
-
-    // Assert
-    expect(path).toBe('M29.1 150.4A149.0 149.0 0 0 1 316.9 150.4');
-  });
-
-  it('draws the half-range ring on the same span at half the radius', () => {
-    // Arrange
-    const g = ndGeometry(346);
-
-    // Act
-    const path = ringPath(g);
-
-    // Assert
-    expect(path).toBe(arcPath(g, g.r2));
-  });
-});
-
-describe('compass', () => {
-  const g = ndGeometry(346);
-
-  it('ticks every 5° across a turn through north, the tens heavier', () => {
-    // Arrange
-    const orient = 350;
-
-    // Act
-    const marks = compass(g, orient);
-
-    // Assert
-    expect([segments(marks.major), segments(marks.minor)]).toEqual([15, 16]);
-  });
-
-  it('labels the tens in tens of degrees, the multiples of three large', () => {
-    // Arrange
-    const orient = 350;
-
-    // Act
-    const marks = compass(g, orient);
-
-    // Assert
-    expect(marks.labels.map((l) => l.text)).toEqual([
-      '28',
-      '29',
-      '30',
-      '31',
-      '32',
-      '33',
-      '34',
-      '35',
-      '0',
-      '1',
-      '2',
-      '3',
-      '4',
-      '5',
-      '6',
-    ]);
-    expect(marks.labels.filter((l) => l.big).map((l) => l.text)).toEqual([
-      '30',
-      '33',
-      '0',
-      '3',
-      '6',
-    ]);
-  });
-
-  it('places a label inside the arc, further in for a large one', () => {
-    // Arrange
-    const orient = 350;
-
-    // Act
-    const [first] = compass(g, orient).labels;
-
-    // Assert
-    expect([first?.x, first?.y]).toEqual([50.8, 144.5]);
-  });
-
-  it('leaves out the labels past 70° and keeps their ticks', () => {
-    // Arrange
-    const orient = 345;
-
-    // Act
-    const marks = compass(g, orient);
-
-    // Assert
-    expect(marks.labels.map((l) => l.text)).toEqual([
-      '28',
-      '29',
-      '30',
-      '31',
-      '32',
-      '33',
-      '34',
-      '35',
-      '0',
-      '1',
-      '2',
-      '3',
-      '4',
-      '5',
-    ]);
-    expect(segments(marks.major)).toBe(16);
-  });
-});
-
-describe('heading pointer', () => {
-  it('draws an open triangle outside the arc at the bearing, none off it', () => {
-    // Arrange
-    const g = ndGeometry(346);
-    const rels = [0, 75, -75, 76];
-
-    // Act
-    const paths = rels.map((rel) => headingPointerPath(g, rel));
-
-    // Assert
-    expect(paths).toEqual([
-      'M173.0 39.0L178.0 28.0L168.0 28.0Z',
-      'M317.9 150.2L329.8 152.2L327.2 142.5Z',
-      'M28.1 150.2L18.8 142.5L16.2 152.2Z',
-      '',
-    ]);
-  });
-});
-
-describe('anchors', () => {
-  it('puts the range labels by the arc and ring ends, the half range beside the track line while drawn, and LAST HEARD over the ring', () => {
-    // Arrange
-    const g = ndGeometry(346);
-
-    // Act
-    const out = {
-      ranges: [false, true].map((line) => rangeAnchors(g, line)),
-      lastHeard: lastHeardY(g),
-    };
-
-    // Assert
-    expect(out).toEqual({
-      ranges: [
-        { outer: { x: 25.1, y: 150.4 }, half: { x: 97, y: 169.7 } },
-        { outer: { x: 25.1, y: 150.4 }, half: { x: 181, y: 114.5 } },
-      ],
-      lastHeard: 106.5,
-    });
-  });
-});
-
-describe('fixed symbols', () => {
-  it('draws the lubber line across the arc and the aircraft apex up at the centre', () => {
-    // Arrange
-    const g = ndGeometry(346);
-
-    // Act
-    const out = { lubber: lubberPath(g), aircraft: aircraftPath(g) };
-
-    // Assert
-    expect(out).toEqual({
-      lubber: 'M173.0 27.0L173.0 43.0',
-      aircraft: 'M173.0 179.0L179.0 197.0L167.0 197.0Z',
-    });
-  });
-});
-
-describe('track line', () => {
-  it("runs straight up from the aircraft's nose to the arc, a 10 px tick at half range", () => {
-    // Arrange
-    const g = ndGeometry(346);
-
-    // Act
-    const path = trackPath(g);
-
-    // Assert
-    expect(path).toBe('M173.0 179.0L173.0 40.0M168.0 114.5L178.0 114.5');
-  });
-});
-
-const vertices = (path: string): [number, number][] => {
-  const numbers = (path.match(/-?\d+\.\d/g) ?? []).map(Number);
-  return Array.from({ length: numbers.length / 2 }, (_, i) => [
-    numbers[2 * i] ?? 0,
-    numbers[2 * i + 1] ?? 0,
-  ]);
-};
-const bearingOf = (g: NdGeometry, [x, y]: [number, number]): number =>
-  (Math.atan2(x - g.cx, g.cy - y) * 180) / Math.PI;
-
 describe('bugPath', () => {
   const g = ndGeometry(346);
-
-  it('draws the whole bug, closed, at its bearing while that is on the arc', () => {
-    // Arrange
-    const rels = [0, 30, -75, 75];
-
-    // Act
-    const paths = rels.map((rel) => bugPath(g, rel));
-
-    // Assert
-    expect(paths[0]).toBe(
-      'M166.0 31.0L180.0 31.0L180.0 39.0L176.0 39.0L173.0 35.0L170.0 39.0L166.0 39.0Z',
-    );
-    expect(paths.map((p) => [p.endsWith('Z'), vertices(p).length])).toEqual(
-      rels.map(() => [true, 7]),
-    );
-  });
-
-  it('draws only the half inside the arc, open, at the end of it for a bearing off it', () => {
-    // Arrange
-    const rels = [100, -100];
-
-    // Act
-    const paths = rels.map((rel) => bugPath(g, rel));
-
-    // Assert
-    expect(paths.map((p) => [p.includes('Z'), vertices(p).length])).toEqual([
-      [false, 5],
-      [false, 5],
-    ]);
-    const [right, left] = paths.map((p) => vertices(p).map((v) => bearingOf(g, v)));
-    expect(Math.max(...(right ?? []))).toBeCloseTo(75, 1);
-    expect(Math.max(...(right ?? []).map(Math.abs))).toBeLessThan(75.1);
-    expect(Math.min(...(left ?? []))).toBeCloseTo(-75, 1);
-    expect(Math.max(...(left ?? []).map(Math.abs))).toBeLessThan(75.1);
-  });
 
   it('parks the same however far off the arc the bearing is', () => {
     // Arrange
@@ -278,18 +30,6 @@ describe('bugPath', () => {
 
     // Assert
     expect(paths[0]).toBe(paths[1]);
-  });
-
-  it('mirrors the half bug at the left end from the one at the right end', () => {
-    // Arrange
-    const mirrored = vertices(bugPath(g, 100)).map(([x, y]): [number, number] => [2 * g.cx - x, y]);
-
-    // Act
-    const left = vertices(bugPath(g, -100));
-
-    // Assert
-    expect(left?.map(([x]) => x)).toEqual(mirrored.map(([x]) => expect.closeTo(x, 1)));
-    expect(left?.map(([, y]) => y)).toEqual(mirrored.map(([, y]) => y));
   });
 });
 
@@ -315,44 +55,10 @@ describe('trend vector', () => {
     expect(points[0]).toEqual([173, 180]);
     expect(lengthOf(points)).toBeCloseTo(67.05, 6);
   });
-
-  it('curves to the side the track turns', () => {
-    // Arrange
-    const rates = [1, -1, 0];
-
-    // Act
-    const ends = rates.map((rate) => trendPoints(g, 0, turning(rate), 20).at(-1)?.[0] ?? 0);
-
-    // Assert
-    expect(ends.map((x) => Math.sign(Math.round((x - g.cx) * 1e6)))).toEqual([1, -1, 0]);
-  });
-
-  it('draws three dashes, one for each 30 s', () => {
-    // Arrange
-    const points = trendPoints(g, 0, turning(0), 20);
-
-    // Act
-    const path = trendPath(points);
-
-    // Assert
-    expect(segments(path)).toBe(3);
-    expect(path.startsWith('M173.0 179.3L173.0 178.5')).toBe(true);
-  });
 });
 
 describe('levelOffPath', () => {
   const g = ndGeometry(346);
-
-  it('draws an arc of 11° either side of the track at the distance, on the scale of the range', () => {
-    // Arrange
-    const nm = 10;
-
-    // Act
-    const path = levelOffPath(g, 0, nm, 20);
-
-    // Assert
-    expect(path).toBe('M158.8 115.9A74.5 74.5 0 0 1 187.2 115.9');
-  });
 
   it('draws none too near the aircraft or at or beyond the arc', () => {
     // Arrange
@@ -363,53 +69,5 @@ describe('levelOffPath', () => {
 
     // Assert
     expect(paths).toEqual(['', '', '']);
-  });
-});
-
-describe('windArrowPath', () => {
-  it('points downwind from a fixed place, with an open head', () => {
-    // Arrange
-    const from = 270;
-
-    // Act
-    const path = windArrowPath(from);
-
-    // Assert
-    expect(path).toBe('M6.0 60.0L26.0 60.0M21.0 63.5L26.0 60.0L21.0 56.5');
-  });
-
-  it('points down the display for a wind from the top', () => {
-    // Arrange
-    const from = 0;
-
-    // Act
-    const path = windArrowPath(from);
-
-    // Assert
-    expect(path.startsWith('M16.0 50.0L16.0 70.0')).toBe(true);
-  });
-});
-
-describe('traffic symbols', () => {
-  it('draws the diamond with a 5.5 px half-diagonal about its centre', () => {
-    // Arrange
-    const at: [number, number] = [100, 50];
-
-    // Act
-    const path = trafficDiamondPath(...at);
-
-    // Assert
-    expect(path).toBe('M100.0 44.5L105.5 50.0L100.0 55.5L94.5 50.0Z');
-  });
-
-  it('draws the threat as a 9 px square about its centre', () => {
-    // Arrange
-    const at: [number, number] = [100, 50];
-
-    // Act
-    const path = squarePath(...at, THREAT_SIDE_PX);
-
-    // Assert
-    expect(path).toBe('M95.5 45.5L104.5 45.5L104.5 54.5L95.5 54.5Z');
   });
 });

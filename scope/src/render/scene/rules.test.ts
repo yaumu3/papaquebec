@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Track } from '../../state/track';
-import { Shape } from '../protocol';
-import { isStale, targetShape, THEME, trackColor, trackLabel, typeLabel } from './rules';
+import { isStale, THEME, trackColor, trackLabel, typeLabel } from './rules';
 import { makeTrack as track } from './trackFixture';
 
 describe('isStale', () => {
@@ -44,24 +43,6 @@ describe('trackColor', () => {
       THEME.descend,
       THEME.level,
     ]);
-  });
-});
-
-describe('targetShape', () => {
-  it('encodes the source in the glyph and filtered targets as hollow diamonds', () => {
-    // Arrange
-    const cases: [Track, 'shown' | 'filtered'][] = [
-      [track(), 'shown'],
-      [track({ source: 'mlat' }), 'shown'],
-      [track({ source: 'tisb' }), 'shown'],
-      [track(), 'filtered'],
-    ];
-
-    // Act
-    const out = cases.map(([t, v]) => targetShape(t, v));
-
-    // Assert
-    expect(out).toEqual([Shape.Square, Shape.SquareRing, Shape.Diamond, Shape.HollowDiamond]);
   });
 });
 

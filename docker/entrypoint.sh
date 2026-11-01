@@ -4,6 +4,6 @@
 cd /app || exit 1
 # The sim flies whenever its site is set, whatever the receiver's is.
 site="${PQ_SIM:-$PQ_SITE}"
-PQ_SITE="$site" bun scripts/build-coast.ts || echo "coastline not generated" >&2
-PQ_SITE="$site" bun scripts/build-mapset.ts || echo "aeronautical data not generated" >&2
+PQ_SITE="$site" bun scripts/map/build-coast.ts || echo "coastline not generated" >&2
+PQ_SITE="$site" bun scripts/map/build-mapset.ts || echo "aeronautical data not generated" >&2
 exec papaquebec

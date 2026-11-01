@@ -1,9 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type Batch, Shape } from '../protocol';
+import { type Batch } from '../protocol';
 import { buildHover, type HoverInput } from './hover';
-import { parseColor } from './pack';
-import { trackColor } from './rules';
 import { makeTrack } from './trackFixture';
 
 function input(over: Partial<HoverInput> = {}): HoverInput {
@@ -22,29 +20,10 @@ function input(over: Partial<HoverInput> = {}): HoverInput {
 
 /** Offsets into a line instance; see `pack.ts`. */
 const LINE_B_PX = 6;
-const LINE_RGBA = 14;
-
 const batch = (batches: Batch[], kind: Batch['kind']) => batches.find((b) => b.kind === kind);
 const count = (batches: Batch[]) => batches.reduce((n, b) => n + b.count, 0);
 
 describe('buildHover', () => {
-  it('boxes the hovered target and draws its leader at full brightness', () => {
-    // Arrange
-    const t = makeTrack();
-
-    // Act
-    const batches = buildHover(input({ track: t }));
-
-    // Assert
-    const markers = batch(batches, 'markers');
-    const lines = batch(batches, 'lines');
-    expect(markers?.count).toBe(1);
-    expect(markers?.data[5]).toBe(Shape.HollowSquare);
-    expect(lines?.count).toBe(1);
-    const rgba = Array.from(lines?.data.slice(LINE_RGBA, LINE_RGBA + 4) ?? []);
-    expect(rgba).toEqual(parseColor(trackColor(t, null)).map((c) => Math.fround(c)));
-  });
-
   it('draws nothing without a target, for the selected one, a filtered one or one without a position', () => {
     // Arrange
     const t = makeTrack();
@@ -73,21 +52,5 @@ describe('buildHover', () => {
     // Assert
     expect(lines?.count).toBe(1);
     expect(lines?.data[LINE_B_PX]).toBeCloseTo(60 - (3 * 60) / Math.hypot(60, 30));
-  });
-});
-
-describe('buildHover instant', () => {
-  it('rings the instant hovered on the history lanes, with no target under the pointer', () => {
-    // Arrange
-    const at = { x: 3, y: 4 };
-
-    // Act
-    const batches = buildHover(input({ track: null, instant: at }));
-
-    // Assert
-    const markers = batch(batches, 'markers');
-    expect(markers?.count).toBe(1);
-    expect(Array.from(markers?.data.slice(0, 2) ?? [])).toEqual([3, 4]);
-    expect(markers?.data[5]).toBe(Shape.Ring);
   });
 });

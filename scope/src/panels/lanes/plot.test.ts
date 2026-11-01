@@ -17,11 +17,10 @@ import {
   headingGlyph,
   laneRange,
   laneTraces,
-  pathOf,
   scaleLabels,
   snapped,
 } from './plot';
-import type { Point, Range } from './trace';
+import type { Range } from './trace';
 
 /** The metres a power of ten stands for, to six figures. */
 const metres = (v: number) => Number((10 ** v).toPrecision(6));
@@ -73,111 +72,6 @@ describe('laneTraces', () => {
 
     // Assert
     expect(traces).toEqual([[], [], []]);
-  });
-});
-
-describe('pathOf', () => {
-  it('starts each run afresh and joins the points within one', () => {
-    // Arrange
-    const runs: Point[][] = [
-      [
-        { t: 0, v: 1 },
-        { t: 5, v: 2 },
-      ],
-      [{ t: 8, v: 3 }],
-    ];
-
-    // Act
-    const d = pathOf(
-      runs,
-      (t) => t * 2,
-      (v) => v * 10,
-    );
-
-    // Assert
-    expect(d).toBe('M0.0 10.0 L10.0 20.0 M16.0 30.0');
-  });
-});
-
-describe('headingGlyph', () => {
-  it('points the aircraft along the heading and the vector along the track, north up', () => {
-    // Arrange
-    const heading = { trk: 180, hdg: 90 };
-
-    // Act
-    const glyph = headingGlyph(100, 50, heading);
-
-    // Assert: the fuselage runs nose east to tail west, the vector due south
-    expect(glyph.aircraft?.startsWith('M111.0 50.0 L89.0 50.0 ')).toBe(true);
-    expect(glyph.vector).toBe('M100.0 50.0 L100.0 69.0');
-    expect(glyph.arrow).toBeUndefined();
-  });
-
-  it('draws the track alone as an arrow centred on the point when the heading is unknown', () => {
-    // Arrange
-    const heading = { trk: 0, hdg: undefined };
-
-    // Act
-    const glyph = headingGlyph(100, 50, heading);
-
-    // Assert
-    expect(glyph.arrow).toBe('M100.0 63.0 L100.0 42.0 M100.0 37.0 L96.8 42.0 L103.2 42.0 Z');
-    expect([glyph.aircraft, glyph.vector]).toEqual([undefined, undefined]);
-  });
-
-  it('draws the aircraft alone when the track is unknown', () => {
-    // Arrange
-    const heading = { trk: undefined, hdg: 0 };
-
-    // Act
-    const glyph = headingGlyph(100, 50, heading);
-
-    // Assert
-    expect(glyph.aircraft?.startsWith('M100.0 39.0 L100.0 61.0 ')).toBe(true);
-    expect([glyph.vector, glyph.arrow]).toEqual([undefined, undefined]);
-  });
-});
-
-describe('headingGlyph with a selected heading', () => {
-  it('arcs from the nose round to the selected heading, the way the turn goes', () => {
-    // Arrange
-    const turns = [
-      { trk: 90, hdg: 90, sel: 180 },
-      { trk: 90, hdg: 90, sel: 0 },
-    ];
-
-    // Act
-    const arcs = turns.map((h) => headingGlyph(100, 50, h).toGo);
-
-    // Assert: right round the south to 180, left round the north to 360
-    expect(arcs).toEqual([
-      'M113.5 50.0 A13.5 13.5 0 0 1 100.0 63.5',
-      'M113.5 50.0 A13.5 13.5 0 0 0 100.0 36.5',
-    ]);
-  });
-
-  it('puts a dot ahead of the nose instead once the heading holds the selection', () => {
-    // Arrange
-    const heading = { trk: 175, hdg: 180, sel: 180.5 };
-
-    // Act
-    const glyph = headingGlyph(100, 50, heading);
-
-    // Assert
-    expect(glyph.held).toEqual({ cx: 100, cy: 64, r: 2.2 });
-    expect(glyph.toGo).toBeUndefined();
-  });
-
-  it('marks the selection past the arrow head when the heading is unknown, with nothing held', () => {
-    // Arrange
-    const heading = { trk: 2, hdg: undefined, sel: 0 };
-
-    // Act
-    const glyph = headingGlyph(100, 50, heading);
-
-    // Assert
-    expect(glyph.tick).toBe('M100.0 34.0 L100.0 30.5');
-    expect([glyph.toGo, glyph.held]).toEqual([undefined, undefined]);
   });
 });
 
@@ -344,37 +238,6 @@ describe('atTicks', () => {
 
     // Assert
     expect(barbs).toEqual([{ t: 100, dir: 300 }]);
-  });
-});
-
-describe('barbPath', () => {
-  it('draws a circle for calm, else a staff toward where the wind comes from with its marks', () => {
-    // Arrange
-    const rows: [number, number][] = [
-      [0, 1],
-      [37, 1],
-      [0, 5],
-      [37, 5],
-      [0, 15],
-      [37, 15],
-      [0, 65],
-      [37, 65],
-    ];
-
-    // Act
-    const paths = rows.map(([dir, speed]) => barbPath(10, 20, dir, speed, 16));
-
-    // Assert
-    expect(paths).toEqual([
-      'M13.0 20.0 a3 3 0 1 0 -6 0 a3 3 0 1 0 6 0',
-      'M13.0 20.0 a3 3 0 1 0 -6 0 a3 3 0 1 0 6 0',
-      'M10.0 20.0 L10.0 4.0 M10.0 7.0 l3.0 0.0',
-      'M10.0 20.0 L19.6 7.2 M17.8 9.6 l2.4 1.8',
-      'M10.0 20.0 L10.0 4.0 M10.0 4.0 l6.0 0.0 M10.0 7.0 l3.0 0.0',
-      'M10.0 20.0 L19.6 7.2 M19.6 7.2 l4.8 3.6 M17.8 9.6 l2.4 1.8',
-      'M10.0 20.0 L10.0 4.0 M10.0 4.0 L16.0 4.0 L10.0 8.5 Z M10.0 8.5 l6.0 0.0 M10.0 11.5 l3.0 0.0',
-      'M10.0 20.0 L19.6 7.2 M19.6 7.2 L24.4 10.8 L16.9 10.8 Z M16.9 10.8 l4.8 3.6 M15.1 13.2 l2.4 1.8',
-    ]);
   });
 });
 

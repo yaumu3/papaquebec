@@ -1,7 +1,6 @@
 import { PALETTE } from '../../design/palette';
 import { climbState, emergencyCode } from '../../lib/format';
 import { LAPSE_SEC } from '../../lib/reports';
-import type { Visibility } from '../../state/filter';
 import type { Readings, Track } from '../../state/track';
 import { Shape } from '../protocol';
 
@@ -50,9 +49,8 @@ export function trackColor(t: Track, selected: string | null): string {
   }
 }
 
-/** Shape encodes source; a filtered target is reduced to a hollow diamond. */
-export function targetShape(t: Track, visibility: Visibility): Shape {
-  if (visibility === 'filtered') return Shape.HollowDiamond;
+/** Shape encodes source. */
+export function targetShape(t: Track): Shape {
   switch (t.source) {
     case 'mlat':
       return Shape.SquareRing;

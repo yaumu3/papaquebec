@@ -120,7 +120,7 @@ const AP_RISE_PX = 10;
 export const apY = (g: PfdGeometry): number => g.wy - AP_RISE_PX;
 
 /** Where `value` stands on a tape that shows `span` either side of `at` over its half-height. */
-export const tapeY = (g: PfdGeometry, value: number, at: number, span: number): number =>
+const tapeY = (g: PfdGeometry, value: number, at: number, span: number): number =>
   g.yc - ((value - at) * (g.yc - g.yTop)) / span;
 
 const SPEED_SPAN_KT = 45;
@@ -186,7 +186,7 @@ const MONO_ADVANCE_EM = 0.6;
  */
 export const MONO_MID_TO_BASELINE_EM = 0.36;
 /** JetBrains Mono's cap height, 730 of 1000 units per em. */
-export const MONO_CAP_EM = 0.73;
+const MONO_CAP_EM = 0.73;
 
 /** The readout box's inner half height: the box's half height less its 1 px stroke. */
 const INNER_HALF_PX = READOUT_HALF_HEIGHT_PX - 1;
@@ -203,7 +203,7 @@ const baselineDepth = (linePx: number): number => MONO_MID_TO_BASELINE_EM * line
  * next row's baseline waits at or above the inner top edge, and when a carry ends the old row's
  * cap top has cleared the inner bottom edge.
  */
-export const carryPitch = (linePx: number): number => {
+const carryPitch = (linePx: number): number => {
   const depth = baselineDepth(linePx);
   const clear = Math.max(INNER_HALF_PX + depth, INNER_HALF_PX + MONO_CAP_EM * linePx - depth);
   return Math.ceil(clear / LAYOUT_STEP_PX) * LAYOUT_STEP_PX;

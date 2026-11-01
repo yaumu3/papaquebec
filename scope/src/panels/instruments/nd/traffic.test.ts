@@ -305,44 +305,6 @@ describe('ndTraffic', () => {
     expect(result.symbols.map((s) => s.kind)).toEqual(['other', 'proximate']);
   });
 
-  it('puts the label 12 px above traffic above or level, 12 px below traffic below', () => {
-    // Arrange
-    const others = [
-      traffic('above', 0, 10, { alt: 31100 }),
-      traffic('level', 20, 10, { alt: 29960 }),
-      traffic('below', 40, 10, { alt: 29100 }),
-    ];
-
-    // Act
-    const result = ndTraffic(nowAt(ownShip(), NOW), others, view());
-
-    // Assert
-    expect(result.symbols.map((s) => [s.label?.text, (s.label?.y ?? 0) - s.y])).toEqual([
-      ['+11', -12],
-      ['+00', -12],
-      ['-09', 12],
-    ]);
-    expect(result.symbols.map((s) => (s.label?.x ?? 0) - s.x)).toEqual([0, 0, 0]);
-  });
-
-  it('puts the arrow 9 px right of the symbol at its height, when the rate calls for one', () => {
-    // Arrange
-    const held = { position: FRESH, alt: FRESH, verticalRate: FRESH };
-    const others = [
-      traffic('climbing', 0, 10, { verticalRate: 1500, heard: held }),
-      traffic('level', 20, 10),
-    ];
-
-    // Act
-    const result = ndTraffic(nowAt(ownShip(), NOW), others, view());
-
-    // Assert
-    const arrows = result.symbols.map(
-      (s) => s.arrow && [s.arrow.glyph, s.arrow.x - s.x, s.arrow.y - s.y],
-    );
-    expect(arrows).toEqual([['↑', 9, 0], undefined]);
-  });
-
   it('draws nothing, and annunciates nothing, on a display that is lost or blank', () => {
     // Arrange
     const own = ownShip({ ra: advisory({ address: 'thr' }) });

@@ -57,7 +57,7 @@ COPY --from=server /papaquebec /usr/bin/papaquebec
 WORKDIR /app
 COPY scope/package.json ./
 COPY scope/src/lib/mapsetFormat.ts ./src/lib/
-COPY scope/scripts/build-coast.ts scope/scripts/build-mapset.ts scope/scripts/site.ts scope/scripts/guards.ts scope/scripts/countries.ts scope/scripts/countries.json scope/scripts/openaip.ts ./scripts/
+COPY scope/scripts/map/build-coast.ts scope/scripts/map/build-mapset.ts scope/scripts/map/site.ts scope/scripts/map/guards.ts scope/scripts/map/countries.ts scope/scripts/map/countries.json scope/scripts/map/openaip.ts ./scripts/map/
 COPY --from=build /app/dist ./dist
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN mkdir -p public/map

@@ -45,8 +45,8 @@ jobs:
         with:
           name: visual-differences
           path: |
-            scope/visual/*.actual.png
-            scope/visual/*.diff.png
+            scope/visual/**/*.actual.png
+            scope/visual/**/*.diff.png
 
   server:
     runs-on: ubuntu-26.04
