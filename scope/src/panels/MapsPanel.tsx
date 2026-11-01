@@ -7,6 +7,7 @@ import {
   armRemoval,
   importMapSet,
   importNote,
+  isSetEnabled,
   type MapSet,
   mapSets,
   removeMapSet,
@@ -70,7 +71,7 @@ function MapSetRow(props: {
     <div class={s.set}>
       <Button
         class={s.setToggle}
-        on={props.set.enabled}
+        on={isSetEnabled(props.set.identity)}
         onClick={() => toggleMapSet(props.set.identity)}
       >
         {props.set.data.title}

@@ -134,6 +134,23 @@ describe('loadPersisted layers', () => {
   });
 });
 
+describe('loadPersisted disabled sets', () => {
+  it('keeps a list of identities, and falls back to none on anything else', () => {
+    // Arrange
+    const stored = [['openaip', 'my-fixes'], ['openaip', 7], 'openaip', null];
+
+    // Act
+    const lists = stored.map((disabledSets) => {
+      const storage = memoryStorage();
+      storage.setItem(PERSIST_KEY, JSON.stringify({ settings: { disabledSets } }));
+      return loadPersisted(storage, DEFAULTS).settings.disabledSets;
+    });
+
+    // Assert
+    expect(lists).toEqual([['openaip', 'my-fixes'], [], [], []]);
+  });
+});
+
 describe('savePersisted', () => {
   it('round-trips through storage', () => {
     // Arrange

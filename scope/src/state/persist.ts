@@ -83,6 +83,10 @@ function knownOf<T>(raw: unknown, among: readonly T[], fallback: readonly T[]): 
   return Array.isArray(raw) ? among.filter((x) => raw.includes(x)) : fallback;
 }
 
+/** The strings of a list; anything else in it, or no list at all, is junk: the fallback. */
+const stringsFrom = (raw: unknown, fallback: readonly string[]): readonly string[] =>
+  Array.isArray(raw) && raw.every((x) => typeof x === 'string') ? raw : fallback;
+
 const GROUP_TITLES = LAYER_GROUPS.map((group) => group.title);
 
 function carried(old: unknown): Record<string, unknown> {
@@ -129,6 +133,7 @@ function settingsFrom(raw: unknown, fallback: Settings): Settings {
     filter: filterFrom(raw.filter, fallback.filter),
     shownLayers: shownLayersFrom(raw, fallback.shownLayers),
     exceptions: exceptionsFrom(raw.exceptions, fallback.exceptions),
+    disabledSets: stringsFrom(raw.disabledSets, fallback.disabledSets),
     openGroups: knownOf(raw.openGroups, GROUP_TITLES, fallback.openGroups),
     openLayers: knownOf<string>(raw.openLayers, DRAW_STACK, fallback.openLayers),
     labelDensity: oneOf(LABEL_DENSITIES, raw.labelDensity, fallback.labelDensity),

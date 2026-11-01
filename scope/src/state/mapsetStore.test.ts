@@ -11,10 +11,9 @@ const data = (title: string): MapSetData => ({
   title,
   features: [],
 });
-const record = (identity: string, enabled = true): StoredMapSet => ({
+const record = (identity: string, imported = 0): StoredMapSet => ({
   identity,
-  enabled,
-  imported: 0,
+  imported,
   data: data(identity),
 });
 
@@ -35,14 +34,14 @@ describe('openMapSetStore', () => {
   it('keeps one record per identity, the latest', async () => {
     // Arrange
     const store = await openMapSetStore(new IDBFactory());
-    await store.put(record('alpha', true));
-    await store.put(record('alpha', false));
+    await store.put(record('alpha', 1));
+    await store.put(record('alpha', 2));
 
     // Act
     const all = await store.all();
 
     // Assert
-    expect(all).toEqual([record('alpha', false)]);
+    expect(all).toEqual([record('alpha', 2)]);
   });
 
   it('deletes a record by identity and leaves the others', async () => {

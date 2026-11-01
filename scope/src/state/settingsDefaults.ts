@@ -25,6 +25,8 @@ export interface Settings {
   filter: Filter;
   shownLayers: ShownLayers;
   exceptions: Exceptions;
+  /** The identities of the map sets switched off, the built-in one among them. */
+  disabledSets: readonly string[];
   /** Titles of the tree's open groups. */
   openGroups: readonly string[];
   /** The tree's open layers. */
@@ -54,6 +56,7 @@ export const DEFAULT_SETTINGS: Settings = {
   filter: { ground: true, lowerFl: 0, upperFl: FL_MAX, squawk: 'all' },
   shownLayers: DEFAULT_SHOWN,
   exceptions: {},
+  disabledSets: [],
   openGroups: [],
   openLayers: [],
   labelDensity: 'normal',

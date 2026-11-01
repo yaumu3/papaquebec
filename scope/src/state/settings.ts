@@ -38,6 +38,7 @@ export function persist(rest: Omit<Persisted, 'settings'>): void {
     filter: { ...settings.filter },
     shownLayers: { ...settings.shownLayers },
     exceptions: { ...settings.exceptions },
+    disabledSets: [...settings.disabledSets],
     openGroups: [...settings.openGroups],
     openLayers: [...settings.openLayers],
     altimeter: { ...settings.altimeter },
