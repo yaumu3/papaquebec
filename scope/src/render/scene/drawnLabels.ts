@@ -23,6 +23,8 @@ export interface DrawnStroke {
 /** What one item's label drew. A gap is kept, not drawn: the chart cuts one box per label. */
 export interface DrawnLabel {
   gaps: DrawnStroke[];
+  /** The identities of the spans a route designator was drawn on, one for each gap. */
+  spans: string[];
   texts: DrawnText[];
   strokes: DrawnStroke[];
 }
@@ -46,7 +48,7 @@ export interface BuiltLabels {
 const recordOf = (drawn: DrawnLabels, key: string): DrawnLabel => {
   const known = drawn.get(key);
   if (known) return known;
-  const made: DrawnLabel = { gaps: [], texts: [], strokes: [] };
+  const made: DrawnLabel = { gaps: [], spans: [], texts: [], strokes: [] };
   drawn.set(key, made);
   return made;
 };
@@ -73,10 +75,20 @@ export function putStroke(
   recordOf(out.drawn, key).strokes.push(stroke);
 }
 
-/** Keeps the gap the item `key`'s designator takes in the line, without drawing it. */
-export function keepGap(drawn: DrawnLabels, key: string, gap: DrawnStroke) {
-  recordOf(drawn, key).gaps.push(gap);
+/** Keeps the gap the item `key`'s designator takes in the line of `span`, without drawing it. */
+export function keepGap(drawn: DrawnLabels, key: string, span: string, gap: DrawnStroke) {
+  const label = recordOf(drawn, key);
+  label.gaps.push(gap);
+  label.spans.push(span);
 }
+
+/** A label to add to without changing the one it copies. */
+export const copyOf = ({ gaps, spans, texts, strokes }: DrawnLabel): DrawnLabel => ({
+  gaps: [...gaps],
+  spans: [...spans],
+  texts: [...texts],
+  strokes: [...strokes],
+});
 
 /** Draws a label again: its gaps as they were, then its text and segments in `color`. */
 export function redrawLabel(

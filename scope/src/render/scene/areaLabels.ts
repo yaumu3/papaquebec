@@ -1,11 +1,12 @@
 import { type ChartItem, itemName } from '../../lib/chart';
 import { rememberFits } from '../../lib/fits';
 import { stacksOf } from '../../lib/labelStacks';
+import { isStyled } from '../../lib/layers';
 import type { AreaPlace } from '../../lib/pole';
 import { limitFt, bandOf } from '../../lib/stratum';
 import { blockOf, putBlock, stackedBlock } from './areaBlocks';
 import type { FitInput, LabelsInput, PlaceInput } from './chart';
-import type { BuiltLabels } from './drawnLabels';
+import type { BuiltLabels, LabelOut } from './drawnLabels';
 import { LAYER_STYLES, labelReaches } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 
@@ -33,6 +34,24 @@ const stacksOfMembers = (members: Member[]): Member[][] =>
     (m) => limitFt(bandOf(m.item.parts).lower),
     (m) => m.name,
   );
+
+/**
+ * Puts an area item's block centred on its place, with no room test and no density gate: the
+ * rows are those of the label density. Says nothing without a label style, a name or a place.
+ */
+export function putAreaLabel(
+  item: ChartItem,
+  density: LabelsInput['labelDensity'],
+  placeOf: PlaceInput['placeOf'],
+  out: LabelOut,
+) {
+  const label = isStyled(item.layer) ? LAYER_STYLES[item.layer].label : undefined;
+  const name = itemName(item);
+  const place = placeOf(item);
+  if (label && name !== undefined && place) {
+    putBlock(blockOf(item, name, label, density, out.text), place.at, out);
+  }
+}
 
 /**
  * The labels of the drawn area items, each block centred on its place, back to front through

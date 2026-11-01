@@ -50,6 +50,10 @@ export const itemOf = (layer: StyledLayer, ...parts: ItemPart[]): ChartItem => (
   parts,
 });
 
+/** A one-part route item named `name`, on the layer `layer`, through these points. */
+export const airway = (layer: StyledLayer, name: string, ...at: Position[]) =>
+  keyed(name, itemOf(layer, partOf(layer, line(...at), { name })));
+
 export const keyed = (key: string, item: ChartItem): ChartItem => ({ ...item, key });
 
 export interface Instance {

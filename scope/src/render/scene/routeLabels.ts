@@ -29,7 +29,7 @@ const CHEVRON_ACROSS_PX = 7;
 const CHEVRON_STROKE_PX = 1.3;
 
 /** What a label draws: the gaps cut in the lines, its text, and the chevrons beside the text. */
-interface Out extends LabelOut {
+export interface RouteLabelOut extends LabelOut {
   gaps: LineBatch;
 }
 
@@ -46,7 +46,7 @@ function putChevron(
   ahead: boolean,
   color: string,
   key: string,
-  out: Out,
+  out: RouteLabelOut,
 ) {
   const [arms, tip] = ahead
     ? [
@@ -79,7 +79,7 @@ function gapOf({ middle, angle }: SpanLabel, from: number, to: number): DrawnStr
  * Puts the designators of a span along it, each with its chevron, on a gap cut in the line; each
  * designator keeps the gap its own text and chevron take.
  */
-function putLabel(spanLabel: SpanLabel, out: Out) {
+export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut) {
   const { middle, angle, designators } = spanLabel;
   const total = widthOf(designators, out.text);
   const style = { baseline: 'middle', angle, halo: true } as const;
@@ -95,7 +95,7 @@ function putLabel(spanLabel: SpanLabel, out: Out) {
       putChevron(spanLabel, slot, reads, label.color, key, out);
     }
     const taken = width + (oneWay ? CHEVRON_PX : 0);
-    keepGap(out.drawn, key, gapOf(spanLabel, pen, pen + taken));
+    keepGap(out.drawn, key, spanLabel.id, gapOf(spanLabel, pen, pen + taken));
     pen += taken + SEPARATOR_PX;
   }
   const { from, to, color, width } = gapOf(spanLabel, -total / 2, total / 2);
@@ -111,7 +111,7 @@ function putLabel(spanLabel: SpanLabel, out: Out) {
  * of the one-way routes, back to front through the draw stack, and what each item's label drew.
  */
 export function buildRouteLabels(input: LabelsInput & FitInput): BuiltLabels {
-  const out: Out = {
+  const out: RouteLabelOut = {
     gaps: new LineBatch(),
     text: new TextBatch(input.atlas),
     strokes: new LineBatch(),

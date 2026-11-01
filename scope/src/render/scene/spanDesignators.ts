@@ -74,17 +74,20 @@ interface Stage extends LabelsInput {
 const byStack = (a: { rank: number; name: string }, b: { rank: number; name: string }) =>
   a.rank - b.rank || a.name.localeCompare(b.name);
 
-/**
- * The designator of a path's part, of the item `key`, in its layer's label style, if the density
- * reaches it.
- */
-function designatorOf(path: ChartPath, key: string, density: LabelsInput['labelDensity']) {
+/** The designator of a path's part, of the item `key`, in its layer's label style, if it has one. */
+function designatorOf(path: ChartPath, key: string) {
   const label = LAYER_STYLES[path.layer].label;
   const name = nameOf(path.part);
-  if (!label || name === undefined || !labelReaches(label, density)) return undefined;
+  if (!label || name === undefined) return undefined;
   const { properties } = path.part;
   const oneWay = 'oneWay' in properties && properties.oneWay === true;
   return { key, name, label, rank: DRAW_STACK.indexOf(path.layer), oneWay };
+}
+
+/** The designator of a path's part, if the density reaches its layer's label. */
+function reachedDesignatorOf(path: ChartPath, key: string, density: LabelsInput['labelDensity']) {
+  const designator = designatorOf(path, key);
+  return designator && labelReaches(designator.label, density) ? designator : undefined;
 }
 
 /** A designator on a span's label: `reads` when its route is flown the way the label reads. */
@@ -142,7 +145,9 @@ function airwayLabels(stage: Stage): SpanLabels {
   for (const path of topology.routes.paths) {
     const key = keys.get(path.part);
     const designator =
-      key !== undefined && isAirwayLayer(path.layer) && designatorOf(path, key, labelDensity);
+      key !== undefined &&
+      isAirwayLayer(path.layer) &&
+      reachedDesignatorOf(path, key, labelDensity);
     if (!designator) continue;
     for (const span of spansOf(path, cuts)) {
       const spanLabel = spanLabelOf(spanLabels, path, span, project);
@@ -179,7 +184,7 @@ function procedureItems(items: readonly ChartItem[]): ChartItem[] {
 }
 
 /** The spans of an item, taking its parts in order and the spans of each in path order. */
-function* spansOfItem(item: ChartItem, { topology, cuts }: Stage) {
+function* spansOfItem(item: ChartItem, { topology, cuts }: Pick<Stage, 'topology' | 'cuts'>) {
   for (const part of item.parts) {
     for (const path of topology.routes.paths.filter((p) => p.part === part)) {
       for (const span of spansOf(path, cuts)) yield { path, span };
@@ -195,7 +200,7 @@ function* spansOfItem(item: ChartItem, { topology, cuts }: Stage) {
 function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
   const { project, labelDensity, shown, scale, text } = stage;
   for (const { path, span } of spansOfItem(item, stage)) {
-    const designator = designatorOf(path, item.key, labelDensity);
+    const designator = reachedDesignatorOf(path, item.key, labelDensity);
     const spanLabel = designator && spanLabelOf(spanLabels, path, span, project);
     if (!spanLabel) continue;
     const named = [...spanLabel.designators, placedOn(designator, path, span, spanLabel)];
@@ -207,6 +212,26 @@ function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
     }
     shown.set(spanLabel.id, spanLabel.shown);
   }
+}
+
+/**
+ * The label of each span of an item with its designator alone, in the item's span order: what
+ * the item would say with no room test and no density gate.
+ */
+export function soleLabels(
+  item: ChartItem,
+  stage: Pick<Stage, 'topology' | 'cuts' | 'project'>,
+): SpanLabel[] {
+  const sole: SpanLabels = new Map();
+  for (const { path, span } of spansOfItem(item, stage)) {
+    const designator = designatorOf(path, item.key);
+    if (!designator) continue;
+    const spanLabel = spanLabelOf(sole, path, span, stage.project);
+    if (spanLabel?.designators.length === 0) {
+      spanLabel.designators.push(placedOn(designator, path, span, spanLabel));
+    }
+  }
+  return [...sole.values()];
 }
 
 /** What a label's rank in the draw stack is: that of its front designator. */

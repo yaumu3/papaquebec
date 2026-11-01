@@ -13,6 +13,7 @@ import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults
 import { atlas } from './atlasFixture';
 import type { FitInput } from './chart';
 import {
+  airway,
   glyphs,
   instances,
   itemOf,
@@ -79,9 +80,6 @@ function labelsIn(text: Parameters<typeof glyphs>[0]) {
 
 const stops = (layer: 'navaid' | 'fix', x: number) =>
   keyed(`${layer}${x}`, itemOf(layer, partOf(layer, point([x, 0]))));
-
-const airway = (layer: StyledLayer, name: string, ...at: [number, number][]) =>
-  keyed(name, itemOf(layer, partOf(layer, line(...at), { name })));
 
 const oneWay = (layer: StyledLayer, name: string, ...at: [number, number][]) =>
   keyed(name, itemOf(layer, partOf(layer, line(...at), { name, oneWay: true })));

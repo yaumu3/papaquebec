@@ -209,6 +209,7 @@ describe('buildTraces', () => {
 
   describe('the label of what is pointed at', () => {
     const label: DrawnLabel = {
+      spans: ['S'],
       gaps: [
         {
           from: { x: 1, y: 2, px: -9, py: 0 },

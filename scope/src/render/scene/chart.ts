@@ -9,8 +9,8 @@ import type { LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo } from '../protocol';
 import type { CHART_SLICES, ShapeBatches } from '../slots';
 import { buildAreaLabels } from './areaLabels';
-import { type BuiltLabels, putText } from './drawnLabels';
-import { isPointStyle, LAYER_STYLES, labelReaches } from './layerStyles';
+import { type BuiltLabels, type LabelOut, putText } from './drawnLabels';
+import { isPointStyle, LAYER_STYLES, labelReaches, type PointLayerStyle } from './layerStyles';
 import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
 import { drawRuns, partsOf, routeCuts } from './runs';
@@ -43,6 +43,13 @@ export interface FitInput {
   shown: ShownMemory;
 }
 
+/** A point at its place on the plane. */
+export const placedPoint = ({ key, id, at: [lon, lat] }: ChartPoint, project: ProjectFn) => ({
+  key,
+  id,
+  at: project(lat, lon),
+});
+
 /** The drawn points of a layer, each at its place on the plane. */
 const pointsIn = (
   layer: StyledLayer,
@@ -51,7 +58,7 @@ const pointsIn = (
 ) =>
   drawnPoints()
     .filter((p) => p.layer === layer)
-    .map(({ key, id, at: [lon, lat] }) => ({ key, id, at: project(lat, lon) }));
+    .map((p) => placedPoint(p, project));
 
 /** The chart's lines and point markers, each back to front through the stack. */
 export function buildShapes({
@@ -76,6 +83,16 @@ export function buildShapes({
   return { lines: lines.finish(), markers: markers.finish() };
 }
 
+/** Puts a point's ident beside its marker, in its layer's label style. */
+export function putPointLabel(
+  out: Pick<LabelOut, 'text' | 'drawn'>,
+  { key, id, at }: ReturnType<typeof placedPoint>,
+  { px, py, size, color, baseline }: PointLayerStyle['label'],
+) {
+  const style = { baseline, halo: true } as const;
+  putText(out, key, { text: id, at: { ...at, px, py }, size, color, style });
+}
+
 /** The idents of the drawn points, each back to front through the stack. */
 export function buildPointLabels({
   drawnPoints,
@@ -88,15 +105,8 @@ export function buildPointLabels({
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
     if (!isPointStyle(style) || !labelReaches(style.label, labelDensity)) continue;
-    const { px, py, size, color, baseline } = style.label;
-    for (const { key, id, at } of pointsIn(layer, drawnPoints, project)) {
-      putText(out, key, {
-        text: id,
-        at: { ...at, px, py },
-        size,
-        color,
-        style: { baseline, halo: true },
-      });
+    for (const point of pointsIn(layer, drawnPoints, project)) {
+      putPointLabel(out, point, style.label);
     }
   }
   return { batches: [out.text.finish()], drawn: out.drawn };

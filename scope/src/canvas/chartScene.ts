@@ -5,6 +5,7 @@ import type { ShownMemory } from '../lib/fits';
 import type { AtlasInfo } from '../render/protocol';
 import { buildShapes, buildSliceLabels } from '../render/scene/chart';
 import type { BuiltLabels, DrawnLabel } from '../render/scene/drawnLabels';
+import { highlightOf } from '../render/scene/highlight';
 import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../render/slots';
 import { areaPlace } from '../state/areaPlaces';
 import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
@@ -20,8 +21,8 @@ export type Show = (build: (atlas: AtlasInfo) => Slots | null) => void;
  * only the labels read does not rebuild the lines. The route and area labels also follow the
  * settled scale, so a zoom that settles builds them again to test whether they still fit, and
  * they remember what they showed between builds. Each slice's labels are built once, in a memo
- * that also keeps what they drew; the returned reader gives what an item's label drew, so a
- * hover reads it and never builds the labels.
+ * that also keeps what they drew; the returned reader gives the label to light up for an item,
+ * so a hover reads cached state and never builds the labels.
  */
 export function showChart(
   show: Show,
@@ -69,8 +70,18 @@ export function showChart(
       return made ? labelSlots(slice, made.batches) : null;
     });
   }
-  return ({ key, layer }) => {
-    const slice = CHART_SLICES.find(({ layers }) => layers.some((l) => l === layer));
-    return slice && labels.get(slice)?.()?.drawn.get(key);
+  return (item) => {
+    const info = atlas();
+    if (!info) return undefined;
+    const slice = CHART_SLICES.find(({ layers }) => layers.some((l) => l === item.layer));
+    const drawn = slice && labels.get(slice)?.()?.drawn.get(item.key);
+    return highlightOf(item, drawn, {
+      topology: topology(),
+      drawnPoints,
+      project: projectNm,
+      labelDensity: settings.labelDensity,
+      atlas: info,
+      placeOf: areaPlace,
+    });
   };
 }
