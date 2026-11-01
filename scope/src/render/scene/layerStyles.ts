@@ -1,8 +1,8 @@
+import { CHART_COLORS } from '../../design/palette';
 import type { Layer } from '../../lib/mapsetFormat';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { Shape } from '../protocol';
 import type { DashPattern, TextStyle } from './pack';
-import { THEME } from './rules';
 
 /** What a kind or an upper stratum changes in a line's look. */
 interface Refinement {
@@ -93,65 +93,65 @@ export const LAYER_STYLES = {
   ad: {
     shape: Shape.Ring,
     size: 9,
-    color: THEME.ad,
-    label: { ...STATION_LABEL, color: THEME.adLabel },
+    color: CHART_COLORS.ad,
+    label: { ...STATION_LABEL, color: CHART_COLORS.adLabel },
   },
   navaid: {
     shape: 'symbol',
     size: 12,
-    color: THEME.navaid,
-    label: { ...STATION_LABEL, color: THEME.navaidLabel },
+    color: CHART_COLORS.navaid,
+    label: { ...STATION_LABEL, color: CHART_COLORS.navaidLabel },
   },
   fix: {
     shape: Shape.Triangle,
     size: 8,
-    color: THEME.fix,
-    label: { ...FIX_LABEL, color: THEME.fixLabel },
+    color: CHART_COLORS.fix,
+    label: { ...FIX_LABEL, color: CHART_COLORS.fixLabel },
   },
   vfr: {
     shape: Shape.Triangle,
     size: 6,
-    color: THEME.vfr,
-    label: { ...FIX_LABEL, from: 'dense', color: THEME.vfrLabel },
+    color: CHART_COLORS.vfr,
+    label: { ...FIX_LABEL, from: 'dense', color: CHART_COLORS.vfrLabel },
   },
-  sid: line(THEME.procedure, {
-    label: { ...ROUTE_LABEL, from: 'dense', color: THEME.procedureLabel },
+  sid: line(CHART_COLORS.procedure, {
+    label: { ...ROUTE_LABEL, from: 'dense', color: CHART_COLORS.procedureLabel },
   }),
-  star: line(THEME.procedure, {
+  star: line(CHART_COLORS.procedure, {
     dash: [6, 3],
-    label: { ...ROUTE_LABEL, from: 'dense', color: THEME.procedureLabel },
+    label: { ...ROUTE_LABEL, from: 'dense', color: CHART_COLORS.procedureLabel },
   }),
-  trans: line(THEME.procedure, {
+  trans: line(CHART_COLORS.procedure, {
     dash: [10, 4],
-    label: { ...ROUTE_LABEL, color: THEME.procedureLabel },
+    label: { ...ROUTE_LABEL, color: CHART_COLORS.procedureLabel },
   }),
-  conv: line(THEME.conv, { label: { ...ROUTE_LABEL, color: THEME.convLabel } }),
-  rnav: line(THEME.rnav, { label: { ...ROUTE_LABEL, color: THEME.rnavLabel } }),
-  dct: line(THEME.conv, { width: 0.5 }),
-  hold: { color: THEME.conv, rnavColor: THEME.rnav, label: undefined },
-  ctr: areaLine(THEME.airspace, THEME.airspaceLabel),
-  pr: areaLine(THEME.airspace, THEME.airspaceLabel, {
+  conv: line(CHART_COLORS.conv, { label: { ...ROUTE_LABEL, color: CHART_COLORS.convLabel } }),
+  rnav: line(CHART_COLORS.rnav, { label: { ...ROUTE_LABEL, color: CHART_COLORS.rnavLabel } }),
+  dct: line(CHART_COLORS.conv, { width: 0.5 }),
+  hold: { color: CHART_COLORS.conv, rnavColor: CHART_COLORS.rnav, label: undefined },
+  ctr: areaLine(CHART_COLORS.airspace, CHART_COLORS.airspaceLabel),
+  pr: areaLine(CHART_COLORS.airspace, CHART_COLORS.airspaceLabel, {
     dash: [4, 3],
     kinds: new Map([['P', SOLID]]),
   }),
-  tma: areaLine(THEME.airspaceDim, THEME.airspaceLabel, {
+  tma: areaLine(CHART_COLORS.airspaceDim, CHART_COLORS.airspaceLabel, {
     kinds: new Map([['MIL', { dash: [8, 3] }]]),
   }),
-  sector: line(THEME.sector, {
+  sector: line(CHART_COLORS.sector, {
     dash: [6, 4],
     upper: { dash: [12, 4] },
-    label: { ...AREA_LABEL, from: 'normal', size: 10, color: THEME.sectorLabel },
+    label: { ...AREA_LABEL, from: 'normal', size: 10, color: CHART_COLORS.sectorLabel },
   }),
-  fir: line(THEME.fir, { dash: [16, 5] }),
-  dng: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [4, 3] }),
-  tra: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [4, 3] }),
-  adiz: line(THEME.boundaryDim, { dash: [16, 4, 2, 4] }),
-  cta: areaLine(THEME.airspaceDim, THEME.airspaceLabel, {
+  fir: line(CHART_COLORS.fir, { dash: [16, 5] }),
+  dng: areaLine(CHART_COLORS.airspaceDim, CHART_COLORS.airspaceLabel, { dash: [4, 3] }),
+  tra: areaLine(CHART_COLORS.airspaceDim, CHART_COLORS.airspaceLabel, { dash: [4, 3] }),
+  adiz: line(CHART_COLORS.boundaryDim, { dash: [16, 4, 2, 4] }),
+  cta: areaLine(CHART_COLORS.airspaceDim, CHART_COLORS.airspaceLabel, {
     kinds: new Map([['PCA', { dash: [12, 6] }]]),
   }),
-  advisory: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [10, 3, 2, 3] }),
-  civt: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [2, 3] }),
-  asr: areaLine(THEME.boundaryDim, THEME.sectorLabel, { dash: [2, 4] }),
+  advisory: areaLine(CHART_COLORS.airspaceDim, CHART_COLORS.airspaceLabel, { dash: [10, 3, 2, 3] }),
+  civt: areaLine(CHART_COLORS.airspaceDim, CHART_COLORS.airspaceLabel, { dash: [2, 3] }),
+  asr: areaLine(CHART_COLORS.boundaryDim, CHART_COLORS.sectorLabel, { dash: [2, 4] }),
 } satisfies Record<Layer, LayerStyle>;
 
 /** Whether a label is drawn at `density`: from its layer's own density up. */

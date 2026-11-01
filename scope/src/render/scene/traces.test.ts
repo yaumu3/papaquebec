@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { CHART_COLORS, PALETTE } from '../../design/palette';
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import { navaidSymbol } from '../../lib/navaidSymbol';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
@@ -7,7 +8,6 @@ import { instances, packed, project } from './chartFixture';
 import { putFigure } from './figures';
 import { LAYER_STYLES } from './layerStyles';
 import { LineBatch, MarkerBatch } from './pack';
-import { THEME } from './rules';
 import { buildTraces } from './traces';
 
 type Position = [number, number];
@@ -77,8 +77,8 @@ const tracesOf = (input: Input) =>
 
 const batchOf = (kind: Batch['kind']): Batch => ({ kind, data: new Float32Array(), count: 0 });
 
-const grey = packed(THEME.hover);
-const faint = packed(THEME.hoverFaint);
+const grey = packed(PALETTE.hover);
+const faint = packed(CHART_COLORS.hoverFaint);
 
 describe('buildTraces', () => {
   it('draws every outline of every part, 2 px wide and solid in the hover grey', () => {
@@ -161,7 +161,7 @@ describe('buildTraces', () => {
         { lines: expectedLines, markers: expectedMarkers },
         { x, y },
         navaidSymbol(kind, 12),
-        THEME.hover,
+        PALETTE.hover,
       );
     });
 

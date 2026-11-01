@@ -1,7 +1,7 @@
+import { PALETTE } from '../../design/palette';
 import type { FitInput, LabelsInput } from './chart';
 import type { BuiltLabels } from './drawnLabels';
 import { LineBatch, TextBatch } from './pack';
-import { THEME } from './rules';
 import { routeCuts } from './runs';
 import {
   CHEVRON_CLEAR_PX,
@@ -78,7 +78,7 @@ export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut) {
   }
   const half = total / 2 + GAP_MARGIN_PX;
   const end = (sign: number) => ({ ...middle.at, ...turned(sign * half, 0, angle) });
-  out.gaps.segment(end(-1), end(1), THEME.bg, { width: GAP_HEIGHT_PX });
+  out.gaps.segment(end(-1), end(1), PALETTE.bg, { width: GAP_HEIGHT_PX });
 }
 
 /**

@@ -1,5 +1,6 @@
 /** The label to light up for the item the tree points at, drawn or not. */
 
+import { PALETTE } from '../../design/palette';
 import type { ChartItem } from '../../lib/chart';
 import { isProcedureLayer, isStyled } from '../../lib/layers';
 import { isPointLayer, isRouteLayer } from '../../lib/mapsetFormat';
@@ -11,7 +12,6 @@ import { type DrawnLabel, type LabelOut, redrawLabel } from './drawnLabels';
 import { isPointStyle, LAYER_STYLES, type LayerStyle } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 import { putLabel, type RouteLabelOut } from './routeLabels';
-import { THEME } from './rules';
 import { routeCuts } from './runs';
 import { itemLabels, type SpanLabel } from './spanDesignators';
 
@@ -45,7 +45,7 @@ export function highlightOf(
 const lit = (label: SpanLabel, key: string): SpanLabel => ({
   ...label,
   designators: label.designators.map((d) =>
-    d.key === key ? { ...d, label: { ...d.label, color: THEME.hover } } : d,
+    d.key === key ? { ...d, label: { ...d.label, color: PALETTE.hover } } : d,
   ),
 });
 
@@ -99,7 +99,7 @@ export function buildHighlight(
   if (isRouteLayer(item.layer)) putRouteLabels(item, input, out);
   else {
     const label = highlightOf(item, drawn, input);
-    if (label) redrawLabel(label, THEME.hover, out);
+    if (label) redrawLabel(label, PALETTE.hover, out);
   }
   return [out.gaps.finish(), out.text.finish(), out.strokes.finish()];
 }

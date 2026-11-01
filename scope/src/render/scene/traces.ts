@@ -1,3 +1,4 @@
+import { CHART_COLORS, PALETTE } from '../../design/palette';
 import { type ChartItem, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
@@ -8,7 +9,6 @@ import { type FigureOut, putFigure, putPointMark } from './figures';
 import { type PlacedRacetrack, racetrackAt } from './holds';
 import { isPointStyle, LAYER_STYLES } from './layerStyles';
 import { LineBatch, MarkerBatch } from './pack';
-import { THEME } from './rules';
 
 interface TracesInput {
   /** The item the tree points at, whether it draws or not. */
@@ -100,10 +100,14 @@ export function buildTraces({
   highlight,
   ...tracing
 }: TracesInput): TraceSlots {
-  const [searchLines, searchStrokes, searchMarkers] = trace(searched, THEME.hoverFaint, tracing);
+  const [searchLines, searchStrokes, searchMarkers] = trace(
+    searched,
+    CHART_COLORS.hoverFaint,
+    tracing,
+  );
   const [pointedLines, pointedStrokes, pointedMarkers] = trace(
     pointedAt ? [pointedAt] : [],
-    THEME.hover,
+    PALETTE.hover,
     tracing,
   );
   const lit = pointedAt && isPointLayer(pointedAt.layer);

@@ -1,5 +1,6 @@
 import type { JSX } from 'solid-js';
 
+import { CHART_COLORS } from '../../design/palette';
 import { isStyled, type ScopeLayer } from '../../lib/layers';
 import { Shape } from '../../render/protocol';
 import {
@@ -10,7 +11,6 @@ import {
   type PointLayerStyle,
 } from '../../render/scene/layerStyles';
 import { DEFAULT_LINE_WIDTH } from '../../render/scene/pack';
-import { THEME } from '../../render/scene/rules';
 
 const STROKE = 1.2;
 
@@ -58,7 +58,7 @@ export function Swatch(props: { layer: ScopeLayer }) {
     return svg(isPointStyle(style) ? marker(style.shape, style.size, style.color) : stroke(style));
   }
   if (layer === 'rings') {
-    return svg(<path d="M2 9 A 12 12 0 0 1 22 9" fill="none" stroke={THEME.ringEdge} />);
+    return svg(<path d="M2 9 A 12 12 0 0 1 22 9" fill="none" stroke={CHART_COLORS.ringEdge} />);
   }
-  return svg(<line x1="0" y1="5" x2="24" y2="5" stroke={THEME.coast} />);
+  return svg(<line x1="0" y1="5" x2="24" y2="5" stroke={CHART_COLORS.coast} />);
 }

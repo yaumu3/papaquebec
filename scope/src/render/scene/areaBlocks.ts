@@ -1,12 +1,12 @@
 /** How an area item's label is laid out: its rows of text and the rules between them. */
 
+import { CHART_COLORS } from '../../design/palette';
 import { type ChartItem, itemFrequency } from '../../lib/chart';
 import { fractionOf, stratumTag } from '../../lib/stratum';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import { type LabelOut, putStroke, putText } from './drawnLabels';
 import type { LabelStyle } from './layerStyles';
 import type { Anchor, TextBatch } from './pack';
-import { THEME } from './rules';
 
 /** A sector's details are in 9 px, set 6 px apart from the name and from each other. */
 const DETAIL_SIZE_PX = 9;
@@ -86,7 +86,7 @@ function nameRow(
     runs.push({
       text: detail,
       size: DETAIL_SIZE_PX,
-      color: THEME.sectorDetail,
+      color: CHART_COLORS.sectorDetail,
       x: width + DETAIL_GAP_PX,
     });
     width += DETAIL_GAP_PX + text.measure(detail, DETAIL_SIZE_PX);

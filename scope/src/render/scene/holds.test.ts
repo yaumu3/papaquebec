@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { CHART_COLORS } from '../../design/palette';
 import { type ChartItem, chartOf } from '../../lib/chart';
 import { northAt, type ProjectFn, type Vec2 } from '../../lib/geo';
 import { drawnItemsOf } from '../../lib/layers';
@@ -12,7 +13,6 @@ import { allShown, hiddenExcept, shownExcept } from '../../lib/visibilityFixture
 import type { Declination } from '../../lib/wmm';
 import { buildShapes } from './chart';
 import { type Instance, instances, packed, project } from './chartFixture';
-import { THEME } from './rules';
 
 const NIMBA = project(34.02, 131.16);
 const CHART = chartOf([parseMapSet(EXAMPLE)]);
@@ -112,7 +112,9 @@ describe('buildShapes holds', () => {
 
     // Assert
     expect(segments.length).toBeGreaterThan(0);
-    expect(segments.every((s) => s.color.every((c, i) => c === packed(THEME.rnav)[i]))).toBe(true);
+    expect(segments.every((s) => s.color.every((c, i) => c === packed(CHART_COLORS.rnav)[i]))).toBe(
+      true,
+    );
     expect(trackOnScreen(inboundLeg(segments), NORTH_UP)).toBeCloseTo(198, 1);
   });
 
@@ -125,7 +127,9 @@ describe('buildShapes holds', () => {
     const segments = linesOf([hold], declination);
 
     // Assert
-    expect(segments.every((s) => s.color.every((c, i) => c === packed(THEME.conv)[i]))).toBe(true);
+    expect(segments.every((s) => s.color.every((c, i) => c === packed(CHART_COLORS.conv)[i]))).toBe(
+      true,
+    );
     expect(trackOnScreen(inboundLeg(segments), NORTH_UP)).toBeCloseTo(18, 1);
   });
 

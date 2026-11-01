@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { PALETTE } from '../../design/palette';
 import { type Chart, type ChartItem, chartOf, itemName } from '../../lib/chart';
 import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
@@ -30,7 +31,6 @@ import type { BuiltLabels, DrawnLabel } from './drawnLabels';
 import { buildHighlight, highlightOf } from './highlight';
 import { LAYER_STYLES } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
-import { THEME } from './rules';
 
 const ALL_LAYERS = DRAW_STACK.filter(isStyled);
 const ROOMY = 1e6;
@@ -111,7 +111,7 @@ function routeBatches({ batches: [gaps, text] }: BuiltLabels): [Batch, Batch] {
 const stopped = [airway('conv', 'V901', [0, 0], [8, 0], [10, 0]), navaid(8)];
 const shared = [airway('conv', 'V901', [0, 0], [2, 0]), airway('rnav', 'Y902', [0, 0], [2, 0])];
 
-const grey = packed(THEME.hover);
+const grey = packed(PALETTE.hover);
 const rnavColor = packed(LAYER_STYLES.rnav.label?.color ?? '');
 
 /** How many glyphs of a text batch are in `color`. */
@@ -392,7 +392,7 @@ describe('buildHighlight', () => {
     // Arrange
     const [arm] = label.strokes;
     const wantedArm = new LineBatch();
-    if (arm) wantedArm.segment(arm.from, arm.to, THEME.hover, { width: arm.width });
+    if (arm) wantedArm.segment(arm.from, arm.to, PALETTE.hover, { width: arm.width });
 
     // Act
     const [, , strokes] = buildHighlight(fix, label, input);

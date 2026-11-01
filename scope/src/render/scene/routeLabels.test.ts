@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { PALETTE } from '../../design/palette';
 import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
@@ -25,7 +26,6 @@ import {
   project,
 } from './chartFixture';
 import { buildRouteLabels } from './routeLabels';
-import { THEME } from './rules';
 
 const ALL_LAYERS = DRAW_STACK.filter(isStyled);
 
@@ -146,7 +146,7 @@ describe('buildRouteLabels', () => {
     );
     expect(gaps.count).toBe(1);
     expect(gap?.width).toBe(12);
-    expect(gap?.color).toEqual(packed(THEME.bg));
+    expect(gap?.color).toEqual(packed(PALETTE.bg));
     expect(
       Math.hypot(
         (gap?.offsetB.x ?? 0) - (gap?.offsetA.x ?? 0),

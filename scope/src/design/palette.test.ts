@@ -28,7 +28,6 @@ describe('design tokens', () => {
   it('feeds the canvas theme from the same palette', () => {
     // Arrange
     const pairs: [string, string][] = [
-      [THEME.bg, PALETTE.bg],
       [THEME.level, PALETTE.level],
       [THEME.climb, PALETTE.climb],
       [THEME.descend, PALETTE.descend],

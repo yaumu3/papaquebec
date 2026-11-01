@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { CHART_COLORS } from '../../design/palette';
 import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import { distanceToSegment } from '../../lib/geo';
@@ -29,7 +30,6 @@ import {
   withoutColor,
 } from './chartFixture';
 import type { DrawnLabel } from './drawnLabels';
-import { THEME } from './rules';
 
 /** The text and the rules of the area labels of `items` as the scope builds them. */
 function built(
@@ -326,8 +326,8 @@ describe('the sector row of buildAreaLabels', () => {
     expect(rows.map((g) => g.char).join('')).toBe('Z55134.65');
     expect(rows.slice(0, 3).every((g) => g.h === (atlas.cellH * 10) / atlas.fontSize)).toBe(true);
     expect(rows.slice(3).every((g) => g.h === (atlas.cellH * 9) / atlas.fontSize)).toBe(true);
-    expect(rows[3]?.color).toEqual(packed(THEME.sectorDetail));
-    expect(rows[0]?.color).toEqual(packed(THEME.sectorLabel));
+    expect(rows[3]?.color).toEqual(packed(CHART_COLORS.sectorDetail));
+    expect(rows[0]?.color).toEqual(packed(CHART_COLORS.sectorLabel));
   });
 
   it('sets the frequency 6 px after the name, the whole row centred', () => {
