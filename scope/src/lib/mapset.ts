@@ -115,6 +115,9 @@ const AreaShape = feature(
 );
 const PointFeature = feature(PointProperties, PointGeometry);
 const RouteFeature = feature(RouteProperties, LineGeometry);
+/** A hold's properties. */
+export type HoldProperties = z.infer<typeof HoldProperties>;
+
 const HoldFeature = feature(HoldProperties, PointGeometry);
 
 type Ring = [number, number][];
