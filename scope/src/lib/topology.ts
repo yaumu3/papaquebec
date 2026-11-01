@@ -5,7 +5,7 @@
  * a route edge never meet.
  */
 
-import { type Chart, type ChartItem, type ItemPart, outlinesOf, toGrid } from './chart';
+import { type Chart, type ChartItem, type ItemPart, itemKind, outlinesOf, toGrid } from './chart';
 import { DRAW_STACK } from './layers';
 import type { LonLat } from './mapdata';
 import {
@@ -47,6 +47,8 @@ export interface ChartPoint {
   key: string;
   layer: PointLayer;
   id: string;
+  /** The kind its symbol draws: its item's first part's. */
+  kind: string | undefined;
   at: LonLat;
   /** Shared with any route position at the same identity. */
   vertex: number;
@@ -123,10 +125,21 @@ function networkOf(outlines: Outline[], vertexOf: VertexOf): Network {
 }
 
 /** The point parts of an item. */
-function pointsOf({ key, parts }: ChartItem, vertexOf: VertexOf): ChartPoint[] {
+function pointsOf(item: ChartItem, vertexOf: VertexOf): ChartPoint[] {
+  const { key, parts } = item;
+  const kind = itemKind(item);
   return parts.flatMap(({ geometry: g, properties: p }) =>
     g.type === 'Point' && 'id' in p
-      ? [{ key, layer: p.layer, id: p.id, at: g.coordinates, vertex: vertexOf(g.coordinates) }]
+      ? [
+          {
+            key,
+            layer: p.layer,
+            id: p.id,
+            kind,
+            at: g.coordinates,
+            vertex: vertexOf(g.coordinates),
+          },
+        ]
       : [],
   );
 }

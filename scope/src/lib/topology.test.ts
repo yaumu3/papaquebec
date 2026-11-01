@@ -321,6 +321,11 @@ const pointPart = (layer: PointLayer, id: string, at: LonLat): ItemPart => ({
   properties: { layer, id },
 });
 
+const kinded = (kind: string, at: LonLat): ItemPart => ({
+  geometry: { type: 'Point', coordinates: at },
+  properties: { layer: 'navaid', id: 'QDG', kind },
+});
+
 const pointItem = (layer: PointLayer, ...parts: ItemPart[]): Chart[number] => ({
   key: layer + parts.length,
   layer,
@@ -358,6 +363,20 @@ describe('the points of a topology', () => {
       ['navaid', 'QDG', C],
       ['ad', 'QAAA', D],
     ]);
+  });
+
+  it("gives every point of an item its first part's kind, undefined when it has none", () => {
+    // Arrange
+    const chartOfKinds: Chart = [
+      pointItem('navaid', kinded('VOR', A), kinded('NDB', B)),
+      pointItem('navaid', pointPart('navaid', 'QIK', C)),
+    ];
+
+    // Act
+    const { points } = topologyOf(chartOfKinds);
+
+    // Assert
+    expect(points.map((p) => p.kind)).toEqual(['VOR', 'VOR', undefined]);
   });
 
   it('draws the points of the layers given, whatever routes are shown', () => {
