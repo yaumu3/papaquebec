@@ -1,21 +1,16 @@
-import { type ChartItem, nameOf, outlinesOf } from '../../lib/chart';
+import type { ChartItem } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
-import { geodesicLine } from '../../lib/geodesic';
 import type { StyledLayer } from '../../lib/layers';
+import type { AreaPlace } from '../../lib/pole';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo, Batch } from '../protocol';
 import type { CHART_SLICES, ShapeBatches } from '../slots';
-import {
-  isPointStyle,
-  LAYER_STYLES,
-  labelReaches,
-  type LineLayerStyle,
-  type PointLabelStyle,
-} from './layerStyles';
-import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
+import { buildAreaLabels } from './areaLabels';
+import { isPointStyle, LAYER_STYLES, labelReaches } from './layerStyles';
+import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
 import { drawRuns, partsOf, routeCuts } from './runs';
 
@@ -35,33 +30,16 @@ export interface LabelsInput extends ShapesInput {
   atlas: AtlasInfo;
 }
 
+/** What an area label reads: where the item's label goes, if it has a place. */
+export interface PlaceInput {
+  placeOf: (item: ChartItem) => AreaPlace | undefined;
+}
+
 /** What a label that must fit reads: the settled scale (px per NM) and what was shown before. */
 export interface FitInput {
   /** Read only by labels that test their room, so only they follow a settled zoom. */
   settledScale: () => number;
   shown: ShownMemory;
-}
-
-function putLabel(name: string, at: Anchor, label: PointLabelStyle, labels: TextBatch) {
-  const { px, py, size, color, baseline } = label;
-  labels.text(name, { ...at, px, py }, size, color, { baseline, halo: true });
-}
-
-/** Names an area item once, at the start of the first outline of its first part, if the density reaches it. */
-function labelItem(
-  item: ChartItem,
-  style: LineLayerStyle,
-  project: ProjectFn,
-  density: LabelDensity,
-  labels: TextBatch,
-) {
-  const { label } = style;
-  const [first] = item.parts;
-  const name = first && nameOf(first);
-  if (!label || !('px' in label) || !first || name === undefined) return;
-  if (!labelReaches(label, density)) return;
-  const [at] = geodesicLine(outlinesOf(first.geometry)[0] ?? [], project);
-  if (at) putLabel(name, at, label, labels);
 }
 
 /** The drawn points of a layer, each at its place on the plane. */
@@ -97,36 +75,31 @@ export function buildShapes({
   return { lines: lines.finish(), markers: markers.finish() };
 }
 
-/** The chart's labels, each back to front through the stack. */
-export function buildLabels({
+/** The idents of the drawn points, each back to front through the stack. */
+export function buildPointLabels({
   drawnPoints,
   project,
   layers,
-  drawnItems,
   labelDensity,
   atlas,
 }: LabelsInput): Batch[] {
   const labels = new TextBatch(atlas);
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
-    if (isPointStyle(style)) {
-      if (!labelReaches(style.label, labelDensity)) continue;
-      for (const { id, at } of pointsIn(layer, drawnPoints, project)) {
-        putLabel(id, at, style.label, labels);
-      }
-    } else {
-      for (const item of drawnItems.filter((i) => i.layer === layer)) {
-        labelItem(item, style, project, labelDensity, labels);
-      }
+    if (!isPointStyle(style) || !labelReaches(style.label, labelDensity)) continue;
+    const { px, py, size, color, baseline } = style.label;
+    for (const { id, at } of pointsIn(layer, drawnPoints, project)) {
+      labels.text(id, { ...at, px, py }, size, color, { baseline, halo: true });
     }
   }
   return [labels.finish()];
 }
 
-/** The labels of a slice, each kind as it is placed: routes by span, areas and points as named. */
+/** The labels of a slice, each kind as it is placed: routes by span, areas at their pole, points by their marker. */
 export function buildSliceLabels(
   slice: (typeof CHART_SLICES)[number],
-  input: LabelsInput & FitInput,
+  input: LabelsInput & FitInput & PlaceInput,
 ): Batch[] {
-  return slice.labels === 'routeLabels' ? buildRouteLabels(input) : buildLabels(input);
+  if (slice.labels === 'routeLabels') return buildRouteLabels(input);
+  return slice.labels === 'areaLabels' ? buildAreaLabels(input) : buildPointLabels(input);
 }

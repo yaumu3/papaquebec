@@ -16,7 +16,7 @@ export interface LabelStyle {
   size: number;
 }
 
-/** A label that hangs off an anchor: a point's ident, or an area's name for now. */
+/** A point's ident hangs off its marker. */
 export interface PointLabelStyle extends LabelStyle {
   /** CSS px from the anchor. */
   px: number;
@@ -31,7 +31,7 @@ export interface LineLayerStyle {
   dash?: DashPattern;
   kinds?: ReadonlyMap<string, Refinement>;
   upper?: Refinement;
-  label?: LabelStyle | PointLabelStyle;
+  label?: LabelStyle;
 }
 
 /** How a layer of points is drawn. */
@@ -48,18 +48,18 @@ export type LayerStyle = LineLayerStyle | PointLayerStyle;
 const SOLID: Refinement = { dash: [] };
 
 /** A label's form but for its colour, which each layer gives. */
-type LabelPlace = Omit<PointLabelStyle, 'color'>;
+type PointLabelPlace = Omit<PointLabelStyle, 'color'>;
 
-const AREA_LABEL: LabelPlace = { from: 'dense', size: 9, px: 4, py: 2, baseline: 'top' };
+const AREA_LABEL: Omit<LabelStyle, 'color'> = { from: 'dense', size: 9 };
 const ROUTE_LABEL: Omit<LabelStyle, 'color'> = { from: 'normal', size: 9 };
-const FIX_LABEL: LabelPlace = {
+const FIX_LABEL: PointLabelPlace = {
   from: 'normal',
   size: 9,
   px: 5,
   py: -3,
   baseline: 'bottom',
 };
-const STATION_LABEL: LabelPlace = {
+const STATION_LABEL: PointLabelPlace = {
   from: 'sparse',
   size: 10,
   px: 8,
@@ -129,7 +129,7 @@ export const LAYER_STYLES = {
   sector: line(THEME.sector, {
     dash: [6, 4],
     upper: { dash: [12, 4] },
-    label: { ...AREA_LABEL, from: 'normal', color: THEME.sectorLabel },
+    label: { ...AREA_LABEL, from: 'normal', size: 10, color: THEME.sectorLabel },
   }),
   fir: line(THEME.fir, { dash: [16, 5] }),
   dng: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [4, 3] }),

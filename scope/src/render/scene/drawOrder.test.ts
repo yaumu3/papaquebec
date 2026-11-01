@@ -5,6 +5,7 @@ import { DRAW_STACK, drawnItemsOf, type ScopeLayer, type StyledLayer } from '../
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { POINT_LAYERS } from '../../lib/mapsetFormat';
+import { areaPlaceOf } from '../../lib/pole';
 import {
   type ChartPath,
   drawnPointsOf,
@@ -75,6 +76,7 @@ const labelsOf = (chart: Chart, slice: (typeof CHART_SLICES)[number], labelDensi
     atlas,
     settledScale: () => ROOMY,
     shown: new Map(),
+    placeOf: (item) => areaPlaceOf(item, project),
   });
 
 /** Everything the scope draws from the map, as the effects post it. */

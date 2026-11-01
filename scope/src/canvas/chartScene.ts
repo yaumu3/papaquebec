@@ -2,6 +2,7 @@ import type { ShownMemory } from '../lib/fits';
 import type { AtlasInfo } from '../render/protocol';
 import { buildShapes, buildSliceLabels } from '../render/scene/chart';
 import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../render/slots';
+import { areaPlace } from '../state/areaPlaces';
 import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
 import { topology } from '../state/mapsets';
 import { settings } from '../state/settings';
@@ -46,6 +47,7 @@ export function showChart(show: Show, projected: () => boolean, settledScale: ()
               labelDensity: settings.labelDensity,
               atlas,
               settledScale,
+              placeOf: areaPlace,
               shown,
             }),
           )

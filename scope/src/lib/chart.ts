@@ -36,6 +36,10 @@ export const gridIdentity = ([lon, lat]: LonLat): string => `${toGrid(lon)},${to
 export const nameOf = ({ properties: p }: ItemPart): string | undefined =>
   'name' in p ? p.name : undefined;
 
+/** The name of an item: that of its first part, if there is one and its layer gives names. */
+export const itemName = ({ parts: [first] }: ChartItem): string | undefined =>
+  first && nameOf(first);
+
 /** What names an item within its layer: a designator, an id, or for a hold its pattern. */
 function naming({ properties: p, geometry: g }: MapSetFeature): unknown[] {
   if ('turn' in p) {

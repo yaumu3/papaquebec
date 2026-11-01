@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'bun:test';
 
-import { chartOf, gridIdentity, type ItemPart, outlinesOf } from './chart';
+import {
+  type ChartItem,
+  chartOf,
+  gridIdentity,
+  type ItemPart,
+  itemName,
+  outlinesOf,
+} from './chart';
 import { direct } from './geodesic';
 import { type MapSetData, validateMapSet } from './mapset';
 import { EXAMPLE, EXAMPLE_LAYERS, feature, variant } from './mapsetCorpus';
@@ -361,5 +368,26 @@ describe('gridIdentity', () => {
     expect(a).toBe('13012346,3370000');
     expect(b).toBe(a);
     expect(c).not.toBe(a);
+  });
+});
+
+const named = (name: string): ItemPart => ({
+  geometry: { type: 'LineString', coordinates: [] },
+  properties: { layer: 'tma', name },
+});
+
+describe('itemName', () => {
+  it('is the name of the first part of an item, and none for an item with no parts', () => {
+    // Arrange
+    const items: ChartItem[] = [
+      { key: 'A', layer: 'tma', parts: [named('PAPAQ'), named('OTHER')] },
+      { key: 'B', layer: 'tma', parts: [] },
+    ];
+
+    // Act
+    const names = items.map(itemName);
+
+    // Assert
+    expect(names).toEqual(['PAPAQ', undefined]);
   });
 });

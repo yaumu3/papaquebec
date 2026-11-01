@@ -98,6 +98,7 @@ export function glyphs(batch: Batch) {
       at: { x: d[o] ?? 0, y: d[o + 1] ?? 0 },
       px: d[o + 2] ?? 0,
       py: d[o + 3] ?? 0,
+      h: d[o + 5] ?? 0,
       color: Array.from(d.subarray(o + 10, o + 14)),
       angle: d[o + 14] ?? 0,
       halo: d[o + 15] ?? 0,

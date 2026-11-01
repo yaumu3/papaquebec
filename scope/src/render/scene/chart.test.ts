@@ -10,7 +10,7 @@ import { allShown, shownExcept } from '../../lib/visibilityFixture';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, MARKER_STRIDE, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
-import { buildLabels, buildShapes } from './chart';
+import { buildPointLabels, buildShapes } from './chart';
 import {
   type Extra,
   type Geometry,
@@ -69,8 +69,8 @@ const build = (
   const drawnItems = drawnItemsOf(items, layers, stateOf, () => inRange);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
   const input = { topology, drawnPoints, project, layers, drawnItems };
-  const [labels] = buildLabels({ ...input, labelDensity, atlas });
-  if (!labels) throw new Error('buildLabels returned no batch');
+  const [labels] = buildPointLabels({ ...input, labelDensity, atlas });
+  if (!labels) throw new Error('buildPointLabels returned no batch');
   return { ...buildShapes(input), labels };
 };
 
@@ -623,26 +623,14 @@ const onePart = (layer: StyledLayer, geometry: Geometry, extra: Extra = {}) =>
 const placeholder = (layer: StyledLayer): Geometry =>
   has(POINT_LAYERS, layer) ? point([0, 0]) : line([0, 0], [0.01, 0]);
 
-describe('buildLabels', () => {
-  it('labels each layer from its own label density up, and some never', () => {
+describe('buildPointLabels', () => {
+  it('labels each point layer from its own label density up', () => {
     // Arrange
     const from: [StyledLayer, LabelDensity | null][] = [
       ['ad', 'sparse'],
       ['navaid', 'sparse'],
       ['fix', 'normal'],
-      ['sector', 'normal'],
       ['vfr', 'dense'],
-      ['ctr', 'dense'],
-      ['pr', 'dense'],
-      ['tma', 'dense'],
-      ['dng', 'dense'],
-      ['tra', 'dense'],
-      ['cta', 'dense'],
-      ['advisory', 'dense'],
-      ['civt', 'dense'],
-      ['asr', 'dense'],
-      ['fir', null],
-      ['adiz', null],
     ];
     const expected = from.map(([, first]) =>
       LABEL_DENSITIES.map((d) => (first !== null && rank(d) >= rank(first) ? 1 : 0)),
@@ -659,17 +647,6 @@ describe('buildLabels', () => {
     expect(counts).toEqual(expected);
   });
 
-  it('prints an area by its name alone, with no kind before it', () => {
-    // Arrange
-    const item = onePart('ctr', placeholder('ctr'), { kind: 'CTR' });
-
-    // Act
-    const { labels } = build([item], ['ctr'], 'dense');
-
-    // Assert
-    expect(labels.count).toBe(1);
-  });
-
   it('prints a point by its ident, not by its name', () => {
     // Arrange
     const shown: StyledLayer[] = ['ad', 'navaid'];
@@ -680,18 +657,6 @@ describe('buildLabels', () => {
 
     // Assert
     expect(counts).toEqual([1, 1]);
-  });
-
-  it('labels a stepped item once, where its first part starts', () => {
-    // Arrange
-    const first = partOf('tma', polygon(triangle(5), triangle(7)));
-    const second = partOf('tma', polygon(triangle(9)));
-
-    // Act
-    const { labels } = build([itemOf('tma', first, second)], ['tma'], 'dense');
-
-    // Assert
-    expect(glyphs(labels).map((g) => g.at)).toEqual([{ x: 5, y: 0 }]);
   });
 
   it('labels each part of a point item where it sits', () => {
@@ -707,19 +672,6 @@ describe('buildLabels', () => {
     expect(glyphs(labels).map((g) => g.at.x)).toEqual([0, 5]);
   });
 
-  it('puts an area label at the start of its path', () => {
-    // Arrange
-    const path = line([0, 0], [1, 0], [2, 0]);
-
-    // Act
-    const placed = glyphs(build([onePart('ctr', path)], ['ctr'], 'dense').labels).map(
-      (g) => g.at.x,
-    );
-
-    // Assert
-    expect(placed).toEqual([0]);
-  });
-
   it('colours each label by its layer', () => {
     // Arrange
     const rows: [StyledLayer, string][] = [
@@ -727,9 +679,6 @@ describe('buildLabels', () => {
       ['navaid', '#909090'],
       ['fix', '#7a7a7a'],
       ['vfr', '#6a6a6a'],
-      ['sector', '#5a7a8a'],
-      ['asr', '#5a7a8a'],
-      ['ctr', '#8a5050'],
     ];
 
     // Act
@@ -786,17 +735,5 @@ describe('the chart hidden items', () => {
       true,
       false,
     ]);
-  });
-
-  it('gives a hidden area no label', () => {
-    // Arrange
-    const items = [keyed('area', itemOf('ctr', partOf('ctr', polygon(triangle(0)))))];
-    const rows: Reads[] = [{}, { stateOf: hiding('area') }];
-
-    // Act
-    const built = rows.map((reads) => build(items, ['ctr'], 'dense', reads));
-
-    // Assert
-    expect(built.map((b) => b.labels.count)).toEqual([1, 0]);
   });
 });

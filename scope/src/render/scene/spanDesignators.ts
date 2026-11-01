@@ -1,6 +1,6 @@
 /** Which designators label which span of the routes. */
 
-import { type ChartItem, gridIdentity, nameOf } from '../../lib/chart';
+import { type ChartItem, gridIdentity, itemName, nameOf } from '../../lib/chart';
 import { fits, rememberFits, type ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
@@ -150,13 +150,11 @@ function settleAirways(entries: Entries, stage: Stage) {
   }
 }
 
-const nameOfItem = (item: ChartItem) => (item.parts[0] && nameOf(item.parts[0])) ?? '';
-
 /** The drawn procedure items, in draw-stack order and then by name. */
 function procedureItems(items: readonly ChartItem[]): ChartItem[] {
   return items
     .filter((item) => isProcedureLayer(item.layer))
-    .map((item) => ({ item, rank: DRAW_STACK.indexOf(item.layer), name: nameOfItem(item) }))
+    .map((item) => ({ item, rank: DRAW_STACK.indexOf(item.layer), name: itemName(item) ?? '' }))
     .toSorted(byStack)
     .map(({ item }) => item);
 }
