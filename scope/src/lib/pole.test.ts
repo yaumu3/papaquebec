@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
+import type { ChartItem, ItemPart } from './chart';
 import { distanceToSegment, type Vec2 } from './geo';
-import { poleOf, ringArea } from './pole';
+import { footprintOf } from './labelStacks';
+import type { LonLat } from './mapdata';
+import { areaPlaceOf, poleOf, ringArea } from './pole';
 
 const ring = (...points: [number, number][]): Vec2[] => points.map(([x, y]) => ({ x, y }));
 
@@ -85,5 +88,81 @@ describe('ringArea', () => {
 
     // Assert
     expect(areas).toEqual([6, 6, 0]);
+  });
+});
+
+const project = (lat: number, lon: number): Vec2 => ({ x: lon, y: lat });
+
+const square = (from: number, to: number): LonLat[] => [
+  [from, from],
+  [to, from],
+  [to, to],
+  [from, to],
+  [from, from],
+];
+
+const areaPart = (...rings: LonLat[][]): ItemPart => ({
+  geometry: { type: 'Polygon', coordinates: rings },
+  properties: { layer: 'tma', name: 'X' },
+});
+
+const itemOf = (layer: 'tma' | 'ad', ...parts: ItemPart[]): ChartItem => ({
+  key: 'K',
+  layer,
+  parts,
+});
+
+describe('areaPlaceOf', () => {
+  it('puts the pole in the largest polygon part, whichever part comes first', () => {
+    // Arrange
+    const item = itemOf('tma', areaPart(square(0, 1)), areaPart(square(10, 20)));
+
+    // Act
+    const place = areaPlaceOf(item, project);
+
+    // Assert
+    expect(place?.at.x).toBeCloseTo(15, 0);
+    expect(place?.at.y).toBeCloseTo(15, 0);
+    expect(place?.room).toBeCloseTo(5, 0);
+    expect(place?.footprint).toBe(footprintOf(square(10, 20)));
+  });
+
+  it('puts a line area at the middle of its first part, with no room or footprint', () => {
+    // Arrange
+    const line: ItemPart = {
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [0, 0],
+          [4, 0],
+        ],
+      },
+      properties: { layer: 'tma', name: 'X' },
+    };
+    const item = itemOf('tma', line);
+
+    // Act
+    const place = areaPlaceOf(item, project);
+
+    // Assert
+    expect(place?.at.x).toBeCloseTo(2, 3);
+    expect(place?.at.y).toBeCloseTo(0, 3);
+    expect(place && 'room' in place).toBe(false);
+    expect(place && 'footprint' in place).toBe(false);
+  });
+
+  it('has no place for an item of points', () => {
+    // Arrange
+    const point: ItemPart = {
+      geometry: { type: 'Point', coordinates: [1, 1] },
+      properties: { layer: 'ad', id: 'XQPA' },
+    };
+    const item = itemOf('ad', point);
+
+    // Act
+    const place = areaPlaceOf(item, project);
+
+    // Assert
+    expect(place).toBeUndefined();
   });
 });

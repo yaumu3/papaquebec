@@ -1,6 +1,11 @@
-/** Where a label goes inside an area: its pole, the point farthest from every edge. */
+/** Where the label of an area item goes: inside it at its pole, the point farthest from every edge. */
 
-import { distanceToSegment, type Segment, type Vec2 } from './geo';
+import type { ChartItem, ItemPart } from './chart';
+import { distanceToSegment, type ProjectFn, type Segment, type Vec2 } from './geo';
+import { geodesicPath } from './geodesic';
+import { footprintOf } from './labelStacks';
+import type { LonLat } from './mapdata';
+import { midpointOf } from './polyline';
 
 /** The area a ring encloses, whichever way it winds. */
 export function ringArea(ring: readonly Vec2[]): number {
@@ -102,4 +107,46 @@ export function poleOf(rings: readonly (readonly Vec2[])[]): Pole | undefined {
     }
   }
   return { at: best.at, room: best.room };
+}
+
+/** Where an area item's label goes and what to test it against. */
+export interface AreaPlace {
+  at: Vec2;
+  /** The distance from `at` to the nearest edge; none for a line. */
+  room?: number;
+  /** What the exterior ring of its largest polygon covers; none for a line. */
+  footprint?: string;
+}
+
+const projected = (ring: readonly LonLat[], project: ProjectFn): Vec2[] =>
+  ring.map(([lon, lat]) => project(lat, lon));
+
+/** The polygon part with the largest exterior ring, measured on the plane. */
+function largestPolygon(parts: readonly ItemPart[], project: ProjectFn) {
+  let best: { rings: LonLat[][]; area: number } | undefined;
+  for (const { geometry } of parts) {
+    if (geometry.type !== 'Polygon') continue;
+    const area = ringArea(projected(geometry.coordinates[0] ?? [], project));
+    if (!best || area > best.area) best = { rings: geometry.coordinates, area };
+  }
+  return best?.rings;
+}
+
+/**
+ * Where an item's label goes. A polygon item has it at the pole of its largest polygon part, the
+ * rings joined by straight chords once projected. An item of lines has it at the middle of its
+ * first part's geodesic. None for an item with neither.
+ */
+export function areaPlaceOf(item: ChartItem, project: ProjectFn): AreaPlace | undefined {
+  const rings = largestPolygon(item.parts, project);
+  const pole = rings && poleOf(rings.map((ring) => projected(ring, project)));
+  if (rings && pole) return { ...pole, footprint: footprintOf(rings[0] ?? []) };
+  const line = item.parts[0]?.geometry;
+  if (line?.type !== 'LineString') return undefined;
+  const path = geodesicPath(
+    line.coordinates.map(([lon, lat]) => ({ lat, lon })),
+    project,
+  );
+  const middle = midpointOf(path);
+  return middle && { at: middle.at };
 }
