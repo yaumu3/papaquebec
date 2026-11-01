@@ -1,9 +1,9 @@
 /**
  * Bounding boxes of every country polygon, keyed by ISO 3166-1 alpha-2, from Natural Earth's
- * 10 m admin-0 countries (public domain). Vendored as `scripts/countries.json` so the map
+ * 10 m admin-0 countries (public domain). Vendored as `scripts/map/countries.json` so the map
  * build can pick which openAIP country exports cover the site without a geometry library.
  *
- *   bun scripts/build-countries.ts [ne_10m_admin_0_countries.geojson]
+ *   bun scripts/map/build-countries.ts [ne_10m_admin_0_countries.geojson]
  */
 import { writeFileSync } from 'node:fs';
 
@@ -11,7 +11,7 @@ import { isRecord } from './guards';
 
 const NE_URL =
   'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_admin_0_countries.geojson';
-const OUT = 'scripts/countries.json';
+const OUT = 'scripts/map/countries.json';
 
 type Box = [number, number, number, number];
 type Ring = [number, number][];

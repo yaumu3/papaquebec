@@ -3,7 +3,7 @@
  * log. Expects a server on `--url`, or starts `vite preview` itself with `--preview`. `--sim`
  * instead starts a server that flies the synthetic fleet at that speed and serves the build.
  *
- *   bun scripts/screenshot.ts --out shot.png [--url http://localhost:4173/] [--preview]
+ *   bun scripts/headless/screenshot.ts --out shot.png [--url http://localhost:4173/] [--preview]
  *     [--sim 10] [--extra 300] [--scenario parallel] [--range 10] [--site lat,lon]
  *     [--wait 6000] [--select TEST02] [--hint] [--scale 2]
  *

@@ -3,7 +3,7 @@ import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 
-const REPO = join(import.meta.dir, '../..');
+const REPO = join(import.meta.dir, '../../..');
 
 /** The files the Dockerfile's final stage copies from the scope, with where each lands. */
 function finalStageFiles(dockerfile: string): { from: string; to: string }[] {
@@ -43,7 +43,7 @@ describe('the final stage of the image', () => {
     // Arrange
     const files = finalStageFiles(readFileSync(join(REPO, 'Dockerfile'), 'utf8'));
     const stage = stageOf(files);
-    const scripts = ['scripts/build-coast.ts', 'scripts/build-mapset.ts'];
+    const scripts = ['scripts/map/build-coast.ts', 'scripts/map/build-mapset.ts'];
 
     // Act
     const said = scripts.map((script) => stderrOf(script, stage));

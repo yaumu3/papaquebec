@@ -1,8 +1,8 @@
 #!/bin/sh
-# Runs scripts/visual.ts on the built scope in the pinned image, with Apple's container where it
+# Runs scripts/visual/main.ts on the built scope in the pinned image, with Apple's container where it
 # is installed and Docker elsewhere. Arguments go to the script: --update rewrites the baselines.
 set -eu
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
 IMAGE=papaquebec-visual
 RUNTIME=$(command -v container || command -v docker)
@@ -18,4 +18,4 @@ cp package.json bun.lock visual/Dockerfile "$context"
   --volume "$PWD/scripts:/app/scripts" \
   --volume "$PWD/src:/app/src" \
   --volume "$PWD/visual:/app/visual" \
-  "$IMAGE" bun scripts/visual.ts "$@"
+  "$IMAGE" bun scripts/visual/main.ts "$@"

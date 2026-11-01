@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type ChartItem, chartOf } from '../src/lib/chart';
-import { parseMapSet, validateMapSet } from '../src/lib/mapset';
+import { type ChartItem, chartOf } from '../../src/lib/chart';
+import { parseMapSet, validateMapSet } from '../../src/lib/mapset';
 import { type OpenAipInput, toMapSet, withinRadius } from './openaip';
 
 const point = (lat: number, lon: number) => ({ type: 'Point', coordinates: [lon, lat] });

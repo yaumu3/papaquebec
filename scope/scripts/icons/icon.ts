@@ -20,7 +20,7 @@
  * The 16 px artwork keeps the path and the centring rule but thickens the ink and widens
  * the gap so three separate marks survive at about four units per pixel.
  */
-import { PALETTE } from '../src/design/palette';
+import { PALETTE } from '../../src/design/palette';
 
 /** The 64 × 64 space the artwork is drawn in. */
 export const TILE = 64;

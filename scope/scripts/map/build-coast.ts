@@ -3,7 +3,7 @@
  * box and written as `public/map/coast.json`: `{ site, radiusNm, lines: [[[lon, lat], ...], ...] }`.
  * Runs before every build and is a no-op while the file already covers the same site.
  *
- *   bun scripts/build-coast.ts [lat lon] [radiusNm=300] [ne_10m_coastline.geojson]
+ *   bun scripts/map/build-coast.ts [lat lon] [radiusNm=300] [ne_10m_coastline.geojson]
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 

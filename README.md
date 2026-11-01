@@ -120,7 +120,7 @@ Query parameters:
 GitHub Actions runs the same checks and builds the image on every push to `main` and every pull
 request. Two headless scripts describe their flags in their headers:
 
-- `bun scripts/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a frame
+- `bun scripts/headless/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a frame
   plus the console log; with `--sim` it starts a server of its own that flies the sim and serves
   the build. `bun run screenshot` regenerates the README picture that way.
 - `mise run bench` is a load test with extra sim traffic, always on a server of its own.
@@ -333,9 +333,9 @@ built at runtime from [JetBrains Mono](https://www.jetbrains.com/lp/mono/).
 **Layout.** `scope/src/` is split by role: pure library, shared state, feed, renderer, canvas input,
 panels and UI, design tokens. The rules: `state/` is the only shared state, `lib/` imports no
 framework, worker code never imports Solid or touches the DOM, and components are styled only
-through the design tokens. `scripts/` holds the data tools and the headless browser scripts.
-`proto/` holds the schema both sides generate their types from. `crates/` holds the server's Rust
-crates:
+through the design tokens. `scripts/` holds the map data tools, the icons, the headless browser
+scripts and the visual tests, a folder each. `proto/` holds the schema both sides generate their
+types from. `crates/` holds the server's Rust crates:
 
 - `web/`: the server, the `papaquebec` binary.
 - `authority/`: the server's local certificate authority.

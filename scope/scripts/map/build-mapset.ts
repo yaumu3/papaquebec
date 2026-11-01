@@ -5,7 +5,7 @@
  * `public/map/openaip.mapset.geojson`.
  * Runs before every build; when the exports cannot be reached, an existing file is kept.
  *
- *   bun scripts/build-mapset.ts [lat lon] [radiusNm=150]      site from PQ_SITE
+ *   bun scripts/map/build-mapset.ts [lat lon] [radiusNm=150]      site from PQ_SITE
  */
 import { existsSync, writeFileSync } from 'node:fs';
 

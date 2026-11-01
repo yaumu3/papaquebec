@@ -3,7 +3,7 @@
  * scope with no feed, no built-in set and no coastline, the example set imported through the Maps
  * panel. On a difference the actual image and a diff are written next to the baseline.
  *
- *   bun scripts/visual.ts [--update]
+ *   bun scripts/visual/main.ts [--update]
  *
  * Runs in the pinned container: use `mise run check:visual`, or `bun run visual --update` to
  * rewrite the baselines.
@@ -14,8 +14,8 @@ import { parseArgs } from 'node:util';
 import type { Locator, Page } from 'playwright';
 import { PNG } from 'pngjs';
 
-import { DRAW_STACK, LAYER_GROUPS } from '../src/lib/layers';
-import { openScope, startPreview } from './browser';
+import { DRAW_STACK, LAYER_GROUPS } from '../../src/lib/layers';
+import { openScope, startPreview } from '../headless/browser';
 import { compareImages, type Image, type Limits } from './imageDiff';
 
 /** XQPA, the example set's aerodrome. */

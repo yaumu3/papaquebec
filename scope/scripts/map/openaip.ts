@@ -4,7 +4,7 @@
  * metres, 1 feet or 6 flight level, `referenceDatum` is 0 ground, 1 mean sea level or 2 standard
  * pressure, and unlimited is flight level 999 (the Japan export has no other encoding).
  */
-import type { MapSetData } from '../src/lib/mapset';
+import type { MapSetData } from '../../src/lib/mapset';
 import {
   type AreaLayer,
   BUILTIN_ID,
@@ -15,7 +15,7 @@ import {
   NOTE_MAX,
   SECTOR_LAYERS,
   TITLE_MAX,
-} from '../src/lib/mapsetFormat';
+} from '../../src/lib/mapsetFormat';
 import { isNum, isRecord } from './guards';
 
 /** A position as lat then lon, the order the conversion works in. */
