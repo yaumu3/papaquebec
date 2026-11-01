@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ItemPart } from './chart';
-import { isUpperStratum, stratumTag } from './stratum';
+import { bandOf, isUpperStratum, stratumTag } from './stratum';
 
 const area = (lower?: string): ItemPart => ({
   geometry: { type: 'Polygon', coordinates: [] },
@@ -102,5 +102,25 @@ describe('stratumTag', () => {
 
     // Assert
     expect(tags).toEqual(rows.map(([, , expected]) => expected));
+  });
+});
+
+describe('bandOf', () => {
+  it('takes the lowest lower and the highest upper limit over the parts, in feet', () => {
+    // Arrange
+    const rows: [ItemPart[], { lower: string; upper: string }][] = [
+      [[sector('SFC', 'FL240'), sector('SFC', 'FL160')], { lower: 'SFC', upper: 'FL240' }],
+      [
+        [sector('5000FT', '12000FT'), sector('FL095', 'FL100')],
+        { lower: '5000FT', upper: '12000FT' },
+      ],
+      [[sector(), sector()], { lower: 'SFC', upper: 'UNL' }],
+    ];
+
+    // Act
+    const bands = rows.map(([parts]) => bandOf(parts));
+
+    // Assert
+    expect(bands).toEqual(rows.map(([, expected]) => expected));
   });
 });

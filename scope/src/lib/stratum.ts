@@ -8,7 +8,7 @@ const MINUS = '−';
 const EN_DASH = '–';
 
 /** A published limit in feet: `SFC` and `GND` are 0, `UNL` is unbounded, `FLnnn` is nnn hundreds. */
-function limitFt(limit: string): number {
+export function limitFt(limit: string): number {
   if (limit === 'UNL') return Infinity;
   if (limit === 'SFC' || limit === 'GND') return 0;
   const level = FLIGHT_LEVEL.exec(limit);
@@ -38,6 +38,14 @@ const upperOf = ({ properties: p }: ItemPart): string =>
 const extreme = (limits: string[], order: (a: number, b: number) => boolean): string =>
   limits.reduce((best, next) => (order(limitFt(next), limitFt(best)) ? next : best));
 
+/** The band of an item's parts: the lowest lower and the highest upper limit, compared in feet. */
+export function bandOf(parts: readonly ItemPart[]): { lower: string; upper: string } {
+  return {
+    lower: extreme(parts.map(lowerOf), (a, b) => a < b),
+    upper: extreme(parts.map(upperOf), (a, b) => a > b),
+  };
+}
+
 /**
  * A sector's stratum written as a tag: `335−` from the surface up to
  * a limit, `335+` from a limit to unlimited, `250–335` between two limits, and no tag for
@@ -45,8 +53,7 @@ const extreme = (limits: string[], order: (a: number, b: number) => boolean): st
  * parts, compared in feet.
  */
 export function stratumTag(parts: readonly ItemPart[]): string {
-  const lower = extreme(parts.map(lowerOf), (a, b) => a < b);
-  const upper = extreme(parts.map(upperOf), (a, b) => a > b);
+  const { lower, upper } = bandOf(parts);
   const fromSurface = limitFt(lower) <= 0;
   const toUnlimited = limitFt(upper) === Infinity;
   if (fromSurface && toUnlimited) return '';
