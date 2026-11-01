@@ -1,0 +1,36 @@
+.search {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+.box {
+  flex: 1;
+  min-width: 0;
+  height: var(--control-height);
+  padding: 0 18px 0 var(--space-2);
+  border: 1px solid var(--panel-border);
+  background: var(--control-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking);
+  appearance: none;
+}
+.box:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.box::-webkit-search-cancel-button {
+  display: none;
+}
+.clear {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 18px;
+  color: var(--text-dim);
+  font-size: var(--text-lg);
+  line-height: 1;
+}

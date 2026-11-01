@@ -3,11 +3,13 @@ import { describe, expect, it } from 'bun:test';
 import { type ChartItem, chartOf } from '../lib/chart';
 import { blockOffset, DB_WIDTH } from '../lib/datablock';
 import { direct, inverse } from '../lib/geodesic';
-import { visibleLayers } from '../lib/layers';
+import { drawnItemsOf } from '../lib/layers';
 import { parseMapSet } from '../lib/mapset';
 import { EXAMPLE } from '../lib/mapsetCorpus';
 import type { Layer } from '../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../lib/topology';
+import type { LayerState } from '../lib/visibility';
+import { allShown, shownExcept } from '../lib/visibilityFixture';
 import type { View } from '../render/protocol';
 import { makeTrack } from '../render/scene/trackFixture';
 import { toScreen } from '../render/scene/view';
@@ -97,13 +99,22 @@ describe('fixNear', () => {
     ],
   };
   const topology = topologyOf([...chartOf([parseMapSet(EXAMPLE)]), stepped]);
-  const drawn = (layers: readonly Layer[]) => drawnPointsOf(topology, layers);
+  const drawn = (
+    layers: readonly Layer[],
+    inRange = true,
+    stateOf: (layer: Layer) => LayerState = allShown,
+  ) =>
+    drawnPointsOf(
+      topology,
+      drawnItemsOf(topology.chart, layers, stateOf, () => inRange),
+    );
   it('snaps onto a shown fix, VFR point or navaid, and onto nothing else', () => {
     // Arrange
     const reach = 0.01;
     const rows: {
       name: string;
       shown: readonly Layer[];
+      inRange?: boolean;
       where: [number, number];
       found: string | null;
     }[] = [
@@ -133,18 +144,17 @@ describe('fixNear', () => {
       { name: 'open ground', shown: ['fix', 'vfr', 'navaid'], where: [128, 36], found: null },
       {
         name: 'a navaid shown but beyond the range threshold',
-        shown: visibleLayers(
-          ['navaid'],
-          () => true,
-          () => false,
-        ),
+        shown: ['navaid'],
+        inRange: false,
         where: [130.4406, 33.5967],
         found: null,
       },
     ];
 
     // Act
-    const found = rows.map((r) => fixNear(drawn(r.shown), at(...r.where), reach, plane.project));
+    const found = rows.map((r) =>
+      fixNear(drawn(r.shown, r.inRange), at(...r.where), reach, plane.project),
+    );
 
     // Assert
     expect(found.map((f) => f?.name ?? null)).toEqual(rows.map((r) => r.found));
@@ -164,6 +174,22 @@ describe('fixNear', () => {
 
     // Assert
     expect(found.map((f) => f?.name)).toEqual(rows.map((r) => r.near));
+  });
+
+  it('snaps past a hidden fix onto the next one in reach', () => {
+    // Arrange
+    const reach = 1;
+    const key = drawn(['fix']).find((p) => p.id === 'TAVRO')?.key ?? '';
+    const where = at(130.93, 33.47);
+
+    // Act
+    const found = [() => allShown(), () => shownExcept(key)].map((stateOf) =>
+      fixNear(drawn(['fix'], true, stateOf), where, reach, plane.project),
+    );
+
+    // Assert
+    expect(key).not.toBe('');
+    expect(found.map((f) => f?.name)).toEqual(['TAVRO', 'NIMBA']);
   });
 
   it('reports where the fix is on the plane', () => {

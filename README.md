@@ -184,6 +184,19 @@ The Maps panel imports one:
 - An imported set carries its own license in `note`; the openAIP terms apply to the built-in set
   only.
 
+The panel's `LAYERS` tree lists groups, layers and each layer's items:
+
+- A dot shows or hides its row; tapping an item shows or hides that item alone.
+  - An item that arrives later follows its layer.
+  - What is hidden and which rows are open stay in this browser.
+- `SEARCH` finds what the tree shows: item names and tags, layer names, group titles.
+  - A term matches the start of a word.
+  - A layer or group name keeps all its items.
+  - The search is not remembered.
+- The scope traces in grey the item pointed at, drawn or not.
+  - A search also traces the items it finds by name or tag.
+  - Holds are not traced yet.
+
 The schema is [`scope/schema/mapset.schema.json`](scope/schema/mapset.schema.json), with a set that
 uses every layer in [`example.mapset.geojson`](scope/schema/example.mapset.geojson) and the rules
 for writing a converter in [`converters.md`](scope/schema/converters.md).

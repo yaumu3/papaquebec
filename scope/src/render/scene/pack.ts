@@ -79,6 +79,9 @@ export type DashPattern =
   | readonly [number, number]
   | readonly [number, number, number, number];
 
+/** The width of a line whose style names none, CSS px. */
+export const DEFAULT_LINE_WIDTH = 1;
+
 export interface LineStyle {
   /** CSS px. */
   width?: number;
@@ -130,7 +133,7 @@ export class LineBatch {
     d[at + 5] = b.y;
     d[at + 6] = b.px ?? 0;
     d[at + 7] = b.py ?? 0;
-    d[at + 8] = style.width ?? 1;
+    d[at + 8] = style.width ?? DEFAULT_LINE_WIDTH;
     d[at + 9] = along;
     d.set(style.dash ?? [], at + 10);
     d.set(parseColor(color), at + 14);

@@ -1,6 +1,5 @@
 import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js';
 
-import { visibleLayers } from '../lib/layers';
 import { buildAtlas } from '../render/atlas/build';
 import { createRenderer, type RenderStatus } from '../render/facade';
 import { type Move, retarget, settleMoves } from '../render/layout/moves';
@@ -14,9 +13,11 @@ import { buildOverlays } from '../render/scene/overlays';
 import { ringPaths } from '../render/scene/rings';
 import { buildCoast, buildRings } from '../render/scene/static';
 import { buildTargets, drawnOffset, type LabelDrag, restingOffset } from '../render/scene/targets';
+import { buildTraces } from '../render/scene/traces';
 import { CHART_SLICES, SLOT_ORDER, type Slots, sliceSlots } from '../render/slots';
-import { drawnPoints, navaidsInRange } from '../state/drawnPoints';
+import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
 import { hoverInstant } from '../state/lanes';
+import { pointedItem, searchedItems } from '../state/layerTree';
 import { declinationAt } from '../state/magnetic';
 import { topology } from '../state/mapsets';
 import {
@@ -128,7 +129,8 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
               topology: topology(),
               drawnPoints,
               project: projectNm,
-              layers: visibleLayers(slice.layers, (l) => settings.shownLayers[l], navaidsInRange),
+              layers: slice.layers,
+              drawnItems: drawnItemsIn(slice.layers),
               labelDensity: settings.labelDensity,
               atlas: a,
             }),
@@ -136,6 +138,18 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
         : null,
     );
   }
+
+  show(() =>
+    projected()
+      ? {
+          traces: buildTraces({
+            pointedAt: pointedItem(),
+            searched: searchedItems(),
+            project: projectNm,
+          }),
+        }
+      : null,
+  );
 
   const layoutScale = settledScale(view);
   /**

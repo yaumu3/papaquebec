@@ -10,6 +10,7 @@ const SIZES: Record<PointLayer, number> = { ad: 9, navaid: 10, fix: 8, vfr: 6 };
 const sizeOf = (layer: PointLayer) => SIZES[layer];
 
 const point = (layer: PointLayer, vertex: number): ChartPoint => ({
+  key: 'Q',
   layer,
   id: 'Q',
   at: [0, 0],

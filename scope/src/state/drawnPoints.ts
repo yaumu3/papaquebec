@@ -1,26 +1,25 @@
 import { createMemo, createRoot } from 'solid-js';
 
-import { navaidsShownAt, visibleLayers } from '../lib/layers';
-import { POINT_LAYERS } from '../lib/mapsetFormat';
+import { drawnItemsOf, navaidsShownAt } from '../lib/layers';
+import { type Layer, POINT_LAYERS } from '../lib/mapsetFormat';
 import { drawnPointsOf } from '../lib/topology';
+import { layerState } from './layerVisibility';
 import { topology } from './mapsets';
 import { settings } from './settings';
 
 /**
- * The memos sit in a root of their own: they live as long as the page, like the state they
- * read, and `canvas/hit.ts` reads them outside the scene.
+ * What draws sits in a root of its own: it lives as long as the page, like the state it
+ * reads, and `canvas/hit.ts` reads it outside the scene.
  */
-export const { navaidsInRange, drawnPoints } = createRoot(() => {
+export const { drawnItemsIn, drawnPoints } = createRoot(() => {
   /** Zooming reaches the points only when it shows or hides the navaids. */
   const inRange = createMemo(() => navaidsShownAt(settings.rangeNm));
+  /** The items of `layers` that draw: those shown, and a navaid only within the range. */
+  const drawnItems = (layers: readonly Layer[]) =>
+    drawnItemsOf(topology().chart, layers, layerState, inRange);
   return {
-    navaidsInRange: inRange,
-    /** The points that draw: their layer shown, and a navaid only within the range. */
-    drawnPoints: createMemo(() =>
-      drawnPointsOf(
-        topology(),
-        visibleLayers(POINT_LAYERS, (l) => settings.shownLayers[l], inRange),
-      ),
-    ),
+    drawnItemsIn: drawnItems,
+    /** The points that draw. */
+    drawnPoints: createMemo(() => drawnPointsOf(topology(), drawnItems(POINT_LAYERS))),
   };
 });

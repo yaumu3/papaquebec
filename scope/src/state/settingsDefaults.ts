@@ -9,8 +9,10 @@ export const RANGE_MAX_NM = 400;
 export const VECTOR_STEPS = [0, 0.5, 1, 2] as const;
 export const TRAIL_STEPS = [0, 30, 60, 120] as const;
 
-/** Whether each layer is drawn. */
+/** Each layer's mode: shown or hidden, before its exceptions. */
 export type ShownLayers = Record<ScopeLayer, boolean>;
+/** The item keys of each layer that go against its `shownLayers` flag, oldest first. */
+export type Exceptions = Partial<Record<ScopeLayer, ReadonlySet<string>>>;
 export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
 
 export const LABEL_DENSITIES: readonly LabelDensity[] = ['off', 'sparse', 'normal', 'dense'];
@@ -24,6 +26,11 @@ export interface Settings {
   trailSec: number;
   filter: Filter;
   shownLayers: ShownLayers;
+  exceptions: Exceptions;
+  /** Titles of the tree's open groups. */
+  openGroups: readonly string[];
+  /** The tree's open layers. */
+  openLayers: readonly string[];
   labelDensity: LabelDensity;
   altimeter: Altimeter;
   qnh: QnhSetting;
@@ -74,6 +81,9 @@ export const DEFAULT_SETTINGS: Settings = {
     coast: true,
     rings: true,
   },
+  exceptions: {},
+  openGroups: [],
+  openLayers: [],
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },
   qnh: { auto: true, station: '' },

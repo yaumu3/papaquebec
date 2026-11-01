@@ -1,0 +1,208 @@
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-4) 0 var(--space-2);
+}
+.titleLine:first-child {
+  margin-top: 0;
+}
+.titleLine > :first-child {
+  margin: 0;
+}
+.none {
+  padding: var(--space-4) 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking);
+  text-align: center;
+}
+.tree mark {
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.tree {
+  display: flex;
+  flex-direction: column;
+  margin-inline: calc(-1 * var(--space-4));
+  --row-h: 26px;
+  --item-h: 22px;
+  --dot-w: 28px;
+  --swatch-w: 30px;
+}
+.group {
+  padding-block: var(--space-1);
+}
+.group + .group {
+  border-top: 1px solid var(--plot-grid);
+}
+.row {
+  display: grid;
+  grid-template-columns: var(--dot-w) 1fr;
+  min-height: var(--row-h);
+}
+.item {
+  display: grid;
+  min-height: var(--item-h);
+}
+.dot,
+.groupHead,
+.layerHead,
+.itemRow {
+  display: grid;
+  align-items: center;
+  color: var(--text);
+  font-size: var(--text-sm);
+  letter-spacing: var(--tracking-wide);
+  text-align: left;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+.dot {
+  justify-items: center;
+}
+.dot:focus-visible,
+.groupHead:focus-visible,
+.layerHead:focus-visible,
+.itemRow:focus-visible {
+  outline: 1px solid var(--text);
+  outline-offset: -1px;
+}
+.groupHead {
+  grid-template-columns: 14px 1fr auto;
+  column-gap: var(--space-1);
+  padding-right: var(--space-4);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+.group > .row:not(.off) .groupHead {
+  color: var(--text);
+}
+.layerHead {
+  grid-template-columns: 14px 12px var(--swatch-w) 1fr auto;
+  padding-right: var(--space-4);
+}
+.itemRow {
+  grid-template-columns: var(--dot-w) 14px 12px var(--swatch-w) 1fr auto;
+  padding-right: var(--space-4);
+}
+.itemRow > .drawing {
+  justify-self: center;
+}
+.itemRow > .guide:nth-of-type(3) {
+  justify-self: start;
+  margin-left: 5px;
+}
+.guide {
+  justify-self: center;
+  align-self: stretch;
+  width: 1px;
+  background: var(--plot-grid);
+}
+.chevron {
+  display: flex;
+  justify-content: center;
+  color: var(--text-muted);
+}
+.chevron svg {
+  display: block;
+  transition: transform 120ms;
+}
+[aria-expanded='true'] > .chevron svg {
+  transform: rotate(90deg);
+}
+.swatch svg {
+  display: block;
+}
+.name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.summary {
+  margin-left: var(--space-3);
+  color: var(--text-dim);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking);
+}
+.subset {
+  max-width: 110px;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tag {
+  margin-left: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking);
+}
+.items {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(var(--item-h) * 8);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.more {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--item-h)), transparent);
+}
+.drawing {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text);
+  box-shadow: inset 0 0 0 1px var(--text);
+}
+.off .drawing {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--text-muted);
+}
+.mixed .drawing {
+  background: linear-gradient(90deg, var(--text) 50%, transparent 50%);
+}
+.off,
+.off .groupHead,
+.off .layerHead,
+.off .tag,
+.off .summary {
+  color: var(--text-muted);
+}
+.off svg {
+  opacity: 0.3;
+}
+.noData {
+  opacity: 0.6;
+}
+@media (hover: hover) {
+  .row:hover,
+  .itemRow:hover {
+    background: var(--row-hover);
+  }
+  .dot:hover .drawing {
+    box-shadow:
+      inset 0 0 0 1px var(--text),
+      0 0 0 3px var(--control-hover);
+  }
+}
+@media (pointer: coarse) {
+  .tree {
+    --row-h: 36px;
+    --item-h: 32px;
+    --dot-w: 36px;
+  }
+}
+@media (max-width: 720px) {
+  .tree {
+    margin-inline: calc(-1 * var(--space-6));
+  }
+}

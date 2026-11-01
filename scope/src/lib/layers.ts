@@ -1,4 +1,6 @@
+import type { Chart, ChartItem } from './chart';
 import type { Layer } from './mapsetFormat';
+import { isItemShown, type LayerState } from './visibility';
 
 /**
  * Every layer the scope draws, front first: what is listed first is drawn over everything after
@@ -39,9 +41,11 @@ export type ScopeLayer = (typeof DRAW_STACK)[number];
 /** A map set layer with a style: every one but `hold`, which draws nothing yet. */
 export type StyledLayer = Exclude<Layer, 'hold'>;
 
+/** Whether the scope makes a layer itself, from no map set: the coastline and the range rings. */
+export const isScopeMade = (layer: ScopeLayer) => layer === 'coast' || layer === 'rings';
+
 /** Whether a layer has a style: not `hold`, and not the two the scope makes itself. */
-export const isStyled = (layer: ScopeLayer) =>
-  layer !== 'hold' && layer !== 'coast' && layer !== 'rings';
+export const isStyled = (layer: ScopeLayer) => layer !== 'hold' && !isScopeMade(layer);
 
 /** The groups of the Maps panel, in the order they are listed there, which is not the draw order. */
 export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
@@ -82,6 +86,31 @@ export const LAYER_NAMES: Record<ScopeLayer, string> = {
   rings: 'RANGE RINGS',
 };
 
+/** Where the AIP describes a layer, for the layers it describes. */
+export const LAYER_AIP_REFS: Partial<Record<ScopeLayer, string>> = {
+  ad: 'AD 2',
+  vfr: 'AD 2.24 visual approach charts',
+  navaid: 'ENR 4.1',
+  fix: 'ENR 4.4',
+  conv: 'ENR 3',
+  rnav: 'ENR 3',
+  dct: 'ENR 3, other routes',
+  hold: 'ENR 3, en-route holding',
+  sid: 'AD 2.22',
+  star: 'AD 2.22',
+  trans: 'AD 2.22',
+  pr: 'ENR 5.1',
+  dng: 'ENR 5.1',
+  tra: 'ENR 5.2',
+  adiz: 'ENR 5.2',
+  ctr: 'AD 2.17',
+  tma: 'ENR 2.1',
+  cta: 'ENR 2.1',
+  advisory: 'ENR 2.2',
+  fir: 'ENR 2.1',
+  asr: 'ENR 1.7',
+};
+
 const NAVAID_MAX_RANGE = 120;
 
 /** Navaids clutter a wide range; they show only out to `NAVAID_MAX_RANGE`. */
@@ -90,13 +119,22 @@ export function navaidsShownAt(rangeNm: number): boolean {
 }
 
 /**
- * The layers to build: those shown, and the navaids only when the range allows. The range is
- * read only for a shown navaid layer, so a rebuild follows it only then.
+ * The items of the chart that draw: of `layers`, those shown, and the navaids only when the range
+ * allows. Each layer's state and the range are read once; the range only for a shown navaid, so a
+ * rebuild follows it only then.
  */
-export function visibleLayers(
-  layers: readonly StyledLayer[],
-  shown: (layer: StyledLayer) => boolean,
+export function drawnItemsOf(
+  chart: Chart,
+  layers: readonly Layer[],
+  stateOf: (layer: Layer) => LayerState,
   navaidsInRange: () => boolean,
-): StyledLayer[] {
-  return layers.filter((l) => shown(l) && (l !== 'navaid' || navaidsInRange()));
+): ChartItem[] {
+  const states = new Map(layers.map((layer) => [layer, stateOf(layer)]));
+  const items = chart.filter((item) => {
+    const state = states.get(item.layer);
+    return state !== undefined && isItemShown(state, item.key);
+  });
+  return items.some((item) => item.layer === 'navaid') && !navaidsInRange()
+    ? items.filter((item) => item.layer !== 'navaid')
+    : items;
 }

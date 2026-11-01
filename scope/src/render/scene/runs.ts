@@ -1,8 +1,8 @@
-import { isUpperStratum, type ItemPart } from '../../lib/chart';
+import type { ChartItem, ItemPart } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
-import type { StyledLayer } from '../../lib/layers';
 import { isRouteLayer } from '../../lib/mapsetFormat';
 import { type Cuts, NO_CUTS, type Span, spansOf, stopCuts } from '../../lib/stops';
+import { isUpperStratum } from '../../lib/stratum';
 import {
   type ChartPath,
   type ChartPoint,
@@ -92,11 +92,11 @@ export function drawRuns(
   }
 }
 
-/** The stops of the routes: where the drawn points stand, if a route layer is among those to draw. */
+/** The stops of the routes: where the drawn points stand, if a route item is among those to draw. */
 export function routeCuts(
-  layers: readonly StyledLayer[],
+  items: readonly ChartItem[],
   drawnPoints: () => readonly ChartPoint[],
 ): Cuts {
-  const routed = layers.some(isRouteLayer);
+  const routed = items.some((item) => isRouteLayer(item.layer));
   return routed ? stopCuts(drawnPoints(), (layer) => LAYER_STYLES[layer].size) : NO_CUTS;
 }

@@ -153,7 +153,8 @@ fn sdHexagon(p: vec2f) -> f32 {
 }
 @fragment fn fs(in: Out) -> @location(0) vec4f {
   let p = in.local;
-  let stroke = 1.0 / in.halfPx * u.dpr * 0.55; // ~1.1 CSS px outline
+  let cssPx = u.dpr / in.halfPx; // one CSS px in shape units
+  let stroke = cssPx * 0.55; // ~1.1 CSS px outline
   var d: f32;
   switch in.shape {
     case 0u: { d = sdSquare(p); }                                   // filled square
@@ -167,6 +168,7 @@ fn sdHexagon(p: vec2f) -> f32 {
     case 5u: { d = min(abs(sdHexagon(p)) - stroke, sdSquare(p * 5.0)); } // hexagon + dot
     case 6u: { d = sdCircle(p, 0.35); }                             // dot
     case 7u: { d = abs(sdCircle(p, 0.85)) - stroke; }               // ring
+    case 9u: { d = abs(sdCircle(p, 1.0)) - cssPx; }                 // ring at the marker's radius, 2 CSS px
     default: { d = abs(sdSquare(p)) - stroke; }                     // hollow square
   }
   let aa = fwidth(d);
