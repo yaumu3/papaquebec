@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
+import { chartWith, itemOf, line, partOf, point, polygon } from '../render/scene/chartFixture';
 import type { Chart, ItemPart } from './chart';
 import type { LonLat } from './mapdata';
-import type { Layer, PointLayer } from './mapsetFormat';
+import type { Layer } from './mapsetFormat';
 import {
   drawnPointsOf,
   ownersOf,
-  type PathLayer,
   runsOf,
   type Stretch,
   type ChartPath,
@@ -22,24 +22,6 @@ const C: LonLat = [130.7, 33.8];
 const D: LonLat = [130.6, 33.8];
 
 type Outline = LonLat[];
-
-interface Extra {
-  lower?: string;
-  kind?: string;
-}
-
-function partOf(layer: PathLayer, name: string, outlines: Outline[], extra: Extra = {}): ItemPart {
-  const [first = []] = outlines;
-  const geometry =
-    outlines.length > 1
-      ? { type: 'Polygon' as const, coordinates: outlines }
-      : { type: 'LineString' as const, coordinates: first };
-  const properties = { layer, name, ...extra };
-  return { geometry, properties };
-}
-
-const chartWith = (...parts: ItemPart[]): Chart =>
-  parts.map((part, i) => ({ key: String(i), layer: part.properties.layer, parts: [part] }));
 
 const nameOf = ({ properties }: ItemPart) => ('name' in properties ? (properties.name ?? '') : '');
 
@@ -60,7 +42,10 @@ describe('topologyOf', () => {
     // Act
     const verdicts = rows.map(([p, q]) => {
       const { routes } = topologyOf(
-        chartWith(partOf('conv', 'P', [[p, far]]), partOf('conv', 'Q', [[q, far]])),
+        chartWith(
+          partOf('conv', line(p, far), { name: 'P' }),
+          partOf('conv', line(q, far), { name: 'Q' }),
+        ),
       );
       return routes.paths[0]?.vertices[0] === routes.paths[1]?.vertices[0];
     });
@@ -72,9 +57,9 @@ describe('topologyOf', () => {
   it('numbers an edge the same whichever way it is walked, and another edge otherwise', () => {
     // Arrange
     const chart = chartWith(
-      partOf('conv', 'AB', [[A, B]]),
-      partOf('conv', 'BA', [[B, A]]),
-      partOf('conv', 'AC', [[A, C]]),
+      partOf('conv', line(A, B), { name: 'AB' }),
+      partOf('conv', line(B, A), { name: 'BA' }),
+      partOf('conv', line(A, C), { name: 'AC' }),
     );
 
     // Act
@@ -88,7 +73,7 @@ describe('topologyOf', () => {
   it('merges neighbours at one identity, so a path has no empty edge', () => {
     // Arrange
     const nearA: LonLat = [130.600004, 33.7];
-    const chart = chartWith(partOf('conv', 'R', [[A, nearA, B]]));
+    const chart = chartWith(partOf('conv', line(A, nearA, B), { name: 'R' }));
 
     // Act
     const { routes } = topologyOf(chart);
@@ -106,7 +91,7 @@ describe('topologyOf', () => {
       [130.64, 33.74],
       [130.62, 33.72],
     ];
-    const chart = chartWith(partOf('tma', 'T', [square, hole]));
+    const chart = chartWith(partOf('tma', polygon(square, hole), { name: 'T' }));
 
     // Act
     const { areas } = topologyOf(chart);
@@ -118,21 +103,14 @@ describe('topologyOf', () => {
 
   it('makes a path of each area outline and each route, and none of a point or a hold', () => {
     // Arrange
-    const point = (layer: 'ad' | 'fix'): ItemPart => ({
-      geometry: { type: 'Point', coordinates: A },
-      properties: { layer, id: 'X' },
-    });
-    const hold: ItemPart = {
-      geometry: { type: 'Point', coordinates: A },
-      properties: { layer: 'hold', turn: 'R', inboundMag: 90, inboundTrue: 90 },
-    };
+    const hold = partOf('hold', point(A), { inboundMag: 90, inboundTrue: 90 });
     const chart = chartWith(
-      partOf('sector', 'S', [square, square]),
-      partOf('asr', 'L', [[A, B, C]]),
-      partOf('conv', 'R', [[A, B]]),
-      point('fix'),
+      partOf('sector', polygon(square, square), { name: 'S' }),
+      partOf('asr', line(A, B, C), { name: 'L' }),
+      partOf('conv', line(A, B), { name: 'R' }),
+      partOf('fix', point(A), { id: 'X' }),
       hold,
-      point('ad'),
+      partOf('ad', point(A), { id: 'X' }),
     );
 
     // Act
@@ -145,11 +123,11 @@ describe('topologyOf', () => {
   it('sorts paths front first, a lower stratum before an upper, then in chart order', () => {
     // Arrange
     const chart = chartWith(
-      partOf('fir', 'fir', [square]),
-      partOf('sector', 'upper', [square], { lower: 'FL195' }),
-      partOf('tma', 'tma1', [square]),
-      partOf('sector', 'lower', [square]),
-      partOf('tma', 'tma2', [square]),
+      partOf('fir', line(...square), { name: 'fir' }),
+      partOf('sector', line(...square), { name: 'upper', lower: 'FL195' }),
+      partOf('tma', line(...square), { name: 'tma1' }),
+      partOf('sector', line(...square), { name: 'lower' }),
+      partOf('tma', line(...square), { name: 'tma2' }),
     );
 
     // Act
@@ -167,7 +145,10 @@ describe('topologyOf', () => {
 
   it('numbers occurrences along the sorted paths', () => {
     // Arrange
-    const chart = chartWith(partOf('fir', 'F', [[A, B, C]]), partOf('tma', 'T', [square]));
+    const chart = chartWith(
+      partOf('fir', line(A, B, C), { name: 'F' }),
+      partOf('tma', line(...square), { name: 'T' }),
+    );
 
     // Act
     const { areas } = topologyOf(chart);
@@ -178,7 +159,10 @@ describe('topologyOf', () => {
 
   it('keeps an area and a route on one line in networks of their own', () => {
     // Arrange
-    const chart = chartWith(partOf('sector', 'S', [[A, B]]), partOf('conv', 'R', [[A, B]]));
+    const chart = chartWith(
+      partOf('sector', line(A, B), { name: 'S' }),
+      partOf('conv', line(A, B), { name: 'R' }),
+    );
 
     // Act
     const { areas, routes } = topologyOf(chart);
@@ -212,7 +196,10 @@ describe('ownersOf', () => {
   it('names the occurrence that draws each edge, and -1 where no drawn part has it', () => {
     // Arrange
     const { areas } = topologyOf(
-      chartWith(partOf('tma', 'T', [[A, B, C]]), partOf('fir', 'F', [[A, B, D]])),
+      chartWith(
+        partOf('tma', line(A, B, C), { name: 'T' }),
+        partOf('fir', line(A, B, D), { name: 'F' }),
+      ),
     );
     const everything = new Set(areas.paths.map((p) => p.part));
     const onlyFir = new Set(areas.paths.slice(1).map((p) => p.part));
@@ -234,21 +221,27 @@ describe('runsOf', () => {
     const rows: [string, Chart, string[], Record<string, Stretch[]>][] = [
       [
         'front layer over a layer behind',
-        chartWith(partOf('fir', 'fir', [[A, B, D]]), partOf('tma', 'tma', [[A, B, C]])),
+        chartWith(
+          partOf('fir', line(A, B, D), { name: 'fir' }),
+          partOf('tma', line(A, B, C), { name: 'tma' }),
+        ),
         [],
         { tma: [run(0, 2)], fir: [run(1, 2)] },
       ],
       [
         'the front layer hidden hands the edge down',
-        chartWith(partOf('fir', 'fir', [[A, B, D]]), partOf('tma', 'tma', [[A, B, C]])),
+        chartWith(
+          partOf('fir', line(A, B, D), { name: 'fir' }),
+          partOf('tma', line(A, B, C), { name: 'tma' }),
+        ),
         ['tma'],
         { tma: [], fir: [run(0, 2)] },
       ],
       [
         'a lower stratum over an upper one that comes first',
         chartWith(
-          partOf('sector', 'upper', [[A, B, C]], { lower: 'FL195' }),
-          partOf('sector', 'lower', [[A, B, D]]),
+          partOf('sector', line(A, B, C), { name: 'upper', lower: 'FL195' }),
+          partOf('sector', line(A, B, D), { name: 'lower' }),
         ),
         [],
         { lower: [run(0, 2)], upper: [run(1, 2)] },
@@ -256,27 +249,33 @@ describe('runsOf', () => {
       [
         'the first in chart order among equals, whatever their kinds',
         chartWith(
-          partOf('tma', 'first', [[A, B, C]], { kind: 'X' }),
-          partOf('tma', 'second', [[A, B, D]], { kind: 'Y' }),
+          partOf('tma', line(A, B, C), { name: 'first', kind: 'X' }),
+          partOf('tma', line(A, B, D), { name: 'second', kind: 'Y' }),
         ),
         [],
         { first: [run(0, 2)], second: [run(1, 2)] },
       ],
       [
         'a path that retraces an edge draws it once',
-        chartWith(partOf('asr', 'R', [[A, B, A, C]])),
+        chartWith(partOf('asr', line(A, B, A, C), { name: 'R' })),
         [],
         { R: [run(0, 1), run(2, 3)] },
       ],
       [
         'an edge shared mid-path splits the path into two runs',
-        chartWith(partOf('fir', 'long', [[A, B, C, D, E]]), partOf('tma', 'short', [[B, C]])),
+        chartWith(
+          partOf('fir', line(A, B, C, D, E), { name: 'long' }),
+          partOf('tma', line(B, C), { name: 'short' }),
+        ),
         [],
         { short: [run(0, 1)], long: [run(0, 1), run(2, 4)] },
       ],
       [
         'a run does not wrap across the start of a ring',
-        chartWith(partOf('fir', 'ring', [square]), partOf('tma', 'side', [[C, D]])),
+        chartWith(
+          partOf('fir', line(...square), { name: 'ring' }),
+          partOf('tma', line(C, D), { name: 'side' }),
+        ),
         [],
         { side: [run(0, 1)], ring: [run(0, 2), run(3, 4)] },
       ],
@@ -291,8 +290,8 @@ describe('runsOf', () => {
 
   it('draws the edge two parts of one item share once', () => {
     // Arrange
-    const step = partOf('tma', 'step', [[B, E, F, C, B]]);
-    const base = partOf('tma', 'base', [square]);
+    const step = partOf('tma', line(B, E, F, C, B), { name: 'step' });
+    const base = partOf('tma', line(...square), { name: 'base' });
     const chart: Chart = [{ key: 'T', layer: 'tma', parts: [base, step] }];
 
     // Act
@@ -304,7 +303,7 @@ describe('runsOf', () => {
 
   it('keeps a run inside the stretch it is asked for', () => {
     // Arrange
-    const { routes } = topologyOf(chartWith(partOf('conv', 'R', [[A, B, C, D, E]])));
+    const { routes } = topologyOf(chartWith(partOf('conv', line(A, B, C, D, E), { name: 'R' })));
     const [path] = routes.paths;
     const owners = ownersOf(routes, new Set(routes.paths.map((p) => p.part)));
 
@@ -316,40 +315,25 @@ describe('runsOf', () => {
   });
 });
 
-const pointPart = (layer: PointLayer, id: string, at: LonLat): ItemPart => ({
-  geometry: { type: 'Point', coordinates: at },
-  properties: { layer, id },
-});
-
-const kinded = (kind: string, at: LonLat): ItemPart => ({
-  geometry: { type: 'Point', coordinates: at },
-  properties: { layer: 'navaid', id: 'QDG', kind },
-});
-
-const pointItem = (layer: PointLayer, ...parts: ItemPart[]): Chart[number] => ({
-  key: layer + parts.length,
-  layer,
-  parts,
-});
-
 describe('the points of a topology', () => {
   const chart: Chart = [
-    pointItem('fix', pointPart('fix', 'TAVRO', A)),
-    pointItem('vfr', pointPart('vfr', 'CAUSE', B), pointPart('vfr', 'CAUSE', E)),
-    pointItem('navaid', pointPart('navaid', 'QDG', C)),
-    pointItem('ad', pointPart('ad', 'QAAA', D)),
+    itemOf('fix', partOf('fix', point(A), { id: 'TAVRO' })),
+    itemOf(
+      'vfr',
+      partOf('vfr', point(B), { id: 'CAUSE' }),
+      partOf('vfr', point(E), { id: 'CAUSE' }),
+    ),
+    itemOf('navaid', partOf('navaid', point(C), { id: 'QDG' })),
+    itemOf('ad', partOf('ad', point(D), { id: 'QAAA' })),
   ];
 
   it('lists a point for each part of a point item, in chart order, and none for a hold or a line', () => {
     // Arrange
-    const hold: ItemPart = {
-      geometry: { type: 'Point', coordinates: A },
-      properties: { layer: 'hold', turn: 'R', inboundMag: 90, inboundTrue: 90 },
-    };
+    const hold = partOf('hold', point(A), { inboundMag: 90, inboundTrue: 90 });
     const mixed: Chart = [
       ...chart,
-      { key: 'hold', layer: 'hold', parts: [hold] },
-      ...chartWith(partOf('conv', 'R', [[A, B]])),
+      itemOf('hold', hold),
+      ...chartWith(partOf('conv', line(A, B), { name: 'R' })),
     ];
 
     // Act
@@ -368,8 +352,12 @@ describe('the points of a topology', () => {
   it("gives every point of an item its first part's kind, undefined when it has none", () => {
     // Arrange
     const chartOfKinds: Chart = [
-      pointItem('navaid', kinded('VOR', A), kinded('NDB', B)),
-      pointItem('navaid', pointPart('navaid', 'QIK', C)),
+      itemOf(
+        'navaid',
+        partOf('navaid', point(A), { id: 'QDG', kind: 'VOR' }),
+        partOf('navaid', point(B), { id: 'QDG', kind: 'NDB' }),
+      ),
+      itemOf('navaid', partOf('navaid', point(C), { id: 'QIK' })),
     ];
 
     // Act
@@ -406,9 +394,9 @@ describe('the vertex of a point', () => {
     // Arrange
     const nearB: LonLat = [130.700004, 33.7];
     const chart: Chart = [
-      ...chartWith(partOf('conv', 'R', [[A, B]])),
-      pointItem('fix', pointPart('fix', 'ON', nearB)),
-      pointItem('fix', pointPart('fix', 'OFF', E)),
+      ...chartWith(partOf('conv', line(A, B), { name: 'R' })),
+      itemOf('fix', partOf('fix', point(nearB), { id: 'ON' })),
+      itemOf('fix', partOf('fix', point(E), { id: 'OFF' })),
     ];
 
     // Act

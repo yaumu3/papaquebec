@@ -1,9 +1,26 @@
-import { type ChartItem, type ItemPart } from '../../lib/chart';
-import { isPointLayer, type Layer } from '../../lib/mapsetFormat';
-import { type Batch, LINE_STRIDE, TEXT_STRIDE } from '../protocol';
+import { type Chart, type ChartItem, type ItemPart } from '../../lib/chart';
+import type { ShownMemory } from '../../lib/fits';
+import { DRAW_STACK, type LabelDensity } from '../../lib/layers';
+import {
+  isChartLayer,
+  isPointLayer,
+  type Layer,
+  type PointLayer,
+  POINT_LAYERS,
+} from '../../lib/mapsetFormat';
+import { type AreaPlace, areaPlaceOf } from '../../lib/pole';
+import { drawnPointsOf, topologyOf } from '../../lib/topology';
+import { type LayerState, drawnItemsOf } from '../../lib/visibility';
+import { shownExcept } from '../../lib/visibilityFixture';
+import type { Declination } from '../../lib/wmm';
+import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
+import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../slots';
 import { atlas } from './atlasFixture';
-import { type DrawnLabels, redrawLabel } from './drawnLabels';
+import { buildShapes, buildSliceLabels } from './chart';
+import { type BuiltLabels, type DrawnLabels, redrawLabel } from './drawnLabels';
+import { buildHighlight } from './highlight';
 import { LineBatch, parseColor, TextBatch } from './pack';
+import { buildTraces } from './traces';
 
 /** The scope plane for tests: x is the longitude and y the latitude. */
 export const project = (lat: number, lon: number) => ({ x: lon, y: lat });
@@ -24,6 +41,14 @@ export const triangle = (x: number): Position[] => [
   [x + 0.01, 0.01],
   [x, 0],
 ];
+/** A closed square ring from the corner (`from`, `from`) to (`to`, `to`). */
+export const box = (from: number, to: number): Position[] => [
+  [from, from],
+  [to, from],
+  [to, to],
+  [from, to],
+  [from, from],
+];
 
 /** What a test may add to a part: a kind, a name, the limits and frequencies of an area or the one-way flag of a route. */
 export interface Extra {
@@ -33,13 +58,22 @@ export interface Extra {
   upper?: string;
   oneWay?: boolean;
   freqs?: string[];
+  id?: string;
+  inboundMag?: number;
+  inboundTrue?: number;
+  turn?: 'L' | 'R';
 }
 
 /** The properties each group of layers carries; `extra` adds a kind, a name, a limit, frequencies or the flag. */
 export function partOf(layer: Layer, geometry: Geometry, extra: Extra = {}): ItemPart {
   const properties =
     layer === 'hold'
-      ? { layer, turn: 'R' as const, inboundTrue: 0, ...extra }
+      ? {
+          layer,
+          turn: 'R' as const,
+          ...('inboundMag' in extra ? {} : { inboundTrue: 0 }),
+          ...extra,
+        }
       : isPointLayer(layer)
         ? { layer, id: 'Q', ...extra }
         : { layer, name: 'Q', ...extra };
@@ -52,13 +86,52 @@ export const itemOf = (layer: Layer, ...parts: ItemPart[]): ChartItem => ({
   parts,
 });
 
-/** A one-part route item named `name`, on the layer `layer`, through these points. */
+export const keyed = (key: string, item: ChartItem): ChartItem => ({ ...item, key });
+
+/** A one-part item named `name`, on the layer `layer`, through these points. */
 export const airway = (layer: Layer, name: string, ...at: Position[]) =>
   keyed(name, itemOf(layer, partOf(layer, line(...at), { name })));
 
-export const keyed = (key: string, item: ChartItem): ChartItem => ({ ...item, key });
+/** A one-way route: `airway` with the flag. */
+export const oneWay = (layer: Layer, name: string, ...at: Position[]) =>
+  keyed(name, itemOf(layer, partOf(layer, line(...at), { name, oneWay: true })));
 
-export interface Instance {
+/** A one-part item of a layer's own geometry, keyed by `key`, which is the layer by default. */
+export const single = (layer: Layer, geometry: Geometry, extra: Extra = {}, key: string = layer) =>
+  keyed(key, itemOf(layer, partOf(layer, geometry, extra)));
+
+/** A point item of `layer` at `at`, keyed `key`. */
+export const stopAt = (layer: PointLayer, at: Position, key: string = layer) =>
+  keyed(key, itemOf(layer, partOf(layer, point(at))));
+
+/** A sector part limited from `lower` to `upper`, as far as they are given. */
+export const sectorPart = (lower?: string, upper?: string): ItemPart =>
+  partOf('sector', polygon(), {
+    name: 'X',
+    ...(lower ? { lower } : {}),
+    ...(upper ? { upper } : {}),
+  });
+
+/** A chart of one item for each part, keyed by position. */
+export const chartWith = (...parts: ItemPart[]): Chart =>
+  parts.map((part, i) => ({ key: String(i), layer: part.properties.layer, parts: [part] }));
+
+/** A GeoJSON Feature of a layer, as a map set holds it. */
+export const featureOf = (layer: Layer, geometry: Geometry, extra: Extra = {}) => ({
+  type: 'Feature' as const,
+  ...partOf(layer, geometry, extra),
+});
+
+/** A map set document of these Features. */
+export const setOf = (id: string, ...features: ReturnType<typeof featureOf>[]) => ({
+  type: 'FeatureCollection' as const,
+  version: 2,
+  id,
+  title: id,
+  features,
+});
+
+export interface Segment {
   a: { x: number; y: number };
   b: { x: number; y: number };
   /** The CSS px offsets of the two ends from their world points. */
@@ -72,8 +145,8 @@ export interface Instance {
   span: number[];
 }
 
-/** The instances of a lines batch, as they were packed. */
-export function instances(batch: Batch): Instance[] {
+/** The segments of a lines batch, as they were packed. */
+export function segments(batch: Batch): Segment[] {
   const d = batch.data;
   return Array.from({ length: batch.count }, (_, i) => {
     const o = i * LINE_STRIDE;
@@ -88,6 +161,27 @@ export function instances(batch: Batch): Instance[] {
       pattern: Array.from(d.subarray(o + 10, o + 14)),
       color: Array.from(d.subarray(o + 14, o + 18)),
       span: Array.from(d.subarray(o + 18, o + 22)),
+    };
+  });
+}
+
+/** The ends of each segment of a lines batch as short strings: `x,y>x,y`. */
+export const edges = (batch: Batch): string[] =>
+  segments(batch).map(({ a, b }) => `${a.x},${a.y}>${b.x},${b.y}`);
+
+/** The old names of the segment decoder. */
+export type Instance = Segment;
+export const instances = segments;
+
+/** The markers of a markers batch, as they were packed. */
+export function markers({ data, count }: Batch) {
+  return Array.from({ length: count }, (_, i) => {
+    const o = i * MARKER_STRIDE;
+    return {
+      at: { x: data[o] ?? 0, y: data[o + 1] ?? 0 },
+      size: data[o + 4] ?? 0,
+      shape: data[o + 5] ?? 0,
+      color: Array.from(data.subarray(o + 6, o + 10)),
     };
   });
 }
@@ -115,6 +209,30 @@ export function glyphs(batch: Batch) {
   });
 }
 
+/** What a text batch says, glyph after glyph. */
+export const spelled = (batch: Batch): string =>
+  glyphs(batch)
+    .map((g) => g.char)
+    .join('');
+
+/** The text runs of a batch: the glyphs that share an anchor, read in order. */
+export function textRuns(batch: Batch) {
+  const runs: { text: string; at: { x: number; y: number }; glyphs: ReturnType<typeof glyphs> }[] =
+    [];
+  for (const glyph of glyphs(batch)) {
+    const last = runs.at(-1);
+    if (last && last.at.x === glyph.at.x && last.at.y === glyph.at.y) {
+      last.text += glyph.char;
+      last.glyphs.push(glyph);
+    } else runs.push({ text: glyph.char, at: glyph.at, glyphs: [glyph] });
+  }
+  return runs;
+}
+
+/** The CSS px a run of `chars` characters takes at `size` px in the fixture's atlas. */
+export const labelWidth = (chars: number, size = 9) =>
+  (chars * atlas.advance * size) / atlas.fontSize;
+
 /** The batches `redrawLabel` draws for the labels of these item keys, all of them by default. */
 export function redrawn(drawn: DrawnLabels, keys: readonly string[] = [...drawn.keys()]) {
   const out = { text: new TextBatch(atlas), strokes: new LineBatch() };
@@ -128,3 +246,191 @@ export function redrawn(drawn: DrawnLabels, keys: readonly string[] = [...drawn.
 /** Rows without their colour, in one order whatever order they were drawn in. */
 export const withoutColor = (rows: readonly object[]): string[] =>
   rows.map((row) => JSON.stringify({ ...row, color: undefined })).toSorted();
+
+/** What a scene reads that a test varies. */
+export interface SceneOptions {
+  /** The chart layers that draw; all of them by default. */
+  layers?: readonly Layer[];
+  /** The state of each layer; every layer shown but the items in `hidden` by default. */
+  stateOf?: (layer: Layer) => LayerState;
+  /** The keys of the items that are not drawn. */
+  hidden?: readonly string[];
+  /** Whether the navaids are within their range. */
+  inRange?: boolean;
+  density?: LabelDensity;
+  /** The settled scale, px per unit of the plane. */
+  scale?: number;
+  project?: (lat: number, lon: number) => { x: number; y: number };
+  declinationAt?: () => Declination;
+  placeOf?: (item: ChartItem) => AreaPlace | undefined;
+  /** What the labels showed before, kept between scenes that share it. */
+  shown?: ShownMemory;
+  /** Called each time the scene reads the points that draw. */
+  onPointsRead?: () => void;
+}
+
+const CHART_LAYERS = DRAW_STACK.filter(isChartLayer);
+type Slice = (typeof CHART_SLICES)[number];
+
+/** One batch of many: their instances in order. */
+function joined(kind: Batch['kind'], batches: readonly Batch[]): Batch {
+  const data = new Float32Array(batches.reduce((n, b) => n + b.data.length, 0));
+  let at = 0;
+  for (const batch of batches) {
+    data.set(batch.data, at);
+    at += batch.data.length;
+  }
+  return { kind, data, count: batches.reduce((n, b) => n + b.count, 0) };
+}
+
+/** The batch at `index` of a build, which must be there. */
+function batchAt(built: readonly Batch[], index: number, what: string): Batch {
+  const batch = built[index];
+  if (!batch) throw new Error(`${what} built no batch ${index}`);
+  return batch;
+}
+
+/**
+ * The scene of a chart as the scope builds it: what draws, the points that stand, and each
+ * slice's shapes and labels. Everything a test reads of a build goes through here.
+ */
+export function sceneOf(chart: Chart, options: SceneOptions = {}) {
+  const {
+    layers = CHART_LAYERS,
+    hidden = [],
+    stateOf = () => shownExcept(...hidden),
+    inRange = true,
+    density = 'dense',
+    scale = 1000,
+    project: plane = project,
+    declinationAt = () => () => 0,
+    placeOf = (item: ChartItem) => areaPlaceOf(item, plane),
+    shown = new Map() as ShownMemory,
+    onPointsRead = () => {},
+  } = options;
+  const topology = topologyOf(chart);
+  const drawn = drawnItemsOf(chart, layers, stateOf, () => inRange);
+  const drawnIn = (among: readonly Layer[]) => drawn.filter((i) => among.includes(i.layer));
+  const drawnPoints = () => {
+    onPointsRead();
+    return drawnPointsOf(topology, drawnIn(POINT_LAYERS));
+  };
+  const inputOf = (slice: Slice, narrowed: readonly Layer[] = layers) => {
+    const among = slice.layers.filter((l) => layers.includes(l) && narrowed.includes(l));
+    return {
+      topology,
+      drawnPoints,
+      project: plane,
+      layers: among,
+      drawnItems: drawnIn(among),
+    };
+  };
+  const labelsMade = new Map<Slice, BuiltLabels>();
+  const labelsOf = (slice: Slice): BuiltLabels => {
+    const known = labelsMade.get(slice);
+    if (known) return known;
+    const made = buildSliceLabels(slice, {
+      ...inputOf(slice),
+      labelDensity: density,
+      atlas,
+      settledScale: () => scale,
+      placeOf,
+      shown,
+    });
+    labelsMade.set(slice, made);
+    return made;
+  };
+  const sliceOf = (labels: Slice['labels']) => {
+    const slice = CHART_SLICES.find((s) => s.labels === labels);
+    if (!slice) throw new Error(`no slice has ${labels}`);
+    return slice;
+  };
+  const shapesOf = (slice: Slice, narrowed?: readonly Layer[]) =>
+    buildShapes(inputOf(slice, narrowed), declinationAt);
+
+  /** The batches that light an item's label: gaps, text, then segments. */
+  const highlight = (item: ChartItem) => {
+    const slice = CHART_SLICES.find((s) => s.layers.some((l) => l === item.layer));
+    const record = slice && labelsOf(slice).drawn?.get(item.key);
+    const [gaps, text, strokes] = buildHighlight(item, record, {
+      spanLabels: labelsOf(sliceOf('routeLabels')).spanLabels ?? new Map(),
+      topology,
+      drawnPoints,
+      project: plane,
+      atlas,
+      placeOf,
+    });
+    return { gaps, text, strokes };
+  };
+
+  return {
+    /** The lines and markers of the chart, back to front; of `narrowed` layers alone when given. */
+    shapes(narrowed?: readonly Layer[]) {
+      const built = CHART_SLICES.map((slice) => shapesOf(slice, narrowed));
+      return {
+        lines: joined(
+          'lines',
+          built.map((b) => b.lines),
+        ),
+        markers: joined(
+          'markers',
+          built.map((b) => b.markers),
+        ),
+      };
+    },
+    /** The idents of the points. */
+    pointLabels() {
+      const built = labelsOf(sliceOf('pointLabels')).batches;
+      return { text: batchAt(built, 0, 'the point labels') };
+    },
+    /** The route labels: the gaps cut in the lines, the text, the chevrons. */
+    routeLabels() {
+      const built = labelsOf(sliceOf('routeLabels')).batches;
+      const at = (index: number) => batchAt(built, index, 'the route labels');
+      return { gaps: at(0), text: at(1), chevrons: at(2) };
+    },
+    /** The area labels: the text and the rules of the fractions. */
+    areaLabels() {
+      const built = labelsOf(sliceOf('areaLabels')).batches;
+      return {
+        text: batchAt(built, 0, 'the area labels'),
+        rules: batchAt(built, 1, 'the area labels'),
+      };
+    },
+    highlight,
+    /** What the tree's pointing and the search add over the chart. */
+    traces({
+      pointedAt,
+      searched,
+    }: {
+      pointedAt: ChartItem | null;
+      searched: readonly ChartItem[];
+    }) {
+      const lit = pointedAt ? highlight(pointedAt) : undefined;
+      const { traces, tracedPoints } = buildTraces({
+        pointedAt,
+        searched,
+        highlight: lit ? [lit.gaps, lit.text, lit.strokes] : [],
+        project: plane,
+        declinationAt,
+      });
+      return {
+        searched: { lines: traces[0], strokes: tracedPoints[0], markers: tracedPoints[1] },
+        pointed: { lines: traces[1], strokes: tracedPoints[2], markers: tracedPoints[3] },
+        /** The highlight a route or an area has among the traces, under the chart's points. */
+        litTraces: traces.slice(2),
+        /** The highlight a point has among the traced points, over the chart's own. */
+        litPoints: tracedPoints.slice(4),
+      };
+    },
+    /** Every slot of the chart, as the scope files them. */
+    slots(): Slots {
+      const slots: Slots = {};
+      for (const slice of CHART_SLICES) {
+        Object.assign(slots, shapeSlots(slice, shapesOf(slice)));
+        Object.assign(slots, labelSlots(slice, labelsOf(slice).batches));
+      }
+      return slots;
+    },
+  };
+}

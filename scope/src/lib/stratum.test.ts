@@ -1,12 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import { partOf, point, sectorPart } from '../render/scene/chartFixture';
 import type { ItemPart } from './chart';
 import { bandOf, fractionOf, isUpperStratum, limitInHundreds, stratumTag } from './stratum';
-
-const area = (lower?: string): ItemPart => ({
-  geometry: { type: 'Polygon', coordinates: [] },
-  properties: { layer: 'sector', name: 'X', ...(lower ? { lower } : {}) },
-});
 
 describe('isUpperStratum', () => {
   it('holds for a lower limit above the surface, and for nothing else', () => {
@@ -24,7 +20,7 @@ describe('isUpperStratum', () => {
     ];
 
     // Act
-    const verdicts = rows.map(([lower]) => isUpperStratum(area(lower)));
+    const verdicts = rows.map(([lower]) => isUpperStratum(sectorPart(lower)));
 
     // Assert
     expect(verdicts).toEqual(rows.map(([, expected]) => expected));
@@ -32,27 +28,14 @@ describe('isUpperStratum', () => {
 
   it('does not hold for a part without limits, such as a point', () => {
     // Arrange
-    const point: ItemPart = {
-      geometry: { type: 'Point', coordinates: [139.78, 35.55] },
-      properties: { layer: 'ad', id: 'QAAA' },
-    };
+    const pointPart = partOf('ad', point([139.78, 35.55]));
 
     // Act
-    const verdict = isUpperStratum(point);
+    const verdict = isUpperStratum(pointPart);
 
     // Assert
     expect(verdict).toBe(false);
   });
-});
-
-const sector = (lower?: string, upper?: string): ItemPart => ({
-  geometry: { type: 'Polygon', coordinates: [] },
-  properties: {
-    layer: 'sector',
-    name: 'X',
-    ...(lower ? { lower } : {}),
-    ...(upper ? { upper } : {}),
-  },
 });
 
 describe('stratumTag', () => {
@@ -97,7 +80,7 @@ describe('stratumTag', () => {
 
     // Act
     const tags = rows.map(([, bands]) =>
-      stratumTag(bands.map(([lower, upper]) => sector(lower, upper))),
+      stratumTag(bands.map(([lower, upper]) => sectorPart(lower, upper))),
     );
 
     // Assert
@@ -109,12 +92,12 @@ describe('bandOf', () => {
   it('takes the lowest lower and the highest upper limit over the parts, in feet', () => {
     // Arrange
     const rows: [ItemPart[], { lower: string; upper: string }][] = [
-      [[sector('SFC', 'FL240'), sector('SFC', 'FL160')], { lower: 'SFC', upper: 'FL240' }],
+      [[sectorPart('SFC', 'FL240'), sectorPart('SFC', 'FL160')], { lower: 'SFC', upper: 'FL240' }],
       [
-        [sector('5000FT', '12000FT'), sector('FL095', 'FL100')],
+        [sectorPart('5000FT', '12000FT'), sectorPart('FL095', 'FL100')],
         { lower: '5000FT', upper: '12000FT' },
       ],
-      [[sector(), sector()], { lower: 'SFC', upper: 'UNL' }],
+      [[sectorPart(), sectorPart()], { lower: 'SFC', upper: 'UNL' }],
     ];
 
     // Act
@@ -153,12 +136,12 @@ describe('fractionOf', () => {
   it('writes the item band as upper over lower, and nothing for an item with no limits', () => {
     // Arrange
     const rows: [ItemPart[], { upper: string; lower: string } | undefined][] = [
-      [[sector('SFC', 'FL240'), sector('SFC', 'FL160')], { upper: '240', lower: 'SFC' }],
-      [[sector('SFC', '3000FT')], { upper: '030', lower: 'SFC' }],
-      [[sector('GND', '12000FT')], { upper: '120', lower: 'SFC' }],
-      [[sector(undefined, 'FL335')], { upper: '335', lower: 'SFC' }],
-      [[sector('FL335')], { upper: 'UNL', lower: '335' }],
-      [[sector(), sector()], undefined],
+      [[sectorPart('SFC', 'FL240'), sectorPart('SFC', 'FL160')], { upper: '240', lower: 'SFC' }],
+      [[sectorPart('SFC', '3000FT')], { upper: '030', lower: 'SFC' }],
+      [[sectorPart('GND', '12000FT')], { upper: '120', lower: 'SFC' }],
+      [[sectorPart(undefined, 'FL335')], { upper: '335', lower: 'SFC' }],
+      [[sectorPart('FL335')], { upper: 'UNL', lower: '335' }],
+      [[sectorPart(), sectorPart()], undefined],
     ];
 
     // Act

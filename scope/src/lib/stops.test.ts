@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { Chart } from './chart';
-import type { LonLat } from './mapdata';
+import type { Position } from '../render/scene/chartFixture';
+import { airway } from '../render/scene/chartFixture';
 import type { PointLayer } from './mapsetFormat';
 import { type Cuts, NO_CUTS, spanIdentity, spansOf, STOP_CLEARANCE_PX, stopCuts } from './stops';
 import { type ChartPoint, topologyOf } from './topology';
@@ -56,7 +56,7 @@ describe('stopCuts', () => {
   });
 });
 
-const line: LonLat[] = [
+const line: Position[] = [
   [130.1, 33.7],
   [130.2, 33.7],
   [130.3, 33.7],
@@ -64,18 +64,7 @@ const line: LonLat[] = [
   [130.5, 33.7],
 ];
 
-const routeOf = (coordinates: LonLat[]): Chart => [
-  {
-    key: 'R',
-    layer: 'conv',
-    parts: [
-      {
-        geometry: { type: 'LineString', coordinates },
-        properties: { layer: 'conv', name: 'R' },
-      },
-    ],
-  },
-];
+const routeOf = (coordinates: Position[]) => [airway('conv', 'R', ...coordinates)];
 
 const span = (from: number, to: number, cutBack: number, cutAhead: number) => ({
   from,
@@ -133,11 +122,11 @@ describe('spansOf', () => {
 describe('spanIdentity', () => {
   it('names a span by its positions in either direction, and tells partial overlaps apart', () => {
     // Arrange
-    const a: LonLat = [130.1, 33.7];
-    const b: LonLat = [130.2, 33.7];
-    const c: LonLat = [130.3, 33.7];
-    const d: LonLat = [130.4, 33.7];
-    const routes: LonLat[][] = [
+    const a: Position = [130.1, 33.7];
+    const b: Position = [130.2, 33.7];
+    const c: Position = [130.3, 33.7];
+    const d: Position = [130.4, 33.7];
+    const routes: Position[][] = [
       [a, b, c],
       [c, b, a],
       [a, b, c, d],
@@ -145,16 +134,7 @@ describe('spanIdentity', () => {
       [d, c, b],
       [a, b, c],
     ];
-    const chart: Chart = routes.map((coordinates, i) => ({
-      key: `R${i}`,
-      layer: 'conv',
-      parts: [
-        {
-          geometry: { type: 'LineString', coordinates },
-          properties: { layer: 'conv', name: `R${i}` },
-        },
-      ],
-    }));
+    const chart = routes.map((coordinates, i) => airway('conv', `R${i}`, ...coordinates));
     const { paths } = topologyOf(chart).routes;
     const whole = (i: number) => ({ from: 0, to: (paths[i]?.vertices.length ?? 1) - 1 });
 
