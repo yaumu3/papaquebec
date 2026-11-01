@@ -42,7 +42,7 @@ interface Rule {
 }
 
 /** What an area's label says, as rows of runs and the rules between them, and how wide it is. */
-export interface Block {
+interface Block {
   rows: Row[];
   rules: Rule[];
   width: number;

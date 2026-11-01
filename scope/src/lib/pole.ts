@@ -17,7 +17,7 @@ export function ringArea(ring: readonly Vec2[]): number {
 }
 
 /** A point inside a polygon and the distance from it to the nearest edge. */
-export interface Pole {
+interface Pole {
   at: Vec2;
   room: number;
 }

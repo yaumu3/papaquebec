@@ -14,7 +14,7 @@ import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
 import { drawRuns, partsOf, routeCuts } from './runs';
 
-export interface ShapesInput {
+interface ShapesInput {
   topology: Topology;
   /** The points that draw; read only for a point layer among `layers`, or when a route item draws. */
   drawnPoints: () => readonly ChartPoint[];

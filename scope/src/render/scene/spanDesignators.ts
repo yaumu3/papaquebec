@@ -65,7 +65,7 @@ export interface Entry {
 type Entries = Map<string, Entry>;
 
 /** What the stages read: the build's input, the cuts at the stops and the text to measure. */
-export interface Stage extends LabelsInput {
+interface Stage extends LabelsInput {
   cuts: Cuts;
   shown: ShownMemory;
   scale: number;

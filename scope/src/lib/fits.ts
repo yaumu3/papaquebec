@@ -1,7 +1,7 @@
 /** The room test for a label: shown when there is room, with a margin so it does not flicker. */
 
 /** How much more than its threshold a hidden label needs to show again. */
-export const SHOW_RATIO = 1.1;
+const SHOW_RATIO = 1.1;
 
 /** Whether each label, by key, was shown the last time it was tested. */
 export type ShownMemory = Map<string, boolean>;

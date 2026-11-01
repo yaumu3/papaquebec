@@ -51,13 +51,13 @@ export const isStyled = (layer: ScopeLayer) => layer !== 'hold' && !isScopeMade(
  * The layers of the airways, which ENR 3 of the AIP lists: a route a pilot files by its
  * designator. Direct routes and procedures are not airways.
  */
-export const AIRWAY_LAYERS = ['conv', 'rnav'] as const satisfies readonly Layer[];
+const AIRWAY_LAYERS = ['conv', 'rnav'] as const satisfies readonly Layer[];
 
 export const isAirwayLayer = (layer: ScopeLayer): layer is (typeof AIRWAY_LAYERS)[number] =>
   (AIRWAY_LAYERS as readonly ScopeLayer[]).includes(layer);
 
 /** The layers of the procedures, which AD 2.22 of the AIP lists: departures, arrivals, transitions. */
-export const PROCEDURE_LAYERS = ['sid', 'star', 'trans'] as const satisfies readonly Layer[];
+const PROCEDURE_LAYERS = ['sid', 'star', 'trans'] as const satisfies readonly Layer[];
 
 export const isProcedureLayer = (layer: ScopeLayer): layer is (typeof PROCEDURE_LAYERS)[number] =>
   (PROCEDURE_LAYERS as readonly ScopeLayer[]).includes(layer);

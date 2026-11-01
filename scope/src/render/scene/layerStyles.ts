@@ -17,7 +17,7 @@ export interface LabelStyle {
 }
 
 /** A point's ident hangs off its marker. */
-export interface PointLabelStyle extends LabelStyle {
+interface PointLabelStyle extends LabelStyle {
   /** CSS px from the anchor. */
   px: number;
   py: number;
