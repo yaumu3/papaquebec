@@ -38,6 +38,18 @@ export const SLOT_ORDER = [
 ] as const;
 
 export type SlotName = (typeof SLOT_ORDER)[number];
+
+/**
+ * The slots of the map's labels, in draw order. The renderer rims all their glyphs with halos
+ * before it draws any glyph, so no halo covers the ink of a label of another slot.
+ */
+export const LABEL_SLOTS: readonly SlotName[] = [
+  'ringLabels',
+  'areaLabels',
+  'routeLabels',
+  'pointLabels',
+];
+
 /** The batches a builder hands the renderer, by the slots it fills. */
 export type Slots = Partial<Record<SlotName, Batch[]>>;
 

@@ -7,7 +7,7 @@ import {
   TEXT_STRIDE,
   type View,
 } from '../protocol';
-import { SLOT_ORDER, type SlotName } from '../slots';
+import { LABEL_SLOTS, SLOT_ORDER, type SlotName } from '../slots';
 import { webgpuMissingReason } from './availability';
 import { BG_RGBA, LINE_SHADER, MARKER_SHADER, TEXT_SHADER, VIEW_UNIFORM_BYTES } from './shaders';
 
@@ -15,14 +15,40 @@ import { BG_RGBA, LINE_SHADER, MARKER_SHADER, TEXT_SHADER, VIEW_UNIFORM_BYTES } 
 const BG: GPUColor = { r: BG_RGBA[0], g: BG_RGBA[1], b: BG_RGBA[2], a: 1 };
 const SAMPLE_COUNT = 4;
 
-/** The pipelines that draw a batch, in order: a text batch rims its glyphs before drawing them. */
-export const PASSES = {
-  lines: ['lines'],
-  markers: ['markers'],
-  text: ['halo', 'text'],
-} as const satisfies Record<BatchKind, readonly string[]>;
+/** A pipeline: one per batch kind, and the halo pass of text. */
+type Pass = BatchKind | 'halo';
 
-type Pass = (typeof PASSES)[BatchKind][number];
+/** One draw call: the pass over the `index`th batch of a slot. */
+interface DrawStep {
+  slot: SlotName;
+  index: number;
+  pass: Pass;
+}
+
+/**
+ * The draw calls in order: the slots back to front, except that the halos of every text batch
+ * of the label slots come first, where the first of them would draw, and their glyphs follow in
+ * slot order. Text elsewhere draws no halo.
+ */
+export function drawSteps(
+  slots: ReadonlyMap<SlotName, readonly { kind: BatchKind }[]>,
+): DrawStep[] {
+  const batchesOf = (slot: SlotName) => slots.get(slot) ?? [];
+  const steps: DrawStep[] = [];
+  for (const slot of SLOT_ORDER) {
+    if (slot === LABEL_SLOTS[0]) {
+      for (const labels of LABEL_SLOTS) {
+        batchesOf(labels).forEach(({ kind }, index) => {
+          if (kind === 'text') steps.push({ slot: labels, index, pass: 'halo' });
+        });
+      }
+    }
+    batchesOf(slot).forEach(({ kind }, index) => {
+      steps.push({ slot, index, pass: kind });
+    });
+  }
+  return steps;
+}
 
 interface GpuBatch {
   kind: BatchKind;
@@ -271,19 +297,16 @@ export class GpuRenderer {
       ],
     });
     pass.setBindGroup(0, this.viewBindGroup);
-    for (const name of SLOT_ORDER) {
-      for (const b of this.slots.get(name) ?? []) {
-        if (b.count === 0) continue;
-        if (b.kind === 'text') {
-          if (!this.atlasBindGroup) continue;
-          pass.setBindGroup(1, this.atlasBindGroup);
-        }
-        pass.setVertexBuffer(0, b.buffer);
-        for (const pipeline of PASSES[b.kind]) {
-          pass.setPipeline(this.pipelines[pipeline]);
-          pass.draw(6, b.count);
-        }
+    for (const step of drawSteps(this.slots)) {
+      const b = this.slots.get(step.slot)?.[step.index];
+      if (!b || b.count === 0) continue;
+      if (b.kind === 'text') {
+        if (!this.atlasBindGroup) continue;
+        pass.setBindGroup(1, this.atlasBindGroup);
       }
+      pass.setVertexBuffer(0, b.buffer);
+      pass.setPipeline(this.pipelines[step.pass]);
+      pass.draw(6, b.count);
     }
     pass.end();
     this.device.queue.submit([encoder.finish()]);
