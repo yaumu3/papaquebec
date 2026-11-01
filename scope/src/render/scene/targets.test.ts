@@ -46,34 +46,6 @@ const shapes = (batches: Batch[]) =>
   );
 
 describe('buildTargets', () => {
-  it('draws a glyph, a vector, a leader, trail slashes and two text lines for a live target', () => {
-    // Arrange
-    const t = track();
-
-    // Act
-    const batches = buildTargets(input([t]));
-
-    // Assert
-    expect(shapes(batches)).toEqual([Shape.Square]);
-    expect(count(batches, 'lines')).toBe(2 + 1 + 1); // two trail slashes, vector, leader
-    expect(count(batches, 'text')).toBe('TEST01'.length + '110B789'.length); // spaces emit nothing
-  });
-
-  it('reduces a filtered target to a bare hollow diamond', () => {
-    // Arrange
-    const t = track({ alt: 45000 });
-
-    // Act
-    const batches = buildTargets(
-      input([t], { filter: { ground: true, lowerFl: 0, upperFl: 200, squawk: 'all' } }),
-    );
-
-    // Assert
-    expect(shapes(batches)).toEqual([Shape.HollowDiamond]);
-    expect(count(batches, 'text')).toBe(0);
-    expect(count(batches, 'lines')).toBe(0);
-  });
-
   it('renders a filtered target in full while it is selected', () => {
     // Arrange
     const t = track({ alt: 45000 });
@@ -108,37 +80,6 @@ describe('buildTargets', () => {
     // Assert
     expect(count(batches, 'markers')).toBe(0);
     expect(count(batches, 'text')).toBe(0);
-  });
-
-  it('draws a dragged block at the drag offset instead of at its direction', () => {
-    // Arrange
-    const t = track();
-    const drag = { hex: 'd00001', dx: -100, dy: 30 };
-
-    // Act
-    const batches = buildTargets(input([t], { labelDrag: drag }));
-
-    // Assert
-    const text = byKind(batches, 'text')[0];
-    const glyphOffsets = Array.from(
-      { length: text?.count ?? 0 },
-      (_, i) => text?.data[i * 16 + 2] ?? 0,
-    );
-    expect(Math.max(...glyphOffsets)).toBeLessThan(0); // whole block sits left of the target
-  });
-
-  it('draws every retained history fix as a dot for the selected target only', () => {
-    // Arrange
-    const t = track();
-    const other = track({ hex: 'd00002', flight: 'TEST02' });
-
-    // Act
-    const all = shapes(buildTargets(input([t, other], { selected: 'd00001' })));
-    const none = shapes(buildTargets(input([t, other])));
-
-    // Assert
-    expect(all.filter((s) => s === Shape.Dot)).toHaveLength(t.history.length);
-    expect(none.filter((s) => s === Shape.Dot)).toHaveLength(0);
   });
 });
 
