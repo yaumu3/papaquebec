@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { filterOf, settled } from './run';
+import { filterOf, orphansAmong, settled, unknownFilters } from './run';
 
 const NAMES = ['block/level', 'block/hovered', 'map/default'];
 
@@ -30,6 +30,49 @@ describe('filterOf', () => {
       ['block/level', 'block/hovered'],
       ['block/level', 'block/hovered'],
     ]);
+  });
+});
+
+describe('unknownFilters', () => {
+  it('names each filter that takes nothing, even beside one that takes something', () => {
+    // Arrange
+    const only = ['block', 'blocks', 'map/defaul', 'block/level/'];
+
+    // Act
+    const unknown = unknownFilters(only, NAMES);
+
+    // Assert
+    expect(unknown).toEqual(['blocks', 'map/defaul']);
+  });
+
+  it('finds nothing to say without a filter', () => {
+    // Arrange
+    const only = undefined;
+
+    // Act
+    const unknown = unknownFilters(only, NAMES);
+
+    // Assert
+    expect(unknown).toEqual([]);
+  });
+});
+
+describe('orphansAmong', () => {
+  it('finds the baselines no name takes, leaving failed runs and other files alone', () => {
+    // Arrange
+    const paths = [
+      'block/level.png',
+      'block/gone.png',
+      'block/level.actual.png',
+      'block/level.diff.png',
+      'Dockerfile',
+    ];
+
+    // Act
+    const orphans = orphansAmong(paths, NAMES);
+
+    // Assert
+    expect(orphans).toEqual(['block/gone.png']);
   });
 });
 

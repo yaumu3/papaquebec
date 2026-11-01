@@ -9,7 +9,15 @@
  * Runs in the pinned container: use `mise run check:visual`, or `bun run visual --update` to
  * rewrite the baselines.
  */
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -18,7 +26,7 @@ import { PNG } from 'pngjs';
 
 import { launch, openScope, startPreview } from '../headless/browser';
 import { compareImages, cropImage, type Image, type Limits } from './imageDiff';
-import { filterOf, settled } from './run';
+import { filterOf, orphansAmong, settled, unknownFilters } from './run';
 import { SITE, type Step, type Visit, VISITS } from './shots';
 import { fixedPlacer, type Flight, listedAs, replayWorker, trafficEvents } from './traffic';
 
@@ -167,6 +175,12 @@ const { values: opt } = parseArgs({
 
 const namesOf = ({ steps }: Visit) =>
   steps.flatMap((step) => (step.name ? [step.name] : (step.crops ?? []).map((c) => c.name)));
+const names = VISITS.flatMap(namesOf);
+const unknown = unknownFilters(opt.only, names);
+if (unknown.length > 0) {
+  console.error(`no shot or folder is named ${unknown.join(', ')}`);
+  process.exit(1);
+}
 const chosen = filterOf(opt.only);
 const visits = VISITS.filter((visit) => namesOf(visit).some(chosen));
 
@@ -196,6 +210,8 @@ async function run(browser: Browser): Promise<string[]> {
   return failures;
 }
 
+const baselines = () => readdirSync('visual', { recursive: true, encoding: 'utf8' });
+
 servedCopy();
 const preview = await startPreview(URL_SERVED, SERVED);
 const browser = await launch();
@@ -203,7 +219,9 @@ const failures = await run(browser).finally(async () => {
   await browser.close();
   preview.stop();
 });
-if (failures.length > 0) {
-  console.error(failures.join('\n'));
+const orphans = opt.only ? [] : orphansAmong(baselines(), names);
+const stale = orphans.map((path) => `${path}: no shot takes it`);
+if (failures.length + stale.length > 0) {
+  console.error([...failures, ...stale].join('\n'));
   process.exit(1);
 }

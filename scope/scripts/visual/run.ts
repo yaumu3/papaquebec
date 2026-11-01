@@ -13,6 +13,19 @@ export const filterOf =
   (name: string): boolean =>
     !only || only.some((filter) => taking(trimmed(filter), name));
 
+/** The filters that take none of `names`: a typing error, not a run that passed. */
+export const unknownFilters = (
+  only: readonly string[] | undefined,
+  names: readonly string[],
+): string[] =>
+  (only ?? []).filter((filter) => !names.some((name) => taking(trimmed(filter), name)));
+
+/** Among the paths in the baselines' folder, the baselines no name takes. */
+export const orphansAmong = (paths: readonly string[], names: readonly string[]): string[] =>
+  paths
+    .filter((path) => /(?<!\.actual|\.diff)\.png$/.test(path))
+    .filter((path) => !names.includes(path.replace(/\.png$/, '')));
+
 interface Settling {
   pause: () => Promise<void>;
   /** The further shots to take before giving up. */
