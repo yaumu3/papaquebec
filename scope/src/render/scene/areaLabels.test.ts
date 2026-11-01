@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, chartOf } from '../../lib/chart';
+import type { ShownMemory } from '../../lib/fits';
 import { distanceToSegment } from '../../lib/geo';
 import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
@@ -11,6 +12,7 @@ import { shownExcept } from '../../lib/visibilityFixture';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { buildAreaLabels } from './areaLabels';
 import { atlas } from './atlasFixture';
+import type { FitInput } from './chart';
 import {
   glyphs,
   itemOf,
@@ -29,6 +31,7 @@ function build(
   layers: readonly StyledLayer[],
   labelDensity: LabelDensity = 'dense',
   hidden: string[] = [],
+  fit: FitInput = { settledScale: () => 1000, shown: new Map() },
 ) {
   const topology = topologyOf(items);
   const drawnItems = drawnItemsOf(
@@ -47,6 +50,7 @@ function build(
     labelDensity,
     atlas,
     placeOf: (item) => areaPlaceOf(item, project),
+    ...fit,
   });
   if (!text) throw new Error('buildAreaLabels returned no batch');
   return text;
@@ -95,6 +99,14 @@ const labelledAt = (layer: StyledLayer, d: LabelDensity) => {
   return first !== null && rank(d) >= rank(first) ? 1 : 0;
 };
 const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
+
+/** An item named PAPAQ of one shape. */
+const place = (shape: ReturnType<typeof polygon>) => [
+  keyed('PAPAQ', itemOf('tma', partOf('tma', shape, { name: 'PAPAQ' }))),
+];
+/** Whether the name is drawn at a settled scale, given what was shown before. */
+const drawn = (shape: ReturnType<typeof polygon>, scale: number, shown: ShownMemory) =>
+  build(place(shape), ['tma'], 'dense', [], { settledScale: () => scale, shown }).count > 0;
 
 describe('buildAreaLabels', () => {
   const el: Position[] = [
@@ -210,5 +222,62 @@ describe('buildAreaLabels', () => {
     // Assert
     expect(colours).toEqual(rows.map(([, hex]) => packed(hex)));
     expect(hidden.count).toBe(0);
+  });
+
+  describe('at the settled scale', () => {
+    const square: Position[] = [
+      [0, 0],
+      [2, 0],
+      [2, 2],
+      [0, 2],
+      [0, 0],
+    ];
+    const threshold = (atlas.advance * 9 * 'PAPAQ'.length) / atlas.fontSize / 2;
+    it('drops the name of an area too small for it, and shows it once it has room', () => {
+      // Arrange
+      const rows: [number, boolean][] = [
+        [0.5 * threshold, false],
+        [4 * threshold, true],
+      ];
+
+      // Act
+      const shown = rows.map(([scale]) => drawn(polygon(square), scale, new Map()));
+
+      // Assert
+      expect(shown).toEqual(rows.map(([, expected]) => expected));
+    });
+
+    it('keeps the state of a name between its thresholds', () => {
+      // Arrange
+      const rows: [number[], boolean][] = [
+        [[4, 1.05], true],
+        [[4, 1.05, 0.9], false],
+        [[0.9, 1.05], false],
+      ];
+      const memories = rows.map(([multiples]) => {
+        const shown: ShownMemory = new Map();
+        for (const m of multiples.slice(0, -1)) drawn(polygon(square), m * threshold, shown);
+        return shown;
+      });
+
+      // Act
+      const result = rows.map(([multiples], i) =>
+        drawn(polygon(square), (multiples.at(-1) ?? 0) * threshold, memories[i] ?? new Map()),
+      );
+
+      // Assert
+      expect(result).toEqual(rows.map(([, expected]) => expected));
+    });
+
+    it('names a line area at any scale', () => {
+      // Arrange
+      const scales = [0.01, 1000];
+
+      // Act
+      const shown = scales.map((scale) => drawn(line([0, 0], [4, 0]), scale, new Map()));
+
+      // Assert
+      expect(shown).toEqual([true, true]);
+    });
   });
 });
