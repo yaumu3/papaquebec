@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Vec2 } from './geo';
-import { lengthOf, midpointOf } from './polyline';
+import { lengthOf, midpointOf, readingAngle } from './polyline';
 
 describe('lengthOf', () => {
   it('sums the chords of a polyline', () => {
@@ -76,5 +76,27 @@ describe('midpointOf', () => {
       undefined,
       undefined,
     ]);
+  });
+});
+
+describe('readingAngle', () => {
+  it('turns a world direction to an upright screen angle, flipping what would read upside down', () => {
+    // Arrange
+    const cases: [Vec2, number, boolean][] = [
+      [{ x: 1, y: 0 }, 0, false],
+      [{ x: -1, y: 0 }, 0, true],
+      [{ x: 1, y: 1 }, -Math.PI / 4, false],
+      [{ x: -1, y: -1 }, -Math.PI / 4, true],
+      [{ x: 0, y: 1 }, -Math.PI / 2, false],
+      [{ x: 0, y: -1 }, Math.PI / 2, false],
+      [{ x: -2, y: 1 }, Math.atan(0.5), true],
+    ];
+
+    // Act
+    const readings = cases.map(([direction]) => readingAngle(direction));
+
+    // Assert
+    expect(readings.map((r) => r.flipped)).toEqual(cases.map(([, , flipped]) => flipped));
+    readings.forEach(({ angle }, i) => expect(angle).toBeCloseTo(cases[i]?.[1] ?? NaN, 12));
   });
 });

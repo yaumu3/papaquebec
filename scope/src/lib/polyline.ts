@@ -38,3 +38,21 @@ export function midpointOf(points: readonly Vec2[]): Midpoint | undefined {
   }
   return undefined;
 }
+
+/** A text angle on the screen, and whether it was turned half a circle to read upright. */
+export interface Reading {
+  /** Radians, clockwise from east, in CSS px with y down. */
+  angle: number;
+  flipped: boolean;
+}
+
+/**
+ * The angle text reads along a world direction (y up) on the screen. Beyond a quarter turn
+ * either way it would read upside down, so it is turned half a circle; exactly a quarter turn is
+ * kept.
+ */
+export function readingAngle({ x, y }: Vec2): Reading {
+  const angle = Math.atan2(-y, x);
+  if (Math.abs(angle) <= Math.PI / 2) return { angle, flipped: false };
+  return { angle: angle - Math.sign(angle) * Math.PI, flipped: true };
+}
