@@ -56,6 +56,21 @@ describe('drawSteps', () => {
     expect(steps.map((s) => `${s.slot}/${s.index}/${s.pass}`)).toEqual(expected);
   });
 
+  it("keeps a lit gap under the chart's symbols, and a traced symbol over them", () => {
+    // Arrange
+    const lit = held([
+      ['tracedPoints', ['markers']],
+      ['pointMarkers', ['markers']],
+      ['traces', ['lines']],
+    ]);
+
+    // Act
+    const steps = drawSteps(lit);
+
+    // Assert
+    expect(steps.map((step) => step.slot)).toEqual(['traces', 'pointMarkers', 'tracedPoints']);
+  });
+
   it('rims the text of a highlight just before its glyphs, over what the slot drew first', () => {
     // Arrange
     const highlighted = held([
