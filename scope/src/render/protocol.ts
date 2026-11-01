@@ -29,6 +29,7 @@ export const enum Shape {
   Dot = 6,
   Ring = 7,
   HollowSquare = 8,
+  Disc = 9,
 }
 
 /** Camera: world NM to CSS pixels. */

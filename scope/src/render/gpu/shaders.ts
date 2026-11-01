@@ -170,6 +170,7 @@ fn sdHexagon(p: vec2f) -> f32 {
     case 4u: { d = abs(sdTriangle(p)) - stroke; }                   // hollow triangle
     case 5u: { d = min(abs(sdHexagon(p)) - stroke, sdSquare(p * 5.0)); } // hexagon + dot
     case 6u: { d = sdCircle(p, 0.35); }                             // dot
+    case 9u: { d = sdCircle(p, 1.0); }                              // disc
     case 7u: { d = abs(sdCircle(p, 0.85)) - stroke; }               // ring
     default: { d = abs(sdSquare(p)) - stroke; }                     // hollow square
   }
