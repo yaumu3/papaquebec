@@ -391,103 +391,6 @@ describe('the time of an import', () => {
   });
 });
 
-describe('a chart read before a change', () => {
-  it('follows the built-in set arriving', () => {
-    // Arrange
-    const { sets } = created();
-    sets.topology();
-
-    // Act
-    sets.setBuiltinMapSet(parsed(builtIn));
-
-    // Assert
-    expect(idsOf(sets, 'fix')).toEqual(['NIMBA']);
-  });
-
-  it('follows an import', () => {
-    // Arrange
-    const { sets } = created();
-    sets.topology();
-
-    // Act
-    const out = importing(sets, fixes);
-
-    // Assert
-    expect(out.ok).toBe(true);
-    expect(idsOf(sets, 'fix')).toEqual(['TAVRO']);
-  });
-
-  it('follows a removal', () => {
-    // Arrange
-    const { sets } = created();
-    importing(sets, fixes);
-    sets.topology();
-
-    // Act
-    sets.removeMapSet('my-fixes');
-
-    // Assert
-    expect(idsOf(sets, 'fix')).toEqual([]);
-  });
-
-  it('follows a toggle', () => {
-    // Arrange
-    const rows = [
-      { identity: 'my-fixes', left: ['NIMBA'] },
-      { identity: BUILTIN_ID, left: ['TAVRO'] },
-    ].map(({ identity, left }) => {
-      const { sets } = created();
-      sets.setBuiltinMapSet(parsed(builtIn));
-      importing(sets, fixes);
-      sets.topology();
-      return { identity, left, sets };
-    });
-
-    // Act
-    for (const { sets, identity } of rows) sets.toggleMapSet(identity);
-
-    // Assert
-    expect(rows.map((r) => idsOf(r.sets, 'fix'))).toEqual(rows.map((r) => r.left));
-  });
-
-  it('follows a set turned back on', () => {
-    // Arrange
-    const rows = ['my-fixes', BUILTIN_ID].map((identity) => {
-      const { sets, storage } = created();
-      sets.setBuiltinMapSet(parsed(builtIn));
-      importing(sets, fixes);
-      sets.toggleMapSet(identity);
-      sets.topology();
-      return { identity, sets, storage };
-    });
-
-    // Act
-    for (const { sets, identity } of rows) sets.toggleMapSet(identity);
-
-    // Assert
-    expect(rows.map((r) => idsOf(r.sets, 'fix'))).toEqual([
-      ['TAVRO', 'NIMBA'],
-      ['TAVRO', 'NIMBA'],
-    ]);
-    expect(rows.map((r) => r.storage.getItem(MAPSETS_KEY))).toEqual([
-      '{"builtinEnabled":true}',
-      '{"builtinEnabled":true}',
-    ]);
-  });
-
-  it('follows the hydration', async () => {
-    // Arrange
-    const { sets } = created(spyStore([stored(more)]));
-    sets.topology();
-
-    // Act
-    await sets.hydrated;
-
-    // Assert
-    expect(idsOf(sets, 'navaid')).toEqual(['QDG']);
-  });
-});
-
 describe('importNote', () => {
   it('reports a failure or an unsaved import, and nothing for a clean one', async () => {
     // Arrange
@@ -544,16 +447,43 @@ describe('the topology of the chart', () => {
     expect(first.chart.map((item) => item.layer)).toEqual(['fix']);
   });
 
-  it('is rebuilt with the chart after a change to the sets', () => {
+  it('follows the sets through every change, read just before it', async () => {
     // Arrange
-    const { sets } = created();
-    importing(sets, fixes);
-    const before = sets.topology();
+    const withBoth = () => {
+      const made = created();
+      made.sets.setBuiltinMapSet(parsed(builtIn));
+      importing(made.sets, fixes);
+      return made.sets;
+    };
+    const offThenOn = (identity: string) => {
+      const sets = withBoth();
+      sets.toggleMapSet(identity);
+      return sets;
+    };
+    const stale = created(spyStore([stored(fixes)])).sets;
+    const arriving = created().sets;
+    const importingInto = created().sets;
+    const removingFrom = withBoth();
+    const switchedOff = withBoth();
+    const builtinOff = withBoth();
+    const backOn = offThenOn('my-fixes');
+    const builtinBackOn = offThenOn(BUILTIN_ID);
+    const rows: [ReturnType<typeof createMapSets>, () => unknown, string[]][] = [
+      [arriving, () => arriving.setBuiltinMapSet(parsed(builtIn)), ['NIMBA']],
+      [importingInto, () => importing(importingInto, fixes), ['TAVRO']],
+      [removingFrom, () => removingFrom.removeMapSet('my-fixes'), ['NIMBA']],
+      [switchedOff, () => switchedOff.toggleMapSet('my-fixes'), ['NIMBA']],
+      [builtinOff, () => builtinOff.toggleMapSet(BUILTIN_ID), ['TAVRO']],
+      [backOn, () => backOn.toggleMapSet('my-fixes'), ['TAVRO', 'NIMBA']],
+      [builtinBackOn, () => builtinBackOn.toggleMapSet(BUILTIN_ID), ['TAVRO', 'NIMBA']],
+      [stale, () => stale.hydrated, ['TAVRO']],
+    ];
+    for (const [sets] of rows) sets.topology();
 
     // Act
-    sets.toggleMapSet('my-fixes');
+    await Promise.all(rows.map(([, change]) => change()));
 
     // Assert
-    expect(sets.topology()).not.toBe(before);
+    expect(rows.map(([sets]) => idsOf(sets, 'fix'))).toEqual(rows.map(([, , ids]) => ids));
   });
 });

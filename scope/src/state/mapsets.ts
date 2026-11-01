@@ -8,7 +8,6 @@ import { BUILTIN_ID, MAPSET_VERSION } from '../lib/mapsetFormat';
 import { type Topology, topologyOf } from '../lib/topology';
 import { DEFAULT_MAPSETS, loadMapSets, saveMapSets } from './mapsetsPersist';
 import { type MapSetStore, openMapSetStore, type StoredMapSet } from './mapsetStore';
-import { versioned } from './versioned';
 
 export interface MapSet {
   identity: string;
@@ -32,6 +31,24 @@ export interface MapSets {
   importMapSet: (text: string) => ImportResult;
   toggleMapSet: (identity: string) => void;
   removeMapSet: (identity: string) => void;
+}
+
+/**
+ * The last result of `compute`, kept while `inputs` gives the same references in order: a memo
+ * that also holds under `bun test`, where `createMemo` never runs again, and that no change to
+ * the inputs can forget to renew.
+ */
+function byReference<I, T>(inputs: () => readonly I[], compute: (inputs: readonly I[]) => T) {
+  let cached: { inputs: readonly I[]; value: T } | null = null;
+  return (): T => {
+    const now = inputs();
+    const known = cached?.inputs;
+    if (cached && known?.length === now.length && now.every((input, i) => input === known[i])) {
+      return cached.value;
+    }
+    cached = { inputs: now, value: compute(now) };
+    return cached.value;
+  };
 }
 
 /** A stored record as a set, if it is one: its data passes the strict parse. */
@@ -73,13 +90,13 @@ export function createMapSets(
   });
 
   /** Read as plain data: a rebuild through store proxies tracks every coordinate. */
-  const topology = versioned(() =>
-    topologyOf(chartOf(store.sets.filter((s) => s.enabled).map((s) => unwrap(s.data)))),
+  const topology = byReference(
+    () => store.sets.filter((s) => s.enabled).map((s) => unwrap(s.data)),
+    (data) => topologyOf(chartOf(data)),
   );
 
-  /** After a change to the sets: the merge is stale, and the built-in flag goes to storage. */
+  /** After a change to the sets: the built-in flag goes to storage. */
   const commit = () => {
-    topology.invalidate();
     const builtin = store.sets.find((s) => s.builtin);
     if (storage) saveMapSets(storage, { builtinEnabled: builtin?.enabled ?? true });
   };
@@ -112,18 +129,16 @@ export function createMapSets(
           ...loaded.filter((s) => !sets.some((own) => own.identity === s.identity)),
         ]),
       );
-      topology.invalidate();
     })
     .catch(() => {});
 
   return {
     mapSets: () => store.sets,
-    topology: topology.get,
+    topology,
     hydrated,
     setBuiltinMapSet(data) {
       // Assigned whole, since a value set at its `data` path would merge into the placeholder.
       setStore('sets', (sets) => sets.map((set) => (set.builtin ? { ...set, data } : set)));
-      topology.invalidate();
     },
     importMapSet(text) {
       let raw: unknown;
@@ -162,7 +177,6 @@ export function createMapSets(
         void stored((open) => open.delete(identity));
       }
       setStore('sets', (sets) => sets.filter((s) => s.identity !== identity || s.builtin));
-      topology.invalidate();
     },
   };
 }
