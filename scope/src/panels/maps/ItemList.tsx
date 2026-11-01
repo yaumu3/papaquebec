@@ -5,7 +5,7 @@ import { cx } from '../../design/cx';
 import { itemKind } from '../../lib/chart';
 import { LAYER_TABLE } from '../../lib/layers';
 import type { ScopeLayer } from '../../lib/mapsetFormat';
-import { itemsIn, type TreeItem } from '../../lib/treeItems';
+import { itemsIn, type TreeItem } from '../../lib/tree';
 import { isItemShown, type LayerState } from '../../lib/visibility';
 import { layerState } from '../../state/drawn';
 import {

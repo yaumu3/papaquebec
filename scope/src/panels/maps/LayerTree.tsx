@@ -3,14 +3,14 @@ import { createMemo, For, type JSX, Show } from 'solid-js';
 import { cx } from '../../design/cx';
 import { LAYER_GROUPS, LAYER_TABLE } from '../../lib/layers';
 import type { ScopeLayer } from '../../lib/mapsetFormat';
-import { itemsIn } from '../../lib/treeItems';
 import {
+  itemsIn,
   groupCount,
   layerSummary,
   layerTitle,
   type RowState,
   rowStateOf,
-} from '../../lib/treeRows';
+} from '../../lib/tree';
 import { layerState } from '../../state/drawn';
 import {
   found,

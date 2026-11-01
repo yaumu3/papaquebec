@@ -1,6 +1,6 @@
 import { For } from 'solid-js';
 
-import { markedPieces } from '../../lib/treeSearch';
+import { markedPieces } from '../../lib/tree';
 import { terms } from '../../state/layerTree';
 
 /** A text with the part the search matched marked. */
