@@ -3,9 +3,9 @@ import { rememberFits } from '../../lib/fits';
 import { stacksOf } from '../../lib/labelStacks';
 import type { AreaPlace } from '../../lib/pole';
 import { limitFt, bandOf } from '../../lib/stratum';
-import type { Batch } from '../protocol';
 import { blockOf, putBlock, stackedBlock } from './areaBlocks';
 import type { FitInput, LabelsInput, PlaceInput } from './chart';
+import type { BuiltLabels } from './drawnLabels';
 import { LAYER_STYLES, labelReaches } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 
@@ -40,7 +40,7 @@ const stacksOfMembers = (members: Member[]): Member[][] =>
  * as one. A layer with no label style, or whose density the label density has not reached,
  * says nothing. A block needs half its width between the pole and the nearest edge, in px at
  * the settled scale; a line area has no edge to test and is always labelled. Returns the text,
- * then the rules of the fractions.
+ * then the rules of the fractions, and what each item's label drew.
  */
 export function buildAreaLabels({
   drawnItems,
@@ -50,8 +50,8 @@ export function buildAreaLabels({
   placeOf,
   settledScale,
   shown,
-}: LabelsInput & PlaceInput & FitInput): Batch[] {
-  const out = { text: new TextBatch(atlas), rules: new LineBatch() };
+}: LabelsInput & PlaceInput & FitInput): BuiltLabels {
+  const out = { text: new TextBatch(atlas), strokes: new LineBatch(), drawn: new Map() };
   const scale = settledScale();
   for (const layer of layers.toReversed()) {
     const label = LAYER_STYLES[layer].label;
@@ -71,5 +71,5 @@ export function buildAreaLabels({
       putBlock(block, first.place.at, out);
     }
   }
-  return [out.text.finish(), out.rules.finish()];
+  return { batches: [out.text.finish(), out.strokes.finish()], drawn: out.drawn };
 }

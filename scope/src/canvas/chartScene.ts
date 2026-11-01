@@ -49,7 +49,7 @@ export function showChart(show: Show, projected: () => boolean, settledScale: ()
               settledScale,
               placeOf: areaPlace,
               shown,
-            }),
+            }).batches,
           )
         : null,
     );

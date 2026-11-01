@@ -83,7 +83,7 @@ const labelsOf = (chart: Chart, slice: (typeof CHART_SLICES)[number], labelDensi
 function mapSlots(chart: Chart): Slots {
   const slots: Slots = {};
   for (const slice of CHART_SLICES) {
-    const labels = labelsOf(chart, slice, 'dense');
+    const labels = labelsOf(chart, slice, 'dense').batches;
     Object.assign(
       slots,
       shapeSlots(slice, shapesOf(chart, slice.layers)),

@@ -24,6 +24,8 @@ import {
   polygon,
   type Position,
   project,
+  redrawn,
+  withoutColor,
 } from './chartFixture';
 import { THEME } from './rules';
 
@@ -43,7 +45,10 @@ function built(
     () => true,
   );
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  const [text, rules] = buildAreaLabels({
+  const {
+    batches: [text, rules],
+    drawn,
+  } = buildAreaLabels({
     topology,
     drawnPoints,
     project,
@@ -55,7 +60,7 @@ function built(
     ...fit,
   });
   if (!text || !rules) throw new Error('buildAreaLabels returned too few batches');
-  return { text, rules };
+  return { text, rules, drawn };
 }
 
 /** The text of the area labels of `items`. */
@@ -533,6 +538,18 @@ describe('the stacks of buildAreaLabels', () => {
     expect(lowRow?.at).toEqual(highRow?.at);
   });
 
+  it('keeps each member of a stack its own rows, at its stacked offset', () => {
+    // Arrange
+    const { drawn: records } = built([high, low], ['sector'], 'normal');
+
+    // Act
+    const [lowRecord, highRecord] = ['LOW', 'HIGH'].map((key) => records.get(key));
+
+    // Assert
+    expect(lowRecord?.texts.map((t) => [t.text, t.at.py])).toEqual([['LOW', -6]]);
+    expect(highRecord?.texts.map((t) => [t.text, t.at.py])).toEqual([['HIGH', 6]]);
+  });
+
   it('orders them by their lower limit, whatever their upper limits are', () => {
     // Arrange
     const wide = stratum('WIDE', el, { upper: 'FL400' });
@@ -589,5 +606,21 @@ describe('the stacks of buildAreaLabels', () => {
     // Assert
     expect(alone.every((n) => n > 0)).toBe(true);
     expect(stacked).toEqual([0, 0]);
+  });
+});
+
+describe('what buildAreaLabels records', () => {
+  it('redraws exactly the text and the rule it drew', () => {
+    // Arrange
+    const example = chartOf([parseMapSet(EXAMPLE)]);
+    const { text, rules, drawn: records } = built(example, ['tma']);
+
+    // Act
+    const again = redrawn(records);
+
+    // Assert
+    expect(rules.count).toBe(1);
+    expect(withoutColor(glyphs(again.text))).toEqual(withoutColor(glyphs(text)));
+    expect(withoutColor(instances(again.strokes))).toEqual(withoutColor(instances(rules)));
   });
 });

@@ -4,8 +4,9 @@ import { type ChartItem, itemFrequency } from '../../lib/chart';
 import type { Vec2 } from '../../lib/geo';
 import { fractionOf, stratumTag } from '../../lib/stratum';
 import type { LabelDensity } from '../../state/settingsDefaults';
+import { type LabelOut, putStroke, putText } from './drawnLabels';
 import type { LabelStyle } from './layerStyles';
-import type { LineBatch, TextBatch } from './pack';
+import type { TextBatch } from './pack';
 import { THEME } from './rules';
 
 /** A sector's details are in 9 px, set 6 px apart from the name and from each other. */
@@ -29,6 +30,8 @@ interface Run {
 
 /** A row of runs, centred on the block, `y` CSS px below the block's centre. */
 interface Row {
+  /** The key of the item the row names. */
+  key: string;
   runs: Run[];
   width: number;
   y: number;
@@ -36,6 +39,8 @@ interface Row {
 
 /** A rule between two rows, `width` CSS px wide, `y` CSS px below the block's centre. */
 interface Rule {
+  /** The key of the item the rule belongs to. */
+  key: string;
   y: number;
   width: number;
   color: string;
@@ -53,7 +58,15 @@ const detailsOf = (item: ChartItem): string[] =>
   [itemFrequency(item) ?? '', stratumTag(item.parts)].filter((detail) => detail !== '');
 
 /** A row of one run, centred. */
-const rowOf = (text: string, size: number, color: string, y: number, width: number): Row => ({
+const rowOf = (
+  key: string,
+  text: string,
+  size: number,
+  color: string,
+  y: number,
+  width: number,
+): Row => ({
+  key,
   runs: [{ text, size, color, x: 0 }],
   width,
   y,
@@ -79,7 +92,7 @@ function nameRow(
     });
     width += DETAIL_GAP_PX + text.measure(detail, DETAIL_SIZE_PX);
   }
-  return { runs, width, y: 0 };
+  return { key: item.key, runs, width, y: 0 };
 }
 
 /**
@@ -104,28 +117,36 @@ export function blockOf(
   const top = -LOWER_Y / 2;
   const rows = [
     { ...first, y: top },
-    rowOf(fraction.upper, FRACTION_SIZE_PX, label.color, top + UPPER_Y, upper ?? 0),
-    rowOf(fraction.lower, FRACTION_SIZE_PX, label.color, top + LOWER_Y, lower ?? 0),
+    rowOf(item.key, fraction.upper, FRACTION_SIZE_PX, label.color, top + UPPER_Y, upper ?? 0),
+    rowOf(item.key, fraction.lower, FRACTION_SIZE_PX, label.color, top + LOWER_Y, lower ?? 0),
   ];
-  const rule = { y: top + RULE_Y, width: Math.max(upper ?? 0, lower ?? 0), color: label.color };
+  const rule = {
+    key: item.key,
+    y: top + RULE_Y,
+    width: Math.max(upper ?? 0, lower ?? 0),
+    color: label.color,
+  };
   return { rows, rules: [rule], width: Math.max(...rows.map((row) => row.width)) };
 }
 
 /** Puts a block's rows and rules centred on `at`. */
-export function putBlock(
-  { rows, rules }: Block,
-  at: Vec2,
-  out: { text: TextBatch; rules: LineBatch },
-) {
+export function putBlock({ rows, rules }: Block, at: Vec2, out: LabelOut) {
+  const style = { baseline: 'middle', halo: true } as const;
   for (const row of rows) {
     for (const run of row.runs) {
       const anchor = { ...at, px: run.x - row.width / 2, py: row.y };
-      out.text.text(run.text, anchor, run.size, run.color, { baseline: 'middle', halo: true });
+      putText(out, row.key, {
+        text: run.text,
+        at: anchor,
+        size: run.size,
+        color: run.color,
+        style,
+      });
     }
   }
-  for (const { y, width, color } of rules) {
+  for (const { key, y, width, color } of rules) {
     const end = (sign: number) => ({ ...at, px: (sign * width) / 2, py: y });
-    out.rules.segment(end(-1), end(1), color, { width: 1 });
+    putStroke(out, key, { from: end(-1), to: end(1), color, width: 1 });
   }
 }
 

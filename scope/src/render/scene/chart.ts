@@ -6,9 +6,10 @@ import type { AreaPlace } from '../../lib/pole';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
 import type { LabelDensity } from '../../state/settingsDefaults';
-import type { AtlasInfo, Batch } from '../protocol';
+import type { AtlasInfo } from '../protocol';
 import type { CHART_SLICES, ShapeBatches } from '../slots';
 import { buildAreaLabels } from './areaLabels';
+import { type BuiltLabels, putText } from './drawnLabels';
 import { isPointStyle, LAYER_STYLES, labelReaches } from './layerStyles';
 import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
@@ -50,7 +51,7 @@ const pointsIn = (
 ) =>
   drawnPoints()
     .filter((p) => p.layer === layer)
-    .map(({ id, at: [lon, lat] }) => ({ id, at: project(lat, lon) }));
+    .map(({ key, id, at: [lon, lat] }) => ({ key, id, at: project(lat, lon) }));
 
 /** The chart's lines and point markers, each back to front through the stack. */
 export function buildShapes({
@@ -82,24 +83,33 @@ export function buildPointLabels({
   layers,
   labelDensity,
   atlas,
-}: LabelsInput): Batch[] {
-  const labels = new TextBatch(atlas);
+}: LabelsInput): BuiltLabels {
+  const out = { text: new TextBatch(atlas), drawn: new Map() };
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
     if (!isPointStyle(style) || !labelReaches(style.label, labelDensity)) continue;
     const { px, py, size, color, baseline } = style.label;
-    for (const { id, at } of pointsIn(layer, drawnPoints, project)) {
-      labels.text(id, { ...at, px, py }, size, color, { baseline, halo: true });
+    for (const { key, id, at } of pointsIn(layer, drawnPoints, project)) {
+      putText(out, key, {
+        text: id,
+        at: { ...at, px, py },
+        size,
+        color,
+        style: { baseline, halo: true },
+      });
     }
   }
-  return [labels.finish()];
+  return { batches: [out.text.finish()], drawn: out.drawn };
 }
 
-/** The labels of a slice, each kind as it is placed: routes by span, areas at their pole, points by their marker. */
+/**
+ * The labels of a slice, each kind as it is placed: routes by span, areas at their pole, points by
+ * their marker. Also what each item's label drew.
+ */
 export function buildSliceLabels(
   slice: (typeof CHART_SLICES)[number],
   input: LabelsInput & FitInput & PlaceInput,
-): Batch[] {
+): BuiltLabels {
   if (slice.labels === 'routeLabels') return buildRouteLabels(input);
   return slice.labels === 'areaLabels' ? buildAreaLabels(input) : buildPointLabels(input);
 }

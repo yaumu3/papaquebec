@@ -3,7 +3,8 @@ import type { StyledLayer } from '../../lib/layers';
 import { isPointLayer } from '../../lib/mapsetFormat';
 import { type Batch, LINE_STRIDE, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
-import { parseColor } from './pack';
+import { type DrawnLabels, redrawLabel } from './drawnLabels';
+import { LineBatch, parseColor, TextBatch } from './pack';
 
 /** The scope plane for tests: x is the longitude and y the latitude. */
 export const project = (lat: number, lon: number) => ({ x: lon, y: lat });
@@ -107,3 +108,17 @@ export function glyphs(batch: Batch) {
     };
   });
 }
+
+/** The batches `redrawLabel` draws for the labels of these item keys, all of them by default. */
+export function redrawn(drawn: DrawnLabels, keys: readonly string[] = [...drawn.keys()]) {
+  const out = { gaps: new LineBatch(), text: new TextBatch(atlas), strokes: new LineBatch() };
+  for (const key of keys) {
+    const label = drawn.get(key);
+    if (label) redrawLabel(label, '#ffffff', out);
+  }
+  return { gaps: out.gaps.finish(), text: out.text.finish(), strokes: out.strokes.finish() };
+}
+
+/** Rows without their colour, in one order whatever order they were drawn in. */
+export const withoutColor = (rows: readonly object[]): string[] =>
+  rows.map((row) => JSON.stringify({ ...row, color: undefined })).toSorted();

@@ -69,9 +69,12 @@ const build = (
   const drawnItems = drawnItemsOf(items, layers, stateOf, () => inRange);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
   const input = { topology, drawnPoints, project, layers, drawnItems };
-  const [labels] = buildPointLabels({ ...input, labelDensity, atlas });
+  const {
+    batches: [labels],
+    drawn,
+  } = buildPointLabels({ ...input, labelDensity, atlas });
   if (!labels) throw new Error('buildPointLabels returned no batch');
-  return { ...buildShapes(input), labels };
+  return { ...buildShapes(input), labels, drawn };
 };
 
 describe('buildShapes lines', () => {
@@ -670,6 +673,22 @@ describe('buildPointLabels', () => {
     // Assert
     expect(markers.count).toBe(2);
     expect(glyphs(labels).map((g) => g.at.x)).toEqual([0, 5]);
+  });
+
+  it('records where each part of a point item is labelled, under the item', () => {
+    // Arrange
+    const west = partOf('vfr', point([0, 0]));
+    const east = partOf('vfr', point([5, 0]));
+    const { drawn } = build([keyed('V1', itemOf('vfr', west, east))], ['vfr'], 'dense');
+
+    // Act
+    const record = drawn.get('V1');
+
+    // Assert
+    expect(record?.texts.map((t) => [t.text, t.at.x])).toEqual([
+      ['Q', 0],
+      ['Q', 5],
+    ]);
   });
 
   it('colours each label by its layer', () => {

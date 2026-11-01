@@ -11,7 +11,6 @@ import type { ChartPath } from '../../lib/topology';
 import type { LabelsInput } from './chart';
 import { LAYER_STYLES, type LabelStyle, labelReaches } from './layerStyles';
 import type { TextBatch } from './pack';
-import { partsOf } from './runs';
 
 /** CSS px between two designators of a label. */
 export const SEPARATOR_PX = 9;
@@ -25,6 +24,8 @@ const MARGIN_PX = 28;
 
 /** One name on a label, in its layer's label style. */
 interface Designator {
+  /** The key of its item. */
+  key: string;
   name: string;
   label: LabelStyle;
   /** Where its layer stands in the draw stack, front first. */
@@ -73,14 +74,17 @@ interface Stage extends LabelsInput {
 const byStack = (a: { rank: number; name: string }, b: { rank: number; name: string }) =>
   a.rank - b.rank || a.name.localeCompare(b.name);
 
-/** The designator of a path's part in its layer's label style, if the density reaches it. */
-function designatorOf(path: ChartPath, density: LabelsInput['labelDensity']) {
+/**
+ * The designator of a path's part, of the item `key`, in its layer's label style, if the density
+ * reaches it.
+ */
+function designatorOf(path: ChartPath, key: string, density: LabelsInput['labelDensity']) {
   const label = LAYER_STYLES[path.layer].label;
   const name = nameOf(path.part);
   if (!label || name === undefined || !labelReaches(label, density)) return undefined;
   const { properties } = path.part;
   const oneWay = 'oneWay' in properties && properties.oneWay === true;
-  return { name, label, rank: DRAW_STACK.indexOf(path.layer), oneWay };
+  return { key, name, label, rank: DRAW_STACK.indexOf(path.layer), oneWay };
 }
 
 /** A designator on a span's label: `reads` when its route is flown the way the label reads. */
@@ -133,11 +137,13 @@ const roomOf = ({ length, span }: SpanLabel, scale: number) =>
 /** The airway designators of the drawn parts, by the span they run along. */
 function airwayLabels(stage: Stage): SpanLabels {
   const { topology, drawnItems, project, labelDensity, cuts } = stage;
-  const drawn = partsOf(drawnItems);
+  const keys = new Map(drawnItems.flatMap((item) => item.parts.map((part) => [part, item.key])));
   const spanLabels: SpanLabels = new Map();
   for (const path of topology.routes.paths) {
-    const designator = isAirwayLayer(path.layer) && designatorOf(path, labelDensity);
-    if (!designator || !drawn.has(path.part)) continue;
+    const key = keys.get(path.part);
+    const designator =
+      key !== undefined && isAirwayLayer(path.layer) && designatorOf(path, key, labelDensity);
+    if (!designator) continue;
     for (const span of spansOf(path, cuts)) {
       const spanLabel = spanLabelOf(spanLabels, path, span, project);
       const present = spanLabel?.designators.some(
@@ -189,7 +195,7 @@ function* spansOfItem(item: ChartItem, { topology, cuts }: Stage) {
 function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
   const { project, labelDensity, shown, scale, text } = stage;
   for (const { path, span } of spansOfItem(item, stage)) {
-    const designator = designatorOf(path, labelDensity);
+    const designator = designatorOf(path, item.key, labelDensity);
     const spanLabel = designator && spanLabelOf(spanLabels, path, span, project);
     if (!spanLabel) continue;
     const named = [...spanLabel.designators, placedOn(designator, path, span, spanLabel)];
