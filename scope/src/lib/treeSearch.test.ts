@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import type { ScopeLayer } from './layers';
-import type { Layer } from './mapsetFormat';
+import type { Layer, ScopeLayer } from './mapsetFormat';
 import type { TreeItem, TreeItems } from './treeItems';
 import { markedPieces, matches, searchTree, termsOf, type TreeSearch } from './treeSearch';
 

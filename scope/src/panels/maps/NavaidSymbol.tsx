@@ -1,10 +1,10 @@
 import { For } from 'solid-js';
 
 import type { Vec2 } from '../../lib/geo';
+import { LAYER_TABLE } from '../../lib/layers';
 import { navaidSymbol } from '../../lib/navaidSymbol';
-import { LAYER_STYLES } from '../../render/scene/layerStyles';
 
-const { size, color } = LAYER_STYLES.navaid;
+const { size, color } = LAYER_TABLE.navaid.style;
 
 const pointsOf = (points: readonly Vec2[]) => points.map(({ x, y }) => `${x},${y}`).join(' ');
 

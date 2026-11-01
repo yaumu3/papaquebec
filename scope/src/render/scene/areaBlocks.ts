@@ -2,10 +2,9 @@
 
 import { CHART_COLORS } from '../../design/palette';
 import { type ChartItem, itemFrequency } from '../../lib/chart';
+import type { LabelDensity, LabelStyle } from '../../lib/layers';
 import { fractionOf, stratumTag } from '../../lib/stratum';
-import type { LabelDensity } from '../../state/settingsDefaults';
 import { type LabelOut, putStroke, putText } from './drawnLabels';
-import type { LabelStyle } from './layerStyles';
 import type { Anchor, TextBatch } from './pack';
 
 /** A sector's details are in 9 px, set 6 px apart from the name and from each other. */

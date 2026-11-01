@@ -2,11 +2,11 @@ import { describe, expect, it } from 'bun:test';
 
 import { CHART_COLORS, PALETTE } from '../../design/palette';
 import type { ChartItem, ItemPart } from '../../lib/chart';
+import { LAYER_TABLE } from '../../lib/layers';
 import { navaidSymbol } from '../../lib/navaidSymbol';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
 import { instances, packed, project } from './chartFixture';
-import { putFigure } from './figures';
-import { LAYER_STYLES } from './layerStyles';
+import { MARKER_SHAPES, putFigure } from './figures';
 import { LineBatch, MarkerBatch } from './pack';
 import { buildTraces } from './traces';
 
@@ -129,7 +129,8 @@ describe('buildTraces', () => {
 
     // Assert
     const expected = layers.map((layer) => {
-      const { shape, size } = LAYER_STYLES[layer];
+      const { marker, size } = LAYER_TABLE[layer].style;
+      const shape = MARKER_SHAPES[marker];
       return [
         { at: [1, 2], size, shape, color: grey },
         { at: [3, 4], size, shape, color: grey },
@@ -241,7 +242,8 @@ describe('buildTraces', () => {
     const drawn = segments(lines);
     expect(drawn.map((x) => x.color)).toEqual(drawn.map(() => faint));
     expect(drawn.map((x) => [x.width, x.pattern])).toEqual(drawn.map(() => [2, [0, 0, 0, 0]]));
-    const { shape, size } = LAYER_STYLES.fix;
+    const { marker, size } = LAYER_TABLE.fix.style;
+    const shape = MARKER_SHAPES[marker];
     expect(markers(dots)).toEqual([{ at: [5, 6], size, shape, color: faint }]);
     expect(faint[3]).toBeCloseTo(128 / 255, 2);
   });

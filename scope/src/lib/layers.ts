@@ -1,152 +1,402 @@
-import type { Chart, ChartItem } from './chart';
-import type { Layer } from './mapsetFormat';
-import { isItemShown, type LayerState } from './visibility';
+import { CHART_COLORS } from '../design/palette';
+import { isScopeLayer, type ScopeLayer } from './mapsetFormat';
+
+/** How much of the chart is named: off, then each density adding to the one before. */
+export type LabelDensity = 'off' | 'sparse' | 'normal' | 'dense';
+
+export const LABEL_DENSITIES: readonly LabelDensity[] = ['off', 'sparse', 'normal', 'dense'];
+
+/** Alternating on and off lengths in CSS px, up to two pairs; empty is solid. */
+export type DashPattern =
+  | readonly []
+  | readonly [number, number]
+  | readonly [number, number, number, number];
+
+/** The width of a line whose style names none, CSS px. */
+export const DEFAULT_LINE_WIDTH = 1;
+
+/** What a kind or an upper stratum changes in a line's look. */
+interface Refinement {
+  dash: DashPattern;
+}
+
+/** How a layer's items are named on the chart: from which label density up, and in what. */
+export interface LabelStyle {
+  from: Exclude<LabelDensity, 'off'>;
+  color: string;
+  size: number;
+}
+
+/** A point's ident hangs off its marker. */
+interface PointLabelStyle extends LabelStyle {
+  /** CSS px from the anchor. */
+  px: number;
+  py: number;
+  baseline: 'middle' | 'bottom';
+}
+
+/** How a layer of lines is drawn: its colour and form, refined by a part's kind or stratum. */
+export interface LineLayerStyle {
+  color: string;
+  width?: number;
+  dash?: DashPattern;
+  kinds?: ReadonlyMap<string, Refinement>;
+  upper?: Refinement;
+  label?: LabelStyle;
+}
+
+/** How a layer of points is drawn: by a marker, or by the navaid symbol of the point's kind. */
+export interface PointLayerStyle {
+  marker: 'ring' | 'triangle' | 'navaid';
+  size: number;
+  color: string;
+  label: PointLabelStyle;
+}
+
+/** How holds are drawn: a racetrack in `rnavColor` for kind RNAV, else in `color`. No label. */
+export interface HoldLayerStyle {
+  color: string;
+  rnavColor: string;
+  label?: undefined;
+}
+
+/** A layer's style: lines, points or holds. */
+export type LayerStyle = LineLayerStyle | PointLayerStyle | HoldLayerStyle;
+
+/** What the scope knows about a layer besides the geometry of its features. */
+interface LayerRow<S extends LayerStyle = LayerStyle> {
+  /** The group of the Maps panel it is listed in. */
+  group: string;
+  /** What the Maps panel calls it. */
+  name: string;
+  /** Where the AIP describes it, if it does. */
+  aip?: string;
+  /** Whether it is shown until the operator says otherwise. */
+  shown: boolean;
+  /** Where it stands in the draw order: a lower rank draws over a higher one. */
+  rank: number;
+  /** A route a pilot files by its designator, which ENR 3 of the AIP lists. */
+  airway?: boolean;
+  style: S;
+}
+
+const row = <S extends LayerStyle>(fields: LayerRow<S>): LayerRow<S> => fields;
+
+const SOLID: Refinement = { dash: [] };
+
+const AREA_LABEL = { from: 'dense', size: 9 } as const;
+const ROUTE_LABEL = { from: 'normal', size: 9 } as const;
+const FIX_LABEL = { from: 'normal', size: 9, px: 5, py: -3, baseline: 'bottom' } as const;
+const STATION_LABEL = { from: 'sparse', size: 10, px: 8, py: -1, baseline: 'middle' } as const;
+
+const line = (color: string, rest: Omit<LineLayerStyle, 'color'> = {}): LineLayerStyle => ({
+  color,
+  ...rest,
+});
+
+const areaLine = (
+  color: string,
+  labelColor: string,
+  rest: Omit<LineLayerStyle, 'color' | 'label'> = {},
+) => line(color, { ...rest, label: { ...AREA_LABEL, color: labelColor } });
+
+const {
+  ad,
+  adLabel,
+  airspace,
+  airspaceDim,
+  airspaceLabel,
+  boundaryDim,
+  coast,
+  conv,
+  convLabel,
+  fir,
+  fix,
+  fixLabel,
+  navaid,
+  navaidLabel,
+  procedure,
+  procedureLabel,
+  ringEdge,
+  rnav,
+  rnavLabel,
+  sector,
+  sectorLabel,
+  vfr,
+  vfrLabel,
+} = CHART_COLORS;
 
 /**
- * Every layer the scope draws, front first: what is listed first is drawn over everything after
- * it. Points go over procedures over routes. Among areas, the boundaries an operator works to
- * go over those that only give context. The base map is behind all of it.
+ * Everything the scope knows about a layer, one row each, in the order the Maps panel lists them.
+ * The draw order is the rank: what ranks first draws over everything after it. Points go over
+ * procedures over routes; among areas, the boundaries an operator works to go over those that
+ * only give context; the base map is behind all of it. Unknown kinds draw as their layer's default.
  */
-export const DRAW_STACK = [
-  'ad',
-  'navaid',
-  'fix',
-  'vfr',
-  'sid',
-  'star',
-  'trans',
-  'conv',
-  'rnav',
-  'dct',
-  'hold',
-  'ctr',
-  'pr',
-  'tma',
-  'sector',
-  'fir',
-  'dng',
-  'tra',
-  'adiz',
-  'cta',
-  'advisory',
-  'civt',
-  'asr',
-  'coast',
-  'rings',
-] as const satisfies readonly (Layer | 'coast' | 'rings')[];
+export const LAYER_TABLE = {
+  ad: row({
+    group: 'POINTS',
+    name: 'AERODROMES',
+    aip: 'AD 2',
+    shown: true,
+    rank: 0,
+    style: {
+      marker: 'ring',
+      size: 9,
+      color: ad,
+      label: { ...STATION_LABEL, color: adLabel },
+    },
+  }),
+  navaid: row({
+    group: 'POINTS',
+    name: 'NAVAIDS',
+    aip: 'ENR 4.1',
+    shown: true,
+    rank: 1,
+    style: {
+      marker: 'navaid',
+      size: 12,
+      color: navaid,
+      label: { ...STATION_LABEL, color: navaidLabel },
+    },
+  }),
+  fix: row({
+    group: 'POINTS',
+    name: 'FIXES',
+    aip: 'ENR 4.4',
+    shown: true,
+    rank: 2,
+    style: {
+      marker: 'triangle',
+      size: 8,
+      color: fix,
+      label: { ...FIX_LABEL, color: fixLabel },
+    },
+  }),
+  vfr: row({
+    group: 'POINTS',
+    name: 'VFR POINTS',
+    aip: 'AD 2.24 visual approach charts',
+    shown: false,
+    rank: 3,
+    style: {
+      marker: 'triangle',
+      size: 6,
+      color: vfr,
+      label: { ...FIX_LABEL, from: 'dense', color: vfrLabel },
+    },
+  }),
+  conv: row({
+    group: 'ROUTES',
+    name: 'CONVENTIONAL',
+    aip: 'ENR 3',
+    shown: true,
+    rank: 7,
+    airway: true,
+    style: line(conv, { label: { ...ROUTE_LABEL, color: convLabel } }),
+  }),
+  rnav: row({
+    group: 'ROUTES',
+    name: 'RNAV',
+    aip: 'ENR 3',
+    shown: true,
+    rank: 8,
+    airway: true,
+    style: line(rnav, { label: { ...ROUTE_LABEL, color: rnavLabel } }),
+  }),
+  dct: row({
+    group: 'ROUTES',
+    name: 'DCT',
+    aip: 'ENR 3, other routes',
+    shown: false,
+    rank: 9,
+    style: line(conv, { width: 0.5 }),
+  }),
+  hold: row({
+    group: 'ROUTES',
+    name: 'EN-ROUTE HOLDING',
+    aip: 'ENR 3, en-route holding',
+    shown: false,
+    rank: 10,
+    style: { color: conv, rnavColor: rnav, label: undefined },
+  }),
+  sid: row({
+    group: 'PROCEDURES',
+    name: 'SID',
+    aip: 'AD 2.22',
+    shown: false,
+    rank: 4,
+    style: line(procedure, {
+      label: { ...ROUTE_LABEL, from: 'dense', color: procedureLabel },
+    }),
+  }),
+  star: row({
+    group: 'PROCEDURES',
+    name: 'STAR',
+    aip: 'AD 2.22',
+    shown: false,
+    rank: 5,
+    style: line(procedure, {
+      dash: [6, 3],
+      label: { ...ROUTE_LABEL, from: 'dense', color: procedureLabel },
+    }),
+  }),
+  trans: row({
+    group: 'PROCEDURES',
+    name: 'TRANSITIONS',
+    aip: 'AD 2.22',
+    shown: false,
+    rank: 6,
+    style: line(procedure, {
+      dash: [10, 4],
+      label: { ...ROUTE_LABEL, color: procedureLabel },
+    }),
+  }),
+  pr: row({
+    group: 'RESTRICTIONS',
+    name: 'RESTRICTED AREAS',
+    aip: 'ENR 5.1',
+    shown: true,
+    rank: 12,
+    style: areaLine(airspace, airspaceLabel, { dash: [4, 3], kinds: new Map([['P', SOLID]]) }),
+  }),
+  dng: row({
+    group: 'RESTRICTIONS',
+    name: 'DANGER AREAS',
+    aip: 'ENR 5.1',
+    shown: true,
+    rank: 16,
+    style: areaLine(airspaceDim, airspaceLabel, { dash: [4, 3] }),
+  }),
+  tra: row({
+    group: 'RESTRICTIONS',
+    name: 'TRA',
+    aip: 'ENR 5.2',
+    shown: false,
+    rank: 17,
+    style: areaLine(airspaceDim, airspaceLabel, { dash: [4, 3] }),
+  }),
+  adiz: row({
+    group: 'RESTRICTIONS',
+    name: 'ADIZ',
+    aip: 'ENR 5.2',
+    shown: false,
+    rank: 18,
+    style: line(boundaryDim, { dash: [16, 4, 2, 4] }),
+  }),
+  civt: row({
+    group: 'RESTRICTIONS',
+    name: 'CIVIL TRAINING',
+    shown: false,
+    rank: 21,
+    style: areaLine(airspaceDim, airspaceLabel, { dash: [2, 3] }),
+  }),
+  ctr: row({
+    group: 'AIRSPACE',
+    name: 'CTR',
+    aip: 'AD 2.17',
+    shown: true,
+    rank: 11,
+    style: areaLine(airspace, airspaceLabel),
+  }),
+  tma: row({
+    group: 'AIRSPACE',
+    name: 'TMA',
+    aip: 'ENR 2.1',
+    shown: true,
+    rank: 13,
+    style: areaLine(airspaceDim, airspaceLabel, { kinds: new Map([['MIL', { dash: [8, 3] }]]) }),
+  }),
+  cta: row({
+    group: 'AIRSPACE',
+    name: 'CTA',
+    aip: 'ENR 2.1',
+    shown: false,
+    rank: 19,
+    style: areaLine(airspaceDim, airspaceLabel, { kinds: new Map([['PCA', { dash: [12, 6] }]]) }),
+  }),
+  advisory: row({
+    group: 'AIRSPACE',
+    name: 'ADVISORY AREAS',
+    aip: 'ENR 2.2',
+    shown: false,
+    rank: 20,
+    style: areaLine(airspaceDim, airspaceLabel, { dash: [10, 3, 2, 3] }),
+  }),
+  sector: row({
+    group: 'AIRSPACE',
+    name: 'SECTORS',
+    shown: true,
+    rank: 14,
+    style: line(sector, {
+      dash: [6, 4],
+      upper: { dash: [12, 4] },
+      label: { ...AREA_LABEL, from: 'normal', size: 10, color: sectorLabel },
+    }),
+  }),
+  fir: row({
+    group: 'AIRSPACE',
+    name: 'FIR',
+    aip: 'ENR 2.1',
+    shown: true,
+    rank: 15,
+    style: line(fir, { dash: [16, 5] }),
+  }),
+  asr: row({
+    group: 'AIRSPACE',
+    name: 'ALTIMETER SETTING',
+    aip: 'ENR 1.7',
+    shown: false,
+    rank: 22,
+    style: areaLine(boundaryDim, sectorLabel, { dash: [2, 4] }),
+  }),
+  coast: row({
+    group: 'BASE MAP',
+    name: 'COASTLINE',
+    shown: true,
+    rank: 23,
+    style: line(coast),
+  }),
+  rings: row({
+    group: 'BASE MAP',
+    name: 'RANGE RINGS',
+    shown: true,
+    rank: 24,
+    style: line(ringEdge),
+  }),
+} satisfies Record<ScopeLayer, LayerRow>;
 
-/** The map set layers plus the two the scope makes itself. */
-export type ScopeLayer = (typeof DRAW_STACK)[number];
+/** Every layer in the order the Maps panel lists them. */
+const PANEL_ORDER: readonly ScopeLayer[] = Object.keys(LAYER_TABLE).filter(isScopeLayer);
 
-/** Whether the scope makes a layer itself, from no map set: the coastline and the range rings. */
-export const isScopeMade = (layer: ScopeLayer) => layer === 'coast' || layer === 'rings';
+/** Every layer the scope draws, front first. */
+export const DRAW_STACK: readonly ScopeLayer[] = PANEL_ORDER.toSorted(
+  (a, b) => LAYER_TABLE[a].rank - LAYER_TABLE[b].rank,
+);
 
-/** Whether a layer has a style: not one of the two the scope makes itself. */
-export const isStyled = (layer: ScopeLayer) => !isScopeMade(layer);
+/** The groups of the Maps panel, in the order they are listed there. */
+export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
+  ...new Set(PANEL_ORDER.map((layer) => LAYER_TABLE[layer].group)),
+].map((title) => ({
+  title,
+  layers: PANEL_ORDER.filter((layer) => LAYER_TABLE[layer].group === title),
+}));
 
-/**
- * The layers of the airways, which ENR 3 of the AIP lists: a route a pilot files by its
- * designator. Direct routes and procedures are not airways.
- */
-const AIRWAY_LAYERS = ['conv', 'rnav'] as const satisfies readonly Layer[];
+/** Each layer's mode until the operator says otherwise. */
+export const DEFAULT_SHOWN = Object.fromEntries(
+  PANEL_ORDER.map((layer) => [layer, LAYER_TABLE[layer].shown]),
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every layer has a row
+) as Record<ScopeLayer, boolean>;
 
-export const isAirwayLayer = (layer: ScopeLayer): layer is (typeof AIRWAY_LAYERS)[number] =>
-  (AIRWAY_LAYERS as readonly ScopeLayer[]).includes(layer);
+export const isAirwayLayer = (layer: ScopeLayer): boolean => LAYER_TABLE[layer].airway === true;
 
 /** The layers of the procedures, which AD 2.22 of the AIP lists: departures, arrivals, transitions. */
-const PROCEDURE_LAYERS = ['sid', 'star', 'trans'] as const satisfies readonly Layer[];
+export const isProcedureLayer = (layer: ScopeLayer): boolean =>
+  LAYER_TABLE[layer].group === 'PROCEDURES';
 
-export const isProcedureLayer = (layer: ScopeLayer): layer is (typeof PROCEDURE_LAYERS)[number] =>
-  (PROCEDURE_LAYERS as readonly ScopeLayer[]).includes(layer);
+/** Whether a label is drawn at `density`: from its layer's own density up. */
+export const labelReaches = (label: LabelStyle, density: LabelDensity): boolean =>
+  LABEL_DENSITIES.indexOf(density) >= LABEL_DENSITIES.indexOf(label.from);
 
-/** The groups of the Maps panel, in the order they are listed there, which is not the draw order. */
-export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer[] }[] = [
-  { title: 'POINTS', layers: ['ad', 'navaid', 'fix', 'vfr'] },
-  { title: 'ROUTES', layers: ['conv', 'rnav', 'dct', 'hold'] },
-  { title: 'PROCEDURES', layers: PROCEDURE_LAYERS },
-  { title: 'RESTRICTIONS', layers: ['pr', 'dng', 'tra', 'adiz', 'civt'] },
-  { title: 'AIRSPACE', layers: ['ctr', 'tma', 'cta', 'advisory', 'sector', 'fir', 'asr'] },
-  { title: 'BASE MAP', layers: ['coast', 'rings'] },
-];
+export const isPointStyle = (style: LayerStyle): style is PointLayerStyle => 'marker' in style;
 
-/** What the Maps panel calls each layer. */
-export const LAYER_NAMES: Record<ScopeLayer, string> = {
-  ad: 'AERODROMES',
-  navaid: 'NAVAIDS',
-  fix: 'FIXES',
-  vfr: 'VFR POINTS',
-  conv: 'CONVENTIONAL',
-  rnav: 'RNAV',
-  dct: 'DCT',
-  hold: 'EN-ROUTE HOLDING',
-  sid: 'SID',
-  star: 'STAR',
-  trans: 'TRANSITIONS',
-  pr: 'RESTRICTED AREAS',
-  dng: 'DANGER AREAS',
-  tra: 'TRA',
-  adiz: 'ADIZ',
-  civt: 'CIVIL TRAINING',
-  ctr: 'CTR',
-  tma: 'TMA',
-  cta: 'CTA',
-  advisory: 'ADVISORY AREAS',
-  sector: 'SECTORS',
-  fir: 'FIR',
-  asr: 'ALTIMETER SETTING',
-  coast: 'COASTLINE',
-  rings: 'RANGE RINGS',
-};
-
-/** Where the AIP describes a layer, for the layers it describes. */
-export const LAYER_AIP_REFS: Partial<Record<ScopeLayer, string>> = {
-  ad: 'AD 2',
-  vfr: 'AD 2.24 visual approach charts',
-  navaid: 'ENR 4.1',
-  fix: 'ENR 4.4',
-  conv: 'ENR 3',
-  rnav: 'ENR 3',
-  dct: 'ENR 3, other routes',
-  hold: 'ENR 3, en-route holding',
-  sid: 'AD 2.22',
-  star: 'AD 2.22',
-  trans: 'AD 2.22',
-  pr: 'ENR 5.1',
-  dng: 'ENR 5.1',
-  tra: 'ENR 5.2',
-  adiz: 'ENR 5.2',
-  ctr: 'AD 2.17',
-  tma: 'ENR 2.1',
-  cta: 'ENR 2.1',
-  advisory: 'ENR 2.2',
-  fir: 'ENR 2.1',
-  asr: 'ENR 1.7',
-};
-
-const NAVAID_MAX_RANGE = 120;
-
-/** Navaids clutter a wide range; they show only out to `NAVAID_MAX_RANGE`. */
-export function navaidsShownAt(rangeNm: number): boolean {
-  return rangeNm <= NAVAID_MAX_RANGE;
-}
-
-/**
- * The items of the chart that draw: of `layers`, those shown, and the navaids only when the range
- * allows. Each layer's state and the range are read once; the range only for a shown navaid, so a
- * rebuild follows it only then.
- */
-export function drawnItemsOf(
-  chart: Chart,
-  layers: readonly Layer[],
-  stateOf: (layer: Layer) => LayerState,
-  navaidsInRange: () => boolean,
-): ChartItem[] {
-  const states = new Map(layers.map((layer) => [layer, stateOf(layer)]));
-  const items = chart.filter((item) => {
-    const state = states.get(item.layer);
-    return state !== undefined && isItemShown(state, item.key);
-  });
-  return items.some((item) => item.layer === 'navaid') && !navaidsInRange()
-    ? items.filter((item) => item.layer !== 'navaid')
-    : items;
-}
+export const isHoldStyle = (style: LayerStyle): style is HoldLayerStyle => 'rnavColor' in style;

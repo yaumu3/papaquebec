@@ -3,7 +3,8 @@
  * of the text's words.
  */
 
-import { LAYER_GROUPS, LAYER_NAMES, type ScopeLayer } from './layers';
+import { LAYER_GROUPS, LAYER_TABLE } from './layers';
+import type { ScopeLayer } from './mapsetFormat';
 import { itemsIn, type TreeItem, type TreeItems } from './treeItems';
 
 /** The characters after which a word starts, besides the start of the text. */
@@ -66,7 +67,7 @@ export function searchTree(items: TreeItems, terms: readonly string[]): TreeSear
   const traced: TreeItem[] = [];
   for (const group of LAYER_GROUPS) {
     for (const layer of group.layers) {
-      const around = [LAYER_NAMES[layer], group.title];
+      const around = [LAYER_TABLE[layer].name, group.title];
       const left = terms.filter((term) => !matches(term, around));
       const kept = itemsIn(items, layer).filter((item) =>
         left.every((term) => matches(term, ownTexts(item))),

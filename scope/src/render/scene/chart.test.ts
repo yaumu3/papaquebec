@@ -1,15 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
+import { DRAW_STACK, LABEL_DENSITIES, type LabelDensity, LAYER_TABLE } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { type Layer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
+import { type Layer, POINT_LAYERS, isChartLayer } from '../../lib/mapsetFormat';
 import { navaidSymbol } from '../../lib/navaidSymbol';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
-import type { LayerState } from '../../lib/visibility';
+import { type LayerState, drawnItemsOf } from '../../lib/visibility';
 import { allShown, shownExcept } from '../../lib/visibilityFixture';
-import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, MARKER_STRIDE, Shape } from '../protocol';
 import { atlas } from './atlasFixture';
 import { buildPointLabels, buildShapes } from './chart';
@@ -67,7 +66,7 @@ const hiding =
 
 const build = (
   items: Chart,
-  layers: readonly Layer[] = DRAW_STACK.filter(isStyled),
+  layers: readonly Layer[] = DRAW_STACK.filter(isChartLayer),
   labelDensity: LabelDensity = 'normal',
   { inRange = true, stateOf = allShown }: Reads = {},
 ) => {
@@ -193,17 +192,17 @@ describe('buildShapes lines', () => {
 
   it('draws the layers back to front in the stack, each read by where its item sits', () => {
     // Arrange
-    const lineLayers = DRAW_STACK.filter(isStyled).filter(
+    const lineLayers = DRAW_STACK.filter(isChartLayer).filter(
       (l) => !has(POINT_LAYERS, l) && l !== 'hold',
     );
     const items = lineLayers.map((layer) =>
       itemOf(
         layer,
-        partOf(layer, line([0, DRAW_STACK.indexOf(layer)], [0.01, DRAW_STACK.indexOf(layer)])),
+        partOf(layer, line([0, LAYER_TABLE[layer].rank], [0.01, LAYER_TABLE[layer].rank])),
       ),
     );
     const shuffled = items.toReversed();
-    const expected = lineLayers.map((l) => DRAW_STACK.indexOf(l)).toReversed();
+    const expected = lineLayers.map((l) => LAYER_TABLE[l].rank).toReversed();
 
     // Act
     const drawn = instances(build(shuffled).lines).map((i) => i.a.y);
@@ -669,9 +668,9 @@ describe('buildShapes markers', () => {
     // Arrange
     const pointLayers = DRAW_STACK.filter((l): l is Layer => has(POINT_LAYERS, l));
     const items = pointLayers.map((layer) =>
-      itemOf(layer, partOf(layer, point([DRAW_STACK.indexOf(layer), 0]))),
+      itemOf(layer, partOf(layer, point([LAYER_TABLE[layer].rank, 0]))),
     );
-    const expected = pointLayers.map((l) => DRAW_STACK.indexOf(l)).toReversed();
+    const expected = pointLayers.map((l) => LAYER_TABLE[l].rank).toReversed();
 
     // Act
     const xs = markerXs(build(items.toReversed()).markers);
@@ -702,7 +701,7 @@ describe('buildShapes markers', () => {
 
   it('draws a route layer as lines only', () => {
     // Arrange
-    const layer = ROUTE_LAYERS[0];
+    const layer = 'conv';
     const item = itemOf(layer, partOf(layer, line([0, 0], [0.01, 0])));
 
     // Act

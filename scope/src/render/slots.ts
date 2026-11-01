@@ -1,10 +1,10 @@
-import { DRAW_STACK, isStyled } from '../lib/layers';
-import type { Layer } from '../lib/mapsetFormat';
+import { DRAW_STACK, LAYER_TABLE } from '../lib/layers';
+import { type Layer, isChartLayer } from '../lib/mapsetFormat';
 import type { Batch, BatchKind } from './protocol';
 
 /** The layers from `first` to `last` of the draw stack, front first. */
 const stackSlice = (first: Layer, last: Layer) =>
-  DRAW_STACK.slice(DRAW_STACK.indexOf(first), DRAW_STACK.indexOf(last) + 1).filter(isStyled);
+  DRAW_STACK.slice(LAYER_TABLE[first].rank, LAYER_TABLE[last].rank + 1).filter(isChartLayer);
 
 /**
  * The chart is built in three slices of the draw stack, so a toggle rebuilds only the slices that

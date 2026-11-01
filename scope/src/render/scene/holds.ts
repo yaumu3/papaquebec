@@ -1,10 +1,10 @@
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import type { Figure } from '../../lib/figure';
 import { bearingOnScreen, northAt, type ProjectFn, type Vec2 } from '../../lib/geo';
+import { LAYER_TABLE } from '../../lib/layers';
 import { inboundTrack, type Racetrack, racetrack } from '../../lib/racetrack';
 import type { Declination } from '../../lib/wmm';
 import { type FigureOut, putFigure } from './figures';
-import { LAYER_STYLES } from './layerStyles';
 
 /** A hold's racetrack and where its fix stands on the plane. */
 export interface PlacedRacetrack {
@@ -40,7 +40,7 @@ export function drawHolds(
   declinationAt: () => Declination,
   out: FigureOut,
 ): void {
-  const style = LAYER_STYLES.hold;
+  const style = LAYER_TABLE.hold.style;
   for (const item of items.filter(({ layer }) => layer === 'hold')) {
     for (const part of item.parts) {
       const placed = racetrackAt(part, project, declinationAt);

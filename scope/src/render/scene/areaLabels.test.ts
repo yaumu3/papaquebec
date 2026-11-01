@@ -4,14 +4,14 @@ import { CHART_COLORS } from '../../design/palette';
 import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import { distanceToSegment } from '../../lib/geo';
-import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
+import { DRAW_STACK, LABEL_DENSITIES, type LabelDensity } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import type { Layer } from '../../lib/mapsetFormat';
+import { type Layer, isChartLayer } from '../../lib/mapsetFormat';
 import { areaPlaceOf, poleOf } from '../../lib/pole';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
+import { drawnItemsOf } from '../../lib/visibility';
 import { shownExcept } from '../../lib/visibilityFixture';
-import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { buildAreaLabels } from './areaLabels';
 import { atlas } from './atlasFixture';
 import type { FitInput } from './chart';
@@ -86,7 +86,7 @@ const clearance = ([x, y]: Position, ring: Position[]): number =>
     }),
   );
 
-const AREA_LAYERS = DRAW_STACK.filter(isStyled).filter((l) =>
+const AREA_LAYERS = DRAW_STACK.filter(isChartLayer).filter((l) =>
   [
     'ctr',
     'pr',

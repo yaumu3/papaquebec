@@ -2,14 +2,14 @@ import { describe, expect, it } from 'bun:test';
 
 import { PALETTE } from '../../design/palette';
 import { type Chart, type ChartItem, chartOf, itemName } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
+import { DRAW_STACK, type LabelDensity, LAYER_TABLE } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import type { Layer } from '../../lib/mapsetFormat';
+import { type Layer, isChartLayer } from '../../lib/mapsetFormat';
 import { areaPlaceOf } from '../../lib/pole';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
+import { drawnItemsOf } from '../../lib/visibility';
 import { shownExcept } from '../../lib/visibilityFixture';
-import type { LabelDensity } from '../../state/settingsDefaults';
 import type { Batch } from '../protocol';
 import { CHART_SLICES } from '../slots';
 import { atlas } from './atlasFixture';
@@ -29,10 +29,9 @@ import {
 } from './chartFixture';
 import type { BuiltLabels, DrawnLabel } from './drawnLabels';
 import { buildHighlight, highlightOf } from './highlight';
-import { LAYER_STYLES } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 
-const ALL_LAYERS = DRAW_STACK.filter(isStyled);
+const ALL_LAYERS = DRAW_STACK.filter(isChartLayer);
 const ROOMY = 1e6;
 
 /** CSS px a run of `n` characters takes at 9 px in the fixture's atlas. */
@@ -112,7 +111,7 @@ const stopped = [airway('conv', 'V901', [0, 0], [8, 0], [10, 0]), navaid(8)];
 const shared = [airway('conv', 'V901', [0, 0], [2, 0]), airway('rnav', 'Y902', [0, 0], [2, 0])];
 
 const grey = packed(PALETTE.hover);
-const rnavColor = packed(LAYER_STYLES.rnav.label?.color ?? '');
+const rnavColor = packed(LAYER_TABLE.rnav.style.label?.color ?? '');
 
 /** How many glyphs of a text batch are in `color`. */
 const inColor = (text: Parameters<typeof glyphs>[0], color: number[]) =>

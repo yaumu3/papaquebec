@@ -1,8 +1,8 @@
 import { createMemo, createRoot } from 'solid-js';
 
-import { drawnItemsOf, navaidsShownAt } from '../lib/layers';
 import { type Layer, POINT_LAYERS } from '../lib/mapsetFormat';
 import { drawnPointsOf } from '../lib/topology';
+import { drawnItemsOf, navaidsShownAt } from '../lib/visibility';
 import { layerState } from './layerVisibility';
 import { topology } from './mapsets';
 import { settings } from './settings';

@@ -1,6 +1,7 @@
 import { createSignal, For, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
+import type { LabelDensity } from '../lib/layers';
 import { setQuery } from '../state/layerTree';
 import {
   armRemoval,
@@ -11,7 +12,7 @@ import {
   removeMapSet,
   toggleMapSet,
 } from '../state/mapsets';
-import { type LabelDensity, setSettings, settings } from '../state/settings';
+import { setSettings, settings } from '../state/settings';
 import { Button } from '../ui/Button';
 import { Pills } from '../ui/Pills';
 import { Divider, SectionTitle } from '../ui/Section';

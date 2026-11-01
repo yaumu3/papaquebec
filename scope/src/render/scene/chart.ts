@@ -1,19 +1,24 @@
 import type { ChartItem } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
+import {
+  type LabelDensity,
+  isPointStyle,
+  labelReaches,
+  type PointLayerStyle,
+  LAYER_TABLE,
+} from '../../lib/layers';
 import type { Layer } from '../../lib/mapsetFormat';
 import type { AreaPlace } from '../../lib/pole';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
 import type { Declination } from '../../lib/wmm';
-import type { LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo } from '../protocol';
 import type { CHART_SLICES, ShapeBatches } from '../slots';
 import { buildAreaLabels } from './areaLabels';
 import { type BuiltLabels, type LabelOut, putText } from './drawnLabels';
 import { putPointMark } from './figures';
 import { drawHolds } from './holds';
-import { isPointStyle, LAYER_STYLES, labelReaches, type PointLayerStyle } from './layerStyles';
 import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
 import { drawRuns, partsOf, routeCuts } from './runs';
@@ -72,7 +77,7 @@ export function buildShapes(
   drawHolds(drawnItems, project, declinationAt, { lines, markers });
   drawRuns(topology.routes, drawn, routeCuts(drawnItems, drawnPoints), project, lines);
   for (const layer of layers.toReversed()) {
-    const style = LAYER_STYLES[layer];
+    const style = LAYER_TABLE[layer].style;
     if (!isPointStyle(style)) continue;
     for (const { at, kind } of pointsIn(layer, drawnPoints, project)) {
       putPointMark({ lines, markers }, at, style, kind, style.color);
@@ -101,7 +106,7 @@ export function buildPointLabels({
 }: LabelsInput): BuiltLabels {
   const out = { text: new TextBatch(atlas), drawn: new Map() };
   for (const layer of layers.toReversed()) {
-    const style = LAYER_STYLES[layer];
+    const style = LAYER_TABLE[layer].style;
     if (!isPointStyle(style) || !labelReaches(style.label, labelDensity)) continue;
     for (const point of pointsIn(layer, drawnPoints, project)) {
       putPointLabel(out, point, style.label);

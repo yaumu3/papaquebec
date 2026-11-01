@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Chart, ItemPart } from './chart';
-import { drawnItemsOf } from './layers';
 import type { LonLat } from './mapdata';
 import type { Layer, PointLayer } from './mapsetFormat';
 import {
@@ -14,6 +13,7 @@ import {
   type Network,
   topologyOf,
 } from './topology';
+import { drawnItemsOf } from './visibility';
 import { allShown } from './visibilityFixture';
 
 const A: LonLat = [130.6, 33.7];

@@ -1,13 +1,13 @@
 import { type ChartItem, itemName } from '../../lib/chart';
 import { rememberFits } from '../../lib/fits';
 import { stacksOf } from '../../lib/labelStacks';
-import { isStyled } from '../../lib/layers';
+import { labelReaches, LAYER_TABLE } from '../../lib/layers';
+import { isChartLayer } from '../../lib/mapsetFormat';
 import type { AreaPlace } from '../../lib/pole';
 import { limitFt, bandOf } from '../../lib/stratum';
 import { blockOf, putBlock, putBlockAtName, stackedBlock } from './areaBlocks';
 import type { FitInput, LabelsInput, PlaceInput } from './chart';
 import type { BuiltLabels, DrawnLabel, LabelOut } from './drawnLabels';
-import { LAYER_STYLES, labelReaches } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 
 /** A named item and where its label goes. */
@@ -46,7 +46,7 @@ export function putAreaLabel(
   placeOf: PlaceInput['placeOf'],
   out: LabelOut,
 ) {
-  const label = isStyled(item.layer) ? LAYER_STYLES[item.layer].label : undefined;
+  const label = isChartLayer(item.layer) ? LAYER_TABLE[item.layer].style.label : undefined;
   const name = itemName(item);
   const place = placeOf(item);
   if (!label || name === undefined || !place) return;
@@ -76,7 +76,7 @@ export function buildAreaLabels({
   const out = { text: new TextBatch(atlas), strokes: new LineBatch(), drawn: new Map() };
   const scale = settledScale();
   for (const layer of layers.toReversed()) {
-    const label = LAYER_STYLES[layer].label;
+    const label = LAYER_TABLE[layer].style.label;
     if (!label || !labelReaches(label, labelDensity)) continue;
     const items = drawnItems.filter((i) => i.layer === layer);
     for (const stack of stacksOfMembers(membersOf(items, placeOf))) {

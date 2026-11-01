@@ -4,8 +4,8 @@
  */
 
 import { type ChartItem, type ItemPart, gridIdentity, itemKind } from './chart';
-import { type ScopeLayer, LAYER_NAMES } from './layers';
-import { POINT_LAYERS } from './mapsetFormat';
+import { LAYER_TABLE } from './layers';
+import { POINT_LAYERS, type ScopeLayer } from './mapsetFormat';
 import { stratumTag } from './stratum';
 import type { ChartPoint, Topology } from './topology';
 
@@ -55,7 +55,7 @@ function tagOf(item: ChartItem, { properties: p }: ItemPart): string {
   if (layer === 'sector') return stratumTag(parts);
   if (layer === 'vfr') return 'ad' in p ? (p.ad ?? '') : '';
   const kind = itemKind(item);
-  return kind === undefined || kind === LAYER_NAMES[layer] ? '' : kind;
+  return kind === undefined || kind === LAYER_TABLE[layer].name ? '' : kind;
 }
 
 const byNameThenTag = (a: TreeItem, b: TreeItem): number =>

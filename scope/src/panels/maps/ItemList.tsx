@@ -3,7 +3,8 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 import { isMouse } from '../../canvas/input/devices/mouse';
 import { cx } from '../../design/cx';
 import { itemKind } from '../../lib/chart';
-import { LAYER_NAMES, type ScopeLayer } from '../../lib/layers';
+import { LAYER_TABLE } from '../../lib/layers';
+import type { ScopeLayer } from '../../lib/mapsetFormat';
 import { itemsIn, type TreeItem } from '../../lib/treeItems';
 import { isItemShown, type LayerState } from '../../lib/visibility';
 import {
@@ -102,7 +103,7 @@ export function ItemList(props: { layer: ScopeLayer }) {
   return (
     <div
       role="group"
-      aria-label={`${LAYER_NAMES[props.layer]} items`}
+      aria-label={`${LAYER_TABLE[props.layer].name} items`}
       class={cx(s.items, more() && s.more)}
       ref={(node) => {
         list = node;

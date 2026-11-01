@@ -4,12 +4,17 @@ import { type ChartItem, gridIdentity, itemName, nameOf } from '../../lib/chart'
 import { fits, rememberFits, type ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
-import { DRAW_STACK, isAirwayLayer, isProcedureLayer } from '../../lib/layers';
+import {
+  isAirwayLayer,
+  isProcedureLayer,
+  type LabelStyle,
+  labelReaches,
+  LAYER_TABLE,
+} from '../../lib/layers';
 import { lengthOf, type Midpoint, midpointOf, readingAngle } from '../../lib/polyline';
 import { type Cuts, type Span, spanIdentity, spansOf } from '../../lib/stops';
 import type { ChartPath } from '../../lib/topology';
 import type { LabelsInput } from './chart';
-import { LAYER_STYLES, type LabelStyle, labelReaches } from './layerStyles';
 import type { TextBatch } from './pack';
 
 /** CSS px between two designators of a label. */
@@ -76,12 +81,12 @@ const byStack = (a: { rank: number; name: string }, b: { rank: number; name: str
 
 /** The designator of a path's part, of the item `key`, in its layer's label style, if it has one. */
 function designatorOf(path: ChartPath, key: string) {
-  const label = LAYER_STYLES[path.layer].label;
+  const label = LAYER_TABLE[path.layer].style.label;
   const name = nameOf(path.part);
   if (!label || name === undefined) return undefined;
   const { properties } = path.part;
   const oneWay = 'oneWay' in properties && properties.oneWay === true;
-  return { key, name, label, rank: DRAW_STACK.indexOf(path.layer), oneWay };
+  return { key, name, label, rank: LAYER_TABLE[path.layer].rank, oneWay };
 }
 
 /** The designator of a path's part, if the density reaches its layer's label. */
@@ -178,7 +183,7 @@ function settleAirways(spanLabels: SpanLabels, stage: Stage) {
 function procedureItems(items: readonly ChartItem[]): ChartItem[] {
   return items
     .filter((item) => isProcedureLayer(item.layer))
-    .map((item) => ({ item, rank: DRAW_STACK.indexOf(item.layer), name: itemName(item) ?? '' }))
+    .map((item) => ({ item, rank: LAYER_TABLE[item.layer].rank, name: itemName(item) ?? '' }))
     .toSorted(byStack)
     .map(({ item }) => item);
 }

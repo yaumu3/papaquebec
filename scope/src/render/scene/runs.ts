@@ -1,6 +1,7 @@
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
+import { type LineLayerStyle, LAYER_TABLE } from '../../lib/layers';
 import { isRouteLayer } from '../../lib/mapsetFormat';
 import { lengthOf } from '../../lib/polyline';
 import { type Cuts, NO_CUTS, type Span, spansOf, stopCuts } from '../../lib/stops';
@@ -13,7 +14,6 @@ import {
   runsOf,
   type Stretch,
 } from '../../lib/topology';
-import { LAYER_STYLES, type LineLayerStyle } from './layerStyles';
 import { type Anchor, type LineBatch, type LineStyle, type SpanPlace } from './pack';
 
 /** A line's form in the layer's style, refined by the part's kind and stratum. */
@@ -79,7 +79,7 @@ export function drawRuns(
 ): void {
   const owners = ownersOf(network, drawn);
   for (const path of network.paths.toReversed()) {
-    const style = LAYER_STYLES[path.layer];
+    const style = LAYER_TABLE[path.layer].style;
     const look = lineLook(style, path.part);
     for (const span of spansOf(path, cuts)) {
       const runs = runsOf(path, owners, span);
@@ -100,5 +100,5 @@ export function routeCuts(
   drawnPoints: () => readonly ChartPoint[],
 ): Cuts {
   const routed = items.some((item) => isRouteLayer(item.layer));
-  return routed ? stopCuts(drawnPoints(), (layer) => LAYER_STYLES[layer].size) : NO_CUTS;
+  return routed ? stopCuts(drawnPoints(), (layer) => LAYER_TABLE[layer].style.size) : NO_CUTS;
 }

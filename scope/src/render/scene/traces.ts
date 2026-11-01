@@ -2,12 +2,12 @@ import { CHART_COLORS, PALETTE } from '../../design/palette';
 import { type ChartItem, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
+import { isPointStyle, LAYER_TABLE } from '../../lib/layers';
 import { isPointLayer } from '../../lib/mapsetFormat';
 import type { Declination } from '../../lib/wmm';
 import type { Batch } from '../protocol';
 import { type FigureOut, putFigure, putPointMark } from './figures';
 import { type PlacedRacetrack, racetrackAt } from './holds';
-import { isPointStyle, LAYER_STYLES } from './layerStyles';
 import { LineBatch, MarkerBatch } from './pack';
 
 interface TracesInput {
@@ -57,7 +57,7 @@ function traceItem(item: ChartItem, color: string, tracing: Tracing, out: TraceO
     }
     if (geometry.type === 'Point') {
       const [lon, lat] = geometry.coordinates;
-      const style = LAYER_STYLES[item.layer];
+      const style = LAYER_TABLE[item.layer].style;
       const { kind } = properties;
       if (isPointStyle(style)) putPointMark(out.symbols, project(lat, lon), style, kind, color);
       continue;

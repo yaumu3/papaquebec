@@ -3,7 +3,8 @@
  * layer's summary. A leaf is an item, or a layer without items.
  */
 
-import { isScopeMade, LAYER_AIP_REFS, LAYER_NAMES, type ScopeLayer } from './layers';
+import { LAYER_TABLE } from './layers';
+import { isChartLayer, type ScopeLayer } from './mapsetFormat';
 import type { TreeItem } from './treeItems';
 import { everyItemSet, isItemShown, itemsSetTo, type LayerState } from './visibility';
 
@@ -70,7 +71,7 @@ export function layerSummary(
   items: readonly TreeItem[],
   state: LayerState,
 ): Summary | null {
-  if (isScopeMade(layer)) return null;
+  if (!isChartLayer(layer)) return null;
   if (items.length === 0) return { text: '—', tone: 'none' };
   const shown = items.filter(({ key }) => isItemShown(state, key));
   if (shown.length === 0 || shown.length === items.length) {
@@ -85,7 +86,8 @@ export function layerSummary(
 
 /** A layer row's full name for its title: with the AIP reference, and when no set has data for it. */
 export function layerTitle(layer: ScopeLayer, hasItems: boolean): string {
-  const ref = LAYER_AIP_REFS[layer];
-  const named = ref === undefined ? LAYER_NAMES[layer] : `${LAYER_NAMES[layer]}, AIP ${ref}`;
-  return hasItems || isScopeMade(layer) ? named : `${named}, no data in the enabled sets`;
+  const ref = LAYER_TABLE[layer].aip;
+  const named =
+    ref === undefined ? LAYER_TABLE[layer].name : `${LAYER_TABLE[layer].name}, AIP ${ref}`;
+  return hasItems || !isChartLayer(layer) ? named : `${named}, no data in the enabled sets`;
 }

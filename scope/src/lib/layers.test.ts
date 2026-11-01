@@ -1,17 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Chart, ChartItem } from './chart';
-import {
-  DRAW_STACK,
-  isAirwayLayer,
-  isProcedureLayer,
-  LAYER_GROUPS,
-  navaidsShownAt,
-  type ScopeLayer,
-  drawnItemsOf,
-} from './layers';
-import { type Layer, LAYERS } from './mapsetFormat';
-import type { LayerState } from './visibility';
+import { DRAW_STACK, isAirwayLayer, isProcedureLayer, LAYER_GROUPS } from './layers';
+import { type Layer, LAYERS, type ScopeLayer } from './mapsetFormat';
+import { type LayerState, navaidsShownAt, drawnItemsOf } from './visibility';
 import { allShown, hiddenExcept, shownExcept } from './visibilityFixture';
 
 type Group = [string, readonly ScopeLayer[]];

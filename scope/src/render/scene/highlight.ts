@@ -2,14 +2,12 @@
 
 import { PALETTE } from '../../design/palette';
 import type { ChartItem } from '../../lib/chart';
-import { isProcedureLayer, isStyled } from '../../lib/layers';
-import { isPointLayer, isRouteLayer } from '../../lib/mapsetFormat';
+import { isProcedureLayer, isPointStyle, type LayerStyle, LAYER_TABLE } from '../../lib/layers';
+import { isPointLayer, isRouteLayer, isChartLayer } from '../../lib/mapsetFormat';
 import type { Batch } from '../protocol';
 import { putAreaLabel } from './areaLabels';
-import { placedPoint, putPointLabel } from './chart';
-import type { LabelsInput, PlaceInput } from './chart';
+import { placedPoint, putPointLabel, type LabelsInput, type PlaceInput } from './chart';
 import { type DrawnLabel, type LabelOut, redrawLabel } from './drawnLabels';
-import { isPointStyle, LAYER_STYLES, type LayerStyle } from './layerStyles';
 import { LineBatch, TextBatch } from './pack';
 import { putLabel, type RouteLabelOut } from './routeLabels';
 import { routeCuts } from './runs';
@@ -32,11 +30,11 @@ export function highlightOf(
   drawn: DrawnLabel | undefined,
   input: HighlightInput,
 ): DrawnLabel | undefined {
-  if (!isStyled(item.layer)) return undefined;
+  if (!isChartLayer(item.layer)) return undefined;
   const out = { text: new TextBatch(input.atlas), strokes: new LineBatch(), drawn: new Map() };
   if (isPointLayer(item.layer)) {
     if (drawn) return drawn;
-    putPointLabels(item, LAYER_STYLES[item.layer], input, out);
+    putPointLabels(item, LAYER_TABLE[item.layer].style, input, out);
   } else putAreaLabel(item, drawn, input.placeOf, out);
   return out.drawn.get(item.key);
 }

@@ -3,14 +3,13 @@ import { describe, expect, it } from 'bun:test';
 import { PALETTE } from '../../design/palette';
 import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
-import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
+import { DRAW_STACK, LABEL_DENSITIES, type LabelDensity } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import type { Layer } from '../../lib/mapsetFormat';
+import { type Layer, isChartLayer } from '../../lib/mapsetFormat';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
-import type { LayerState } from '../../lib/visibility';
+import { type LayerState, drawnItemsOf } from '../../lib/visibility';
 import { allShown, shownExcept } from '../../lib/visibilityFixture';
-import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { atlas } from './atlasFixture';
 import type { FitInput } from './chart';
 import {
@@ -27,7 +26,7 @@ import {
 } from './chartFixture';
 import { buildRouteLabels } from './routeLabels';
 
-const ALL_LAYERS = DRAW_STACK.filter(isStyled);
+const ALL_LAYERS = DRAW_STACK.filter(isChartLayer);
 
 /** The route labels of `items` as the scope builds them. */
 function build(

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, type ScopeLayer } from '../../lib/layers';
+import { DRAW_STACK, type LabelDensity, LAYER_TABLE } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { POINT_LAYERS, type Layer } from '../../lib/mapsetFormat';
+import { POINT_LAYERS, type Layer, type ScopeLayer } from '../../lib/mapsetFormat';
 import { areaPlaceOf } from '../../lib/pole';
 import {
   type ChartPath,
@@ -13,8 +13,8 @@ import {
   ownersOf,
   topologyOf,
 } from '../../lib/topology';
+import { drawnItemsOf } from '../../lib/visibility';
 import { allShown } from '../../lib/visibilityFixture';
-import type { LabelDensity } from '../../state/settingsDefaults';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
 import {
   CHART_SLICES,
@@ -30,7 +30,7 @@ import { buildShapes, buildSliceLabels } from './chart';
 import { project } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
-const at = (layer: ScopeLayer) => DRAW_STACK.indexOf(layer);
+const at = (layer: ScopeLayer) => LAYER_TABLE[layer].rank;
 const isPoint = (layer: ScopeLayer): layer is (typeof POINT_LAYERS)[number] =>
   (POINT_LAYERS as readonly string[]).includes(layer);
 const CHART_LAYERS: Layer[] = CHART_SLICES.flatMap((s) => s.layers);

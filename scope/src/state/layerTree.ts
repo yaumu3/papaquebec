@@ -3,7 +3,8 @@
 import { batch, createMemo, createRoot, createSignal } from 'solid-js';
 
 import type { ChartItem } from '../lib/chart';
-import { LAYER_GROUPS, type ScopeLayer } from '../lib/layers';
+import { LAYER_GROUPS } from '../lib/layers';
+import type { ScopeLayer } from '../lib/mapsetFormat';
 import { type TreeItem, itemsIn, treeItemsOf } from '../lib/treeItems';
 import { afterDot, type LayerLeaves } from '../lib/treeRows';
 import { searchTree, termsOf } from '../lib/treeSearch';

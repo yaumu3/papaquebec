@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { drawnItemsOf, type ScopeLayer } from './layers';
-import type { Layer } from './mapsetFormat';
+import type { Layer, ScopeLayer } from './mapsetFormat';
 import type { TreeItem } from './treeItems';
 import {
   afterDot,
@@ -13,7 +12,7 @@ import {
   rowStateOf,
   type StateOf,
 } from './treeRows';
-import type { LayerState } from './visibility';
+import { type LayerState, drawnItemsOf } from './visibility';
 import { hiddenExcept, plainState, shownExcept } from './visibilityFixture';
 
 /** A layer with items; `listed` are those the tree lists, all of them unless a search narrows. */

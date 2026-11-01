@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
 import { chartOf } from './chart';
-import type { ScopeLayer } from './layers';
 import { type MapSetData, validateMapSet } from './mapset';
+import type { ScopeLayer } from './mapsetFormat';
 import { topologyOf } from './topology';
 import { itemsIn, treeItemsOf } from './treeItems';
 

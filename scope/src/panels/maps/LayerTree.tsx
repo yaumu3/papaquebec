@@ -1,7 +1,8 @@
 import { createMemo, For, type JSX, Show } from 'solid-js';
 
 import { cx } from '../../design/cx';
-import { LAYER_GROUPS, LAYER_NAMES, type ScopeLayer } from '../../lib/layers';
+import { LAYER_GROUPS, LAYER_TABLE } from '../../lib/layers';
+import type { ScopeLayer } from '../../lib/mapsetFormat';
 import { itemsIn } from '../../lib/treeItems';
 import {
   groupCount,
@@ -75,7 +76,11 @@ function LayerBranch(props: { layer: ScopeLayer }) {
     <Show when={isLayerListed(props.layer)}>
       <div role="treeitem" aria-expanded={expanded()}>
         <div class={cx(s.row, stateClass(state()), summary()?.tone === 'none' && s.noData)}>
-          <Dot state={state()} label={LAYER_NAMES[props.layer]} onTap={() => tapDot([leaves()])} />
+          <Dot
+            state={state()}
+            label={LAYER_TABLE[props.layer].name}
+            onTap={() => tapDot([leaves()])}
+          />
           <button
             type="button"
             data-head
@@ -94,7 +99,7 @@ function LayerBranch(props: { layer: ScopeLayer }) {
               <Swatch layer={props.layer} />
             </span>
             <span class={s.name}>
-              <Marked text={LAYER_NAMES[props.layer]} />
+              <Marked text={LAYER_TABLE[props.layer].name} />
             </span>
             <Show when={summary()}>
               {(text) => (

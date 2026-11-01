@@ -1,6 +1,6 @@
 import { batch } from 'solid-js';
 
-import type { ScopeLayer } from '../lib/layers';
+import type { ScopeLayer } from '../lib/mapsetFormat';
 import { type LayerState, NO_EXCEPTIONS } from '../lib/visibility';
 import { setSettings, settings } from './settings';
 
