@@ -15,6 +15,7 @@ import { atlas } from './atlasFixture';
 import type { FitInput } from './chart';
 import {
   glyphs,
+  instances,
   itemOf,
   keyed,
   line,
@@ -26,8 +27,8 @@ import {
 } from './chartFixture';
 import { THEME } from './rules';
 
-/** The area labels of `items` as the scope builds them. */
-function build(
+/** The text and the rules of the area labels of `items` as the scope builds them. */
+function built(
   items: Chart,
   layers: readonly StyledLayer[],
   labelDensity: LabelDensity = 'dense',
@@ -42,7 +43,7 @@ function build(
     () => true,
   );
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  const [text] = buildAreaLabels({
+  const [text, rules] = buildAreaLabels({
     topology,
     drawnPoints,
     project,
@@ -53,9 +54,12 @@ function build(
     placeOf: (item) => areaPlaceOf(item, project),
     ...fit,
   });
-  if (!text) throw new Error('buildAreaLabels returned no batch');
-  return text;
+  if (!text || !rules) throw new Error('buildAreaLabels returned too few batches');
+  return { text, rules };
 }
+
+/** The text of the area labels of `items`. */
+const build = (...args: Parameters<typeof built>) => built(...args).text;
 
 /** Whether a point lies inside a ring, by the even-odd rule. */
 function inside([x, y]: Position, ring: Position[]): boolean {
@@ -161,7 +165,7 @@ describe('buildAreaLabels', () => {
 
     // Assert
     const names = glyphs(text).map((g) => g.char);
-    expect(names.join('')).toBe('PAPAQ');
+    expect(names.join('')).toBe('PAPAQ240SFC');
   });
 
   it('puts the name of a line area at the middle of its line', () => {
@@ -368,5 +372,117 @@ describe('the sector row of buildAreaLabels', () => {
 
     // Assert
     expect(rows.map((g) => g.char).join('')).toBe('Z55127.35');
+  });
+});
+
+/** The CSS px below the pole of the centre of a glyph set in `px` size. */
+const centreOf = (g: { py: number }, px: number) =>
+  g.py + (atlas.cellH * px) / (2 * atlas.fontSize);
+
+describe('the fraction of buildAreaLabels', () => {
+  const size = 8;
+  const example = chartOf([parseMapSet(EXAMPLE)]);
+
+  it('writes the upper limit over the lower, a rule as wide as the wider between, the block centred', () => {
+    // Arrange
+    const layers: StyledLayer[] = ['tma'];
+
+    // Act
+    const { text, rules } = built(example, layers);
+
+    // Assert
+    const rows = glyphs(text);
+    const [name, upper, lower] = [rows.slice(0, 5), rows.slice(5, 8), rows.slice(8, 11)];
+    expect(rows.map((g) => g.char).join('')).toBe('PAPAQ240SFC');
+    expect(centreOf(name[0] ?? { py: NaN }, 9)).toBeCloseTo(-10.5, 6);
+    expect(centreOf(upper[0] ?? { py: NaN }, size)).toBeCloseTo(-0.5, 6);
+    expect(centreOf(lower[0] ?? { py: NaN }, size)).toBeCloseTo(10.5, 6);
+    expect(upper.every((g) => g.color.join() === packed('#8a5050').join())).toBe(true);
+    const [rule] = instances(rules);
+    expect(rules.count).toBe(1);
+    expect(rule?.offsetA.y).toBeCloseTo(5, 6);
+    expect(rule?.offsetB.y).toBeCloseTo(5, 6);
+    expect((rule?.offsetB.x ?? 0) - (rule?.offsetA.x ?? 0)).toBeCloseTo(
+      (3 * atlas.advance * size) / atlas.fontSize,
+      6,
+    );
+    expect(rule?.width).toBe(1);
+    expect(rule?.color).toEqual(packed('#8a5050'));
+  });
+
+  it('writes each limit in hundreds of feet', () => {
+    // Arrange
+    const layers: StyledLayer[] = ['ctr', 'dng', 'pr', 'tra', 'cta', 'advisory', 'civt', 'asr'];
+
+    // Act
+    const { text } = built(example, layers);
+
+    // Assert
+    const all = glyphs(text)
+      .map((g) => g.char)
+      .join('');
+    expect(all).toContain('PAPAQ030SFC');
+    expect(all).toContain('XQR-927120SFC');
+    expect(all).toContain('D-901350SFC');
+  });
+
+  it('makes the rule as wide as the wider limit', () => {
+    // Arrange
+    const items = [
+      itemOf(
+        'ctr',
+        partOf('ctr', polygon(el), { name: 'LOW', lower: '1500FT AGL', upper: 'FL240' }),
+      ),
+    ];
+
+    // Act
+    const { text, rules } = built(items, ['ctr']);
+
+    // Assert
+    const [rule] = instances(rules);
+    expect(
+      glyphs(text)
+        .map((g) => g.char)
+        .join(''),
+    ).toBe('LOW240015AGL');
+    expect((rule?.offsetB.x ?? 0) - (rule?.offsetA.x ?? 0)).toBeCloseTo(
+      (7 * atlas.advance * size) / atlas.fontSize,
+      6,
+    );
+  });
+
+  it('gives an area with no limits its name alone, and no rule', () => {
+    // Arrange
+    const items = [itemOf('ctr', partOf('ctr', polygon(el), { name: 'FREE' }))];
+
+    // Act
+    const { text, rules } = built(items, ['ctr']);
+
+    // Assert
+    expect(
+      glyphs(text)
+        .map((g) => g.char)
+        .join(''),
+    ).toBe('FREE');
+    expect(rules.count).toBe(0);
+  });
+
+  it('gives a sector no fraction', () => {
+    // Arrange
+    const sectorItem = itemOf(
+      'sector',
+      partOf('sector', polygon(el), { name: 'Z55', upper: 'FL335' }),
+    );
+
+    // Act
+    const { text, rules } = built([sectorItem], ['sector']);
+
+    // Assert
+    expect(
+      glyphs(text)
+        .map((g) => g.char)
+        .join(''),
+    ).toBe('Z55335−');
+    expect(rules.count).toBe(0);
   });
 });

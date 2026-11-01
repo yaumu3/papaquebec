@@ -1,17 +1,22 @@
 import { type ChartItem, itemFrequency, itemName } from '../../lib/chart';
 import { rememberFits } from '../../lib/fits';
 import type { Vec2 } from '../../lib/geo';
-import { stratumTag } from '../../lib/stratum';
+import { fractionOf, stratumTag } from '../../lib/stratum';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import type { Batch } from '../protocol';
 import type { FitInput, LabelsInput, PlaceInput } from './chart';
 import { LAYER_STYLES, type LabelStyle, labelReaches } from './layerStyles';
-import { TextBatch } from './pack';
+import { LineBatch, TextBatch } from './pack';
 import { THEME } from './rules';
 
 /** A sector's details are in 9 px, set 6 px apart from the name and from each other. */
 const DETAIL_SIZE_PX = 9;
 const DETAIL_GAP_PX = 6;
+/** A fraction: 8 px, its upper limit 10 px below the name, a rule 5.5 px below it, the lower 5.5 px more. */
+const FRACTION_SIZE_PX = 8;
+const UPPER_Y = 10;
+const RULE_Y = 15.5;
+const LOWER_Y = 21;
 
 /** A piece of text on a row of a block, `x` CSS px from the row's start. */
 interface Run {
@@ -28,9 +33,17 @@ interface Row {
   y: number;
 }
 
-/** What an area's label says, as rows of runs, and how wide it is. */
+/** A rule between two rows, `width` CSS px wide, `y` CSS px below the block's centre. */
+interface Rule {
+  y: number;
+  width: number;
+  color: string;
+}
+
+/** What an area's label says, as rows of runs and the rules between them, and how wide it is. */
 interface Block {
   rows: Row[];
+  rules: Rule[];
   width: number;
 }
 
@@ -38,14 +51,21 @@ interface Block {
 const detailsOf = (item: ChartItem): string[] =>
   [itemFrequency(item) ?? '', stratumTag(item.parts)].filter((detail) => detail !== '');
 
-/** The block of an item: its name on one row, and a sector's details after it at DENSE. */
-function blockOf(
+/** A row of one run, centred. */
+const rowOf = (text: string, size: number, color: string, y: number, width: number): Row => ({
+  runs: [{ text, size, color, x: 0 }],
+  width,
+  y,
+});
+
+/** The name on one row, a sector's details after it. */
+function nameRow(
   item: ChartItem,
   name: string,
   label: LabelStyle,
   density: LabelDensity,
   text: TextBatch,
-): Block {
+): Row {
   const details = item.layer === 'sector' && density === 'dense' ? detailsOf(item) : [];
   const runs: Run[] = [{ text: name, size: label.size, color: label.color, x: 0 }];
   let width = text.measure(name, label.size);
@@ -58,16 +78,49 @@ function blockOf(
     });
     width += DETAIL_GAP_PX + text.measure(detail, DETAIL_SIZE_PX);
   }
-  return { rows: [{ runs, width, y: 0 }], width };
+  return { runs, width, y: 0 };
 }
 
-/** Puts a block's rows centred on `at`. */
-function putBlock({ rows }: Block, at: Vec2, text: TextBatch) {
+/**
+ * The block of an item: its name on one row, a sector's details after it at DENSE, and under the
+ * name of any other area at DENSE its limits as a fraction, upper over lower with a rule between.
+ * The block is centred on the pole: the name above it, the limits below.
+ */
+function blockOf(
+  item: ChartItem,
+  name: string,
+  label: LabelStyle,
+  density: LabelDensity,
+  text: TextBatch,
+): Block {
+  const first = nameRow(item, name, label, density, text);
+  const fraction =
+    item.layer === 'sector' || density !== 'dense' ? undefined : fractionOf(item.parts);
+  if (!fraction) return { rows: [first], rules: [], width: first.width };
+  const [upper, lower] = [fraction.upper, fraction.lower].map((s) =>
+    text.measure(s, FRACTION_SIZE_PX),
+  );
+  const top = -LOWER_Y / 2;
+  const rows = [
+    { ...first, y: top },
+    rowOf(fraction.upper, FRACTION_SIZE_PX, label.color, top + UPPER_Y, upper ?? 0),
+    rowOf(fraction.lower, FRACTION_SIZE_PX, label.color, top + LOWER_Y, lower ?? 0),
+  ];
+  const rule = { y: top + RULE_Y, width: Math.max(upper ?? 0, lower ?? 0), color: label.color };
+  return { rows, rules: [rule], width: Math.max(...rows.map((row) => row.width)) };
+}
+
+/** Puts a block's rows and rules centred on `at`. */
+function putBlock({ rows, rules }: Block, at: Vec2, out: { text: TextBatch; rules: LineBatch }) {
   for (const row of rows) {
     for (const run of row.runs) {
       const anchor = { ...at, px: run.x - row.width / 2, py: row.y };
-      text.text(run.text, anchor, run.size, run.color, { baseline: 'middle', halo: true });
+      out.text.text(run.text, anchor, run.size, run.color, { baseline: 'middle', halo: true });
     }
+  }
+  for (const { y, width, color } of rules) {
+    const end = (sign: number) => ({ ...at, px: (sign * width) / 2, py: y });
+    out.rules.segment(end(-1), end(1), color, { width: 1 });
   }
 }
 
@@ -75,7 +128,8 @@ function putBlock({ rows }: Block, at: Vec2, text: TextBatch) {
  * The labels of the drawn area items, each block centred on its place, back to front through
  * the stack. A layer with no label style, or whose density the label density has not reached,
  * says nothing. A block needs half its width between the pole and the nearest edge, in px at
- * the settled scale; a line area has no edge to test and is always labelled.
+ * the settled scale; a line area has no edge to test and is always labelled. Returns the text,
+ * then the rules of the fractions.
  */
 export function buildAreaLabels({
   drawnItems,
@@ -86,7 +140,7 @@ export function buildAreaLabels({
   settledScale,
   shown,
 }: LabelsInput & PlaceInput & FitInput): Batch[] {
-  const text = new TextBatch(atlas);
+  const out = { text: new TextBatch(atlas), rules: new LineBatch() };
   const scale = settledScale();
   for (const layer of layers.toReversed()) {
     const label = LAYER_STYLES[layer].label;
@@ -95,15 +149,15 @@ export function buildAreaLabels({
       const name = itemName(item);
       const place = placeOf(item);
       if (name === undefined || !place) continue;
-      const block = blockOf(item, name, label, labelDensity, text);
+      const block = blockOf(item, name, label, labelDensity, out.text);
       if (
         place.room !== undefined &&
         !rememberFits(shown, item.key, place.room * scale, block.width / 2)
       ) {
         continue;
       }
-      putBlock(block, place.at, text);
+      putBlock(block, place.at, out);
     }
   }
-  return [text.finish()];
+  return [out.text.finish(), out.rules.finish()];
 }
