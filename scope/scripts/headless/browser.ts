@@ -24,6 +24,8 @@ export interface ScopeBrowserOptions {
   settings?: Record<string, unknown> | undefined;
   /** Readies the context before the page loads. */
   prepare?: ((context: BrowserContext) => Promise<void>) | undefined;
+  /** A browser to open a page in and leave running, in place of one of its own. */
+  browser?: Browser | undefined;
 }
 
 export interface ScopeBrowser {
@@ -122,7 +124,7 @@ const GPU_ARGS =
         '--use-gpu-in-tests',
       ];
 
-function launch(): Promise<Browser> {
+export function launch(): Promise<Browser> {
   return chromium.launch({
     headless: true,
     args: [
@@ -137,7 +139,7 @@ function launch(): Promise<Browser> {
 export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser> {
   const served = await serve(opt.from);
   return stoppedOnFailure(served.stop, async () => {
-    const browser = await launch();
+    const browser = opt.browser ?? (await launch());
     const context = await browser.newContext({
       viewport: { width: 1600, height: 1000 },
       deviceScaleFactor: opt.scale,
@@ -161,7 +163,7 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
       page,
       log,
       close: async () => {
-        await browser.close();
+        await (opt.browser ? context.close() : browser.close());
         served.stop();
       },
     };
