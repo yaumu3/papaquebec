@@ -8,7 +8,6 @@ import {
   LAYER_GROUPS,
   navaidsShownAt,
   type ScopeLayer,
-  type StyledLayer,
   drawnItemsOf,
 } from './layers';
 import { type Layer, LAYERS } from './mapsetFormat';
@@ -132,7 +131,7 @@ const statesOf =
     states[layer] ?? hiddenExcept();
 
 describe('drawnItemsOf', () => {
-  const all: StyledLayer[] = ['ad', 'navaid', 'fix', 'ctr'];
+  const all: Layer[] = ['ad', 'navaid', 'fix', 'ctr'];
   const chartLayers: Layer[] = ['ad', 'navaid', 'navaid', 'fix', 'ctr', 'sector'];
   const chart: Chart = chartLayers.map((layer, i) => ({ key: String(i), layer, parts: [] }));
   it('keeps the items that are shown, in chart order, and navaids only within range', () => {
@@ -245,7 +244,7 @@ describe('drawnItemsOf', () => {
 
   it('leaves out the items of a layer that is not among those given', () => {
     // Arrange
-    const given: StyledLayer[] = ['sector'];
+    const given: Layer[] = ['sector'];
 
     // Act
     const kept = drawnItemsOf(chart, given, allShown, () => true);

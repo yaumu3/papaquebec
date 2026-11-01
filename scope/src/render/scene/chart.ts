@@ -1,7 +1,7 @@
 import type { ChartItem } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
-import type { StyledLayer } from '../../lib/layers';
+import type { Layer } from '../../lib/mapsetFormat';
 import type { AreaPlace } from '../../lib/pole';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
@@ -24,7 +24,7 @@ interface ShapesInput {
   drawnPoints: () => readonly ChartPoint[];
   project: ProjectFn;
   /** The slice's layers, front first, as in the draw stack. */
-  layers: readonly StyledLayer[];
+  layers: readonly Layer[];
   /** The items to draw, of `layers`. */
   drawnItems: readonly ChartItem[];
 }
@@ -55,11 +55,7 @@ export const placedPoint = ({ key, id, kind, at: [lon, lat] }: ChartPoint, proje
 });
 
 /** The drawn points of a layer, each at its place on the plane. */
-const pointsIn = (
-  layer: StyledLayer,
-  drawnPoints: ShapesInput['drawnPoints'],
-  project: ProjectFn,
-) =>
+const pointsIn = (layer: Layer, drawnPoints: ShapesInput['drawnPoints'], project: ProjectFn) =>
   drawnPoints()
     .filter((p) => p.layer === layer)
     .map((p) => placedPoint(p, project));

@@ -3,9 +3,10 @@ import { describe, expect, it } from 'bun:test';
 import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import { distanceToSegment } from '../../lib/geo';
-import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
+import type { Layer } from '../../lib/mapsetFormat';
 import { areaPlaceOf, poleOf } from '../../lib/pole';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import { shownExcept } from '../../lib/visibilityFixture';
@@ -33,7 +34,7 @@ import { THEME } from './rules';
 /** The text and the rules of the area labels of `items` as the scope builds them. */
 function built(
   items: Chart,
-  layers: readonly StyledLayer[],
+  layers: readonly Layer[],
   labelDensity: LabelDensity = 'dense',
   hidden: string[] = [],
   fit: FitInput = { settledScale: () => 1000, shown: new Map() },
@@ -102,10 +103,10 @@ const AREA_LAYERS = DRAW_STACK.filter(isStyled).filter((l) =>
   ].includes(l),
 );
 /** The density an area layer is labelled from; none for the layers that are not. */
-const from = (layer: StyledLayer): LabelDensity | null =>
+const from = (layer: Layer): LabelDensity | null =>
   layer === 'fir' || layer === 'adiz' ? null : layer === 'sector' ? 'normal' : 'dense';
 /** Whether a layer's labels are drawn at a density: 1 or 0. */
-const labelledAt = (layer: StyledLayer, d: LabelDensity) => {
+const labelledAt = (layer: Layer, d: LabelDensity) => {
   const first = from(layer);
   return first !== null && rank(d) >= rank(first) ? 1 : 0;
 };
@@ -189,7 +190,7 @@ describe('buildAreaLabels', () => {
 
   it('writes a sector name at 10 px and the name of another area at 9 px', () => {
     // Arrange
-    const rows: StyledLayer[] = ['sector', 'ctr'];
+    const rows: Layer[] = ['sector', 'ctr'];
     const items = rows.map((layer) => keyed(layer, itemOf(layer, partOf(layer, polygon(el)))));
 
     // Act
@@ -220,7 +221,7 @@ describe('buildAreaLabels', () => {
 
   it('colours each name by its layer', () => {
     // Arrange
-    const rows: [StyledLayer, string][] = [
+    const rows: [Layer, string][] = [
       ['ctr', '#8a5050'],
       ['sector', '#5a7a8a'],
       ['asr', '#5a7a8a'],
@@ -368,7 +369,7 @@ describe('the sector row of buildAreaLabels', () => {
   it('writes the name alone below DENSE, and for an area that is not a sector', () => {
     // Arrange
     const ctr = itemOf('ctr', partOf('ctr', polygon(el), { name: 'Z55' }));
-    const rows: [ReturnType<typeof sector>, StyledLayer, LabelDensity][] = [
+    const rows: [ReturnType<typeof sector>, Layer, LabelDensity][] = [
       [z55, 'sector', 'normal'],
       [ctr, 'ctr', 'dense'],
     ];
@@ -406,7 +407,7 @@ describe('the fraction of buildAreaLabels', () => {
 
   it('writes the upper limit over the lower, a rule as wide as the wider between, the block centred', () => {
     // Arrange
-    const layers: StyledLayer[] = ['tma'];
+    const layers: Layer[] = ['tma'];
 
     // Act
     const { text, rules } = built(example, layers);
@@ -433,7 +434,7 @@ describe('the fraction of buildAreaLabels', () => {
 
   it('writes each limit in hundreds of feet', () => {
     // Arrange
-    const layers: StyledLayer[] = ['ctr', 'dng', 'pr', 'tra', 'cta', 'advisory', 'civt', 'asr'];
+    const layers: Layer[] = ['ctr', 'dng', 'pr', 'tra', 'cta', 'advisory', 'civt', 'asr'];
 
     // Act
     const { text } = built(example, layers);

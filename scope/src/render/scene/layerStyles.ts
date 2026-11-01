@@ -1,4 +1,4 @@
-import type { StyledLayer } from '../../lib/layers';
+import type { Layer } from '../../lib/mapsetFormat';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { Shape } from '../protocol';
 import type { DashPattern, TextStyle } from './pack';
@@ -152,7 +152,7 @@ export const LAYER_STYLES = {
   advisory: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [10, 3, 2, 3] }),
   civt: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [2, 3] }),
   asr: areaLine(THEME.boundaryDim, THEME.sectorLabel, { dash: [2, 4] }),
-} satisfies Record<StyledLayer, LayerStyle>;
+} satisfies Record<Layer, LayerStyle>;
 
 /** Whether a label is drawn at `density`: from its layer's own density up. */
 export const labelReaches = (label: LabelStyle, density: LabelDensity): boolean =>

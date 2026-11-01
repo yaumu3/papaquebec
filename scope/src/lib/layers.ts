@@ -38,9 +38,6 @@ export const DRAW_STACK = [
 /** The map set layers plus the two the scope makes itself. */
 export type ScopeLayer = (typeof DRAW_STACK)[number];
 
-/** A map set layer with a style: every one. */
-export type StyledLayer = Layer;
-
 /** Whether the scope makes a layer itself, from no map set: the coastline and the range rings. */
 export const isScopeMade = (layer: ScopeLayer) => layer === 'coast' || layer === 'rings';
 

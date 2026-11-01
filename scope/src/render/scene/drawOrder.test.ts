@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, type ScopeLayer, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, type ScopeLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { POINT_LAYERS } from '../../lib/mapsetFormat';
+import { POINT_LAYERS, type Layer } from '../../lib/mapsetFormat';
 import { areaPlaceOf } from '../../lib/pole';
 import {
   type ChartPath,
@@ -33,10 +33,10 @@ import { buildCoast, buildRings } from './static';
 const at = (layer: ScopeLayer) => DRAW_STACK.indexOf(layer);
 const isPoint = (layer: ScopeLayer): layer is (typeof POINT_LAYERS)[number] =>
   (POINT_LAYERS as readonly string[]).includes(layer);
-const CHART_LAYERS: StyledLayer[] = CHART_SLICES.flatMap((s) => s.layers);
+const CHART_LAYERS: Layer[] = CHART_SLICES.flatMap((s) => s.layers);
 
 /** An item of `layer`, one glyph in its name, sitting at x = its place in the stack. */
-function itemAt(layer: StyledLayer): ChartItem {
+function itemAt(layer: Layer): ChartItem {
   const x = at(layer);
   const part: ItemPart =
     layer === 'hold'
@@ -60,7 +60,7 @@ function itemAt(layer: StyledLayer): ChartItem {
 }
 
 /** What the scope reads to draw `layers` of the chart. */
-function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
+function drawnOf(chart: Chart, layers: readonly Layer[]) {
   const topology = topologyOf(chart);
   const drawnItems = drawnItemsOf(chart, layers, allShown, () => true);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
@@ -69,9 +69,9 @@ function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
 
 /** A slice's shapes built as the scope builds them. */
 /** The layers whose shapes are edges: a hold is a figure at screen size, not an edge. */
-const edgeLayers = (layers: readonly StyledLayer[]) => layers.filter((l) => l !== 'hold');
+const edgeLayers = (layers: readonly Layer[]) => layers.filter((l) => l !== 'hold');
 
-const shapesOf = (chart: Chart, layers: readonly StyledLayer[]) =>
+const shapesOf = (chart: Chart, layers: readonly Layer[]) =>
   buildShapes(drawnOf(chart, layers), () => () => 0);
 
 /** A settled scale at which every label of the fixture has room. */
@@ -365,7 +365,7 @@ describe('the example map set', () => {
     const items = chartOf([parseMapSet(EXAMPLE)]).filter((item) =>
       /V901|A901|TAVRO/.test(item.key),
     );
-    const shown: StyledLayer[][] = [['conv'], ['conv', 'fix']];
+    const shown: Layer[][] = [['conv'], ['conv', 'fix']];
 
     // Act
     const rows = shown.map((layers) => {

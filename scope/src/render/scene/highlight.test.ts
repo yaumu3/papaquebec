@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf, itemName } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
+import type { Layer } from '../../lib/mapsetFormat';
 import { areaPlaceOf } from '../../lib/pole';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import { shownExcept } from '../../lib/visibilityFixture';
@@ -54,7 +55,7 @@ function drawnOf(chart: Chart, hidden: readonly string[]) {
 /** The labels the chart draws for the slice of `layer`, `hidden` items not drawn. */
 function chartLabels(
   chart: Chart,
-  layer: StyledLayer,
+  layer: Layer,
   hidden: readonly string[] = [],
   settledScale = ROOMY,
   labelDensity: LabelDensity = 'dense',
@@ -131,7 +132,7 @@ describe('highlightOf', () => {
     const example = chartOf([parseMapSet(EXAMPLE)]);
     const tma = example.find((i) => i.layer === 'tma' && itemName(i) === 'PAPAQ')?.key ?? '';
     const fix = [keyed('F1', itemOf('fix', partOf('fix', point([3, 3]))))];
-    const cases: [Chart, StyledLayer, string][] = [
+    const cases: [Chart, Layer, string][] = [
       [example, 'tma', tma],
       [fix, 'fix', 'F1'],
     ];

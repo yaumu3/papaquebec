@@ -2,7 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
-import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import type { Layer } from '../../lib/mapsetFormat';
@@ -32,7 +32,7 @@ const ALL_LAYERS = DRAW_STACK.filter(isStyled);
 /** The route labels of `items` as the scope builds them. */
 function build(
   items: Chart,
-  layers: readonly StyledLayer[],
+  layers: readonly Layer[],
   labelDensity: LabelDensity = 'dense',
   stateOf: (layer: Layer) => LayerState = allShown,
   fit: FitInput = { settledScale: () => 1000, shown: new Map() },
@@ -78,7 +78,7 @@ function labelsIn(text: Parameters<typeof glyphs>[0]) {
 const stops = (layer: 'navaid' | 'fix', x: number) =>
   keyed(`${layer}${x}`, itemOf(layer, partOf(layer, point([x, 0]))));
 
-const oneWay = (layer: StyledLayer, name: string, ...at: [number, number][]) =>
+const oneWay = (layer: Layer, name: string, ...at: [number, number][]) =>
   keyed(name, itemOf(layer, partOf(layer, line(...at), { name, oneWay: true })));
 
 /** CSS px a run of `n` characters takes at 9 px in the fixture's atlas. */
@@ -204,7 +204,7 @@ describe('buildRouteLabels', () => {
       stops('fix', 1),
       stops('navaid', 2),
     ];
-    const rows: StyledLayer[][] = [
+    const rows: Layer[][] = [
       ['conv', 'navaid'],
       ['conv', 'navaid', 'fix'],
     ];
@@ -229,7 +229,7 @@ describe('buildRouteLabels', () => {
 
   it('labels a route from its density, a procedure too, and never a direct route', () => {
     // Arrange
-    const rows: [StyledLayer, number[]][] = [
+    const rows: [Layer, number[]][] = [
       ['conv', [0, 0, 1, 1]],
       ['rnav', [0, 0, 1, 1]],
       ['trans', [0, 0, 1, 1]],
@@ -253,7 +253,7 @@ describe('buildRouteLabels', () => {
   it('shows a label from its threshold, hides it below, and keeps its state between', () => {
     // Arrange
     const items = [stops('navaid', 0), airway('conv', 'V901', [0, 0], [2, 0])];
-    const layers: StyledLayer[] = ['conv', 'navaid'];
+    const layers: Layer[] = ['conv', 'navaid'];
     const threshold = widthOf(4) + 28;
     const cut = 12 / 2 + 3;
     const scaleOf = (multiple: number) => (multiple * threshold + cut) / 2;
@@ -287,7 +287,7 @@ describe('buildRouteLabels', () => {
   describe('a procedure', () => {
     const sid = airway('sid', 'SID1', [0, 0], [0.5, 0], [2, 0], [4, 0]);
     const fixes = [stops('fix', 0.5), stops('fix', 2)];
-    const layers: StyledLayer[] = ['sid', 'fix'];
+    const layers: Layer[] = ['sid', 'fix'];
     const named = (scale: number) =>
       labelsIn(
         build([sid, ...fixes], layers, 'dense', allShown, {

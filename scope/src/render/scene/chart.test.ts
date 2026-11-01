@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { type Layer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
@@ -67,7 +67,7 @@ const hiding =
 
 const build = (
   items: Chart,
-  layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
+  layers: readonly Layer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
   { inRange = true, stateOf = allShown }: Reads = {},
 ) => {
@@ -95,7 +95,7 @@ describe('buildShapes lines', () => {
     const grey = '#4a4a47';
     const procedure = '#33606c';
     const rows: {
-      layer: StyledLayer;
+      layer: Layer;
       extra?: object;
       color: string;
       pattern: number[];
@@ -182,7 +182,7 @@ describe('buildShapes lines', () => {
   it('draws nothing for a layer that is not among those shown', () => {
     // Arrange
     const item = itemOf('ctr', partOf('ctr', polygon(triangle(0))));
-    const shown: StyledLayer[] = ['fir', 'sid'];
+    const shown: Layer[] = ['fir', 'sid'];
 
     // Act
     const batches = build([item], shown, 'dense');
@@ -220,7 +220,7 @@ describe('buildShapes shared edges', () => {
       itemOf('fir', partOf('fir', line([0, 0], [1, 0], [0, 1]))),
       itemOf('tma', partOf('tma', line([0, 0], [1, 0], [1, 1]))),
     ];
-    const rows: StyledLayer[][] = [['tma', 'fir'], ['fir']];
+    const rows: Layer[][] = [['tma', 'fir'], ['fir']];
 
     // Act
     const drawn = rows.map((layers) => instances(build(items, layers).lines));
@@ -377,13 +377,12 @@ function visibleAt(i: Instance, pxPerNm: number): boolean {
   return from <= to;
 }
 
-const stopAt = (layer: StyledLayer, at: Position) => itemOf(layer, partOf(layer, point(at)));
-const routeOf = (layer: StyledLayer, ...at: Position[]) =>
-  itemOf(layer, partOf(layer, line(...at)));
+const stopAt = (layer: Layer, at: Position) => itemOf(layer, partOf(layer, point(at)));
+const routeOf = (layer: Layer, ...at: Position[]) => itemOf(layer, partOf(layer, line(...at)));
 
 describe('buildShapes routes stop short of points', () => {
   const conv = packed('#82573c');
-  const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[], reads?: Reads) =>
+  const cutsOf = (items: ChartItem[], layers?: readonly Layer[], reads?: Reads) =>
     instances(build(items, layers, 'normal', reads).lines)
       .filter((i) => i.color.every((c, k) => c === conv[k]))
       .map((i) => i.span);
@@ -403,7 +402,7 @@ describe('buildShapes routes stop short of points', () => {
 
   it('measures the way back and ahead along the whole span, across vertices and runs', () => {
     // Arrange
-    const rows: [string, ChartItem[], StyledLayer[], number[][]][] = [
+    const rows: [string, ChartItem[], Layer[], number[][]][] = [
       [
         'a stop at each end, across edges of unequal length',
         [
@@ -457,7 +456,7 @@ describe('buildShapes routes stop short of points', () => {
   it('writes no cut where no point stands at a vertex, where the point layer is hidden, or the navaid is out of range', () => {
     // Arrange
     const through = routeOf('conv', [0, 0], [1, 0], [2, 0]);
-    const rows: [string, ChartItem[], readonly StyledLayer[], Reads][] = [
+    const rows: [string, ChartItem[], readonly Layer[], Reads][] = [
       ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix'], {}],
       ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv'], {}],
       [
@@ -482,7 +481,7 @@ describe('buildShapes routes stop short of points', () => {
 
   it('cuts half the marker plus 3 CSS px', () => {
     // Arrange
-    const rows: [StyledLayer, number][] = [
+    const rows: [Layer, number][] = [
       ['fix', 7],
       ['navaid', 9],
       ['ad', 7.5],
@@ -523,7 +522,7 @@ describe('buildShapes routes stop short of points', () => {
       routeOf('conv', [0, 0], [1, 0]),
       itemOf('tma', partOf('tma', polygon(triangle(0)))),
     ];
-    const rows: StyledLayer[][] = [['tma'], [], ['conv'], ['fix']];
+    const rows: Layer[][] = [['tma'], [], ['conv'], ['fix']];
     const reads = rows.map(() => 0);
     const inputs = rows.map((layers, i) => ({
       topology: topologyOf(items),
@@ -648,7 +647,7 @@ describe('buildShapes navaids', () => {
 describe('buildShapes markers', () => {
   it('draws each kind of point with its own glyph, size and colour', () => {
     // Arrange
-    const rows: [StyledLayer, Shape, number, string][] = [
+    const rows: [Layer, Shape, number, string][] = [
       ['ad', Shape.Ring, 9, '#8a8a8a'],
       ['fix', Shape.Triangle, 8, '#707070'],
       ['vfr', Shape.Triangle, 6, '#5c5c5c'],
@@ -668,7 +667,7 @@ describe('buildShapes markers', () => {
 
   it('draws the points back to front in the stack', () => {
     // Arrange
-    const pointLayers = DRAW_STACK.filter((l): l is StyledLayer => has(POINT_LAYERS, l));
+    const pointLayers = DRAW_STACK.filter((l): l is Layer => has(POINT_LAYERS, l));
     const items = pointLayers.map((layer) =>
       itemOf(layer, partOf(layer, point([DRAW_STACK.indexOf(layer), 0]))),
     );
@@ -717,16 +716,16 @@ describe('buildShapes markers', () => {
 const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
 
 /** A one-part item whose name is one glyph, so its label is one instance. */
-const onePart = (layer: StyledLayer, geometry: Geometry, extra: Extra = {}) =>
+const onePart = (layer: Layer, geometry: Geometry, extra: Extra = {}) =>
   itemOf(layer, partOf(layer, geometry, extra));
 
-const placeholder = (layer: StyledLayer): Geometry =>
+const placeholder = (layer: Layer): Geometry =>
   has(POINT_LAYERS, layer) ? point([0, 0]) : line([0, 0], [0.01, 0]);
 
 describe('buildPointLabels', () => {
   it('labels each point layer from its own label density up', () => {
     // Arrange
-    const from: [StyledLayer, LabelDensity | null][] = [
+    const from: [Layer, LabelDensity | null][] = [
       ['ad', 'sparse'],
       ['navaid', 'sparse'],
       ['fix', 'normal'],
@@ -749,7 +748,7 @@ describe('buildPointLabels', () => {
 
   it('prints a point by its ident, not by its name', () => {
     // Arrange
-    const shown: StyledLayer[] = ['ad', 'navaid'];
+    const shown: Layer[] = ['ad', 'navaid'];
     const items = shown.map((layer) => onePart(layer, point([0, 0]), { name: 'PAPAQ' }));
 
     // Act
@@ -790,7 +789,7 @@ describe('buildPointLabels', () => {
 
   it('colours each label by its layer', () => {
     // Arrange
-    const rows: [StyledLayer, string][] = [
+    const rows: [Layer, string][] = [
       ['ad', '#a0a0a0'],
       ['navaid', '#909090'],
       ['fix', '#7a7a7a'],
