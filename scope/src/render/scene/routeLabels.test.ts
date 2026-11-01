@@ -3,95 +3,36 @@ import { describe, expect, it } from 'bun:test';
 import { PALETTE } from '../../design/palette';
 import { type Chart, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
-import { DRAW_STACK, LABEL_DENSITIES, type LabelDensity } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { type Layer, isChartLayer } from '../../lib/mapsetFormat';
-import { drawnPointsOf, topologyOf } from '../../lib/topology';
-import { type LayerState, drawnItemsOf } from '../../lib/visibility';
-import { allShown, shownExcept } from '../../lib/visibilityFixture';
-import { atlas } from './atlasFixture';
-import type { FitInput } from './chart';
+import type { Layer } from '../../lib/mapsetFormat';
+import type { Batch } from '../protocol';
 import {
   airway,
   glyphs,
-  instances,
-  itemOf,
-  keyed,
-  line,
+  labelWidth,
+  oneWay,
   packed,
-  partOf,
-  point,
-  project,
+  sceneOf,
+  type SceneOptions,
+  segments,
+  stopAt,
+  textRuns,
 } from './chartFixture';
-import { buildRouteLabels } from './routeLabels';
 
-const ALL_LAYERS = DRAW_STACK.filter(isChartLayer);
-
-/** The route labels of `items` as the scope builds them. */
-function build(
-  items: Chart,
-  layers: readonly Layer[],
-  labelDensity: LabelDensity = 'dense',
-  stateOf: (layer: Layer) => LayerState = allShown,
-  fit: FitInput = { settledScale: () => 1000, shown: new Map() },
-) {
-  const topology = topologyOf(items);
-  const drawnItems = drawnItemsOf(items, layers, stateOf, () => true);
-  const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  const {
-    batches: [gaps, text, chevrons],
-  } = buildRouteLabels({
-    topology,
-    drawnPoints,
-    project,
-    layers,
-    drawnItems,
-    labelDensity,
-    atlas,
-    ...fit,
-  });
-  if (!gaps || !text || !chevrons) throw new Error('buildRouteLabels returned too few batches');
-  return { gaps, text, chevrons };
-}
-
-/** The labels of a text batch: the glyphs that share an anchor, read in order. */
-function labelsIn(text: Parameters<typeof glyphs>[0]) {
-  const labels: {
-    text: string;
-    at: { x: number; y: number };
-    glyphs: ReturnType<typeof glyphs>;
-  }[] = [];
-  for (const glyph of glyphs(text)) {
-    const last = labels.at(-1);
-    if (last && last.at.x === glyph.at.x && last.at.y === glyph.at.y) {
-      last.text += glyph.char;
-      last.glyphs.push(glyph);
-    } else {
-      labels.push({ text: glyph.char, at: glyph.at, glyphs: [glyph] });
-    }
-  }
-  return labels;
-}
-
-const stops = (layer: 'navaid' | 'fix', x: number) =>
-  keyed(`${layer}${x}`, itemOf(layer, partOf(layer, point([x, 0]))));
-
-const oneWay = (layer: Layer, name: string, ...at: [number, number][]) =>
-  keyed(name, itemOf(layer, partOf(layer, line(...at), { name, oneWay: true })));
-
-/** CSS px a run of `n` characters takes at 9 px in the fixture's atlas. */
-const widthOf = (n: number) => (n * atlas.advance * 9) / atlas.fontSize;
+/** The route labels of `chart`; `layers` are the layers shown. */
+const routeLabels = (chart: Chart, options: SceneOptions = {}) =>
+  sceneOf(chart, options).routeLabels();
 
 /** The chevrons of a batch in their label's frame (turned back by `angle`): each tip and the x of its arms. */
-function chevronsIn(batch: Parameters<typeof instances>[0], angle: number) {
+function chevronsIn(batch: Batch, angle: number) {
   const frame = ({ x, y }: { x: number; y: number }) => ({
     x: x * Math.cos(angle) + y * Math.sin(angle),
     y: -x * Math.sin(angle) + y * Math.cos(angle),
   });
-  const segments = instances(batch);
-  return Array.from({ length: segments.length / 2 }, (_, i) => {
-    const [arm, other] = [segments[2 * i], segments[2 * i + 1]];
+  const drawn = segments(batch);
+  return Array.from({ length: drawn.length / 2 }, (_, i) => {
+    const [arm, other] = [drawn[2 * i], drawn[2 * i + 1]];
     return {
       tip: frame(arm?.offsetB ?? { x: 0, y: 0 }),
       arm: frame(arm?.offsetA ?? { x: 0, y: 0 }),
@@ -105,20 +46,21 @@ function chevronsIn(batch: Parameters<typeof instances>[0], angle: number) {
 
 /** CSS px a label of one-way designators of these lengths takes, chevrons and separators included. */
 const oneWayTotal = (...names: number[]) =>
-  names.reduce((sum, n) => sum + widthOf(n) + 10, 0) + 9 * (names.length - 1);
+  names.reduce((sum, n) => sum + labelWidth(n) + 10, 0) + 9 * (names.length - 1);
 
-describe('buildRouteLabels', () => {
+describe('the route labels', () => {
   const west = airway('conv', 'V901', [3, 1], [1, 0.5], [0, 0.25]);
+  const example = chartOf([parseMapSet(EXAMPLE)]);
 
   it('centres a label on the middle of its span, along it and upright', () => {
     // Arrange
-    const items = [west];
+    const chart = [west];
 
     // Act
-    const { text } = build(items, ['conv']);
+    const { text } = routeLabels(chart);
 
     // Assert
-    const [label] = labelsIn(text);
+    const [label] = textRuns(text);
     expect(label?.text).toBe('V901');
     expect(label?.at.x).toBeCloseTo(1.5, 6);
     expect(label?.at.y).toBeCloseTo(0.625, 6);
@@ -131,13 +73,13 @@ describe('buildRouteLabels', () => {
 
   it('cuts a gap in the line: a box of the background, 12 px tall, 4 px past the text each side', () => {
     // Arrange
-    const items = [west];
+    const chart = [west];
 
     // Act
-    const { gaps, text } = build(items, ['conv']);
+    const { gaps, text } = routeLabels(chart);
 
     // Assert
-    const [gap] = instances(gaps);
+    const [gap] = segments(gaps);
     const angle = glyphs(text)[0]?.angle ?? NaN;
     const along = Math.atan2(
       (gap?.offsetB.y ?? 0) - (gap?.offsetA.y ?? 0),
@@ -151,7 +93,7 @@ describe('buildRouteLabels', () => {
         (gap?.offsetB.x ?? 0) - (gap?.offsetA.x ?? 0),
         (gap?.offsetB.y ?? 0) - (gap?.offsetA.y ?? 0),
       ),
-    ).toBeCloseTo(widthOf(4) + 8, 6);
+    ).toBeCloseTo(labelWidth(4) + 8, 6);
     expect((gap?.offsetA.x ?? 0) + (gap?.offsetB.x ?? 0)).toBeCloseTo(0, 6);
     expect(along).toBeCloseTo(angle, 6);
     expect(gap?.a).toEqual(gap?.b);
@@ -159,20 +101,20 @@ describe('buildRouteLabels', () => {
 
   it('labels a span shared by several routes once, each designator in its layer colour', () => {
     // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
+    const chart = example;
 
     // Act
-    const { text } = build(items, ALL_LAYERS);
+    const { text } = routeLabels(chart);
 
     // Assert
-    const labels = labelsIn(text);
-    const shared = labels.find((l) => l.text === 'V901Y902');
+    const runs = textRuns(text);
+    const shared = runs.find((l) => l.text === 'V901Y902');
     expect(shared?.glyphs.map((g) => g.color)).toEqual([
       ...Array(4).fill(packed('#9a6a4c')),
       ...Array(4).fill(packed('#4a8090')),
     ]);
     expect(
-      labels
+      runs
         .filter((l) => l.text.includes('V901'))
         .map((l) => l.text)
         .toSorted(),
@@ -181,13 +123,13 @@ describe('buildRouteLabels', () => {
 
   it('keeps a conventional and an RNAV airway of one designator apart', () => {
     // Arrange
-    const items = [airway('conv', 'X1', [0, 0], [2, 0]), airway('rnav', 'X1', [0, 0], [2, 0])];
+    const chart = [airway('conv', 'X1', [0, 0], [2, 0]), airway('rnav', 'X1', [0, 0], [2, 0])];
 
     // Act
-    const { text } = build(items, ['conv', 'rnav']);
+    const { text } = routeLabels(chart);
 
     // Assert
-    const [label] = labelsIn(text);
+    const [label] = textRuns(text);
     expect(label?.text).toBe('X1X1');
     expect(label?.glyphs.map((g) => g.color)).toEqual([
       ...Array(2).fill(packed('#9a6a4c')),
@@ -197,11 +139,11 @@ describe('buildRouteLabels', () => {
 
   it('labels a route once between its drawn stops, whatever fixes lie between', () => {
     // Arrange
-    const items = [
+    const chart = [
       airway('conv', 'V901', [0, 0], [1, 0], [2, 0]),
-      stops('navaid', 0),
-      stops('fix', 1),
-      stops('navaid', 2),
+      stopAt('navaid', [0, 0], 'n0'),
+      stopAt('fix', [1, 0], 'f1'),
+      stopAt('navaid', [2, 0], 'n2'),
     ];
     const rows: Layer[][] = [
       ['conv', 'navaid'],
@@ -209,7 +151,7 @@ describe('buildRouteLabels', () => {
     ];
 
     // Act
-    const counts = rows.map((layers) => labelsIn(build(items, layers).text).length);
+    const counts = rows.map((layers) => textRuns(routeLabels(chart, { layers }).text).length);
 
     // Assert
     expect(counts).toEqual([1, 2]);
@@ -217,43 +159,19 @@ describe('buildRouteLabels', () => {
 
   it('gives a hidden route no label', () => {
     // Arrange
-    const items = [west];
+    const chart = [west];
 
     // Act
-    const { text } = build(items, ['conv'], 'dense', () => shownExcept('V901'));
+    const { text } = routeLabels(chart, { hidden: ['V901'] });
 
     // Assert
     expect(text.count).toBe(0);
   });
 
-  it('labels a route from its density, a procedure too, and never a direct route', () => {
-    // Arrange
-    const rows: [Layer, number[]][] = [
-      ['conv', [0, 0, 1, 1]],
-      ['rnav', [0, 0, 1, 1]],
-      ['trans', [0, 0, 1, 1]],
-      ['sid', [0, 0, 0, 1]],
-      ['star', [0, 0, 0, 1]],
-      ['dct', [0, 0, 0, 0]],
-    ];
-
-    // Act
-    const counts = rows.map(([layer]) =>
-      LABEL_DENSITIES.map((density): number => {
-        const item = airway(layer, 'Q', [0, 0], [1, 0]);
-        return build([item], [layer], density).text.count > 0 ? 1 : 0;
-      }),
-    );
-
-    // Assert
-    expect(counts).toEqual(rows.map(([, expected]) => expected));
-  });
-
   it('shows a label from its threshold, hides it below, and keeps its state between', () => {
     // Arrange
-    const items = [stops('navaid', 0), airway('conv', 'V901', [0, 0], [2, 0])];
-    const layers: Layer[] = ['conv', 'navaid'];
-    const threshold = widthOf(4) + 28;
+    const chart = [stopAt('navaid', [0, 0]), airway('conv', 'V901', [0, 0], [2, 0])];
+    const threshold = labelWidth(4) + 28;
     const cut = 12 / 2 + 3;
     const scaleOf = (multiple: number) => (multiple * threshold + cut) / 2;
     const rows: [number[], boolean][] = [
@@ -267,16 +185,15 @@ describe('buildRouteLabels', () => {
     const memories = rows.map(([multiples]) => {
       const shown: ShownMemory = new Map();
       for (const multiple of multiples.slice(0, -1)) {
-        build(items, layers, 'dense', allShown, { settledScale: () => scaleOf(multiple), shown });
+        routeLabels(chart, { scale: scaleOf(multiple), shown });
       }
       return shown;
     });
 
     // Act
     const drawn = rows.map(([multiples], i) => {
-      const settledScale = () => scaleOf(multiples.at(-1) ?? 0);
-      const shown = memories[i] ?? new Map();
-      return build(items, layers, 'dense', allShown, { settledScale, shown }).text.count > 0;
+      const options = { scale: scaleOf(multiples.at(-1) ?? 0), shown: memories[i] ?? new Map() };
+      return routeLabels(chart, options).text.count > 0;
     });
 
     // Assert
@@ -285,15 +202,8 @@ describe('buildRouteLabels', () => {
 
   describe('a procedure', () => {
     const sid = airway('sid', 'SID1', [0, 0], [0.5, 0], [2, 0], [4, 0]);
-    const fixes = [stops('fix', 0.5), stops('fix', 2)];
-    const layers: Layer[] = ['sid', 'fix'];
-    const named = (scale: number) =>
-      labelsIn(
-        build([sid, ...fixes], layers, 'dense', allShown, {
-          settledScale: () => scale,
-          shown: new Map(),
-        }).text,
-      );
+    const fixes = [stopAt('fix', [0.5, 0], 'f1'), stopAt('fix', [2, 0], 'f2')];
+    const named = (scale: number) => textRuns(routeLabels([sid, ...fixes], { scale }).text);
 
     it('is named once, on the first of its spans that has room', () => {
       // Arrange
@@ -320,13 +230,13 @@ describe('buildRouteLabels', () => {
 
     it('joins the label of an airway on the same span, in draw-stack order', () => {
       // Arrange
-      const items = chartOf([parseMapSet(EXAMPLE)]);
+      const chart = example;
 
       // Act
-      const { text } = build(items, ALL_LAYERS);
+      const { text } = routeLabels(chart);
 
       // Assert
-      const joined = labelsIn(text).find((l) => l.text === 'TAVRO2.ZOLEKA901');
+      const joined = textRuns(text).find((l) => l.text === 'TAVRO2.ZOLEKA901');
       expect(joined?.glyphs.map((g) => g.color)).toEqual([
         ...Array(12).fill(packed('#40707c')),
         ...Array(4).fill(packed('#9a6a4c')),
@@ -335,33 +245,27 @@ describe('buildRouteLabels', () => {
 
     it('does not take the room of an airway label that already fits', () => {
       // Arrange
-      const items = [airway('conv', 'V901', [0, 0], [2, 0]), airway('sid', 'SID1', [0, 0], [2, 0])];
-      const scale = (2 * widthOf(4) + 9 + 28 - 1) / 2;
+      const chart = [airway('conv', 'V901', [0, 0], [2, 0]), airway('sid', 'SID1', [0, 0], [2, 0])];
+      const scale = (2 * labelWidth(4) + 9 + 28 - 1) / 2;
 
       // Act
-      const { text } = build(items, ['conv', 'sid'], 'dense', allShown, {
-        settledScale: () => scale,
-        shown: new Map(),
-      });
+      const { text } = routeLabels(chart, { scale });
 
       // Assert
-      expect(labelsIn(text).map((l) => l.text)).toEqual(['V901']);
+      expect(textRuns(text).map((l) => l.text)).toEqual(['V901']);
     });
 
     describe('on a span of airways', () => {
-      const items = [
+      const chart = [
         airway('conv', 'V901', [0, 0], [2, 0]),
         airway('conv', 'V902', [0, 0], [2, 0]),
         airway('sid', 'S1', [0, 0], [2, 0]),
       ];
-      const airwayT = 2 * widthOf(4) + 9 + 28;
+      const airwayT = 2 * labelWidth(4) + 9 + 28;
       const textAt = (multiple: number, shown: ShownMemory) =>
-        labelsIn(
-          build(items, ['conv', 'sid'], 'dense', allShown, {
-            settledScale: () => (multiple * airwayT) / 2,
-            shown,
-          }).text,
-        ).map((l) => l.text);
+        textRuns(routeLabels(chart, { scale: (multiple * airwayT) / 2, shown }).text).map(
+          (l) => l.text,
+        );
 
       it('is not named alone where the airways do not fit', () => {
         // Arrange
@@ -404,27 +308,27 @@ describe('buildRouteLabels', () => {
   describe('a one-way designator', () => {
     it('has a chevron after it where its route is flown along the reading, and before it, pointing back, where it is flown against', () => {
       // Arrange
-      const w = widthOf(4);
-      const rows: [Chart, { tipX: number; armX: number }[]][] = [
+      const w = labelWidth(4);
+      const rows: [Chart, { tipX: number; armX: number }][] = [
         [
           [oneWay('conv', 'V901', [0, 0], [2, 0])],
-          [{ tipX: -(w + 10) / 2 + w + 9, armX: -(w + 10) / 2 + w + 4 }],
+          { tipX: -(w + 10) / 2 + w + 9, armX: -(w + 10) / 2 + w + 4 },
         ],
         [
           [oneWay('conv', 'V901', [2, 0], [0, 0])],
-          [{ tipX: -(w + 10) / 2 + 1, armX: -(w + 10) / 2 + 6 }],
+          { tipX: -(w + 10) / 2 + 1, armX: -(w + 10) / 2 + 6 },
         ],
       ];
 
       // Act
-      const found = rows.map(([items]) => {
-        const { text, chevrons } = build(items, ['conv']);
+      const found = rows.map(([chart]) => {
+        const { text, chevrons } = routeLabels(chart);
         return chevronsIn(chevrons, glyphs(text)[0]?.angle ?? NaN);
       });
 
       // Assert
       found.forEach((chevs, i) => {
-        const [expected] = rows[i]?.[1] ?? [];
+        const expected = rows[i]?.[1];
         expect(chevs).toHaveLength(1);
         expect(chevs[0]?.tip.x).toBeCloseTo(expected?.tipX ?? NaN, 6);
         expect(chevs[0]?.arm.x).toBeCloseTo(expected?.armX ?? NaN, 6);
@@ -438,12 +342,12 @@ describe('buildRouteLabels', () => {
 
     it('is read per designator when two share a span, in the colour of each', () => {
       // Arrange
-      const items = [oneWay('conv', 'A1', [0, 0], [2, 0]), oneWay('rnav', 'B1', [2, 0], [0, 0])];
-      const w = widthOf(2);
+      const chart = [oneWay('conv', 'A1', [0, 0], [2, 0]), oneWay('rnav', 'B1', [2, 0], [0, 0])];
+      const w = labelWidth(2);
       const start = -oneWayTotal(2, 2) / 2;
 
       // Act
-      const { text, chevrons } = build(items, ['conv', 'rnav']);
+      const { text, chevrons } = routeLabels(chart);
 
       // Assert
       const [first, second] = chevronsIn(chevrons, glyphs(text)[0]?.angle ?? NaN);
@@ -455,13 +359,13 @@ describe('buildRouteLabels', () => {
 
     it('is flown along the reading on TAVRO-ZOLEK and against it on the way into QDG', () => {
       // Arrange
-      const items = chartOf([parseMapSet(EXAMPLE)]);
+      const chart = example;
 
       // Act
-      const { text, chevrons } = build(items, ALL_LAYERS);
+      const { text, chevrons } = routeLabels(chart);
 
       // Assert
-      const label = (name: string) => labelsIn(text).find((l) => l.text === name);
+      const label = (name: string) => textRuns(text).find((l) => l.text === name);
       const joined = label('TAVRO2.ZOLEKA901');
       const y903 = label('Y903');
       const ofLabel = (l: typeof joined) =>
@@ -476,18 +380,15 @@ describe('buildRouteLabels', () => {
 
     it('takes 10 px more room than the same designator without it', () => {
       // Arrange
-      const threshold = widthOf(4) + 28;
+      const threshold = labelWidth(4) + 28;
       const scale = (1.05 * threshold) / 2;
-      const fit = { settledScale: () => scale, shown: new Map() };
       const routes = [
         airway('conv', 'V901', [0, 0], [2, 0]),
         oneWay('conv', 'V901', [0, 0], [2, 0]),
       ];
 
       // Act
-      const drawn = routes.map(
-        (route) => build([route], ['conv'], 'dense', allShown, fit).text.count,
-      );
+      const drawn = routes.map((route) => routeLabels([route], { scale }).text.count);
 
       // Assert
       expect(drawn.map((n) => n > 0)).toEqual([true, false]);

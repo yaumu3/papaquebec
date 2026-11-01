@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import { chartWith, itemOf, line, partOf, point, polygon } from '../render/scene/chartFixture';
-import type { Chart, ItemPart } from './chart';
+import { type Chart, chartOf, type ItemPart } from './chart';
 import type { LonLat } from './mapdata';
+import { parseMapSet } from './mapset';
+import { EXAMPLE } from './mapsetCorpus';
 import type { Layer } from './mapsetFormat';
 import {
   drawnPointsOf,
@@ -411,5 +413,83 @@ describe('the vertex of a point', () => {
     expect(on?.vertex).toBe(path?.vertices[1]);
     expect(off?.vertex).not.toBe(path?.vertices[0]);
     expect(off?.vertex).not.toBe(path?.vertices[1]);
+  });
+});
+
+const labelOf = (p: ChartPath) =>
+  `${p.layer} ${'name' in p.part.properties ? p.part.properties.name : ''}`;
+
+/** The vertices strictly inside another path's edge, which is one line traced with two spacings. */
+function tracesOf(network: Network): string[] {
+  const found: string[] = [];
+  for (const p of network.paths) {
+    for (let i = 1; i < p.coordinates.length; i++) {
+      const [ax = 0, ay = 0] = p.coordinates[i - 1] ?? [];
+      const [bx = 0, by = 0] = p.coordinates[i] ?? [];
+      for (const q of network.paths.filter((other) => other !== p)) {
+        for (const [vx = 0, vy = 0] of q.coordinates) {
+          const [dx, dy, wx, wy] = [bx - ax, by - ay, vx - ax, vy - ay];
+          const t = (wx * dx + wy * dy) / (dx * dx + dy * dy);
+          if (Math.abs(dx * wy - dy * wx) < 1e-9 && t > 1e-9 && t < 1 - 1e-9) {
+            found.push(`${labelOf(q)} at ${vx},${vy} on ${labelOf(p)}`);
+          }
+        }
+      }
+    }
+  }
+  return found;
+}
+
+/** How many edges each layer owns when every part draws. */
+function ownedBy(network: Network): Record<string, number> {
+  const owners = ownersOf(network, new Set(network.paths.map((p) => p.part)));
+  const counts: Record<string, number> = {};
+  for (const path of network.paths) {
+    path.edges.forEach((edge, i) => {
+      if (owners[edge] !== path.firstOccurrence + i) return;
+      counts[path.layer] = (counts[path.layer] ?? 0) + 1;
+    });
+  }
+  return counts;
+}
+
+describe('the example map set', () => {
+  it("has no outline that traces another's line with different vertices", () => {
+    // Arrange
+    const { areas, routes } = topologyOf(chartOf([parseMapSet(EXAMPLE)]));
+
+    // Act
+    const traces = [areas, routes].map(tracesOf);
+
+    // Assert
+    expect(traces).toEqual([[], []]);
+  });
+
+  it('gives each layer the edges no nearer layer has', () => {
+    // Arrange
+    const { areas, routes } = topologyOf(chartOf([parseMapSet(EXAMPLE)]));
+    const expected = {
+      areas: {
+        ctr: 4,
+        pr: 4,
+        tma: 9,
+        sector: 5,
+        fir: 2,
+        dng: 4,
+        tra: 4,
+        adiz: 2,
+        cta: 7,
+        advisory: 4,
+        civt: 3,
+        asr: 1,
+      },
+      routes: { sid: 1, star: 1, trans: 1, conv: 2, rnav: 1, dct: 1 },
+    };
+
+    // Act
+    const counts = { areas: ownedBy(areas), routes: ownedBy(routes) };
+
+    // Assert
+    expect(counts).toEqual(expected);
   });
 });

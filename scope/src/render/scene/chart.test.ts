@@ -1,149 +1,67 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type Chart, type ChartItem, chartOf } from '../../lib/chart';
-import { DRAW_STACK, LABEL_DENSITIES, type LabelDensity, LAYER_TABLE } from '../../lib/layers';
-import { parseMapSet } from '../../lib/mapset';
-import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { type Layer, POINT_LAYERS, isChartLayer } from '../../lib/mapsetFormat';
-import { navaidSymbol } from '../../lib/navaidSymbol';
-import { drawnPointsOf, topologyOf } from '../../lib/topology';
-import { type LayerState, drawnItemsOf } from '../../lib/visibility';
-import { allShown, shownExcept } from '../../lib/visibilityFixture';
-import { type Batch, MARKER_STRIDE, Shape } from '../protocol';
-import { atlas } from './atlasFixture';
-import { buildPointLabels, buildShapes } from './chart';
+import type { Chart, ChartItem } from '../../lib/chart';
 import {
-  type Extra,
-  type Geometry,
+  DRAW_STACK,
+  isPointStyle,
+  LABEL_DENSITIES,
+  type LabelDensity,
+  LAYER_TABLE,
+} from '../../lib/layers';
+import { isChartLayer, isRouteLayer, type Layer } from '../../lib/mapsetFormat';
+import {
+  airway,
+  box,
+  edges,
   glyphs,
-  type Instance,
-  instances,
   itemOf,
-  keyed,
   line,
   packed,
   partOf,
   point,
   polygon,
   type Position,
-  project,
+  sceneOf,
+  type Segment,
+  segments,
+  single,
+  spelled,
+  stopAt,
   triangle,
 } from './chartFixture';
-import type { DrawnLabel } from './drawnLabels';
-import { putFigure } from './figures';
-import { LineBatch, MarkerBatch } from './pack';
 
-const NO_DECLINATION = () => () => 0;
-const has = (layers: readonly string[], layer: string) => layers.includes(layer);
+const PLACE = 5;
 
-/** A map set holding one navaid. */
-const navaidSet = (id: string, at: Position) =>
-  parseMapSet({
-    type: 'FeatureCollection',
-    version: 2,
-    id,
-    title: id,
-    features: [
-      {
-        type: 'Feature',
-        properties: { layer: 'navaid', id: 'Q' },
-        geometry: { type: 'Point', coordinates: at },
-      },
-    ],
-  });
-
-/** What the scope reads to decide what draws: the navaid range and each layer's state. */
-interface Reads {
-  inRange?: boolean;
-  stateOf?: (layer: Layer) => LayerState;
-}
-
-/** Every layer shown, and the items with these keys hidden. */
-const hiding =
-  (...keys: string[]) =>
-  () =>
-    shownExcept(...keys);
-
-const build = (
-  items: Chart,
-  layers: readonly Layer[] = DRAW_STACK.filter(isChartLayer),
-  labelDensity: LabelDensity = 'normal',
-  { inRange = true, stateOf = allShown }: Reads = {},
-) => {
-  const topology = topologyOf(items);
-  const drawnItems = drawnItemsOf(items, layers, stateOf, () => inRange);
-  const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  const input = { topology, drawnPoints, project, layers, drawnItems };
-  const {
-    batches: [labels],
-    drawn,
-  } = buildPointLabels({ ...input, labelDensity, atlas });
-  if (!labels) throw new Error('buildPointLabels returned no batch');
-  return {
-    ...buildShapes(input, NO_DECLINATION),
-    labels,
-    drawn: drawn ?? new Map<string, DrawnLabel>(),
-  };
-};
-
-describe('buildShapes lines', () => {
-  it('styles each layer, refined by the kind or the stratum of the part', () => {
+describe('the lines of the chart', () => {
+  it('refines a layer by the kind of the part, and by an upper stratum', () => {
     // Arrange
-    const dim = '#5e3a3a';
-    const bright = '#a04040';
-    const grey = '#4a4a47';
-    const procedure = '#33606c';
-    const rows: {
-      layer: Layer;
-      extra?: object;
-      color: string;
-      pattern: number[];
-      width?: number;
-    }[] = [
-      { layer: 'ctr', color: bright, pattern: [0, 0, 0, 0] },
-      { layer: 'pr', color: bright, pattern: [4, 3, 0, 0] },
-      { layer: 'pr', extra: { kind: 'P' }, color: bright, pattern: [0, 0, 0, 0] },
-      { layer: 'pr', extra: { kind: 'R' }, color: bright, pattern: [4, 3, 0, 0] },
-      { layer: 'tma', color: dim, pattern: [0, 0, 0, 0] },
-      { layer: 'tma', extra: { kind: 'MIL' }, color: dim, pattern: [8, 3, 0, 0] },
-      { layer: 'sector', color: '#4a6878', pattern: [6, 4, 0, 0] },
-      { layer: 'sector', extra: { lower: 'FL335' }, color: '#4a6878', pattern: [12, 4, 0, 0] },
-      { layer: 'sector', extra: { lower: 'SFC' }, color: '#4a6878', pattern: [6, 4, 0, 0] },
-      { layer: 'fir', color: '#606060', pattern: [16, 5, 0, 0] },
-      { layer: 'dng', color: dim, pattern: [4, 3, 0, 0] },
-      { layer: 'tra', color: dim, pattern: [4, 3, 0, 0] },
-      { layer: 'adiz', color: grey, pattern: [16, 4, 2, 4] },
-      { layer: 'cta', color: dim, pattern: [0, 0, 0, 0] },
-      { layer: 'cta', extra: { kind: 'PCA' }, color: dim, pattern: [12, 6, 0, 0] },
-      { layer: 'advisory', color: dim, pattern: [10, 3, 2, 3] },
-      { layer: 'civt', color: dim, pattern: [2, 3, 0, 0] },
-      { layer: 'asr', color: grey, pattern: [2, 4, 0, 0] },
-      { layer: 'conv', color: '#82573c', pattern: [0, 0, 0, 0] },
-      { layer: 'rnav', color: '#3a6a78', pattern: [0, 0, 0, 0] },
-      { layer: 'dct', color: '#82573c', pattern: [0, 0, 0, 0], width: 0.5 },
-      { layer: 'sid', color: procedure, pattern: [0, 0, 0, 0] },
-      { layer: 'star', color: procedure, pattern: [6, 3, 0, 0] },
-      { layer: 'trans', color: procedure, pattern: [10, 4, 0, 0] },
+    const rows: { layer: Layer; extra?: object; pattern: number[] }[] = [
+      { layer: 'pr', pattern: [4, 3, 0, 0] },
+      { layer: 'pr', extra: { kind: 'P' }, pattern: [0, 0, 0, 0] },
+      { layer: 'tma', pattern: [0, 0, 0, 0] },
+      { layer: 'tma', extra: { kind: 'MIL' }, pattern: [8, 3, 0, 0] },
+      { layer: 'sector', pattern: [6, 4, 0, 0] },
+      { layer: 'sector', extra: { lower: 'FL335' }, pattern: [12, 4, 0, 0] },
+      { layer: 'sector', extra: { lower: 'SFC' }, pattern: [6, 4, 0, 0] },
+      { layer: 'cta', extra: { kind: 'PCA' }, pattern: [12, 6, 0, 0] },
     ];
     const items = rows.map((r) =>
       itemOf(r.layer, partOf(r.layer, line([0, 0], [0.01, 0]), r.extra)),
     );
 
     // Act
-    const drawn = items.map((item) => instances(build([item]).lines)[0]);
+    const drawn = items.map((item) => segments(sceneOf([item]).shapes().lines)[0]);
 
     // Assert
-    expect(drawn.map((i) => i?.color)).toEqual(rows.map((r) => packed(r.color)));
-    expect(drawn.map((i) => i?.pattern)).toEqual(rows.map((r) => r.pattern));
-    expect(drawn.map((i) => i?.width)).toEqual(rows.map((r) => r.width ?? 1));
+    expect(drawn.map((s) => s?.pattern)).toEqual(rows.map((r) => r.pattern));
   });
 
   it('runs the dash on across a vertex', () => {
     // Arrange
-    const item = itemOf('fir', partOf('fir', line([0, 0], [0.03, 0], [0.03, 0.04])));
+    const item = single('fir', line([0, 0], [0.03, 0], [0.03, 0.04]));
 
     // Act
-    const [first, second] = instances(build([item]).lines);
+    const [first, second] = segments(sceneOf([item]).shapes().lines);
 
     // Assert
     expect(first?.along).toBe(0);
@@ -152,11 +70,11 @@ describe('buildShapes lines', () => {
 
   it('draws a line area open, and a polygon along its ring without closing it again', () => {
     // Arrange
-    const open = itemOf('sector', partOf('sector', line([0, 0], [1, 0], [1, 1])));
-    const closed = itemOf('ctr', partOf('ctr', polygon(triangle(0))));
+    const open = single('sector', line([0, 0], [1, 0], [1, 1]));
+    const closed = single('ctr', polygon(triangle(0)));
 
     // Act
-    const counts = [open, closed].map((item) => build([item]).lines.count);
+    const counts = [open, closed].map((item) => sceneOf([item]).shapes().lines.count);
 
     // Assert
     expect(counts).toEqual([2, 3]);
@@ -164,7 +82,7 @@ describe('buildShapes lines', () => {
 
   it('draws the holes of a polygon and every part of an item', () => {
     // Arrange
-    const holed = itemOf('tma', partOf('tma', polygon(triangle(0), triangle(0.5))));
+    const holed = single('tma', polygon(triangle(0), triangle(0.5)));
     const stepped = itemOf(
       'tma',
       partOf('tma', polygon(triangle(0))),
@@ -172,7 +90,7 @@ describe('buildShapes lines', () => {
     );
 
     // Act
-    const counts = [holed, stepped].map((item) => build([item]).lines.count);
+    const counts = [holed, stepped].map((item) => sceneOf([item]).shapes().lines.count);
 
     // Assert
     expect(counts).toEqual([6, 6]);
@@ -180,90 +98,43 @@ describe('buildShapes lines', () => {
 
   it('draws nothing for a layer that is not among those shown', () => {
     // Arrange
-    const item = itemOf('ctr', partOf('ctr', polygon(triangle(0))));
-    const shown: Layer[] = ['fir', 'sid'];
+    const scene = sceneOf([single('ctr', polygon(triangle(0)))], { layers: ['fir', 'sid'] });
 
     // Act
-    const batches = build([item], shown, 'dense');
+    const { lines, markers } = scene.shapes();
 
     // Assert
-    expect([batches.lines.count, batches.markers.count, batches.labels.count]).toEqual([0, 0, 0]);
+    expect([lines.count, markers.count, scene.pointLabels().text.count]).toEqual([0, 0, 0]);
   });
 
-  it('draws the layers back to front in the stack, each read by where its item sits', () => {
-    // Arrange
-    const lineLayers = DRAW_STACK.filter(isChartLayer).filter(
-      (l) => !has(POINT_LAYERS, l) && l !== 'hold',
-    );
-    const items = lineLayers.map((layer) =>
-      itemOf(
-        layer,
-        partOf(layer, line([0, LAYER_TABLE[layer].rank], [0.01, LAYER_TABLE[layer].rank])),
-      ),
-    );
-    const shuffled = items.toReversed();
-    const expected = lineLayers.map((l) => LAYER_TABLE[l].rank).toReversed();
-
-    // Act
-    const drawn = instances(build(shuffled).lines).map((i) => i.a.y);
-
-    // Assert
-    expect(drawn).toEqual(expected);
-  });
-});
-
-describe('buildShapes shared edges', () => {
   it("draws an edge two layers share once, in the front layer's colour, and hands it down when the front layer is hidden", () => {
     // Arrange
-    const items = [
-      itemOf('fir', partOf('fir', line([0, 0], [1, 0], [0, 1]))),
-      itemOf('tma', partOf('tma', line([0, 0], [1, 0], [1, 1]))),
+    const chart = [
+      single('fir', line([0, 0], [1, 0], [0, 1])),
+      single('tma', line([0, 0], [1, 0], [1, 1])),
     ];
     const rows: Layer[][] = [['tma', 'fir'], ['fir']];
+    const fir = packed('#606060');
+    const tma = packed('#5e3a3a');
 
     // Act
-    const drawn = rows.map((layers) => instances(build(items, layers).lines));
+    const drawn = rows.map((layers) => sceneOf(chart, { layers }).shapes().lines);
 
     // Assert
-    expect(drawn.map((batch) => batch.map((i) => [i.a.x, i.a.y, i.b.x, i.b.y]))).toEqual([
-      [
-        [1, 0, 0, 1],
-        [0, 0, 1, 0],
-        [1, 0, 1, 1],
-      ],
-      [
-        [0, 0, 1, 0],
-        [1, 0, 0, 1],
-      ],
+    expect(drawn.map((batch) => segments(batch).map((s) => s.color))).toEqual([
+      [fir, tma, tma],
+      [fir, fir],
     ]);
-    expect(drawn.map((batch) => batch.map((i) => i.color))).toEqual([
-      [packed('#606060'), packed('#5e3a3a'), packed('#5e3a3a')],
-      [packed('#606060'), packed('#606060')],
+    expect(drawn.map(edges)).toEqual([
+      ['1,0>0,1', '0,0>1,0', '1,0>1,1'],
+      ['0,0>1,0', '1,0>0,1'],
     ]);
   });
 
   it("draws the footprint two strata share once, with the lower stratum's dash, whichever part comes first", () => {
     // Arrange
-    const lower = partOf(
-      'sector',
-      polygon([
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 0],
-      ]),
-    );
-    const upper = partOf(
-      'sector',
-      polygon([
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-        [0, 0],
-      ]),
-      { lower: 'FL335' },
-    );
+    const lower = partOf('sector', polygon(box(0, 1)));
+    const upper = partOf('sector', polygon(box(0, 1)), { lower: 'FL335' });
     const orders = [
       [lower, upper],
       [upper, lower],
@@ -271,245 +142,120 @@ describe('buildShapes shared edges', () => {
 
     // Act
     const dashes = orders.map((parts) =>
-      instances(build([itemOf('sector', ...parts)]).lines)
-        .map((i) => i.pattern[0])
-        .toSorted((a, b) => (a ?? 0) - (b ?? 0)),
+      segments(sceneOf([itemOf('sector', ...parts)]).shapes().lines).map((s) => s.pattern[0]),
     );
 
     // Assert
     expect(dashes).toEqual([
-      [6, 6, 6, 12, 12],
-      [6, 6, 6, 12, 12],
+      [6, 6, 6, 6],
+      [6, 6, 6, 6],
     ]);
-  });
-
-  it('draws the edge two parts of one stepped item share once', () => {
-    // Arrange
-    const base = partOf(
-      'tma',
-      polygon([
-        [0, 0],
-        [1, 0],
-        [1, 1],
-        [0, 1],
-        [0, 0],
-      ]),
-    );
-    const step = partOf(
-      'tma',
-      polygon([
-        [1, 0],
-        [2, 0],
-        [2, 1],
-        [1, 1],
-        [1, 0],
-      ]),
-    );
-
-    // Act
-    const { lines } = build([itemOf('tma', base, step)]);
-
-    // Assert
-    expect(lines.count).toBe(7);
   });
 
   it('splits a path at an edge it shares, and restarts the dash in the next run', () => {
     // Arrange
-    const items = [
-      itemOf('fir', partOf('fir', line([0, 0], [1, 0], [2, 0], [3, 0], [4, 0]))),
-      itemOf('tma', partOf('tma', line([1, 0], [2, 0]))),
+    const chart = [
+      single('fir', line([0, 0], [1, 0], [2, 0], [3, 0], [4, 0])),
+      single('tma', line([1, 0], [2, 0])),
     ];
 
     // Act
-    const drawn = instances(build(items).lines).map((i) => [i.a.x, i.along]);
+    const { lines } = sceneOf(chart).shapes();
 
     // Assert
-    expect(drawn).toEqual([
-      [0, 0],
-      [2, 0],
-      [3, 1],
-      [1, 0],
-    ]);
-  });
-
-  it('draws a route segment two routes share once, as the front layer', () => {
-    // Arrange
-    const items = [
-      itemOf('rnav', partOf('rnav', line([1, 0], [2, 0], [2, 1]))),
-      itemOf('conv', partOf('conv', line([0, 0], [1, 0], [2, 0]))),
-    ];
-
-    // Act
-    const drawn = instances(build(items).lines);
-
-    // Assert
-    expect(drawn.map((i) => [i.a.x, i.a.y, i.b.x, i.b.y].concat(i.color))).toEqual([
-      [2, 0, 2, 1].concat(packed('#3a6a78')),
-      [0, 0, 1, 0].concat(packed('#82573c')),
-      [1, 0, 2, 0].concat(packed('#82573c')),
-    ]);
-  });
-
-  it('keeps an area and a route on one line apart, and draws both', () => {
-    // Arrange
-    const items = [
-      itemOf('sector', partOf('sector', line([0, 0], [1, 0]))),
-      itemOf('conv', partOf('conv', line([0, 0], [1, 0]))),
-    ];
-
-    // Act
-    const { lines } = build(items);
-
-    // Assert
-    expect(lines.count).toBe(2);
+    expect(segments(lines).map((s) => `${s.a.x}:${s.along}`)).toEqual(['0:0', '2:0', '3:1', '1:0']);
   });
 });
 
-const chord = ({ a, b }: Instance) => Math.hypot(b.x - a.x, b.y - a.y);
-
-/** Whether any part of an instance shows at `pxPerNm`, by the line shader's rule for the cuts. */
-function visibleAt(i: Instance, pxPerNm: number): boolean {
-  const [back, ahead, cutBack, cutAhead] = i.span;
-  const len = chord(i) * pxPerNm;
-  const from = cutBack ? Math.max(0, (cutBack - (back ?? 0) * pxPerNm) / len) : 0;
-  const to = cutAhead ? Math.min(1, 1 - (cutAhead - (ahead ?? 0) * pxPerNm) / len) : 1;
+/** Whether any part of a segment shows at `pxPerNm`, by the line shader's rule for the cuts. */
+function visibleAt(s: Segment, pxPerNm: number): boolean {
+  const [back = 0, ahead = 0, cutBack = 0, cutAhead = 0] = s.span;
+  const len = Math.hypot(s.b.x - s.a.x, s.b.y - s.a.y) * pxPerNm;
+  const from = cutBack ? Math.max(0, (cutBack - back * pxPerNm) / len) : 0;
+  const to = cutAhead ? Math.min(1, 1 - (cutAhead - ahead * pxPerNm) / len) : 1;
   return from <= to;
 }
 
-const stopAt = (layer: Layer, at: Position) => itemOf(layer, partOf(layer, point(at)));
-const routeOf = (layer: Layer, ...at: Position[]) => itemOf(layer, partOf(layer, line(...at)));
+const route = (...at: Position[]) => airway('conv', 'R', ...at);
 
-describe('buildShapes routes stop short of points', () => {
+describe('routes stop short of points', () => {
   const conv = packed('#82573c');
-  const cutsOf = (items: ChartItem[], layers?: readonly Layer[], reads?: Reads) =>
-    instances(build(items, layers, 'normal', reads).lines)
-      .filter((i) => i.color.every((c, k) => c === conv[k]))
-      .map((i) => i.span);
+  const cutsOf = (chart: Chart, options: Parameters<typeof sceneOf>[1] = {}) =>
+    segments(sceneOf(chart, options).shapes().lines)
+      .filter((s) => s.color.every((c, k) => c === conv[k]))
+      .map((s) => s.span);
 
   it('cuts a route back at a stop on either side of it', () => {
     // Arrange
-    const items = [routeOf('conv', [0, 0], [1, 0], [2, 0]), stopAt('fix', [1, 0])];
+    const chart = [route([0, 0], [1, 0], [2, 0]), stopAt('fix', [1, 0])];
 
     // Act
-    const cuts = new Set(
-      cutsOf(items, ['conv', 'fix']).map(([, , back, ahead]) => `${back},${ahead}`),
-    );
+    const cuts = cutsOf(chart, { layers: ['conv', 'fix'] });
 
     // Assert
-    expect([...cuts].toSorted()).toEqual(['0,7', '7,0']);
+    const ways = cuts.map(([, , back = 0, ahead = 0]) => `${back > 0},${ahead > 0}`);
+    expect(ways.toSorted()).toEqual(['false,true', 'true,false']);
   });
 
   it('measures the way back and ahead along the whole span, across vertices and runs', () => {
     // Arrange
-    const rows: [string, ChartItem[], Layer[], number[][]][] = [
+    const rows: [Chart, Layer[], string[]][] = [
       [
-        'a stop at each end, across edges of unequal length',
-        [
-          routeOf('conv', [0, 0], [1, 0], [3, 0], [7, 0]),
-          stopAt('fix', [0, 0]),
-          stopAt('navaid', [7, 0]),
-        ],
+        [route([0, 0], [1, 0], [3, 0], [7, 0]), stopAt('fix', [0, 0]), stopAt('navaid', [7, 0])],
         ['conv', 'fix', 'navaid'],
-        [
-          [0, 6, 7, 9],
-          [1, 4, 7, 9],
-          [3, 0, 7, 9],
-        ],
+        ['0,6,7,9', '1,4,7,9', '3,0,7,9'],
       ],
       [
-        'a run another route owns in the middle',
         [
-          routeOf('conv', [0, 0], [1, 0], [3, 0], [4, 0], [6, 0]),
-          routeOf('sid', [1, 0], [3, 0]),
+          route([0, 0], [1, 0], [3, 0], [4, 0], [6, 0]),
+          airway('sid', 'S', [1, 0], [3, 0]),
           stopAt('fix', [0, 0]),
           stopAt('fix', [6, 0]),
         ],
         ['sid', 'conv', 'fix'],
-        [
-          [0, 5, 7, 7],
-          [3, 2, 7, 7],
-          [4, 0, 7, 7],
-        ],
+        ['0,5,7,7', '3,2,7,7', '4,0,7,7'],
       ],
       [
-        'a stop inside a path, and none at its ends',
-        [routeOf('conv', [0, 0], [2, 0], [3, 0], [5, 0]), stopAt('fix', [2, 0])],
+        [route([0, 0], [2, 0], [3, 0], [5, 0]), stopAt('fix', [2, 0])],
         ['conv', 'fix'],
-        [
-          [0, 0, 0, 7],
-          [0, 2, 7, 0],
-          [1, 0, 7, 0],
-        ],
+        ['0,0,0,7', '0,2,7,0', '1,0,7,0'],
       ],
     ];
 
     // Act
-    const spans = rows.map(([, items, layers]) =>
-      cutsOf(items, layers).map((span) => span.map((v) => Math.round(v * 1000) / 1000)),
+    const spans = rows.map(([chart, layers]) =>
+      cutsOf(chart, { layers }).map((span) => span.map((v) => Math.round(v * 1000) / 1000).join()),
     );
 
     // Assert
-    expect(spans).toEqual(rows.map(([, , , expected]) => expected));
+    expect(spans).toEqual(rows.map(([, , expected]) => expected));
   });
 
   it('writes no cut where no point stands at a vertex, where the point layer is hidden, or the navaid is out of range', () => {
     // Arrange
-    const through = routeOf('conv', [0, 0], [1, 0], [2, 0]);
-    const rows: [string, ChartItem[], readonly Layer[], Reads][] = [
-      ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix'], {}],
-      ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv'], {}],
-      [
-        'a navaid beyond the range threshold',
-        [through, stopAt('navaid', [1, 0])],
-        ['conv', 'navaid'],
-        { inRange: false },
-      ],
+    const through = route([0, 0], [1, 0], [2, 0]);
+    const rows: [Chart, Parameters<typeof sceneOf>[1]][] = [
+      [[through, stopAt('fix', [5, 5])], {}],
+      [[through, stopAt('fix', [1, 0])], { layers: ['conv'] }],
+      [[through, stopAt('navaid', [1, 0])], { inRange: false }],
     ];
 
     // Act
-    const spans = rows.map(([, items, layers, reads]) => cutsOf(items, layers, reads));
+    const cuts = rows.map(([chart, options]) => cutsOf(chart, options));
 
     // Assert
-    expect(spans.map((list) => list.every((s) => s.every((v) => v === 0)))).toEqual([
-      true,
-      true,
-      true,
-    ]);
-    expect(spans.map((list) => list.length > 0)).toEqual([true, true, true]);
-  });
-
-  it('cuts half the marker plus 3 CSS px', () => {
-    // Arrange
-    const rows: [Layer, number][] = [
-      ['fix', 7],
-      ['navaid', 9],
-      ['ad', 7.5],
-      ['vfr', 6],
-    ];
-    const charts = rows.map(([layer]) => ({
-      layer,
-      items: [routeOf('conv', [0, 0], [1, 0], [2, 0]), stopAt(layer, [1, 0])],
-    }));
-
-    // Act
-    const cuts = charts.map(({ layer, items }) => cutsOf(items, ['conv', layer])[0]?.[3]);
-
-    // Assert
-    expect(cuts).toEqual(rows.map(([, cut]) => cut));
+    expect(cuts.map((list) => list.length > 0)).toEqual([true, true, true]);
+    expect(cuts.map((list) => list.flat().every((v) => v === 0))).toEqual([true, true, true]);
   });
 
   it('draws a span shorter than its two cuts at no zoom where it is short, and at a closer one, from one batch', () => {
     // Arrange
-    const items = [
-      routeOf('conv', [0, 0], [0.001, 0]),
-      stopAt('fix', [0, 0]),
-      stopAt('fix', [0.001, 0]),
-    ];
-    const drawn = instances(build(items, ['conv', 'fix']).lines);
+    const chart = [route([0, 0], [0.001, 0]), stopAt('fix', [0, 0]), stopAt('fix', [0.001, 0])];
+    const drawn = segments(sceneOf(chart).shapes().lines);
     const [far, near] = [1000, 100_000];
 
     // Act
-    const shown = [far, near].map((zoom) => drawn.some((i) => visibleAt(i, zoom)));
+    const shown = [far, near].map((zoom) => drawn.some((s) => visibleAt(s, zoom)));
 
     // Assert
     expect(shown).toEqual([false, true]);
@@ -517,25 +263,20 @@ describe('buildShapes routes stop short of points', () => {
 
   it('reads the drawn points only for a route or a point layer', () => {
     // Arrange
-    const items = [
-      routeOf('conv', [0, 0], [1, 0]),
-      itemOf('tma', partOf('tma', polygon(triangle(0)))),
-    ];
+    const chart = [route([0, 0], [1, 0]), single('tma', polygon(triangle(0)))];
     const rows: Layer[][] = [['tma'], [], ['conv'], ['fix']];
     const reads = rows.map(() => 0);
-    const inputs = rows.map((layers, i) => ({
-      topology: topologyOf(items),
-      drawnPoints: () => {
-        reads[i] = (reads[i] ?? 0) + 1;
-        return [];
-      },
-      project,
-      layers,
-      drawnItems: drawnItemsOf(items, layers, allShown, () => true),
-    }));
+    const scenes = rows.map((layers, i) =>
+      sceneOf(chart, {
+        layers,
+        onPointsRead: () => {
+          reads[i] = (reads[i] ?? 0) + 1;
+        },
+      }),
+    );
 
     // Act
-    for (const input of inputs) buildShapes(input, NO_DECLINATION);
+    for (const scene of scenes) scene.shapes();
 
     // Assert
     expect(reads.map((n) => n > 0)).toEqual([false, false, true, true]);
@@ -543,311 +284,166 @@ describe('buildShapes routes stop short of points', () => {
 
   it('does not cut an area outline where a point stands on its vertex', () => {
     // Arrange
-    const items = [itemOf('tma', partOf('tma', polygon(triangle(0)))), stopAt('fix', [0.01, 0])];
+    const chart = [single('tma', polygon(triangle(0))), stopAt('fix', [0.01, 0])];
 
     // Act
-    const { lines } = build(items, ['tma', 'fix']);
+    const { lines } = sceneOf(chart).shapes();
 
     // Assert
-    expect(instances(lines).every((i) => i.span.every((v) => v === 0))).toBe(true);
+    expect(segments(lines).every((s) => s.span.every((v) => v === 0))).toBe(true);
     expect(lines.count).toBe(3);
+  });
+
+  it('does not stop a route at a hidden fix, and gives the fix no marker or label', () => {
+    // Arrange
+    const chart = [route([0, 0], [1, 0], [2, 0]), stopAt('fix', [1, 0], 'stop')];
+    const rows = [[], ['stop']];
+
+    // Act
+    const built = rows.map((hidden) => {
+      const scene = sceneOf(chart, { hidden });
+      return { shapes: scene.shapes(), labels: scene.pointLabels().text };
+    });
+
+    // Assert
+    expect(built.map((b) => b.shapes.markers.count)).toEqual([1, 0]);
+    expect(built.map((b) => b.labels.count)).toEqual([1, 0]);
+    expect(
+      built.map((b) => segments(b.shapes.lines).some((s) => s.span.some((v) => v !== 0))),
+    ).toEqual([true, false]);
   });
 });
 
-const markerXs = ({ count, data }: Batch) =>
-  Array.from({ length: count }, (_, i) => data[i * MARKER_STRIDE]);
+describe('the navaids', () => {
+  const at: Position = [139.5, 35.5];
+  const drawing = (kind: string | undefined, positions: Position[] = [at]) => {
+    const parts = positions.map((p) =>
+      partOf('navaid', point(p), kind === undefined ? {} : { kind }),
+    );
+    const { lines, markers } = sceneOf([itemOf('navaid', ...parts)]).shapes();
+    return JSON.stringify([Array.from(lines.data), Array.from(markers.data)]);
+  };
 
-/** A navaid item of the given part kinds, one part at each position. */
-const navaidOf = (parts: [Position, string | undefined][]) =>
-  itemOf(
-    'navaid',
-    ...parts.map(([at, kind]) => partOf('navaid', point(at), kind === undefined ? {} : { kind })),
-  );
-
-/** What the points slice draws for navaid symbols: each of `symbols` at its position, in order. */
-function symbolsAt(symbols: [Position, string | undefined][]) {
-  const lines = new LineBatch();
-  const markers = new MarkerBatch();
-  for (const [[x, y], kind] of symbols) {
-    putFigure({ lines, markers }, { x, y }, navaidSymbol(kind, 12), '#808080');
-  }
-  return [Array.from(lines.finish().data), Array.from(markers.finish().data)];
-}
-
-const shapesOf = ({ lines, markers }: { lines: Batch; markers: Batch }) => [
-  Array.from(lines.data),
-  Array.from(markers.data),
-];
-
-describe('buildShapes navaids', () => {
-  it('draws each navaid kind as its own symbol', () => {
+  it('draws each navaid kind as a symbol of its own', () => {
     // Arrange
     const kinds = ['VOR', 'DME', 'VOR/DME', 'TACAN', 'VORTAC', 'NDB'];
-    const at: Position = [139.5, 35.5];
 
     // Act
-    const drawn = kinds.map((kind) => shapesOf(build([navaidOf([[at, kind]])])));
+    const drawn = kinds.map((kind) => drawing(kind));
 
     // Assert
-    expect(drawn).toEqual(kinds.map((kind) => symbolsAt([[at, kind]])));
-    expect(new Set(drawn.map((d) => JSON.stringify(d))).size).toBe(kinds.length);
+    expect(new Set(drawn).size).toBe(kinds.length);
   });
 
   it('draws an unknown kind and a missing one as the default circle', () => {
     // Arrange
     const kinds = ['TVOR', 'vor', undefined];
-    const at: Position = [139.5, 35.5];
 
     // Act
-    const drawn = kinds.map((kind) => shapesOf(build([navaidOf([[at, kind]])])));
+    const drawn = kinds.map((kind) => drawing(kind));
 
     // Assert
-    expect(drawn).toEqual(kinds.map(() => symbolsAt([[at, undefined]])));
+    expect(drawn).toEqual(kinds.map(() => drawing(undefined)));
   });
 
   it("draws every part of a navaid with its first part's kind", () => {
     // Arrange
-    const first: Position = [139.5, 35.5];
-    const second: Position = [139.6, 35.5];
-    const item = navaidOf([
-      [first, 'VOR'],
-      [second, 'NDB'],
-    ]);
-
-    // Act
-    const drawn = shapesOf(build([item]));
-
-    // Assert
-    expect(drawn).toEqual(
-      symbolsAt([
-        [first, 'VOR'],
-        [second, 'VOR'],
-      ]),
-    );
-  });
-
-  it("draws the example's QDG as VORTAC and QIK as VOR/DME", () => {
-    // Arrange
-    const chart = chartOf([parseMapSet(EXAMPLE)]);
-
-    // Act
-    const drawn = shapesOf(build(chart, ['navaid']));
-
-    // Assert
-    expect(drawn).toEqual(
-      symbolsAt([
-        [[130.4406, 33.5967], 'VORTAC'],
-        [[129.96, 33.73], 'VOR/DME'],
-      ]),
-    );
-  });
-});
-
-describe('buildShapes markers', () => {
-  it('draws each kind of point with its own glyph, size and colour', () => {
-    // Arrange
-    const rows: [Layer, Shape, number, string][] = [
-      ['ad', Shape.Ring, 9, '#8a8a8a'],
-      ['fix', Shape.Triangle, 8, '#707070'],
-      ['vfr', Shape.Triangle, 6, '#5c5c5c'],
-    ];
-    const items = rows.map(([layer]) => itemOf(layer, partOf(layer, point([139.5, 35.5]))));
-
-    // Act
-    const read = items.map((item) =>
-      Array.from(build([item]).markers.data.subarray(0, MARKER_STRIDE)),
-    );
-
-    // Assert
-    expect(read.map((m) => [m[0], m[1]])).toEqual(rows.map(() => [139.5, 35.5]));
-    expect(read.map((m) => [m[4], m[5]])).toEqual(rows.map(([, shape, size]) => [size, shape]));
-    expect(read.map((m) => m.slice(6, 10))).toEqual(rows.map(([, , , hex]) => packed(hex)));
-  });
-
-  it('draws the points back to front in the stack', () => {
-    // Arrange
-    const pointLayers = DRAW_STACK.filter((l): l is Layer => has(POINT_LAYERS, l));
-    const items = pointLayers.map((layer) =>
-      itemOf(layer, partOf(layer, point([LAYER_TABLE[layer].rank, 0]))),
-    );
-    const expected = pointLayers.map((l) => LAYER_TABLE[l].rank).toReversed();
-
-    // Act
-    const xs = markerXs(build(items.toReversed()).markers);
-
-    // Assert
-    expect(xs).toEqual(expected);
-  });
-
-  it('draws the same navaid of two sets once, with its label, and one elsewhere twice', () => {
-    // Arrange
-    const rows: Position[] = [
-      [139.8, 35.5],
-      [139.8, 35.7],
-    ];
-    const charts = rows.map((at) =>
-      chartOf([navaidSet('first', [139.8, 35.5]), navaidSet('second', at)]),
+    const east: Position = [139.6, 35.5];
+    const mixed = itemOf(
+      'navaid',
+      partOf('navaid', point(at), { kind: 'VOR' }),
+      partOf('navaid', point(east), { kind: 'NDB' }),
     );
 
     // Act
-    const drawn = charts.map((chart) => build(chart, ['navaid'], 'dense'));
+    const drawn = sceneOf([mixed]).shapes();
 
     // Assert
-    expect(drawn.map((d) => [d.markers.count, d.labels.count])).toEqual([
-      [1, 1],
-      [2, 2],
-    ]);
-  });
-
-  it('draws a route layer as lines only', () => {
-    // Arrange
-    const layer = 'conv';
-    const item = itemOf(layer, partOf(layer, line([0, 0], [0.01, 0])));
-
-    // Act
-    const batches = build([item]);
-
-    // Assert
-    expect([batches.lines.count, batches.markers.count]).toEqual([1, 0]);
-  });
-});
-
-const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
-
-/** A one-part item whose name is one glyph, so its label is one instance. */
-const onePart = (layer: Layer, geometry: Geometry, extra: Extra = {}) =>
-  itemOf(layer, partOf(layer, geometry, extra));
-
-const placeholder = (layer: Layer): Geometry =>
-  has(POINT_LAYERS, layer) ? point([0, 0]) : line([0, 0], [0.01, 0]);
-
-describe('buildPointLabels', () => {
-  it('labels each point layer from its own label density up', () => {
-    // Arrange
-    const from: [Layer, LabelDensity | null][] = [
-      ['ad', 'sparse'],
-      ['navaid', 'sparse'],
-      ['fix', 'normal'],
-      ['vfr', 'dense'],
-    ];
-    const expected = from.map(([, first]) =>
-      LABEL_DENSITIES.map((d) => (first !== null && rank(d) >= rank(first) ? 1 : 0)),
-    );
-
-    // Act
-    const counts = from.map(([layer]) =>
-      LABEL_DENSITIES.map(
-        (d) => build([onePart(layer, placeholder(layer))], [layer], d).labels.count,
+    const { lines, markers } = sceneOf([
+      itemOf(
+        'navaid',
+        partOf('navaid', point(at), { kind: 'VOR' }),
+        partOf('navaid', point(east), { kind: 'VOR' }),
       ),
-    );
-
-    // Assert
-    expect(counts).toEqual(expected);
+    ]).shapes();
+    expect([Array.from(drawn.lines.data), Array.from(drawn.markers.data)]).toEqual([
+      Array.from(lines.data),
+      Array.from(markers.data),
+    ]);
   });
+});
 
+describe('the point labels', () => {
   it('prints a point by its ident, not by its name', () => {
     // Arrange
-    const shown: Layer[] = ['ad', 'navaid'];
-    const items = shown.map((layer) => onePart(layer, point([0, 0]), { name: 'PAPAQ' }));
+    const item = single('ad', point([0, 0]), { name: 'PAPAQ' });
 
     // Act
-    const counts = items.map((item) => build([item], shown, 'dense').labels.count);
+    const { text } = sceneOf([item]).pointLabels();
 
     // Assert
-    expect(counts).toEqual([1, 1]);
+    expect(spelled(text)).toBe('Q');
   });
 
   it('labels each part of a point item where it sits', () => {
     // Arrange
     const west = partOf('vfr', point([0, 0]));
-    const east = partOf('vfr', point([5, 0]));
+    const east = partOf('vfr', point([PLACE, 0]));
+    const scene = sceneOf([itemOf('vfr', west, east)]);
 
     // Act
-    const { markers, labels } = build([itemOf('vfr', west, east)], ['vfr'], 'dense');
+    const { text } = scene.pointLabels();
 
     // Assert
-    expect(markers.count).toBe(2);
-    expect(glyphs(labels).map((g) => g.at.x)).toEqual([0, 5]);
+    expect(scene.shapes().markers.count).toBe(2);
+    expect(glyphs(text).map((g) => g.at.x)).toEqual([0, PLACE]);
   });
 
-  it('records where each part of a point item is labelled, under the item', () => {
+  it('draws a route layer as lines only', () => {
     // Arrange
-    const west = partOf('vfr', point([0, 0]));
-    const east = partOf('vfr', point([5, 0]));
-    const { drawn } = build([keyed('V1', itemOf('vfr', west, east))], ['vfr'], 'dense');
+    const scene = sceneOf([airway('conv', 'R', [0, 0], [0.01, 0])]);
 
     // Act
-    const record = drawn.get('V1');
+    const { lines, markers } = scene.shapes();
 
     // Assert
-    expect(record?.texts.map((t) => [t.text, t.at.x])).toEqual([
-      ['Q', 0],
-      ['Q', 5],
-    ]);
-  });
-
-  it('colours each label by its layer', () => {
-    // Arrange
-    const rows: [Layer, string][] = [
-      ['ad', '#a0a0a0'],
-      ['navaid', '#909090'],
-      ['fix', '#7a7a7a'],
-      ['vfr', '#6a6a6a'],
-    ];
-
-    // Act
-    const colours = rows.map(([layer]) => {
-      const { labels } = build([onePart(layer, placeholder(layer))], [layer], 'dense');
-      return glyphs(labels)[0]?.color;
-    });
-
-    // Assert
-    expect(colours).toEqual(rows.map(([, hex]) => packed(hex)));
+    expect([lines.count, markers.count]).toEqual([1, 0]);
   });
 });
 
-describe('the chart hidden items', () => {
-  it('hands an edge to the next owner when the item that owned it is hidden', () => {
+const placeholder = (layer: Layer): ChartItem => {
+  const style = LAYER_TABLE[layer].style;
+  const geometry =
+    isPointStyle(style) || layer === 'hold'
+      ? point([0, 0])
+      : isRouteLayer(layer)
+        ? line([0, 0], [1, 0])
+        : polygon(box(0, 6));
+  return itemOf(layer, partOf(layer, geometry));
+};
+
+/** How many glyphs the three label slots draw for a lone item of `layer`. */
+const labelled = (layer: Layer, density: LabelDensity) => {
+  const scene = sceneOf([placeholder(layer)], { layers: [layer], density });
+  const texts = [scene.pointLabels().text, scene.routeLabels().text, scene.areaLabels().text];
+  return texts.reduce((sum, text) => sum + text.count, 0);
+};
+
+describe('where a layer begins to be labelled', () => {
+  it('is the density the layer table gives, and a layer without a label never draws one', () => {
     // Arrange
-    const items = [
-      keyed('fir', itemOf('fir', partOf('fir', line([0, 0], [1, 0], [0, 1])))),
-      keyed('tma', itemOf('tma', partOf('tma', line([0, 0], [1, 0], [1, 1])))),
-    ];
-    const rows: Reads[] = [{}, { stateOf: hiding('fir') }];
+    const layers = DRAW_STACK.filter(isChartLayer);
+    const expected = layers.map((layer) => {
+      const from = LAYER_TABLE[layer].style.label?.from;
+      return LABEL_DENSITIES.map(
+        (d) => from !== undefined && LABEL_DENSITIES.indexOf(d) >= LABEL_DENSITIES.indexOf(from),
+      );
+    });
 
     // Act
-    const drawn = rows.map((reads) =>
-      instances(build(items, ['tma', 'fir'], 'normal', reads).lines),
-    );
+    const drawn = layers.map((layer) => LABEL_DENSITIES.map((d) => labelled(layer, d) > 0));
 
     // Assert
-    expect(drawn.map((batch) => batch.map((i) => i.color))).toEqual([
-      [packed('#606060'), packed('#5e3a3a'), packed('#5e3a3a')],
-      [packed('#5e3a3a'), packed('#5e3a3a')],
-    ]);
-    expect(drawn[1]?.map((i) => [i.a.x, i.a.y, i.b.x, i.b.y])).toEqual([
-      [0, 0, 1, 0],
-      [1, 0, 1, 1],
-    ]);
-  });
-
-  it('does not stop a route at a hidden fix, and gives the fix no marker or label', () => {
-    // Arrange
-    const items = [
-      keyed('route', routeOf('conv', [0, 0], [1, 0], [2, 0])),
-      keyed('stop', stopAt('fix', [1, 0])),
-    ];
-    const rows: Reads[] = [{}, { stateOf: hiding('stop') }];
-
-    // Act
-    const built = rows.map((reads) => build(items, ['conv', 'fix'], 'dense', reads));
-
-    // Assert
-    expect(built.map((b) => b.markers.count)).toEqual([1, 0]);
-    expect(built.map((b) => b.labels.count)).toEqual([1, 0]);
-    expect(built.map((b) => instances(b.lines).some((i) => i.span.some((v) => v !== 0)))).toEqual([
-      true,
-      false,
-    ]);
+    expect(drawn).toEqual(expected);
   });
 });

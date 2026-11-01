@@ -1,33 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
-import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, type LabelDensity, LAYER_TABLE } from '../../lib/layers';
-import { parseMapSet } from '../../lib/mapset';
-import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { POINT_LAYERS, type Layer, type ScopeLayer } from '../../lib/mapsetFormat';
-import { areaPlaceOf } from '../../lib/pole';
-import {
-  type ChartPath,
-  drawnPointsOf,
-  type Network,
-  ownersOf,
-  topologyOf,
-} from '../../lib/topology';
-import { drawnItemsOf } from '../../lib/visibility';
-import { allShown } from '../../lib/visibilityFixture';
+import type { Chart, ChartItem } from '../../lib/chart';
+import { DRAW_STACK, LAYER_TABLE } from '../../lib/layers';
+import { type Layer, POINT_LAYERS, type ScopeLayer } from '../../lib/mapsetFormat';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol';
-import {
-  CHART_SLICES,
-  LABEL_SLOTS,
-  SLOT_ORDER,
-  labelSlots,
-  type Slots,
-  shapeSlots,
-  type SlotName,
-} from '../slots';
+import { CHART_SLICES, LABEL_SLOTS, type Slots, SLOT_ORDER, type SlotName } from '../slots';
 import { atlas } from './atlasFixture';
-import { buildShapes, buildSliceLabels } from './chart';
-import { project } from './chartFixture';
+import { itemOf, line, partOf, point, project, sceneOf } from './chartFixture';
 import { buildCoast, buildRings } from './static';
 
 const at = (layer: ScopeLayer) => LAYER_TABLE[layer].rank;
@@ -38,67 +17,13 @@ const CHART_LAYERS: Layer[] = CHART_SLICES.flatMap((s) => s.layers);
 /** An item of `layer`, one glyph in its name, sitting at x = its place in the stack. */
 function itemAt(layer: Layer): ChartItem {
   const x = at(layer);
-  const part: ItemPart =
-    layer === 'hold'
-      ? {
-          geometry: { type: 'Point', coordinates: [x, 0] },
-          properties: { layer, turn: 'R', inboundTrue: 0 },
-        }
-      : isPoint(layer)
-        ? { geometry: { type: 'Point', coordinates: [x, 0] }, properties: { layer, id: 'Q' } }
-        : {
-            geometry: {
-              type: 'LineString',
-              coordinates: [
-                [x, 0],
-                [x + 0.01, 0],
-              ],
-            },
-            properties: { layer, name: 'Q' },
-          };
-  return { key: layer, layer, parts: [part] };
+  const geometry = layer === 'hold' || isPoint(layer) ? point([x, 0]) : line([x, 0], [x + 0.01, 0]);
+  return itemOf(layer, partOf(layer, geometry));
 }
-
-/** What the scope reads to draw `layers` of the chart. */
-function drawnOf(chart: Chart, layers: readonly Layer[]) {
-  const topology = topologyOf(chart);
-  const drawnItems = drawnItemsOf(chart, layers, allShown, () => true);
-  const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  return { topology, drawnItems, drawnPoints, project, layers };
-}
-
-/** A slice's shapes built as the scope builds them. */
-/** The layers whose shapes are edges: a hold is a figure at screen size, not an edge. */
-const edgeLayers = (layers: readonly Layer[]) => layers.filter((l) => l !== 'hold');
-
-const shapesOf = (chart: Chart, layers: readonly Layer[]) =>
-  buildShapes(drawnOf(chart, layers), () => () => 0);
-
-/** A settled scale at which every label of the fixture has room. */
-const ROOMY = 1e6;
-
-/** A slice's labels built as the scope builds them. */
-const labelsOf = (chart: Chart, slice: (typeof CHART_SLICES)[number], labelDensity: LabelDensity) =>
-  buildSliceLabels(slice, {
-    ...drawnOf(chart, slice.layers),
-    labelDensity,
-    atlas,
-    settledScale: () => ROOMY,
-    shown: new Map(),
-    placeOf: (item) => areaPlaceOf(item, project),
-  });
 
 /** Everything the scope draws from the map, as the effects post it. */
 function mapSlots(chart: Chart): Slots {
-  const slots: Slots = {};
-  for (const slice of CHART_SLICES) {
-    const labels = labelsOf(chart, slice, 'dense').batches;
-    Object.assign(
-      slots,
-      shapeSlots(slice, shapesOf(chart, slice.layers)),
-      labelSlots(slice, labels),
-    );
-  }
+  const slots = sceneOf(chart, { scale: 1e6 }).slots();
   const coastX = at('coast');
   const coast = {
     lines: [
@@ -214,170 +139,11 @@ describe('the halo of a label', () => {
     const halos = [...mapLabels, 'ringLabels' as const].map((name) => haloOf(slots, name));
 
     // Assert
-    const [area = [], route = [], point = [], ring = []] = halos;
-    expect([area.length, route.length, point.length, ring.length].every((n) => n > 0)).toBe(true);
-    expect([...area, ...route, ...point].every((h) => h > 0)).toBe(true);
-    expect(ring.every((h) => h === 0)).toBe(true);
-  });
-});
-
-const nameOf = (p: ChartPath) =>
-  `${p.layer} ${'name' in p.part.properties ? p.part.properties.name : ''}`;
-
-/** The vertices strictly inside another path's edge, which is one line traced with two spacings. */
-function tracesOf(network: Network): string[] {
-  const found: string[] = [];
-  for (const p of network.paths) {
-    for (let i = 1; i < p.coordinates.length; i++) {
-      const [ax = 0, ay = 0] = p.coordinates[i - 1] ?? [];
-      const [bx = 0, by = 0] = p.coordinates[i] ?? [];
-      for (const q of network.paths.filter((other) => other !== p)) {
-        for (const [vx = 0, vy = 0] of q.coordinates) {
-          const [dx, dy, wx, wy] = [bx - ax, by - ay, vx - ax, vy - ay];
-          const t = (wx * dx + wy * dy) / (dx * dx + dy * dy);
-          if (Math.abs(dx * wy - dy * wx) < 1e-9 && t > 1e-9 && t < 1 - 1e-9) {
-            found.push(`${nameOf(q)} at ${vx},${vy} on ${nameOf(p)}`);
-          }
-        }
-      }
-    }
-  }
-  return found;
-}
-
-/** How many edges each layer owns when every part draws. */
-function ownedBy(network: Network): Record<string, number> {
-  const owners = ownersOf(network, new Set(network.paths.map((p) => p.part)));
-  const counts: Record<string, number> = {};
-  for (const path of network.paths) {
-    path.edges.forEach((edge, i) => {
-      if (owners[edge] !== path.firstOccurrence + i) return;
-      counts[path.layer] = (counts[path.layer] ?? 0) + 1;
-    });
-  }
-  return counts;
-}
-
-/** Each instance of a lines batch as its unordered pair of ends, rounded to 1e-5. */
-function edgeKeys({ data, count }: Batch): string[] {
-  return Array.from({ length: count }, (_, i) => {
-    const [ax = 0, ay = 0, bx = 0, by = 0] = [0, 1, 4, 5].map((k) =>
-      Math.round((data[i * LINE_STRIDE + k] ?? 0) * 1e5),
+    const [areas = [], routes = [], points = [], rings = []] = halos;
+    expect([areas.length, routes.length, points.length, rings.length].every((n) => n > 0)).toBe(
+      true,
     );
-    return (ax < bx || (ax === bx && ay <= by) ? [ax, ay, bx, by] : [bx, by, ax, ay]).join();
-  });
-}
-
-describe('the example map set', () => {
-  it('draws every layer', () => {
-    // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
-
-    // Act
-    const undrawn = CHART_LAYERS.filter((layer) => {
-      const { lines, markers } = shapesOf(items, [layer]);
-      return lines.count + markers.count === 0;
-    });
-
-    // Assert
-    expect(undrawn).toEqual([]);
-  });
-
-  it('draws no segment twice in the area and route slices', () => {
-    // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
-    const slices = [CHART_SLICES[0], CHART_SLICES[1]];
-
-    // Act
-    const keys = slices.map((slice) => edgeKeys(shapesOf(items, edgeLayers(slice.layers)).lines));
-
-    // Assert
-    expect(keys.map((k) => k.length > 0)).toEqual([true, true]);
-    expect(keys.map((k) => new Set(k).size)).toEqual(keys.map((k) => k.length));
-  });
-
-  it("has no outline that traces another's line with different vertices", () => {
-    // Arrange
-    const { areas, routes } = topologyOf(chartOf([parseMapSet(EXAMPLE)]));
-
-    // Act
-    const traces = [areas, routes].map(tracesOf);
-
-    // Assert
-    expect(traces).toEqual([[], []]);
-  });
-
-  it('gives each layer the edges no nearer layer has', () => {
-    // Arrange
-    const { areas, routes } = topologyOf(chartOf([parseMapSet(EXAMPLE)]));
-    const expected = {
-      areas: {
-        ctr: 4,
-        pr: 4,
-        tma: 9,
-        sector: 5,
-        fir: 2,
-        dng: 4,
-        tra: 4,
-        adiz: 2,
-        cta: 7,
-        advisory: 4,
-        civt: 3,
-        asr: 1,
-      },
-      routes: { sid: 1, star: 1, trans: 1, conv: 2, rnav: 1, dct: 1 },
-    };
-
-    // Act
-    const counts = { areas: ownedBy(areas), routes: ownedBy(routes) };
-
-    // Assert
-    expect(counts).toEqual(expected);
-  });
-
-  it("draws the edges of a sector's two strata once, in the lower stratum's dash", () => {
-    // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
-
-    // Act
-    const { lines } = shapesOf(items, ['sector']);
-
-    // Assert
-    expect(lines.count).toBe(6);
-    expect(Array.from({ length: lines.count }, (_, i) => lines.data[i * LINE_STRIDE + 10])).toEqual(
-      Array.from({ length: lines.count }, () => 6),
-    );
-  });
-
-  it("draws the edge a stepped area's parts share once", () => {
-    // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
-
-    // Act
-    const { lines } = shapesOf(items, ['tma']);
-
-    // Assert
-    expect(lines.count).toBe(9);
-  });
-
-  it('runs V901 through a hidden fix, and cuts it on either side of a shown one', () => {
-    // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]).filter((item) =>
-      /V901|A901|TAVRO/.test(item.key),
-    );
-    const shown: Layer[][] = [['conv'], ['conv', 'fix']];
-
-    // Act
-    const rows = shown.map((layers) => {
-      const { lines } = shapesOf(items, layers);
-      return Array.from({ length: lines.count }, (_, i) =>
-        Array.from(lines.data.subarray(i * LINE_STRIDE + 20, i * LINE_STRIDE + 22)),
-      );
-    });
-
-    // Assert
-    expect(rows[0]?.every((cut) => cut.every((v) => v === 0))).toBe(true);
-    expect(rows[1]?.some(([back]) => back === 7)).toBe(true);
-    expect(rows[1]?.some(([, ahead]) => ahead === 7)).toBe(true);
+    expect([...areas, ...routes, ...points].every((h) => h > 0)).toBe(true);
+    expect(rings.every((h) => h === 0)).toBe(true);
   });
 });

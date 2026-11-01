@@ -17,9 +17,9 @@ import { type Batch, LINE_STRIDE, MARKER_STRIDE, TEXT_STRIDE } from '../protocol
 import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../slots';
 import { atlas } from './atlasFixture';
 import { buildShapes, buildSliceLabels } from './chart';
-import { type BuiltLabels, type DrawnLabels, redrawLabel } from './drawnLabels';
+import type { BuiltLabels } from './drawnLabels';
 import { buildHighlight } from './highlight';
-import { LineBatch, parseColor, TextBatch } from './pack';
+import { parseColor } from './pack';
 import { buildTraces } from './traces';
 
 /** The scope plane for tests: x is the longitude and y the latitude. */
@@ -169,10 +169,6 @@ export function segments(batch: Batch): Segment[] {
 export const edges = (batch: Batch): string[] =>
   segments(batch).map(({ a, b }) => `${a.x},${a.y}>${b.x},${b.y}`);
 
-/** The old names of the segment decoder. */
-export type Instance = Segment;
-export const instances = segments;
-
 /** The markers of a markers batch, as they were packed. */
 export function markers({ data, count }: Batch) {
   return Array.from({ length: count }, (_, i) => {
@@ -232,16 +228,6 @@ export function textRuns(batch: Batch) {
 /** The CSS px a run of `chars` characters takes at `size` px in the fixture's atlas. */
 export const labelWidth = (chars: number, size = 9) =>
   (chars * atlas.advance * size) / atlas.fontSize;
-
-/** The batches `redrawLabel` draws for the labels of these item keys, all of them by default. */
-export function redrawn(drawn: DrawnLabels, keys: readonly string[] = [...drawn.keys()]) {
-  const out = { text: new TextBatch(atlas), strokes: new LineBatch() };
-  for (const key of keys) {
-    const label = drawn.get(key);
-    if (label) redrawLabel(label, '#ffffff', out);
-  }
-  return { text: out.text.finish(), strokes: out.strokes.finish() };
-}
 
 /** Rows without their colour, in one order whatever order they were drawn in. */
 export const withoutColor = (rows: readonly object[]): string[] =>

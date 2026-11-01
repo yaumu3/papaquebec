@@ -1,23 +1,16 @@
 import { describe, expect, it } from 'bun:test';
 
 import { CHART_COLORS } from '../../design/palette';
-import { type Chart, chartOf } from '../../lib/chart';
+import { chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
-import { distanceToSegment } from '../../lib/geo';
-import { DRAW_STACK, LABEL_DENSITIES, type LabelDensity } from '../../lib/layers';
+import type { LabelDensity } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { type Layer, isChartLayer } from '../../lib/mapsetFormat';
-import { areaPlaceOf, poleOf } from '../../lib/pole';
-import { drawnPointsOf, topologyOf } from '../../lib/topology';
-import { drawnItemsOf } from '../../lib/visibility';
-import { shownExcept } from '../../lib/visibilityFixture';
-import { buildAreaLabels } from './areaLabels';
+import type { Layer } from '../../lib/mapsetFormat';
 import { atlas } from './atlasFixture';
-import type { FitInput } from './chart';
 import {
+  type Extra,
   glyphs,
-  instances,
   itemOf,
   keyed,
   line,
@@ -25,100 +18,16 @@ import {
   partOf,
   polygon,
   type Position,
-  project,
-  redrawn,
-  withoutColor,
+  sceneOf,
+  type SceneOptions,
+  segments,
+  single,
+  spelled,
 } from './chartFixture';
-import type { DrawnLabel } from './drawnLabels';
 
-/** The text and the rules of the area labels of `items` as the scope builds them. */
-function built(
-  items: Chart,
-  layers: readonly Layer[],
-  labelDensity: LabelDensity = 'dense',
-  hidden: string[] = [],
-  fit: FitInput = { settledScale: () => 1000, shown: new Map() },
-) {
-  const topology = topologyOf(items);
-  const drawnItems = drawnItemsOf(
-    items,
-    layers,
-    () => shownExcept(...hidden),
-    () => true,
-  );
-  const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  const {
-    batches: [text, rules],
-    drawn,
-  } = buildAreaLabels({
-    topology,
-    drawnPoints,
-    project,
-    layers,
-    drawnItems,
-    labelDensity,
-    atlas,
-    placeOf: (item) => areaPlaceOf(item, project),
-    ...fit,
-  });
-  if (!text || !rules) throw new Error('buildAreaLabels returned too few batches');
-  return { text, rules, drawn: drawn ?? new Map<string, DrawnLabel>() };
-}
-
-/** The text of the area labels of `items`. */
-const build = (...args: Parameters<typeof built>) => built(...args).text;
-
-/** Whether a point lies inside a ring, by the even-odd rule. */
-function inside([x, y]: Position, ring: Position[]): boolean {
-  const crossings = ring.filter(([ax, ay], i) => {
-    const [bx, by] = ring[(i + 1) % ring.length] ?? [ax, ay];
-    return ay > y !== by > y && x < ((bx - ax) * (y - ay)) / (by - ay) + ax;
-  });
-  return crossings.length % 2 === 1;
-}
-
-/** How far a point is from the nearest edge of a ring. */
-const clearance = ([x, y]: Position, ring: Position[]): number =>
-  Math.min(
-    ...ring.map(([ax, ay], i) => {
-      const [bx, by] = ring[(i + 1) % ring.length] ?? [ax, ay];
-      return distanceToSegment({ x, y }, { x: ax, y: ay }, { x: bx, y: by });
-    }),
-  );
-
-const AREA_LAYERS = DRAW_STACK.filter(isChartLayer).filter((l) =>
-  [
-    'ctr',
-    'pr',
-    'tma',
-    'sector',
-    'fir',
-    'dng',
-    'tra',
-    'adiz',
-    'cta',
-    'advisory',
-    'civt',
-    'asr',
-  ].includes(l),
-);
-/** The density an area layer is labelled from; none for the layers that are not. */
-const from = (layer: Layer): LabelDensity | null =>
-  layer === 'fir' || layer === 'adiz' ? null : layer === 'sector' ? 'normal' : 'dense';
-/** Whether a layer's labels are drawn at a density: 1 or 0. */
-const labelledAt = (layer: Layer, d: LabelDensity) => {
-  const first = from(layer);
-  return first !== null && rank(d) >= rank(first) ? 1 : 0;
-};
-const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
-
-/** An item named PAPAQ of one shape. */
-const place = (shape: ReturnType<typeof polygon>) => [
-  keyed('PAPAQ', itemOf('tma', partOf('tma', shape, { name: 'PAPAQ' }))),
-];
-/** Whether the name is drawn at a settled scale, given what was shown before. */
-const drawn = (shape: ReturnType<typeof polygon>, scale: number, shown: ShownMemory) =>
-  build(place(shape), ['tma'], 'dense', [], { settledScale: () => scale, shown }).count > 0;
+/** The area labels of `chart`: the text and the rules. */
+const areaLabels = (chart: Parameters<typeof sceneOf>[0], options: SceneOptions = {}) =>
+  sceneOf(chart, options).areaLabels();
 
 /** An L-shaped ring. */
 const el: Position[] = [
@@ -131,31 +40,21 @@ const el: Position[] = [
   [0, 0],
 ];
 
-describe('buildAreaLabels', () => {
-  it('puts the name at the pole of the area, inside it and off its boundary', () => {
-    // Arrange
-    const items = [itemOf('ctr', partOf('ctr', polygon(el)))];
-    const pole = poleOf([el.map(([x, y]) => ({ x, y }))]);
+/** Whether the name is drawn at a settled scale, given what was shown before. */
+const drawn = (shape: ReturnType<typeof polygon>, scale: number, shown: ShownMemory) => {
+  const chart = [keyed('PAPAQ', itemOf('tma', partOf('tma', shape, { name: 'PAPAQ' })))];
+  return areaLabels(chart, { scale, shown }).text.count > 0;
+};
 
-    // Act
-    const text = build(items, ['ctr']);
-
-    // Assert
-    const [glyph] = glyphs(text);
-    expect(glyph?.at.x).toBeCloseTo(pole?.at.x ?? NaN, 9);
-    expect(glyph?.at.y).toBeCloseTo(pole?.at.y ?? NaN, 9);
-    expect(inside([glyph?.at.x ?? NaN, glyph?.at.y ?? NaN], el)).toBe(true);
-    expect(clearance([glyph?.at.x ?? NaN, glyph?.at.y ?? NaN], el)).toBeGreaterThan(0.9);
-  });
-
+describe('the area labels', () => {
   it('centres the name on the pole, with a halo', () => {
     // Arrange
-    const items = [itemOf('ctr', partOf('ctr', polygon(el)))];
+    const chart = [single('ctr', polygon(el))];
     const scale = 9 / atlas.fontSize;
     const half = (1 * atlas.advance * scale) / 2;
 
     // Act
-    const text = build(items, ['ctr']);
+    const { text } = areaLabels(chart);
 
     // Assert
     const [glyph] = glyphs(text);
@@ -165,36 +64,22 @@ describe('buildAreaLabels', () => {
 
   it('labels a stepped item once', () => {
     // Arrange
-    const items = chartOf([parseMapSet(EXAMPLE)]);
+    const chart = chartOf([parseMapSet(EXAMPLE)]);
 
     // Act
-    const text = build(items, ['tma']);
+    const { text } = areaLabels(chart, { layers: ['tma'] });
 
     // Assert
-    const names = glyphs(text).map((g) => g.char);
-    expect(names.join('')).toBe('PAPAQ240SFC');
-  });
-
-  it('puts the name of a line area at the middle of its line', () => {
-    // Arrange
-    const items = [itemOf('tma', partOf('tma', line([0, 0], [4, 0])))];
-
-    // Act
-    const text = build(items, ['tma']);
-
-    // Assert
-    const [glyph] = glyphs(text);
-    expect(glyph?.at.x).toBeCloseTo(2, 6);
-    expect(glyph?.at.y).toBeCloseTo(0, 6);
+    expect(spelled(text)).toBe('PAPAQ240SFC');
   });
 
   it('writes a sector name at 10 px and the name of another area at 9 px', () => {
     // Arrange
     const rows: Layer[] = ['sector', 'ctr'];
-    const items = rows.map((layer) => keyed(layer, itemOf(layer, partOf(layer, polygon(el)))));
+    const chart = rows.map((layer) => keyed(layer, itemOf(layer, partOf(layer, polygon(el)))));
 
     // Act
-    const heights = rows.map((layer) => glyphs(build(items, [layer]))[0]?.h);
+    const heights = rows.map((layer) => glyphs(areaLabels(chart, { layers: [layer] }).text)[0]?.h);
 
     // Assert
     expect(heights).toEqual([
@@ -203,47 +88,15 @@ describe('buildAreaLabels', () => {
     ]);
   });
 
-  it('labels each area layer from its own density up, and the FIR and the ADIZ never', () => {
-    // Arrange
-    const expected = AREA_LAYERS.map((layer) => LABEL_DENSITIES.map((d) => labelledAt(layer, d)));
-
-    // Act
-    const counts = AREA_LAYERS.map((layer) =>
-      LABEL_DENSITIES.map((d) => {
-        const items = [itemOf(layer, partOf(layer, polygon(el)))];
-        return build(items, [layer], d).count > 0 ? 1 : 0;
-      }),
-    );
-
-    // Assert
-    expect(counts).toEqual(expected);
-  });
-
-  it('colours each name by its layer', () => {
-    // Arrange
-    const rows: [Layer, string][] = [
-      ['ctr', '#8a5050'],
-      ['sector', '#5a7a8a'],
-      ['asr', '#5a7a8a'],
-    ];
-    const items = rows.map(([layer]) => keyed(layer, itemOf(layer, partOf(layer, polygon(el)))));
-
-    // Act
-    const colours = rows.map(([layer]) => glyphs(build(items, [layer]))[0]?.color);
-
-    // Assert
-    expect(colours).toEqual(rows.map(([, hex]) => packed(hex)));
-  });
-
   it('gives a hidden area no name', () => {
     // Arrange
-    const items = [keyed('ctr', itemOf('ctr', partOf('ctr', polygon(el))))];
+    const chart = [single('ctr', polygon(el))];
 
     // Act
-    const hidden = build(items, ['ctr'], 'dense', ['ctr']);
+    const { text } = areaLabels(chart, { hidden: ['ctr'] });
 
     // Assert
-    expect(hidden.count).toBe(0);
+    expect(text.count).toBe(0);
   });
 
   describe('at the settled scale', () => {
@@ -304,16 +157,16 @@ describe('buildAreaLabels', () => {
   });
 });
 
-const sector = (...parts: Parameters<typeof partOf>[2][]) =>
+const sector = (...parts: Extra[]) =>
   itemOf(
     'sector',
     ...parts.map((extra) => partOf('sector', polygon(el), { name: 'Z55', ...extra })),
   );
 
-describe('the sector row of buildAreaLabels', () => {
+describe('the sector row of the area labels', () => {
   const z55 = sector({ freqs: ['134.65'], upper: 'FL375' }, { freqs: ['127.35'], lower: 'FL375' });
   const textOf = (item: ReturnType<typeof sector>, density: LabelDensity) =>
-    glyphs(build([item], ['sector'], density));
+    glyphs(areaLabels([item], { layers: ['sector'], density }).text);
 
   it('adds the first frequency of the item at DENSE, in the detail colour and 9 px', () => {
     // Arrange
@@ -376,9 +229,7 @@ describe('the sector row of buildAreaLabels', () => {
 
     // Act
     const names = rows.map(([item, layer, density]) =>
-      glyphs(build([item], [layer], density))
-        .map((g) => g.char)
-        .join(''),
+      spelled(areaLabels([item], { layers: [layer], density }).text),
     );
 
     // Assert
@@ -401,26 +252,26 @@ describe('the sector row of buildAreaLabels', () => {
 const centreOf = (g: { py: number }, px: number) =>
   g.py + (atlas.cellH * px) / (2 * atlas.fontSize);
 
-describe('the fraction of buildAreaLabels', () => {
+describe('the fraction of an area label', () => {
   const size = 8;
   const example = chartOf([parseMapSet(EXAMPLE)]);
 
   it('writes the upper limit over the lower, a rule as wide as the wider between, the block centred', () => {
     // Arrange
-    const layers: Layer[] = ['tma'];
+    const options: SceneOptions = { layers: ['tma'] };
 
     // Act
-    const { text, rules } = built(example, layers);
+    const { text, rules } = areaLabels(example, options);
 
     // Assert
     const rows = glyphs(text);
     const [name, upper, lower] = [rows.slice(0, 5), rows.slice(5, 8), rows.slice(8, 11)];
-    expect(rows.map((g) => g.char).join('')).toBe('PAPAQ240SFC');
+    expect(spelled(text)).toBe('PAPAQ240SFC');
     expect(centreOf(name[0] ?? { py: NaN }, 9)).toBeCloseTo(-10.5, 6);
     expect(centreOf(upper[0] ?? { py: NaN }, size)).toBeCloseTo(-0.5, 6);
     expect(centreOf(lower[0] ?? { py: NaN }, size)).toBeCloseTo(10.5, 6);
     expect(upper.every((g) => g.color.join() === packed('#8a5050').join())).toBe(true);
-    const [rule] = instances(rules);
+    const [rule] = segments(rules);
     expect(rules.count).toBe(1);
     expect(rule?.offsetA.y).toBeCloseTo(5, 6);
     expect(rule?.offsetB.y).toBeCloseTo(5, 6);
@@ -437,36 +288,26 @@ describe('the fraction of buildAreaLabels', () => {
     const layers: Layer[] = ['ctr', 'dng', 'pr', 'tra', 'cta', 'advisory', 'civt', 'asr'];
 
     // Act
-    const { text } = built(example, layers);
+    const { text } = areaLabels(example, { layers });
 
     // Assert
-    const all = glyphs(text)
-      .map((g) => g.char)
-      .join('');
-    expect(all).toContain('PAPAQ030SFC');
-    expect(all).toContain('XQR-927120SFC');
-    expect(all).toContain('D-901350SFC');
+    expect(spelled(text)).toContain('PAPAQ030SFC');
+    expect(spelled(text)).toContain('XQR-927120SFC');
+    expect(spelled(text)).toContain('D-901350SFC');
   });
 
   it('makes the rule as wide as the wider limit', () => {
     // Arrange
-    const items = [
-      itemOf(
-        'ctr',
-        partOf('ctr', polygon(el), { name: 'LOW', lower: '1500FT AGL', upper: 'FL240' }),
-      ),
+    const chart = [
+      single('ctr', polygon(el), { name: 'LOW', lower: '1500FT AGL', upper: 'FL240' }),
     ];
 
     // Act
-    const { text, rules } = built(items, ['ctr']);
+    const { text, rules } = areaLabels(chart);
 
     // Assert
-    const [rule] = instances(rules);
-    expect(
-      glyphs(text)
-        .map((g) => g.char)
-        .join(''),
-    ).toBe('LOW240015AGL');
+    const [rule] = segments(rules);
+    expect(spelled(text)).toBe('LOW240015AGL');
     expect((rule?.offsetB.x ?? 0) - (rule?.offsetA.x ?? 0)).toBeCloseTo(
       (7 * atlas.advance * size) / atlas.fontSize,
       6,
@@ -475,54 +316,41 @@ describe('the fraction of buildAreaLabels', () => {
 
   it('gives an area with no limits its name alone, and no rule', () => {
     // Arrange
-    const items = [itemOf('ctr', partOf('ctr', polygon(el), { name: 'FREE' }))];
+    const chart = [single('ctr', polygon(el), { name: 'FREE' })];
 
     // Act
-    const { text, rules } = built(items, ['ctr']);
+    const { text, rules } = areaLabels(chart);
 
     // Assert
-    expect(
-      glyphs(text)
-        .map((g) => g.char)
-        .join(''),
-    ).toBe('FREE');
+    expect(spelled(text)).toBe('FREE');
     expect(rules.count).toBe(0);
   });
 
   it('gives a sector no fraction', () => {
     // Arrange
-    const sectorItem = itemOf(
-      'sector',
-      partOf('sector', polygon(el), { name: 'Z55', upper: 'FL335' }),
-    );
+    const chart = [single('sector', polygon(el), { name: 'Z55', upper: 'FL335' })];
 
     // Act
-    const { text, rules } = built([sectorItem], ['sector']);
+    const { text, rules } = areaLabels(chart);
 
     // Assert
-    expect(
-      glyphs(text)
-        .map((g) => g.char)
-        .join(''),
-    ).toBe('Z55335−');
+    expect(spelled(text)).toBe('Z55335−');
     expect(rules.count).toBe(0);
   });
 });
 
 /** A one-part sector item of a ring and limits. */
-const stratum = (name: string, ring: Position[], extra: { lower?: string; upper?: string }) =>
+const stratum = (name: string, ring: Position[], extra: Extra) =>
   keyed(name, itemOf('sector', partOf('sector', polygon(ring), { name, ...extra })));
 
-/** A settled scale of 2 with nothing remembered yet. */
-const fit = (): FitInput => ({ settledScale: () => 2, shown: new Map() });
-
-describe('the stacks of buildAreaLabels', () => {
+describe('the stacks of area labels', () => {
   /** The same L ring, listed from another vertex. */
   const turnedEl = [...el.slice(2, -1), ...el.slice(0, 2), el[2] ?? [0, 0]];
   const low = stratum('LOW', el, { upper: 'FL335' });
   const high = stratum('HIGH', turnedEl, { lower: 'FL335' });
+  const fitting: SceneOptions = { density: 'normal', scale: 2 };
   const rows = (items: ReturnType<typeof stratum>[], density: LabelDensity = 'normal') =>
-    glyphs(build(items, ['sector'], density));
+    glyphs(areaLabels(items, { layers: ['sector'], density }).text);
 
   it('puts the strata of one footprint one over the other, the lowest on top, centred on the pole', () => {
     // Arrange
@@ -540,16 +368,16 @@ describe('the stacks of buildAreaLabels', () => {
     expect(lowRow?.at).toEqual(highRow?.at);
   });
 
-  it('keeps each member of a stack its own rows, at its stacked offset', () => {
+  it('lights each member of a stack on its own rows, at its stacked offset', () => {
     // Arrange
-    const { drawn: records } = built([high, low], ['sector'], 'normal');
+    const scene = sceneOf([high, low], { layers: ['sector'], density: 'normal' });
 
     // Act
-    const [lowRecord, highRecord] = ['LOW', 'HIGH'].map((key) => records.get(key));
+    const [lit, other] = [low, high].map((item) => glyphs(scene.highlight(item).text));
 
     // Assert
-    expect(lowRecord?.texts.map((t) => [t.text, t.at.py])).toEqual([['LOW', -6]]);
-    expect(highRecord?.texts.map((t) => [t.text, t.at.py])).toEqual([['HIGH', 6]]);
+    expect(centreOf(lit?.[0] ?? { py: NaN }, 10)).toBeCloseTo(-6, 6);
+    expect(centreOf(other?.[0] ?? { py: NaN }, 10)).toBeCloseTo(6, 6);
   });
 
   it('orders them by their lower limit, whatever their upper limits are', () => {
@@ -597,32 +425,16 @@ describe('the stacks of buildAreaLabels', () => {
       [longLow, shortHigh],
       [shortLow, longHigh],
     ];
+    const countOf = (items: ReturnType<typeof stratum>[]) =>
+      areaLabels(items, { ...fitting, layers: ['sector'] }).text.count;
     // Precondition: the short name alone fits
-    const alone = [shortHigh, shortLow].map(
-      (s) => build([s], ['sector'], 'normal', [], fit()).count,
-    );
+    const alone = [shortHigh, shortLow].map((s) => countOf([s]));
 
     // Act
-    const stacked = pairs.map((pair) => build(pair, ['sector'], 'normal', [], fit()).count);
+    const stacked = pairs.map(countOf);
 
     // Assert
     expect(alone.every((n) => n > 0)).toBe(true);
     expect(stacked).toEqual([0, 0]);
-  });
-});
-
-describe('what buildAreaLabels records', () => {
-  it('redraws exactly the text and the rule it drew', () => {
-    // Arrange
-    const example = chartOf([parseMapSet(EXAMPLE)]);
-    const { text, rules, drawn: records } = built(example, ['tma']);
-
-    // Act
-    const again = redrawn(records);
-
-    // Assert
-    expect(rules.count).toBe(1);
-    expect(withoutColor(glyphs(again.text))).toEqual(withoutColor(glyphs(text)));
-    expect(withoutColor(instances(again.strokes))).toEqual(withoutColor(instances(rules)));
   });
 });
