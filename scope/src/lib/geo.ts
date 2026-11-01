@@ -13,6 +13,11 @@ export function trueToMagnetic(trueDeg: number, declinationDeg: number): number 
   return m < 0 ? m + 360 : m;
 }
 
+/** Magnetic bearing to true, given declination in degrees east positive. */
+export function magneticToTrue(magneticDeg: number, declinationDeg: number): number {
+  return trueToMagnetic(magneticDeg, -declinationDeg);
+}
+
 /** Degrees from `from` round to `to` the short way, to the right positive. */
 export const turn = (from: number, to: number): number => ((to - from + 540) % 360) - 180;
 
@@ -99,4 +104,28 @@ export function nearest<T extends GeoPoint>(
   items: readonly T[],
 ): T | null {
   return rankByDistance(lat, lon, items)[0] ?? null;
+}
+
+/** How far north is stepped to find where it lies on the plane, degrees of latitude. */
+const NORTH_STEP_DEG = 0.01;
+
+/**
+ * True north at a place on the world plane (x east, y up), as a unit vector: toward the
+ * projection of a point a short step north of it, so it holds wherever the plane turns it.
+ */
+export function northAt(project: ProjectFn, lat: number, lon: number): Vec2 {
+  const from = project(lat, lon);
+  const to = project(lat + NORTH_STEP_DEG, lon);
+  const length = Math.hypot(to.x - from.x, to.y - from.y);
+  return { x: (to.x - from.x) / length, y: (to.y - from.y) / length };
+}
+
+/**
+ * The direction of a true bearing on the screen, as a unit vector with y down, given where true
+ * north lies on the world plane (y up). The one place the flip of y happens.
+ */
+export function bearingOnScreen(north: Vec2, bearingDeg: number): Vec2 {
+  const [sin, cos] = [Math.sin(bearingDeg * RAD), Math.cos(bearingDeg * RAD)];
+  const up = { x: north.x, y: -north.y };
+  return { x: up.x * cos - up.y * sin, y: up.x * sin + up.y * cos };
 }

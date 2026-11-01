@@ -40,6 +40,10 @@ export const nameOf = ({ properties: p }: ItemPart): string | undefined =>
 export const itemName = ({ parts: [first] }: ChartItem): string | undefined =>
   first && nameOf(first);
 
+/** The kind of an item: that of its first part, which is the one its tree tag shows. */
+export const itemKind = ({ parts: [first] }: ChartItem): string | undefined =>
+  first?.properties.kind;
+
 /** The first frequency of the first part, in chart order, that has one. */
 export const itemFrequency = ({ parts }: ChartItem): string | undefined =>
   parts.flatMap(({ properties: p }) => ('freqs' in p ? (p.freqs ?? []) : []))[0];

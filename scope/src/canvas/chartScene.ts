@@ -9,6 +9,7 @@ import { buildHighlight } from '../render/scene/highlight';
 import { CHART_SLICES, labelSlots, type Slots, shapeSlots } from '../render/slots';
 import { areaPlace } from '../state/areaPlaces';
 import { drawnItemsIn, drawnPoints } from '../state/drawnPoints';
+import { declinationAt } from '../state/magnetic';
 import { topology } from '../state/mapsets';
 import { settings } from '../state/settings';
 import { projectNm } from '../state/tracks';
@@ -37,13 +38,16 @@ export function showChart(
       projected()
         ? shapeSlots(
             slice,
-            buildShapes({
-              topology: topology(),
-              drawnPoints,
-              project: projectNm,
-              layers: slice.layers,
-              drawnItems: drawnItemsIn(slice.layers),
-            }),
+            buildShapes(
+              {
+                topology: topology(),
+                drawnPoints,
+                project: projectNm,
+                layers: slice.layers,
+                drawnItems: drawnItemsIn(slice.layers),
+              },
+              declinationAt,
+            ),
           )
         : null,
     );

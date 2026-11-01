@@ -1,15 +1,18 @@
 import type { ChartItem } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
-import type { StyledLayer } from '../../lib/layers';
+import type { Layer } from '../../lib/mapsetFormat';
 import type { AreaPlace } from '../../lib/pole';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
+import type { Declination } from '../../lib/wmm';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo } from '../protocol';
 import type { CHART_SLICES, ShapeBatches } from '../slots';
 import { buildAreaLabels } from './areaLabels';
 import { type BuiltLabels, type LabelOut, putText } from './drawnLabels';
+import { putPointMark } from './figures';
+import { drawHolds } from './holds';
 import { isPointStyle, LAYER_STYLES, labelReaches, type PointLayerStyle } from './layerStyles';
 import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
@@ -21,7 +24,7 @@ interface ShapesInput {
   drawnPoints: () => readonly ChartPoint[];
   project: ProjectFn;
   /** The slice's layers, front first, as in the draw stack. */
-  layers: readonly StyledLayer[];
+  layers: readonly Layer[];
   /** The items to draw, of `layers`. */
   drawnItems: readonly ChartItem[];
 }
@@ -44,40 +47,35 @@ export interface FitInput {
 }
 
 /** A point at its place on the plane. */
-export const placedPoint = ({ key, id, at: [lon, lat] }: ChartPoint, project: ProjectFn) => ({
+export const placedPoint = ({ key, id, kind, at: [lon, lat] }: ChartPoint, project: ProjectFn) => ({
   key,
   id,
+  kind,
   at: project(lat, lon),
 });
 
 /** The drawn points of a layer, each at its place on the plane. */
-const pointsIn = (
-  layer: StyledLayer,
-  drawnPoints: ShapesInput['drawnPoints'],
-  project: ProjectFn,
-) =>
+const pointsIn = (layer: Layer, drawnPoints: ShapesInput['drawnPoints'], project: ProjectFn) =>
   drawnPoints()
     .filter((p) => p.layer === layer)
     .map((p) => placedPoint(p, project));
 
 /** The chart's lines and point markers, each back to front through the stack. */
-export function buildShapes({
-  topology,
-  drawnPoints,
-  project,
-  layers,
-  drawnItems,
-}: ShapesInput): ShapeBatches {
+export function buildShapes(
+  { topology, drawnPoints, project, layers, drawnItems }: ShapesInput,
+  declinationAt: () => Declination,
+): ShapeBatches {
   const lines = new LineBatch();
   const markers = new MarkerBatch();
   const drawn = partsOf(drawnItems);
   drawRuns(topology.areas, drawn, NO_CUTS, project, lines);
+  drawHolds(drawnItems, project, declinationAt, { lines, markers });
   drawRuns(topology.routes, drawn, routeCuts(drawnItems, drawnPoints), project, lines);
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
     if (!isPointStyle(style)) continue;
-    for (const { at } of pointsIn(layer, drawnPoints, project)) {
-      markers.marker(at, style.shape, style.size, style.color);
+    for (const { at, kind } of pointsIn(layer, drawnPoints, project)) {
+      putPointMark({ lines, markers }, at, style, kind, style.color);
     }
   }
   return { lines: lines.finish(), markers: markers.finish() };

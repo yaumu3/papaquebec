@@ -1,4 +1,4 @@
-import type { StyledLayer } from '../../lib/layers';
+import type { Layer } from '../../lib/mapsetFormat';
 import { LABEL_DENSITIES, type LabelDensity } from '../../state/settingsDefaults';
 import { Shape } from '../protocol';
 import type { DashPattern, TextStyle } from './pack';
@@ -34,16 +34,26 @@ export interface LineLayerStyle {
   label?: LabelStyle;
 }
 
-/** How a layer of points is drawn. */
+/** How a layer of points is drawn: as a marker, or as the navaid symbol of the point's kind. */
 export interface PointLayerStyle {
-  shape: Shape;
+  shape: Shape | 'symbol';
   size: number;
   color: string;
   label: PointLabelStyle;
 }
 
-/** A layer's style: lines or points. */
-export type LayerStyle = LineLayerStyle | PointLayerStyle;
+/**
+ * How holds are drawn: a racetrack in `rnavColor` for kind RNAV, else in `color`. Holds have no
+ * label.
+ */
+export interface HoldLayerStyle {
+  color: string;
+  rnavColor: string;
+  label?: undefined;
+}
+
+/** A layer's style: lines, points or holds. */
+export type LayerStyle = LineLayerStyle | PointLayerStyle | HoldLayerStyle;
 
 const SOLID: Refinement = { dash: [] };
 
@@ -87,8 +97,8 @@ export const LAYER_STYLES = {
     label: { ...STATION_LABEL, color: THEME.adLabel },
   },
   navaid: {
-    shape: Shape.Hexagon,
-    size: 10,
+    shape: 'symbol',
+    size: 12,
     color: THEME.navaid,
     label: { ...STATION_LABEL, color: THEME.navaidLabel },
   },
@@ -118,6 +128,7 @@ export const LAYER_STYLES = {
   conv: line(THEME.conv, { label: { ...ROUTE_LABEL, color: THEME.convLabel } }),
   rnav: line(THEME.rnav, { label: { ...ROUTE_LABEL, color: THEME.rnavLabel } }),
   dct: line(THEME.conv, { width: 0.5 }),
+  hold: { color: THEME.conv, rnavColor: THEME.rnav, label: undefined },
   ctr: areaLine(THEME.airspace, THEME.airspaceLabel),
   pr: areaLine(THEME.airspace, THEME.airspaceLabel, {
     dash: [4, 3],
@@ -141,10 +152,12 @@ export const LAYER_STYLES = {
   advisory: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [10, 3, 2, 3] }),
   civt: areaLine(THEME.airspaceDim, THEME.airspaceLabel, { dash: [2, 3] }),
   asr: areaLine(THEME.boundaryDim, THEME.sectorLabel, { dash: [2, 4] }),
-} satisfies Record<StyledLayer, LayerStyle>;
+} satisfies Record<Layer, LayerStyle>;
 
 /** Whether a label is drawn at `density`: from its layer's own density up. */
 export const labelReaches = (label: LabelStyle, density: LabelDensity): boolean =>
   LABEL_DENSITIES.indexOf(density) >= LABEL_DENSITIES.indexOf(label.from);
 
 export const isPointStyle = (style: LayerStyle): style is PointLayerStyle => 'shape' in style;
+
+export const isHoldStyle = (style: LayerStyle): style is HoldLayerStyle => 'rnavColor' in style;

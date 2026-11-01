@@ -1,6 +1,5 @@
 import { type ChartItem, type ItemPart } from '../../lib/chart';
-import type { StyledLayer } from '../../lib/layers';
-import { isPointLayer } from '../../lib/mapsetFormat';
+import { isPointLayer, type Layer } from '../../lib/mapsetFormat';
 import { type Batch, LINE_STRIDE, TEXT_STRIDE } from '../protocol';
 import { atlas } from './atlasFixture';
 import { type DrawnLabels, redrawLabel } from './drawnLabels';
@@ -37,21 +36,24 @@ export interface Extra {
 }
 
 /** The properties each group of layers carries; `extra` adds a kind, a name, a limit, frequencies or the flag. */
-export function partOf(layer: StyledLayer, geometry: Geometry, extra: Extra = {}): ItemPart {
-  const properties = isPointLayer(layer)
-    ? { layer, id: 'Q', ...extra }
-    : { layer, name: 'Q', ...extra };
+export function partOf(layer: Layer, geometry: Geometry, extra: Extra = {}): ItemPart {
+  const properties =
+    layer === 'hold'
+      ? { layer, turn: 'R' as const, inboundTrue: 0, ...extra }
+      : isPointLayer(layer)
+        ? { layer, id: 'Q', ...extra }
+        : { layer, name: 'Q', ...extra };
   return { geometry, properties };
 }
 
-export const itemOf = (layer: StyledLayer, ...parts: ItemPart[]): ChartItem => ({
+export const itemOf = (layer: Layer, ...parts: ItemPart[]): ChartItem => ({
   key: layer,
   layer,
   parts,
 });
 
 /** A one-part route item named `name`, on the layer `layer`, through these points. */
-export const airway = (layer: StyledLayer, name: string, ...at: Position[]) =>
+export const airway = (layer: Layer, name: string, ...at: Position[]) =>
   keyed(name, itemOf(layer, partOf(layer, line(...at), { name })));
 
 export const keyed = (key: string, item: ChartItem): ChartItem => ({ ...item, key });

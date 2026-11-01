@@ -13,6 +13,7 @@ const point = (layer: PointLayer, vertex: number): ChartPoint => ({
   key: 'Q',
   layer,
   id: 'Q',
+  kind: undefined,
   at: [0, 0],
   vertex,
 });

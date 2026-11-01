@@ -195,7 +195,7 @@ The panel's `LAYERS` tree lists groups, layers and each layer's items:
   - The search is not remembered.
 - The scope traces in grey the item pointed at, drawn or not.
   - A search also traces the items it finds by name or tag.
-  - Holds are not traced yet.
+  - A hold traces as its racetrack, without the chevrons.
 
 The schema is [`scope/schema/mapset.schema.json`](scope/schema/mapset.schema.json), with a set that
 uses every layer in [`example.mapset.geojson`](scope/schema/example.mapset.geojson) and the rules

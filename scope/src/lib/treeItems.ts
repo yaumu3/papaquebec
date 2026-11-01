@@ -3,7 +3,7 @@
  * layer and put in order.
  */
 
-import { type ChartItem, type ItemPart, gridIdentity } from './chart';
+import { type ChartItem, type ItemPart, gridIdentity, itemKind } from './chart';
 import { type ScopeLayer, LAYER_NAMES } from './layers';
 import { POINT_LAYERS } from './mapsetFormat';
 import { stratumTag } from './stratum';
@@ -50,10 +50,11 @@ function nameOf(part: ItemPart, ids: ReadonlyMap<string, string>): string {
   return 'id' in p ? p.id : p.name;
 }
 
-function tagOf({ layer, parts }: ChartItem, { properties: p }: ItemPart): string {
+function tagOf(item: ChartItem, { properties: p }: ItemPart): string {
+  const { layer, parts } = item;
   if (layer === 'sector') return stratumTag(parts);
   if (layer === 'vfr') return 'ad' in p ? (p.ad ?? '') : '';
-  const { kind } = p;
+  const kind = itemKind(item);
   return kind === undefined || kind === LAYER_NAMES[layer] ? '' : kind;
 }
 

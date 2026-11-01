@@ -1,18 +1,18 @@
-import { DRAW_STACK, isStyled, type StyledLayer } from '../lib/layers';
+import { DRAW_STACK, isStyled } from '../lib/layers';
+import type { Layer } from '../lib/mapsetFormat';
 import type { Batch, BatchKind } from './protocol';
 
 /** The layers from `first` to `last` of the draw stack, front first. */
-const stackSlice = (first: StyledLayer, last: StyledLayer) =>
+const stackSlice = (first: Layer, last: Layer) =>
   DRAW_STACK.slice(DRAW_STACK.indexOf(first), DRAW_STACK.indexOf(last) + 1).filter(isStyled);
 
 /**
  * The chart is built in three slices of the draw stack, so a toggle rebuilds only the slices that
- * read its layer. Each fills a slot for its lines and markers and one for its labels. `hold` sits
- * in none: it draws nothing.
+ * read its layer. Each fills a slot for its lines and markers and one for its labels.
  */
 export const CHART_SLICES = [
   { layers: stackSlice('ctr', 'asr'), shapes: 'areaLines', labels: 'areaLabels' },
-  { layers: stackSlice('sid', 'dct'), shapes: 'routeLines', labels: 'routeLabels' },
+  { layers: stackSlice('sid', 'hold'), shapes: 'routeLines', labels: 'routeLabels' },
   { layers: stackSlice('ad', 'vfr'), shapes: 'pointMarkers', labels: 'pointLabels' },
 ] as const;
 

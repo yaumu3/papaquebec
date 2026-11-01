@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
 import {
+  bearingOnScreen,
   distanceToSegment,
   flatDistanceNm,
+  magneticToTrue,
+  northAt,
+  type ProjectFn,
   trueToMagnetic,
   velocityNm,
   nearest,
@@ -178,5 +182,82 @@ describe('splitByCircle', () => {
       ['past', { outside: [[at(-3, 2), at(3, 2)]], inside: [] }],
       ['short of', { outside: [[at(-3), at(-2)]], inside: [] }],
     ]);
+  });
+});
+
+describe('magneticToTrue', () => {
+  it('undoes trueToMagnetic, wrapping into 0..360', () => {
+    // Arrange
+    const cases: [number, number, number][] = [
+      [25, -7, 18],
+      [355, 10, 5],
+      [5, -10, 355],
+    ];
+
+    // Act
+    const results = cases.map(([mag, decl]) => magneticToTrue(mag, decl));
+
+    // Assert
+    results.forEach((t, i) => expect(t).toBeCloseTo(cases[i]?.[2] ?? NaN, 9));
+  });
+});
+
+/** A plane turned `deg` degrees anticlockwise from x = longitude, y = latitude. */
+const turnedBy =
+  (deg: number): ProjectFn =>
+  (lat, lon) => {
+    const a = deg * (Math.PI / 180);
+    return { x: lon * Math.cos(a) - lat * Math.sin(a), y: lon * Math.sin(a) + lat * Math.cos(a) };
+  };
+
+describe('northAt', () => {
+  it('points to a point a short step north, as a unit vector', () => {
+    // Arrange
+    const planes = [0, 30, -90];
+
+    // Act
+    const norths = planes.map((deg) => northAt(turnedBy(deg), 34, 131));
+
+    // Assert
+    norths.forEach((north, i) => {
+      const a = (planes[i] ?? 0) * (Math.PI / 180);
+      expect(north.x).toBeCloseTo(-Math.sin(a), 9);
+      expect(north.y).toBeCloseTo(Math.cos(a), 9);
+    });
+  });
+});
+
+describe('bearingOnScreen', () => {
+  it('turns north clockwise by the bearing, y down', () => {
+    // Arrange
+    const north = { x: 0, y: 1 };
+    const bearings = [0, 90, 180, 270];
+
+    // Act
+    const screen = bearings.map((deg) => bearingOnScreen(north, deg));
+
+    // Assert
+    const expected = [
+      [0, -1],
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+    ];
+    screen.forEach((v, i) => {
+      expect(v.x).toBeCloseTo(expected[i]?.[0] ?? NaN, 9);
+      expect(v.y).toBeCloseTo(expected[i]?.[1] ?? NaN, 9);
+    });
+  });
+
+  it('turns with the plane, east of a north turned 30 degrees anticlockwise', () => {
+    // Arrange
+    const north = northAt(turnedBy(30), 34, 131);
+
+    // Act
+    const east = bearingOnScreen(north, 90);
+
+    // Assert
+    expect(east.x).toBeCloseTo(Math.cos(Math.PI / 6), 9);
+    expect(east.y).toBeCloseTo(-Math.sin(Math.PI / 6), 9);
   });
 });

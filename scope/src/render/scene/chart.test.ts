@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, isStyled } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
+import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { type Layer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
+import { navaidSymbol } from '../../lib/navaidSymbol';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import type { LayerState } from '../../lib/visibility';
 import { allShown, shownExcept } from '../../lib/visibilityFixture';
@@ -29,7 +31,10 @@ import {
   triangle,
 } from './chartFixture';
 import type { DrawnLabel } from './drawnLabels';
+import { putFigure } from './figures';
+import { LineBatch, MarkerBatch } from './pack';
 
+const NO_DECLINATION = () => () => 0;
 const has = (layers: readonly string[], layer: string) => layers.includes(layer);
 
 /** A map set holding one navaid. */
@@ -62,7 +67,7 @@ const hiding =
 
 const build = (
   items: Chart,
-  layers: readonly StyledLayer[] = DRAW_STACK.filter(isStyled),
+  layers: readonly Layer[] = DRAW_STACK.filter(isStyled),
   labelDensity: LabelDensity = 'normal',
   { inRange = true, stateOf = allShown }: Reads = {},
 ) => {
@@ -75,7 +80,11 @@ const build = (
     drawn,
   } = buildPointLabels({ ...input, labelDensity, atlas });
   if (!labels) throw new Error('buildPointLabels returned no batch');
-  return { ...buildShapes(input), labels, drawn: drawn ?? new Map<string, DrawnLabel>() };
+  return {
+    ...buildShapes(input, NO_DECLINATION),
+    labels,
+    drawn: drawn ?? new Map<string, DrawnLabel>(),
+  };
 };
 
 describe('buildShapes lines', () => {
@@ -86,7 +95,7 @@ describe('buildShapes lines', () => {
     const grey = '#4a4a47';
     const procedure = '#33606c';
     const rows: {
-      layer: StyledLayer;
+      layer: Layer;
       extra?: object;
       color: string;
       pattern: number[];
@@ -173,7 +182,7 @@ describe('buildShapes lines', () => {
   it('draws nothing for a layer that is not among those shown', () => {
     // Arrange
     const item = itemOf('ctr', partOf('ctr', polygon(triangle(0))));
-    const shown: StyledLayer[] = ['fir', 'sid'];
+    const shown: Layer[] = ['fir', 'sid'];
 
     // Act
     const batches = build([item], shown, 'dense');
@@ -184,7 +193,9 @@ describe('buildShapes lines', () => {
 
   it('draws the layers back to front in the stack, each read by where its item sits', () => {
     // Arrange
-    const lineLayers = DRAW_STACK.filter(isStyled).filter((l) => !has(POINT_LAYERS, l));
+    const lineLayers = DRAW_STACK.filter(isStyled).filter(
+      (l) => !has(POINT_LAYERS, l) && l !== 'hold',
+    );
     const items = lineLayers.map((layer) =>
       itemOf(
         layer,
@@ -209,7 +220,7 @@ describe('buildShapes shared edges', () => {
       itemOf('fir', partOf('fir', line([0, 0], [1, 0], [0, 1]))),
       itemOf('tma', partOf('tma', line([0, 0], [1, 0], [1, 1]))),
     ];
-    const rows: StyledLayer[][] = [['tma', 'fir'], ['fir']];
+    const rows: Layer[][] = [['tma', 'fir'], ['fir']];
 
     // Act
     const drawn = rows.map((layers) => instances(build(items, layers).lines));
@@ -366,13 +377,12 @@ function visibleAt(i: Instance, pxPerNm: number): boolean {
   return from <= to;
 }
 
-const stopAt = (layer: StyledLayer, at: Position) => itemOf(layer, partOf(layer, point(at)));
-const routeOf = (layer: StyledLayer, ...at: Position[]) =>
-  itemOf(layer, partOf(layer, line(...at)));
+const stopAt = (layer: Layer, at: Position) => itemOf(layer, partOf(layer, point(at)));
+const routeOf = (layer: Layer, ...at: Position[]) => itemOf(layer, partOf(layer, line(...at)));
 
 describe('buildShapes routes stop short of points', () => {
   const conv = packed('#82573c');
-  const cutsOf = (items: ChartItem[], layers?: readonly StyledLayer[], reads?: Reads) =>
+  const cutsOf = (items: ChartItem[], layers?: readonly Layer[], reads?: Reads) =>
     instances(build(items, layers, 'normal', reads).lines)
       .filter((i) => i.color.every((c, k) => c === conv[k]))
       .map((i) => i.span);
@@ -392,7 +402,7 @@ describe('buildShapes routes stop short of points', () => {
 
   it('measures the way back and ahead along the whole span, across vertices and runs', () => {
     // Arrange
-    const rows: [string, ChartItem[], StyledLayer[], number[][]][] = [
+    const rows: [string, ChartItem[], Layer[], number[][]][] = [
       [
         'a stop at each end, across edges of unequal length',
         [
@@ -402,9 +412,9 @@ describe('buildShapes routes stop short of points', () => {
         ],
         ['conv', 'fix', 'navaid'],
         [
-          [0, 6, 7, 8],
-          [1, 4, 7, 8],
-          [3, 0, 7, 8],
+          [0, 6, 7, 9],
+          [1, 4, 7, 9],
+          [3, 0, 7, 9],
         ],
       ],
       [
@@ -446,7 +456,7 @@ describe('buildShapes routes stop short of points', () => {
   it('writes no cut where no point stands at a vertex, where the point layer is hidden, or the navaid is out of range', () => {
     // Arrange
     const through = routeOf('conv', [0, 0], [1, 0], [2, 0]);
-    const rows: [string, ChartItem[], readonly StyledLayer[], Reads][] = [
+    const rows: [string, ChartItem[], readonly Layer[], Reads][] = [
       ['a point off the route', [through, stopAt('fix', [5, 5])], ['conv', 'fix'], {}],
       ['a hidden fix layer', [through, stopAt('fix', [1, 0])], ['conv'], {}],
       [
@@ -471,9 +481,9 @@ describe('buildShapes routes stop short of points', () => {
 
   it('cuts half the marker plus 3 CSS px', () => {
     // Arrange
-    const rows: [StyledLayer, number][] = [
+    const rows: [Layer, number][] = [
       ['fix', 7],
-      ['navaid', 8],
+      ['navaid', 9],
       ['ad', 7.5],
       ['vfr', 6],
     ];
@@ -512,7 +522,7 @@ describe('buildShapes routes stop short of points', () => {
       routeOf('conv', [0, 0], [1, 0]),
       itemOf('tma', partOf('tma', polygon(triangle(0)))),
     ];
-    const rows: StyledLayer[][] = [['tma'], [], ['conv'], ['fix']];
+    const rows: Layer[][] = [['tma'], [], ['conv'], ['fix']];
     const reads = rows.map(() => 0);
     const inputs = rows.map((layers, i) => ({
       topology: topologyOf(items),
@@ -526,7 +536,7 @@ describe('buildShapes routes stop short of points', () => {
     }));
 
     // Act
-    for (const input of inputs) buildShapes(input);
+    for (const input of inputs) buildShapes(input, NO_DECLINATION);
 
     // Assert
     expect(reads.map((n) => n > 0)).toEqual([false, false, true, true]);
@@ -548,12 +558,97 @@ describe('buildShapes routes stop short of points', () => {
 const markerXs = ({ count, data }: Batch) =>
   Array.from({ length: count }, (_, i) => data[i * MARKER_STRIDE]);
 
+/** A navaid item of the given part kinds, one part at each position. */
+const navaidOf = (parts: [Position, string | undefined][]) =>
+  itemOf(
+    'navaid',
+    ...parts.map(([at, kind]) => partOf('navaid', point(at), kind === undefined ? {} : { kind })),
+  );
+
+/** What the points slice draws for navaid symbols: each of `symbols` at its position, in order. */
+function symbolsAt(symbols: [Position, string | undefined][]) {
+  const lines = new LineBatch();
+  const markers = new MarkerBatch();
+  for (const [[x, y], kind] of symbols) {
+    putFigure({ lines, markers }, { x, y }, navaidSymbol(kind, 12), '#808080');
+  }
+  return [Array.from(lines.finish().data), Array.from(markers.finish().data)];
+}
+
+const shapesOf = ({ lines, markers }: { lines: Batch; markers: Batch }) => [
+  Array.from(lines.data),
+  Array.from(markers.data),
+];
+
+describe('buildShapes navaids', () => {
+  it('draws each navaid kind as its own symbol', () => {
+    // Arrange
+    const kinds = ['VOR', 'DME', 'VOR/DME', 'TACAN', 'VORTAC', 'NDB'];
+    const at: Position = [139.5, 35.5];
+
+    // Act
+    const drawn = kinds.map((kind) => shapesOf(build([navaidOf([[at, kind]])])));
+
+    // Assert
+    expect(drawn).toEqual(kinds.map((kind) => symbolsAt([[at, kind]])));
+    expect(new Set(drawn.map((d) => JSON.stringify(d))).size).toBe(kinds.length);
+  });
+
+  it('draws an unknown kind and a missing one as the default circle', () => {
+    // Arrange
+    const kinds = ['TVOR', 'vor', undefined];
+    const at: Position = [139.5, 35.5];
+
+    // Act
+    const drawn = kinds.map((kind) => shapesOf(build([navaidOf([[at, kind]])])));
+
+    // Assert
+    expect(drawn).toEqual(kinds.map(() => symbolsAt([[at, undefined]])));
+  });
+
+  it("draws every part of a navaid with its first part's kind", () => {
+    // Arrange
+    const first: Position = [139.5, 35.5];
+    const second: Position = [139.6, 35.5];
+    const item = navaidOf([
+      [first, 'VOR'],
+      [second, 'NDB'],
+    ]);
+
+    // Act
+    const drawn = shapesOf(build([item]));
+
+    // Assert
+    expect(drawn).toEqual(
+      symbolsAt([
+        [first, 'VOR'],
+        [second, 'VOR'],
+      ]),
+    );
+  });
+
+  it("draws the example's QDG as VORTAC and QIK as VOR/DME", () => {
+    // Arrange
+    const chart = chartOf([parseMapSet(EXAMPLE)]);
+
+    // Act
+    const drawn = shapesOf(build(chart, ['navaid']));
+
+    // Assert
+    expect(drawn).toEqual(
+      symbolsAt([
+        [[130.4406, 33.5967], 'VORTAC'],
+        [[129.96, 33.73], 'VOR/DME'],
+      ]),
+    );
+  });
+});
+
 describe('buildShapes markers', () => {
   it('draws each kind of point with its own glyph, size and colour', () => {
     // Arrange
-    const rows: [StyledLayer, Shape, number, string][] = [
+    const rows: [Layer, Shape, number, string][] = [
       ['ad', Shape.Ring, 9, '#8a8a8a'],
-      ['navaid', Shape.Hexagon, 10, '#808080'],
       ['fix', Shape.Triangle, 8, '#707070'],
       ['vfr', Shape.Triangle, 6, '#5c5c5c'],
     ];
@@ -572,7 +667,7 @@ describe('buildShapes markers', () => {
 
   it('draws the points back to front in the stack', () => {
     // Arrange
-    const pointLayers = DRAW_STACK.filter((l): l is StyledLayer => has(POINT_LAYERS, l));
+    const pointLayers = DRAW_STACK.filter((l): l is Layer => has(POINT_LAYERS, l));
     const items = pointLayers.map((layer) =>
       itemOf(layer, partOf(layer, point([DRAW_STACK.indexOf(layer), 0]))),
     );
@@ -621,16 +716,16 @@ describe('buildShapes markers', () => {
 const rank = (d: LabelDensity) => LABEL_DENSITIES.indexOf(d);
 
 /** A one-part item whose name is one glyph, so its label is one instance. */
-const onePart = (layer: StyledLayer, geometry: Geometry, extra: Extra = {}) =>
+const onePart = (layer: Layer, geometry: Geometry, extra: Extra = {}) =>
   itemOf(layer, partOf(layer, geometry, extra));
 
-const placeholder = (layer: StyledLayer): Geometry =>
+const placeholder = (layer: Layer): Geometry =>
   has(POINT_LAYERS, layer) ? point([0, 0]) : line([0, 0], [0.01, 0]);
 
 describe('buildPointLabels', () => {
   it('labels each point layer from its own label density up', () => {
     // Arrange
-    const from: [StyledLayer, LabelDensity | null][] = [
+    const from: [Layer, LabelDensity | null][] = [
       ['ad', 'sparse'],
       ['navaid', 'sparse'],
       ['fix', 'normal'],
@@ -653,7 +748,7 @@ describe('buildPointLabels', () => {
 
   it('prints a point by its ident, not by its name', () => {
     // Arrange
-    const shown: StyledLayer[] = ['ad', 'navaid'];
+    const shown: Layer[] = ['ad', 'navaid'];
     const items = shown.map((layer) => onePart(layer, point([0, 0]), { name: 'PAPAQ' }));
 
     // Act
@@ -694,7 +789,7 @@ describe('buildPointLabels', () => {
 
   it('colours each label by its layer', () => {
     // Arrange
-    const rows: [StyledLayer, string][] = [
+    const rows: [Layer, string][] = [
       ['ad', '#a0a0a0'],
       ['navaid', '#909090'],
       ['fix', '#7a7a7a'],

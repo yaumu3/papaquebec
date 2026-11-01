@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'bun:test';
 
 import { type Chart, type ChartItem, chartOf, type ItemPart } from '../../lib/chart';
-import { DRAW_STACK, drawnItemsOf, type ScopeLayer, type StyledLayer } from '../../lib/layers';
+import { DRAW_STACK, drawnItemsOf, type ScopeLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
-import { POINT_LAYERS } from '../../lib/mapsetFormat';
+import { POINT_LAYERS, type Layer } from '../../lib/mapsetFormat';
 import { areaPlaceOf } from '../../lib/pole';
 import {
   type ChartPath,
@@ -33,28 +33,34 @@ import { buildCoast, buildRings } from './static';
 const at = (layer: ScopeLayer) => DRAW_STACK.indexOf(layer);
 const isPoint = (layer: ScopeLayer): layer is (typeof POINT_LAYERS)[number] =>
   (POINT_LAYERS as readonly string[]).includes(layer);
-const CHART_LAYERS: StyledLayer[] = CHART_SLICES.flatMap((s) => s.layers);
+const CHART_LAYERS: Layer[] = CHART_SLICES.flatMap((s) => s.layers);
 
 /** An item of `layer`, one glyph in its name, sitting at x = its place in the stack. */
-function itemAt(layer: StyledLayer): ChartItem {
+function itemAt(layer: Layer): ChartItem {
   const x = at(layer);
-  const part: ItemPart = isPoint(layer)
-    ? { geometry: { type: 'Point', coordinates: [x, 0] }, properties: { layer, id: 'Q' } }
-    : {
-        geometry: {
-          type: 'LineString',
-          coordinates: [
-            [x, 0],
-            [x + 0.01, 0],
-          ],
-        },
-        properties: { layer, name: 'Q' },
-      };
+  const part: ItemPart =
+    layer === 'hold'
+      ? {
+          geometry: { type: 'Point', coordinates: [x, 0] },
+          properties: { layer, turn: 'R', inboundTrue: 0 },
+        }
+      : isPoint(layer)
+        ? { geometry: { type: 'Point', coordinates: [x, 0] }, properties: { layer, id: 'Q' } }
+        : {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [x, 0],
+                [x + 0.01, 0],
+              ],
+            },
+            properties: { layer, name: 'Q' },
+          };
   return { key: layer, layer, parts: [part] };
 }
 
 /** What the scope reads to draw `layers` of the chart. */
-function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
+function drawnOf(chart: Chart, layers: readonly Layer[]) {
   const topology = topologyOf(chart);
   const drawnItems = drawnItemsOf(chart, layers, allShown, () => true);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
@@ -62,8 +68,11 @@ function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
 }
 
 /** A slice's shapes built as the scope builds them. */
-const shapesOf = (chart: Chart, layers: readonly StyledLayer[]) =>
-  buildShapes(drawnOf(chart, layers));
+/** The layers whose shapes are edges: a hold is a figure at screen size, not an edge. */
+const edgeLayers = (layers: readonly Layer[]) => layers.filter((l) => l !== 'hold');
+
+const shapesOf = (chart: Chart, layers: readonly Layer[]) =>
+  buildShapes(drawnOf(chart, layers), () => () => 0);
 
 /** A settled scale at which every label of the fixture has room. */
 const ROOMY = 1e6;
@@ -125,6 +134,9 @@ function xsInDrawOrder(
     .flatMap((b) => Array.from({ length: b.count }, (_, i) => Math.round(b.data[i * stride] ?? 0)));
 }
 
+/** A list with each run of equal values as one: a layer's many instances at one place. */
+const oneEach = (xs: readonly number[]) => xs.filter((x, i) => x !== xs[i - 1]);
+
 /** The kind of each non-empty batch, in the order the renderer draws them. */
 const kindsInDrawOrder = (slots: Slots): Batch['kind'][] =>
   SLOT_ORDER.flatMap((name) => slots[name] ?? [])
@@ -136,15 +148,18 @@ describe('the draw order of the chart', () => {
   const behind = DRAW_STACK.toReversed();
   const unlabelled: ReadonlySet<ScopeLayer> = new Set(['fir', 'adiz', 'dct', 'hold', 'coast']);
 
-  it('draws lines back to front through the stack, the base map first', () => {
+  it('draws lines back to front through the stack, the base map first, the navaid strokes last', () => {
     // Arrange
-    const lineLayers = behind.filter((l) => !isPoint(l) && l !== 'hold');
+    const lineLayers = behind.filter((l) => !isPoint(l));
 
     // Act
     const slots = mapSlots(chart);
 
     // Assert
-    expect(xsInDrawOrder(slots, 'lines', SHAPE_SLOTS)).toEqual(lineLayers.map(at));
+    expect(oneEach(xsInDrawOrder(slots, 'lines', SHAPE_SLOTS))).toEqual([
+      ...lineLayers.map(at),
+      at('navaid'),
+    ]);
   });
 
   it('draws the markers back to front', () => {
@@ -254,7 +269,7 @@ function edgeKeys({ data, count }: Batch): string[] {
 }
 
 describe('the example map set', () => {
-  it('draws every layer but hold', () => {
+  it('draws every layer', () => {
     // Arrange
     const items = chartOf([parseMapSet(EXAMPLE)]);
 
@@ -274,7 +289,7 @@ describe('the example map set', () => {
     const slices = [CHART_SLICES[0], CHART_SLICES[1]];
 
     // Act
-    const keys = slices.map((slice) => edgeKeys(shapesOf(items, slice.layers).lines));
+    const keys = slices.map((slice) => edgeKeys(shapesOf(items, edgeLayers(slice.layers)).lines));
 
     // Assert
     expect(keys.map((k) => k.length > 0)).toEqual([true, true]);
@@ -350,7 +365,7 @@ describe('the example map set', () => {
     const items = chartOf([parseMapSet(EXAMPLE)]).filter((item) =>
       /V901|A901|TAVRO/.test(item.key),
     );
-    const shown: StyledLayer[][] = [['conv'], ['conv', 'fix']];
+    const shown: Layer[][] = [['conv'], ['conv', 'fix']];
 
     // Act
     const rows = shown.map((layers) => {

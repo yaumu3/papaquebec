@@ -25,7 +25,7 @@ export const enum Shape {
   Diamond = 2,
   HollowDiamond = 3,
   Triangle = 4,
-  Hexagon = 5,
+  Disc = 5,
   Dot = 6,
   Ring = 7,
   HollowSquare = 8,
