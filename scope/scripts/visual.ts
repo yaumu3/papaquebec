@@ -14,6 +14,7 @@ import { parseArgs } from 'node:util';
 import type { Locator, Page } from 'playwright';
 import { PNG } from 'pngjs';
 
+import { DRAW_STACK, LAYER_GROUPS } from '../src/lib/layers';
 import { openScope, startPreview } from './browser';
 import { compareImages, type Image, type Limits } from './imageDiff';
 
@@ -33,35 +34,8 @@ const SETTLE_TRIES = 100;
 /** The feed's status and the clock depend on when the shot is taken. */
 const UNSTABLE = '#top-bar { visibility: hidden }';
 
-const EVERY_LAYER = {
-  ad: true,
-  navaid: true,
-  fix: true,
-  vfr: true,
-  sid: true,
-  star: true,
-  trans: true,
-  conv: true,
-  rnav: true,
-  dct: true,
-  hold: true,
-  ctr: true,
-  pr: true,
-  tma: true,
-  sector: true,
-  fir: true,
-  dng: true,
-  tra: true,
-  adiz: true,
-  cta: true,
-  advisory: true,
-  civt: true,
-  asr: true,
-  coast: true,
-  rings: true,
-};
-
-const GROUPS = ['POINTS', 'ROUTES', 'PROCEDURES', 'RESTRICTIONS', 'AIRSPACE', 'BASE MAP'];
+const EVERY_LAYER = Object.fromEntries(DRAW_STACK.map((layer) => [layer, true]));
+const GROUPS = LAYER_GROUPS.map((group) => group.title);
 
 interface Shot {
   name: string;

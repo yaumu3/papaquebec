@@ -1,6 +1,6 @@
 import { blockHeight, DB_WIDTH, type Rect } from '../lib/datablock';
 import { distanceToSegment, type ProjectFn, type UnprojectFn, type Vec2 } from '../lib/geo';
-import type { PointLayer } from '../lib/mapsetFormat';
+import { isSnapLayer } from '../lib/layers';
 import type { ChartPoint } from '../lib/topology';
 import type { Offset } from '../render/layout/moves';
 import type { View } from '../render/protocol';
@@ -122,9 +122,6 @@ export function rblAt(view: View, cx: number, cy: number): Rbl | null {
   });
 }
 
-/** The layers whose points the range cursor snaps onto. */
-const SNAP_LAYERS: ReadonlySet<PointLayer> = new Set(['fix', 'vfr', 'navaid']);
-
 /** The fix, VFR point or navaid among the drawn points nearest `at`, if any is within `reach`. */
 export function fixNear(
   points: readonly ChartPoint[],
@@ -135,7 +132,7 @@ export function fixNear(
   let best: { name: string; x: number; y: number } | null = null;
   let bestD = reach * reach;
   for (const point of points) {
-    if (!SNAP_LAYERS.has(point.layer)) continue;
+    if (!isSnapLayer(point.layer)) continue;
     const [lon, lat] = point.at;
     const p = project(lat, lon);
     const d = (p.x - at.x) ** 2 + (p.y - at.y) ** 2;

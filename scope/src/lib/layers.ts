@@ -77,10 +77,22 @@ interface LayerRow<S extends LayerStyle = LayerStyle> {
   rank: number;
   /** A route a pilot files by its designator, which ENR 3 of the AIP lists. */
   airway?: boolean;
+  /** The range cursor snaps to its points. */
+  snaps?: boolean;
   style: S;
 }
 
-const row = <S extends LayerStyle>(fields: LayerRow<S>): LayerRow<S> => fields;
+/** The maker of the rows of a group of the Maps panel. */
+const rowsOf =
+  (group: string) =>
+  <S extends LayerStyle>(fields: Omit<LayerRow<S>, 'group'>): LayerRow<S> => ({ ...fields, group });
+
+const point = rowsOf('POINTS');
+const route = rowsOf('ROUTES');
+const procedure = rowsOf('PROCEDURES');
+const restriction = rowsOf('RESTRICTIONS');
+const airspace = rowsOf('AIRSPACE');
+const baseMap = rowsOf('BASE MAP');
 
 const SOLID: Refinement = { dash: [] };
 
@@ -100,31 +112,7 @@ const areaLine = (
   rest: Omit<LineLayerStyle, 'color' | 'label'> = {},
 ) => line(color, { ...rest, label: { ...AREA_LABEL, color: labelColor } });
 
-const {
-  ad,
-  adLabel,
-  airspace,
-  airspaceDim,
-  airspaceLabel,
-  boundaryDim,
-  coast,
-  conv,
-  convLabel,
-  fir,
-  fix,
-  fixLabel,
-  navaid,
-  navaidLabel,
-  procedure,
-  procedureLabel,
-  ringEdge,
-  rnav,
-  rnavLabel,
-  sector,
-  sectorLabel,
-  vfr,
-  vfrLabel,
-} = CHART_COLORS;
+const C = CHART_COLORS;
 
 /**
  * Everything the scope knows about a layer, one row each, in the order the Maps panel lists them.
@@ -133,8 +121,7 @@ const {
  * only give context; the base map is behind all of it. Unknown kinds draw as their layer's default.
  */
 export const LAYER_TABLE = {
-  ad: row({
-    group: 'POINTS',
+  ad: point({
     name: 'AERODROMES',
     aip: 'AD 2',
     shown: true,
@@ -142,226 +129,209 @@ export const LAYER_TABLE = {
     style: {
       marker: 'ring',
       size: 9,
-      color: ad,
-      label: { ...STATION_LABEL, color: adLabel },
+      color: C.ad,
+      label: { ...STATION_LABEL, color: C.adLabel },
     },
   }),
-  navaid: row({
-    group: 'POINTS',
+  navaid: point({
     name: 'NAVAIDS',
     aip: 'ENR 4.1',
     shown: true,
     rank: 1,
+    snaps: true,
     style: {
       marker: 'navaid',
       size: 12,
-      color: navaid,
-      label: { ...STATION_LABEL, color: navaidLabel },
+      color: C.navaid,
+      label: { ...STATION_LABEL, color: C.navaidLabel },
     },
   }),
-  fix: row({
-    group: 'POINTS',
+  fix: point({
     name: 'FIXES',
     aip: 'ENR 4.4',
     shown: true,
     rank: 2,
+    snaps: true,
     style: {
       marker: 'triangle',
       size: 8,
-      color: fix,
-      label: { ...FIX_LABEL, color: fixLabel },
+      color: C.fix,
+      label: { ...FIX_LABEL, color: C.fixLabel },
     },
   }),
-  vfr: row({
-    group: 'POINTS',
+  vfr: point({
     name: 'VFR POINTS',
     aip: 'AD 2.24 visual approach charts',
     shown: false,
     rank: 3,
+    snaps: true,
     style: {
       marker: 'triangle',
       size: 6,
-      color: vfr,
-      label: { ...FIX_LABEL, from: 'dense', color: vfrLabel },
+      color: C.vfr,
+      label: { ...FIX_LABEL, from: 'dense', color: C.vfrLabel },
     },
   }),
-  conv: row({
-    group: 'ROUTES',
+  conv: route({
     name: 'CONVENTIONAL',
     aip: 'ENR 3',
     shown: true,
     rank: 7,
     airway: true,
-    style: line(conv, { label: { ...ROUTE_LABEL, color: convLabel } }),
+    style: line(C.conv, { label: { ...ROUTE_LABEL, color: C.convLabel } }),
   }),
-  rnav: row({
-    group: 'ROUTES',
+  rnav: route({
     name: 'RNAV',
     aip: 'ENR 3',
     shown: true,
     rank: 8,
     airway: true,
-    style: line(rnav, { label: { ...ROUTE_LABEL, color: rnavLabel } }),
+    style: line(C.rnav, { label: { ...ROUTE_LABEL, color: C.rnavLabel } }),
   }),
-  dct: row({
-    group: 'ROUTES',
+  dct: route({
     name: 'DCT',
     aip: 'ENR 3, other routes',
     shown: false,
     rank: 9,
-    style: line(conv, { width: 0.5 }),
+    style: line(C.conv, { width: 0.5 }),
   }),
-  hold: row({
-    group: 'ROUTES',
+  hold: route({
     name: 'EN-ROUTE HOLDING',
     aip: 'ENR 3, en-route holding',
     shown: false,
     rank: 10,
-    style: { color: conv, rnavColor: rnav, label: undefined },
+    style: { color: C.conv, rnavColor: C.rnav, label: undefined },
   }),
-  sid: row({
-    group: 'PROCEDURES',
+  sid: procedure({
     name: 'SID',
     aip: 'AD 2.22',
     shown: false,
     rank: 4,
-    style: line(procedure, {
-      label: { ...ROUTE_LABEL, from: 'dense', color: procedureLabel },
+    style: line(C.procedure, {
+      label: { ...ROUTE_LABEL, from: 'dense', color: C.procedureLabel },
     }),
   }),
-  star: row({
-    group: 'PROCEDURES',
+  star: procedure({
     name: 'STAR',
     aip: 'AD 2.22',
     shown: false,
     rank: 5,
-    style: line(procedure, {
+    style: line(C.procedure, {
       dash: [6, 3],
-      label: { ...ROUTE_LABEL, from: 'dense', color: procedureLabel },
+      label: { ...ROUTE_LABEL, from: 'dense', color: C.procedureLabel },
     }),
   }),
-  trans: row({
-    group: 'PROCEDURES',
+  trans: procedure({
     name: 'TRANSITIONS',
     aip: 'AD 2.22',
     shown: false,
     rank: 6,
-    style: line(procedure, {
+    style: line(C.procedure, {
       dash: [10, 4],
-      label: { ...ROUTE_LABEL, color: procedureLabel },
+      label: { ...ROUTE_LABEL, color: C.procedureLabel },
     }),
   }),
-  pr: row({
-    group: 'RESTRICTIONS',
+  pr: restriction({
     name: 'RESTRICTED AREAS',
     aip: 'ENR 5.1',
     shown: true,
     rank: 12,
-    style: areaLine(airspace, airspaceLabel, { dash: [4, 3], kinds: new Map([['P', SOLID]]) }),
+    style: areaLine(C.airspace, C.airspaceLabel, { dash: [4, 3], kinds: new Map([['P', SOLID]]) }),
   }),
-  dng: row({
-    group: 'RESTRICTIONS',
+  dng: restriction({
     name: 'DANGER AREAS',
     aip: 'ENR 5.1',
     shown: true,
     rank: 16,
-    style: areaLine(airspaceDim, airspaceLabel, { dash: [4, 3] }),
+    style: areaLine(C.airspaceDim, C.airspaceLabel, { dash: [4, 3] }),
   }),
-  tra: row({
-    group: 'RESTRICTIONS',
+  tra: restriction({
     name: 'TRA',
     aip: 'ENR 5.2',
     shown: false,
     rank: 17,
-    style: areaLine(airspaceDim, airspaceLabel, { dash: [4, 3] }),
+    style: areaLine(C.airspaceDim, C.airspaceLabel, { dash: [4, 3] }),
   }),
-  adiz: row({
-    group: 'RESTRICTIONS',
+  adiz: restriction({
     name: 'ADIZ',
     aip: 'ENR 5.2',
     shown: false,
     rank: 18,
-    style: line(boundaryDim, { dash: [16, 4, 2, 4] }),
+    style: line(C.boundaryDim, { dash: [16, 4, 2, 4] }),
   }),
-  civt: row({
-    group: 'RESTRICTIONS',
+  civt: restriction({
     name: 'CIVIL TRAINING',
     shown: false,
     rank: 21,
-    style: areaLine(airspaceDim, airspaceLabel, { dash: [2, 3] }),
+    style: areaLine(C.airspaceDim, C.airspaceLabel, { dash: [2, 3] }),
   }),
-  ctr: row({
-    group: 'AIRSPACE',
+  ctr: airspace({
     name: 'CTR',
     aip: 'AD 2.17',
     shown: true,
     rank: 11,
-    style: areaLine(airspace, airspaceLabel),
+    style: areaLine(C.airspace, C.airspaceLabel),
   }),
-  tma: row({
-    group: 'AIRSPACE',
+  tma: airspace({
     name: 'TMA',
     aip: 'ENR 2.1',
     shown: true,
     rank: 13,
-    style: areaLine(airspaceDim, airspaceLabel, { kinds: new Map([['MIL', { dash: [8, 3] }]]) }),
+    style: areaLine(C.airspaceDim, C.airspaceLabel, {
+      kinds: new Map([['MIL', { dash: [8, 3] }]]),
+    }),
   }),
-  cta: row({
-    group: 'AIRSPACE',
+  cta: airspace({
     name: 'CTA',
     aip: 'ENR 2.1',
     shown: false,
     rank: 19,
-    style: areaLine(airspaceDim, airspaceLabel, { kinds: new Map([['PCA', { dash: [12, 6] }]]) }),
+    style: areaLine(C.airspaceDim, C.airspaceLabel, {
+      kinds: new Map([['PCA', { dash: [12, 6] }]]),
+    }),
   }),
-  advisory: row({
-    group: 'AIRSPACE',
+  advisory: airspace({
     name: 'ADVISORY AREAS',
     aip: 'ENR 2.2',
     shown: false,
     rank: 20,
-    style: areaLine(airspaceDim, airspaceLabel, { dash: [10, 3, 2, 3] }),
+    style: areaLine(C.airspaceDim, C.airspaceLabel, { dash: [10, 3, 2, 3] }),
   }),
-  sector: row({
-    group: 'AIRSPACE',
+  sector: airspace({
     name: 'SECTORS',
     shown: true,
     rank: 14,
-    style: line(sector, {
+    style: line(C.sector, {
       dash: [6, 4],
       upper: { dash: [12, 4] },
-      label: { ...AREA_LABEL, from: 'normal', size: 10, color: sectorLabel },
+      label: { ...AREA_LABEL, from: 'normal', size: 10, color: C.sectorLabel },
     }),
   }),
-  fir: row({
-    group: 'AIRSPACE',
+  fir: airspace({
     name: 'FIR',
     aip: 'ENR 2.1',
     shown: true,
     rank: 15,
-    style: line(fir, { dash: [16, 5] }),
+    style: line(C.fir, { dash: [16, 5] }),
   }),
-  asr: row({
-    group: 'AIRSPACE',
+  asr: airspace({
     name: 'ALTIMETER SETTING',
     aip: 'ENR 1.7',
     shown: false,
     rank: 22,
-    style: areaLine(boundaryDim, sectorLabel, { dash: [2, 4] }),
+    style: areaLine(C.boundaryDim, C.sectorLabel, { dash: [2, 4] }),
   }),
-  coast: row({
-    group: 'BASE MAP',
+  coast: baseMap({
     name: 'COASTLINE',
     shown: true,
     rank: 23,
-    style: line(coast),
+    style: line(C.coast),
   }),
-  rings: row({
-    group: 'BASE MAP',
+  rings: baseMap({
     name: 'RANGE RINGS',
     shown: true,
     rank: 24,
-    style: line(ringEdge),
+    style: line(C.ringEdge),
   }),
 } satisfies Record<ScopeLayer, LayerRow>;
 
@@ -388,6 +358,8 @@ export const DEFAULT_SHOWN = Object.fromEntries(
 ) as Record<ScopeLayer, boolean>;
 
 export const isAirwayLayer = (layer: ScopeLayer): boolean => LAYER_TABLE[layer].airway === true;
+
+export const isSnapLayer = (layer: ScopeLayer): boolean => LAYER_TABLE[layer].snaps === true;
 
 /** The layers of the procedures, which AD 2.22 of the AIP lists: departures, arrivals, transitions. */
 export const isProcedureLayer = (layer: ScopeLayer): boolean =>

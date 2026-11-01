@@ -70,6 +70,9 @@ export const isRouteLayer = (layer: ScopeLayer): layer is RouteLayer => GEOMETRY
 /** Whether a layer comes from a map set, not from the scope itself. */
 export const isChartLayer = (layer: ScopeLayer): layer is Layer => GEOMETRY[layer] !== 'scope';
 
+/** The point layers whose ids are unique within a set. */
+export const POINT_ID_LAYERS: ReadonlySet<string> = new Set<Layer>(['ad', 'navaid', 'fix']);
+
 /** The area layers that divide airspace among control units: an ACC sector, a FIR or UIR. */
 export const SECTOR_LAYERS: ReadonlySet<Layer> = new Set<Layer>(['sector', 'fir']);
 

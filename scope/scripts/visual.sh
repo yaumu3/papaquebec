@@ -16,5 +16,6 @@ cp package.json bun.lock visual/Dockerfile "$context"
   --volume "$PWD/dist:/app/dist" \
   --volume "$PWD/schema:/app/schema" \
   --volume "$PWD/scripts:/app/scripts" \
+  --volume "$PWD/src:/app/src" \
   --volume "$PWD/visual:/app/visual" \
   "$IMAGE" bun scripts/visual.ts "$@"
