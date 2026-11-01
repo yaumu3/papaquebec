@@ -42,8 +42,18 @@ export interface PointLayerStyle {
   label: PointLabelStyle;
 }
 
-/** A layer's style: lines or points. */
-export type LayerStyle = LineLayerStyle | PointLayerStyle;
+/**
+ * How holds are drawn: a racetrack in `rnavColor` for kind RNAV, else in `color`. Holds have no
+ * label.
+ */
+export interface HoldLayerStyle {
+  color: string;
+  rnavColor: string;
+  label?: undefined;
+}
+
+/** A layer's style: lines, points or holds. */
+export type LayerStyle = LineLayerStyle | PointLayerStyle | HoldLayerStyle;
 
 const SOLID: Refinement = { dash: [] };
 
@@ -118,6 +128,7 @@ export const LAYER_STYLES = {
   conv: line(THEME.conv, { label: { ...ROUTE_LABEL, color: THEME.convLabel } }),
   rnav: line(THEME.rnav, { label: { ...ROUTE_LABEL, color: THEME.rnavLabel } }),
   dct: line(THEME.conv, { width: 0.5 }),
+  hold: { color: THEME.conv, rnavColor: THEME.rnav, label: undefined },
   ctr: areaLine(THEME.airspace, THEME.airspaceLabel),
   pr: areaLine(THEME.airspace, THEME.airspaceLabel, {
     dash: [4, 3],
@@ -148,3 +159,5 @@ export const labelReaches = (label: LabelStyle, density: LabelDensity): boolean 
   LABEL_DENSITIES.indexOf(density) >= LABEL_DENSITIES.indexOf(label.from);
 
 export const isPointStyle = (style: LayerStyle): style is PointLayerStyle => 'shape' in style;
+
+export const isHoldStyle = (style: LayerStyle): style is HoldLayerStyle => 'rnavColor' in style;

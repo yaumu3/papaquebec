@@ -38,14 +38,14 @@ export const DRAW_STACK = [
 /** The map set layers plus the two the scope makes itself. */
 export type ScopeLayer = (typeof DRAW_STACK)[number];
 
-/** A map set layer with a style: every one but `hold`, which draws nothing yet. */
-export type StyledLayer = Exclude<Layer, 'hold'>;
+/** A map set layer with a style: every one. */
+export type StyledLayer = Layer;
 
 /** Whether the scope makes a layer itself, from no map set: the coastline and the range rings. */
 export const isScopeMade = (layer: ScopeLayer) => layer === 'coast' || layer === 'rings';
 
-/** Whether a layer has a style: not `hold`, and not the two the scope makes itself. */
-export const isStyled = (layer: ScopeLayer) => layer !== 'hold' && !isScopeMade(layer);
+/** Whether a layer has a style: not one of the two the scope makes itself. */
+export const isStyled = (layer: ScopeLayer) => !isScopeMade(layer);
 
 /**
  * The layers of the airways, which ENR 3 of the AIP lists: a route a pilot files by its

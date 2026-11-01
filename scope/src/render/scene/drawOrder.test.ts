@@ -38,18 +38,24 @@ const CHART_LAYERS: StyledLayer[] = CHART_SLICES.flatMap((s) => s.layers);
 /** An item of `layer`, one glyph in its name, sitting at x = its place in the stack. */
 function itemAt(layer: StyledLayer): ChartItem {
   const x = at(layer);
-  const part: ItemPart = isPoint(layer)
-    ? { geometry: { type: 'Point', coordinates: [x, 0] }, properties: { layer, id: 'Q' } }
-    : {
-        geometry: {
-          type: 'LineString',
-          coordinates: [
-            [x, 0],
-            [x + 0.01, 0],
-          ],
-        },
-        properties: { layer, name: 'Q' },
-      };
+  const part: ItemPart =
+    layer === 'hold'
+      ? {
+          geometry: { type: 'Point', coordinates: [x, 0] },
+          properties: { layer, turn: 'R', inboundTrue: 0 },
+        }
+      : isPoint(layer)
+        ? { geometry: { type: 'Point', coordinates: [x, 0] }, properties: { layer, id: 'Q' } }
+        : {
+            geometry: {
+              type: 'LineString',
+              coordinates: [
+                [x, 0],
+                [x + 0.01, 0],
+              ],
+            },
+            properties: { layer, name: 'Q' },
+          };
   return { key: layer, layer, parts: [part] };
 }
 
@@ -62,8 +68,11 @@ function drawnOf(chart: Chart, layers: readonly StyledLayer[]) {
 }
 
 /** A slice's shapes built as the scope builds them. */
+/** The layers whose shapes are edges: a hold is a figure at screen size, not an edge. */
+const edgeLayers = (layers: readonly StyledLayer[]) => layers.filter((l) => l !== 'hold');
+
 const shapesOf = (chart: Chart, layers: readonly StyledLayer[]) =>
-  buildShapes(drawnOf(chart, layers));
+  buildShapes(drawnOf(chart, layers), () => () => 0);
 
 /** A settled scale at which every label of the fixture has room. */
 const ROOMY = 1e6;
@@ -141,7 +150,7 @@ describe('the draw order of the chart', () => {
 
   it('draws lines back to front through the stack, the base map first, the navaid strokes last', () => {
     // Arrange
-    const lineLayers = behind.filter((l) => !isPoint(l) && l !== 'hold');
+    const lineLayers = behind.filter((l) => !isPoint(l));
 
     // Act
     const slots = mapSlots(chart);
@@ -260,7 +269,7 @@ function edgeKeys({ data, count }: Batch): string[] {
 }
 
 describe('the example map set', () => {
-  it('draws every layer but hold', () => {
+  it('draws every layer', () => {
     // Arrange
     const items = chartOf([parseMapSet(EXAMPLE)]);
 
@@ -280,7 +289,7 @@ describe('the example map set', () => {
     const slices = [CHART_SLICES[0], CHART_SLICES[1]];
 
     // Act
-    const keys = slices.map((slice) => edgeKeys(shapesOf(items, slice.layers).lines));
+    const keys = slices.map((slice) => edgeKeys(shapesOf(items, edgeLayers(slice.layers)).lines));
 
     // Assert
     expect(keys.map((k) => k.length > 0)).toEqual([true, true]);

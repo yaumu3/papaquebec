@@ -3,6 +3,7 @@ import type { JSX } from 'solid-js';
 import { isStyled, type ScopeLayer } from '../../lib/layers';
 import { Shape } from '../../render/protocol';
 import {
+  isHoldStyle,
   isPointStyle,
   LAYER_STYLES,
   type LineLayerStyle,
@@ -30,6 +31,10 @@ function marker(shape: PointLayerStyle['shape'], size: number, color: string) {
   return <polygon points={points} fill="none" stroke={color} stroke-width={STROKE} />;
 }
 
+const racetrack = (color: string) => (
+  <rect x="3.5" y="2.5" width="17" height="5" rx="2.5" fill="none" stroke={color} />
+);
+
 function stroke(style: LineLayerStyle) {
   return (
     <line
@@ -49,12 +54,8 @@ export function Swatch(props: { layer: ScopeLayer }) {
   const layer = props.layer;
   if (isStyled(layer)) {
     const style = LAYER_STYLES[layer];
+    if (isHoldStyle(style)) return svg(racetrack(style.rnavColor));
     return svg(isPointStyle(style) ? marker(style.shape, style.size, style.color) : stroke(style));
-  }
-  if (layer === 'hold') {
-    return svg(
-      <rect x="3.5" y="2.5" width="17" height="5" rx="2.5" fill="none" stroke={THEME.rnav} />,
-    );
   }
   if (layer === 'rings') {
     return svg(<path d="M2 9 A 12 12 0 0 1 22 9" fill="none" stroke={THEME.ringEdge} />);

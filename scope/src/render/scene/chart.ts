@@ -5,12 +5,14 @@ import type { StyledLayer } from '../../lib/layers';
 import type { AreaPlace } from '../../lib/pole';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
+import type { Declination } from '../../lib/wmm';
 import type { LabelDensity } from '../../state/settingsDefaults';
 import type { AtlasInfo } from '../protocol';
 import type { CHART_SLICES, ShapeBatches } from '../slots';
 import { buildAreaLabels } from './areaLabels';
 import { type BuiltLabels, type LabelOut, putText } from './drawnLabels';
 import { putPointMark } from './figures';
+import { drawHolds } from './holds';
 import { isPointStyle, LAYER_STYLES, labelReaches, type PointLayerStyle } from './layerStyles';
 import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
@@ -63,17 +65,15 @@ const pointsIn = (
     .map((p) => placedPoint(p, project));
 
 /** The chart's lines and point markers, each back to front through the stack. */
-export function buildShapes({
-  topology,
-  drawnPoints,
-  project,
-  layers,
-  drawnItems,
-}: ShapesInput): ShapeBatches {
+export function buildShapes(
+  { topology, drawnPoints, project, layers, drawnItems }: ShapesInput,
+  declinationAt: () => Declination,
+): ShapeBatches {
   const lines = new LineBatch();
   const markers = new MarkerBatch();
   const drawn = partsOf(drawnItems);
   drawRuns(topology.areas, drawn, NO_CUTS, project, lines);
+  drawHolds(drawnItems, project, declinationAt, { lines, markers });
   drawRuns(topology.routes, drawn, routeCuts(drawnItems, drawnPoints), project, lines);
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];

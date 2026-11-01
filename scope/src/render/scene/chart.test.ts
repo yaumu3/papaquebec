@@ -34,6 +34,7 @@ import type { DrawnLabel } from './drawnLabels';
 import { putFigure } from './figures';
 import { LineBatch, MarkerBatch } from './pack';
 
+const NO_DECLINATION = () => () => 0;
 const has = (layers: readonly string[], layer: string) => layers.includes(layer);
 
 /** A map set holding one navaid. */
@@ -79,7 +80,11 @@ const build = (
     drawn,
   } = buildPointLabels({ ...input, labelDensity, atlas });
   if (!labels) throw new Error('buildPointLabels returned no batch');
-  return { ...buildShapes(input), labels, drawn: drawn ?? new Map<string, DrawnLabel>() };
+  return {
+    ...buildShapes(input, NO_DECLINATION),
+    labels,
+    drawn: drawn ?? new Map<string, DrawnLabel>(),
+  };
 };
 
 describe('buildShapes lines', () => {
@@ -188,7 +193,9 @@ describe('buildShapes lines', () => {
 
   it('draws the layers back to front in the stack, each read by where its item sits', () => {
     // Arrange
-    const lineLayers = DRAW_STACK.filter(isStyled).filter((l) => !has(POINT_LAYERS, l));
+    const lineLayers = DRAW_STACK.filter(isStyled).filter(
+      (l) => !has(POINT_LAYERS, l) && l !== 'hold',
+    );
     const items = lineLayers.map((layer) =>
       itemOf(
         layer,
@@ -530,7 +537,7 @@ describe('buildShapes routes stop short of points', () => {
     }));
 
     // Act
-    for (const input of inputs) buildShapes(input);
+    for (const input of inputs) buildShapes(input, NO_DECLINATION);
 
     // Assert
     expect(reads.map((n) => n > 0)).toEqual([false, false, true, true]);

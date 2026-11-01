@@ -38,9 +38,12 @@ export interface Extra {
 
 /** The properties each group of layers carries; `extra` adds a kind, a name, a limit, frequencies or the flag. */
 export function partOf(layer: StyledLayer, geometry: Geometry, extra: Extra = {}): ItemPart {
-  const properties = isPointLayer(layer)
-    ? { layer, id: 'Q', ...extra }
-    : { layer, name: 'Q', ...extra };
+  const properties =
+    layer === 'hold'
+      ? { layer, turn: 'R' as const, inboundTrue: 0, ...extra }
+      : isPointLayer(layer)
+        ? { layer, id: 'Q', ...extra }
+        : { layer, name: 'Q', ...extra };
   return { geometry, properties };
 }
 

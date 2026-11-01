@@ -62,11 +62,11 @@ describe('SLOT_ORDER of the traces', () => {
 });
 
 describe('CHART_SLICES', () => {
-  it('cuts the draw stack into the areas, the routes and procedures, and the points', () => {
+  it('cuts the draw stack into the areas, the routes, procedures and holds, and the points', () => {
     // Arrange
     const expected = [
       ['ctr', 'asr'],
-      ['sid', 'dct'],
+      ['sid', 'hold'],
       ['ad', 'vfr'],
     ];
 
