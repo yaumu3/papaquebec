@@ -140,4 +140,26 @@ describe('drawSteps', () => {
     // Assert
     expect(steps.map((s) => `${s.slot}/${s.index}/${s.pass}`)).toEqual(expected);
   });
+
+  it('rims the text of a highlight just before its glyphs, over what the slot drew first', () => {
+    // Arrange
+    const highlighted = held([
+      ['traces', ['lines', 'markers', 'text', 'lines']],
+      ['targets', ['text']],
+    ]);
+    const expected = [
+      'traces/0/lines',
+      'traces/1/markers',
+      'traces/2/halo',
+      'traces/2/text',
+      'traces/3/lines',
+      'targets/0/text',
+    ];
+
+    // Act
+    const steps = drawSteps(highlighted);
+
+    // Assert
+    expect(steps.map((s) => `${s.slot}/${s.index}/${s.pass}`)).toEqual(expected);
+  });
 });

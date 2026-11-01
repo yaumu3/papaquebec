@@ -50,6 +50,12 @@ export const LABEL_SLOTS: readonly SlotName[] = [
   'pointLabels',
 ];
 
+/**
+ * The slots whose text rims its own glyphs just before them, over what the slot drew first: a
+ * pointed label's highlight over its trace.
+ */
+const HIGHLIGHT_SLOTS: readonly SlotName[] = ['traces'];
+
 /** The batches a builder hands the renderer, by the slots it fills. */
 export type Slots = Partial<Record<SlotName, Batch[]>>;
 
@@ -85,7 +91,8 @@ interface DrawStep {
 /**
  * The draw calls in order: the slots back to front, except that the halos of every text batch
  * of the label slots come first, where the first of them would draw, and their glyphs follow in
- * slot order. Text elsewhere draws no halo.
+ * slot order. The text of the highlight slots rims itself just before its glyphs; text elsewhere
+ * draws no halo.
  */
 export function drawSteps(
   slots: ReadonlyMap<SlotName, readonly { kind: BatchKind }[]>,
@@ -101,6 +108,8 @@ export function drawSteps(
       }
     }
     batchesOf(slot).forEach(({ kind }, index) => {
+      if (kind === 'text' && HIGHLIGHT_SLOTS.includes(slot))
+        steps.push({ slot, index, pass: 'halo' });
       steps.push({ slot, index, pass: kind });
     });
   }
