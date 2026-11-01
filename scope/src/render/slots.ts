@@ -1,5 +1,5 @@
 import { DRAW_STACK, isStyled, type StyledLayer } from '../lib/layers';
-import type { Batch } from './protocol';
+import type { Batch, BatchKind } from './protocol';
 
 /** The layers from `first` to `last` of the draw stack, front first. */
 const stackSlice = (first: StyledLayer, last: StyledLayer) =>
@@ -70,4 +70,39 @@ export function shapeSlots(
 /** A slice's built labels as the slot they go to. */
 export function labelSlots(slice: (typeof CHART_SLICES)[number], labels: Batch[]): Slots {
   return { [slice.labels]: labels };
+}
+
+/** A pipeline: one per batch kind, and the halo pass of text. */
+export type Pass = BatchKind | 'halo';
+
+/** One draw call: the pass over the `index`th batch of a slot. */
+interface DrawStep {
+  slot: SlotName;
+  index: number;
+  pass: Pass;
+}
+
+/**
+ * The draw calls in order: the slots back to front, except that the halos of every text batch
+ * of the label slots come first, where the first of them would draw, and their glyphs follow in
+ * slot order. Text elsewhere draws no halo.
+ */
+export function drawSteps(
+  slots: ReadonlyMap<SlotName, readonly { kind: BatchKind }[]>,
+): DrawStep[] {
+  const batchesOf = (slot: SlotName) => slots.get(slot) ?? [];
+  const steps: DrawStep[] = [];
+  for (const slot of SLOT_ORDER) {
+    if (slot === LABEL_SLOTS[0]) {
+      for (const labels of LABEL_SLOTS) {
+        batchesOf(labels).forEach(({ kind }, index) => {
+          if (kind === 'text') steps.push({ slot: labels, index, pass: 'halo' });
+        });
+      }
+    }
+    batchesOf(slot).forEach(({ kind }, index) => {
+      steps.push({ slot, index, pass: kind });
+    });
+  }
+  return steps;
 }

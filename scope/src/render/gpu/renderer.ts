@@ -7,48 +7,13 @@ import {
   TEXT_STRIDE,
   type View,
 } from '../protocol';
-import { LABEL_SLOTS, SLOT_ORDER, type SlotName } from '../slots';
+import { drawSteps, type Pass, type SlotName } from '../slots';
 import { webgpuMissingReason } from './availability';
 import { BG_RGBA, LINE_SHADER, MARKER_SHADER, TEXT_SHADER, VIEW_UNIFORM_BYTES } from './shaders';
 
 /** The palette's background as a GPU clear color. */
 const BG: GPUColor = { r: BG_RGBA[0], g: BG_RGBA[1], b: BG_RGBA[2], a: 1 };
 const SAMPLE_COUNT = 4;
-
-/** A pipeline: one per batch kind, and the halo pass of text. */
-type Pass = BatchKind | 'halo';
-
-/** One draw call: the pass over the `index`th batch of a slot. */
-interface DrawStep {
-  slot: SlotName;
-  index: number;
-  pass: Pass;
-}
-
-/**
- * The draw calls in order: the slots back to front, except that the halos of every text batch
- * of the label slots come first, where the first of them would draw, and their glyphs follow in
- * slot order. Text elsewhere draws no halo.
- */
-export function drawSteps(
-  slots: ReadonlyMap<SlotName, readonly { kind: BatchKind }[]>,
-): DrawStep[] {
-  const batchesOf = (slot: SlotName) => slots.get(slot) ?? [];
-  const steps: DrawStep[] = [];
-  for (const slot of SLOT_ORDER) {
-    if (slot === LABEL_SLOTS[0]) {
-      for (const labels of LABEL_SLOTS) {
-        batchesOf(labels).forEach(({ kind }, index) => {
-          if (kind === 'text') steps.push({ slot: labels, index, pass: 'halo' });
-        });
-      }
-    }
-    batchesOf(slot).forEach(({ kind }, index) => {
-      steps.push({ slot, index, pass: kind });
-    });
-  }
-  return steps;
-}
 
 interface GpuBatch {
   kind: BatchKind;
