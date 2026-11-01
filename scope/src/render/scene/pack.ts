@@ -201,12 +201,21 @@ export class MarkerBatch {
 export interface TextStyle {
   align?: 'left' | 'right' | 'center';
   baseline?: 'top' | 'middle' | 'bottom';
+  /** Radians clockwise on the screen, about the anchor. */
+  angle?: number;
+  /** Rims each glyph in the scope's background colour. */
+  halo?: boolean;
 }
+
+/** How far a halo reaches outside a glyph's edge, CSS px. */
+const HALO_PX = 1;
 
 /**
  * Layout per instance (16 floats):
- * `wx wy px py w h u0 v0 u1 v1 r g b a _ _`
- * The quad covers a whole atlas cell; `px py` is its top-left offset from the anchor.
+ * `wx wy px py w h u0 v0 u1 v1 r g b a angle halo`
+ * The quad covers a whole atlas cell; `px py` is its top-left offset from the anchor, turned by
+ * `angle` about it. `halo` is how far the halo reaches outside the glyph's edge, as a drop in the
+ * atlas field's value; 0 draws none.
  */
 export class TextBatch {
   private readonly buf: InstanceBuffer;
@@ -249,6 +258,7 @@ export class TextBatch {
     const cellW = atlas.cellW * scale;
     const cellH = atlas.cellH * scale;
     const bufPx = atlas.buffer * scale;
+    const halo = style.halo ? (HALO_PX * atlas.fontSize) / (sizePx * atlas.buffer) : 0;
     for (const c of s) {
       const i = this.index.get(c) ?? this.placeholder();
       if (c === ' ') {
@@ -273,6 +283,8 @@ export class TextBatch {
       d[o + 11] = g;
       d[o + 12] = b;
       d[o + 13] = a;
+      d[o + 14] = style.angle ?? 0;
+      d[o + 15] = halo;
       pen += atlas.advance * scale;
     }
   }

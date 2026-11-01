@@ -1,4 +1,3 @@
-import { PALETTE } from '../../design/palette';
 import {
   type AtlasInfo,
   type Batch,
@@ -10,15 +9,20 @@ import {
 } from '../protocol';
 import { SLOT_ORDER, type SlotName } from '../slots';
 import { webgpuMissingReason } from './availability';
-import { LINE_SHADER, MARKER_SHADER, TEXT_SHADER, VIEW_UNIFORM_BYTES } from './shaders';
+import { BG_RGBA, LINE_SHADER, MARKER_SHADER, TEXT_SHADER, VIEW_UNIFORM_BYTES } from './shaders';
 
 /** The palette's background as a GPU clear color. */
-function clearColor(hex: string): GPUColor {
-  const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
-  return { r, g, b, a: 1 };
-}
-const BG = clearColor(PALETTE.bg);
+const BG: GPUColor = { r: BG_RGBA[0], g: BG_RGBA[1], b: BG_RGBA[2], a: 1 };
 const SAMPLE_COUNT = 4;
+
+/** The pipelines that draw a batch, in order: a text batch rims its glyphs before drawing them. */
+export const PASSES = {
+  lines: ['lines'],
+  markers: ['markers'],
+  text: ['halo', 'text'],
+} as const satisfies Record<BatchKind, readonly string[]>;
+
+type Pass = (typeof PASSES)[BatchKind][number];
 
 interface GpuBatch {
   kind: BatchKind;
@@ -48,7 +52,7 @@ export class GpuRenderer {
   private device!: GPUDevice;
   private context!: GPUCanvasContext;
   private format!: GPUTextureFormat;
-  private pipelines!: Record<BatchKind, GPURenderPipeline>;
+  private pipelines!: Record<Pass, GPURenderPipeline>;
   private viewBuffer!: GPUBuffer;
   private viewBindGroup!: GPUBindGroup;
   private atlasBindGroup: GPUBindGroup | null = null;
@@ -115,7 +119,12 @@ export class GpuRenderer {
       color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
       alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
     };
-    const make = (code: string, layouts: GPUBindGroupLayout[], vertex: GPUVertexBufferLayout) => {
+    const make = (
+      code: string,
+      layouts: GPUBindGroupLayout[],
+      vertex: GPUVertexBufferLayout,
+      entries = { vs: 'vs', fs: 'fs' },
+    ) => {
       const module = device.createShaderModule({ code });
       void module.getCompilationInfo().then((info) => {
         for (const m of info.messages) {
@@ -124,12 +133,20 @@ export class GpuRenderer {
       });
       return device.createRenderPipeline({
         layout: device.createPipelineLayout({ bindGroupLayouts: layouts }),
-        vertex: { module, entryPoint: 'vs', buffers: [vertex] },
-        fragment: { module, entryPoint: 'fs', targets: [{ format: this.format, blend }] },
+        vertex: { module, entryPoint: entries.vs, buffers: [vertex] },
+        fragment: { module, entryPoint: entries.fs, targets: [{ format: this.format, blend }] },
         primitive: { topology: 'triangle-list' },
         multisample: { count: SAMPLE_COUNT },
       });
     };
+    const textLayouts = [viewLayout, this.atlasLayout];
+    const textVertex = instanceLayout(TEXT_STRIDE, [
+      [0, 'float32x4'],
+      [1, 'float32x2'],
+      [2, 'float32x4'],
+      [3, 'float32x4'],
+      [4, 'float32x2'],
+    ]);
     this.pipelines = {
       lines: make(
         LINE_SHADER,
@@ -152,16 +169,8 @@ export class GpuRenderer {
           [2, 'float32x4'],
         ]),
       ),
-      text: make(
-        TEXT_SHADER,
-        [viewLayout, this.atlasLayout],
-        instanceLayout(TEXT_STRIDE, [
-          [0, 'float32x4'],
-          [1, 'float32x2'],
-          [2, 'float32x4'],
-          [3, 'float32x4'],
-        ]),
-      ),
+      halo: make(TEXT_SHADER, textLayouts, textVertex, { vs: 'vsHalo', fs: 'fsHalo' }),
+      text: make(TEXT_SHADER, textLayouts, textVertex),
     };
   }
 
@@ -269,9 +278,11 @@ export class GpuRenderer {
           if (!this.atlasBindGroup) continue;
           pass.setBindGroup(1, this.atlasBindGroup);
         }
-        pass.setPipeline(this.pipelines[b.kind]);
         pass.setVertexBuffer(0, b.buffer);
-        pass.draw(6, b.count);
+        for (const pipeline of PASSES[b.kind]) {
+          pass.setPipeline(this.pipelines[pipeline]);
+          pass.draw(6, b.count);
+        }
       }
     }
     pass.end();
