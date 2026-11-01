@@ -491,6 +491,9 @@ describe('the fraction of buildAreaLabels', () => {
 const stratum = (name: string, ring: Position[], extra: { lower?: string; upper?: string }) =>
   keyed(name, itemOf('sector', partOf('sector', polygon(ring), { name, ...extra })));
 
+/** A settled scale of 2 with nothing remembered yet. */
+const fit = (): FitInput => ({ settledScale: () => 2, shown: new Map() });
+
 describe('the stacks of buildAreaLabels', () => {
   /** The same L ring, listed from another vertex. */
   const turnedEl = [...el.slice(2, -1), ...el.slice(0, 2), el[2] ?? [0, 0]];
@@ -550,21 +553,26 @@ describe('the stacks of buildAreaLabels', () => {
     expect(centreOf(apartRow[0] ?? { py: NaN }, 10)).toBeCloseTo(0, 6);
   });
 
-  it('shows or hides the pair as one, on the width of the widest', () => {
+  it('shows or hides the pair as one, on the width of the widest, low or high', () => {
     // Arrange
-    const long = stratum('LONGNAME', el, { upper: 'FL335' });
-    const short = stratum('S2', turnedEl, { lower: 'FL335' });
-    const fit = { settledScale: () => 2, shown: new Map() };
+    const longLow = stratum('LONGNAME', el, { upper: 'FL335' });
+    const shortHigh = stratum('S2', turnedEl, { lower: 'FL335' });
+    const shortLow = stratum('S2', el, { upper: 'FL335' });
+    const longHigh = stratum('LONGNAME', turnedEl, { lower: 'FL335' });
+    const pairs = [
+      [longLow, shortHigh],
+      [shortLow, longHigh],
+    ];
+    // Precondition: the short name alone fits
+    const alone = [shortHigh, shortLow].map(
+      (s) => build([s], ['sector'], 'normal', [], fit()).count,
+    );
 
     // Act
-    const alone = build([short], ['sector'], 'normal', [], fit).count;
-    const stacked = build([long, short], ['sector'], 'normal', [], {
-      ...fit,
-      shown: new Map(),
-    }).count;
+    const stacked = pairs.map((pair) => build(pair, ['sector'], 'normal', [], fit()).count);
 
     // Assert
-    expect(alone).toBeGreaterThan(0);
-    expect(stacked).toBe(0);
+    expect(alone.every((n) => n > 0)).toBe(true);
+    expect(stacked).toEqual([0, 0]);
   });
 });
