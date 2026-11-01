@@ -22,6 +22,8 @@ export interface ScopeBrowserOptions {
   scale: number;
   /** Settings stored before the page loads, as if saved by an earlier visit; the rest default. */
   settings?: Record<string, unknown> | undefined;
+  /** The lanes of the detail column, stored with the settings; the default ones if not given. */
+  plotted?: readonly string[] | undefined;
   /** Readies the context before the page loads. */
   prepare?: ((context: BrowserContext) => Promise<void>) | undefined;
   /** A browser to open a page in and leave running, in place of one of its own. */
@@ -124,6 +126,15 @@ const GPU_ARGS =
         '--use-gpu-in-tests',
       ];
 
+/** What an earlier visit would have left in storage; nothing if the options name nothing. */
+export function storedBy({
+  settings,
+  plotted,
+}: Pick<ScopeBrowserOptions, 'settings' | 'plotted'>): Record<string, unknown> | null {
+  if (!settings && !plotted) return null;
+  return { ...(settings ? { settings } : {}), ...(plotted ? { plotted } : {}) };
+}
+
 export function launch(): Promise<Browser> {
   return chromium.launch({
     headless: true,
@@ -144,10 +155,12 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
       viewport: { width: 1600, height: 1000 },
       deviceScaleFactor: opt.scale,
     });
-    if (opt.settings) {
-      await context.addInitScript((settings: Record<string, unknown>) => {
-        localStorage.setItem('papaquebec.settings', JSON.stringify({ settings }));
-      }, opt.settings);
+    const stored = storedBy(opt);
+    if (stored) {
+      await context.addInitScript(
+        (state) => localStorage.setItem('papaquebec.settings', JSON.stringify(state)),
+        stored,
+      );
     }
     await opt.prepare?.(context);
     const page = await context.newPage();

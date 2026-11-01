@@ -43,13 +43,13 @@ dir = "scope"
 run = ["bun run format:check", "bun run lint", "bun run test", "bun run build"]
 
 [tasks."check:visual"]
-description = "The map's screenshots against their baselines, in the pinned container"
+description = "The scope's screenshots against their baselines, in the pinned container"
 depends = ["wasm"]
 dir = "scope"
 run = "bun run visual"
 
 [tasks."update:visual"]
-description = "Rewrite the map's baselines, in the pinned container"
+description = "Rewrite the screenshots' baselines, in the pinned container"
 depends = ["wasm"]
 dir = "scope"
 run = "bun run visual --update"

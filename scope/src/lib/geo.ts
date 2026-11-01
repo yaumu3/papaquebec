@@ -74,7 +74,7 @@ export type ProjectFn = (lat: number, lon: number) => Vec2;
 export type UnprojectFn = (x: number, y: number) => GeoPoint;
 
 /** Nautical miles in a degree of latitude, near enough: it runs from 59.7 at the equator to 60.3 at the poles. */
-const NM_PER_DEGREE = 60;
+export const NM_PER_DEGREE = 60;
 
 /**
  * Equirectangular distance in nautical miles, the short way round the antimeridian. Within 1% of

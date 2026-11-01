@@ -1,8 +1,8 @@
 /**
  * Screenshots against the baselines in `visual/`, a folder for each subject: the built scope with
- * no feed, no built-in set and no coastline, showing a map set imported through the Maps panel.
- * `shots.ts` lists them. On a difference the actual image and a diff are written next to the
- * baseline.
+ * no built-in set and no coastline, showing a map set imported through the Maps panel with no
+ * feed, or a fleet with no chart. `shots.ts` lists them. On a difference the actual image
+ * and a diff are written next to the baseline.
  *
  *   bun scripts/visual/main.ts [--update] [--only name-or-folder]...
  *
@@ -13,16 +13,19 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import type { Browser, Page } from 'playwright';
+import type { Browser, BrowserContext, Page, Route } from 'playwright';
 import { PNG } from 'pngjs';
 
 import { launch, openScope, startPreview } from '../headless/browser';
 import { compareImages, type Image, type Limits } from './imageDiff';
 import { filterOf, settled } from './run';
 import { SITE, type Step, type Visit, VISITS } from './shots';
+import { fixedPlacer, type Flight, listedAs, replayWorker, trafficEvents } from './traffic';
 
 /** The example set's date: the scope's clock stands still at it. */
 const CLOCK = new Date('2026-10-29T00:00:00Z');
+const FEED_WORKER = '**/assets/feedWorker-*.js';
+const PLACER_WORKER = '**/assets/placerWorker-*.js';
 const SERVED = '/tmp/visual-dist';
 const URL_SERVED = 'http://localhost:4173/';
 /** Tight enough to fail a label moved 1 px, a removed halo or a wider chevron. */
@@ -47,18 +50,36 @@ async function drawing(page: Page): Promise<void> {
   if ((await failed.count()) > 0) throw new Error(await failed.innerText());
 }
 
+const workerOf = (body: string) => (route: Route) =>
+  route.fulfill({ contentType: 'text/javascript', body });
+
+/** The replay of each fleet: a long one takes as long to write out as a page does to load. */
+const replays = new Map<readonly Flight[], string>();
+
+function replayOf(fleet: readonly Flight[]): string {
+  const replay = replays.get(fleet) ?? replayWorker(trafficEvents(fleet, SITE, CLOCK));
+  replays.set(fleet, replay);
+  return replay;
+}
+
+/** Stands in for the feed worker and the placer's: the build flies `fleet`, its blocks fixed. */
+async function fly(context: BrowserContext, fleet: readonly Flight[]): Promise<void> {
+  await context.route(FEED_WORKER, workerOf(replayOf(fleet)));
+  await context.route(PLACER_WORKER, workerOf(fixedPlacer()));
+}
+
 const imageOf = (png: Buffer): Image => PNG.sync.read(png);
 
 const pngOf = (image: Image): Buffer =>
   PNG.sync.write(Object.assign(new PNG(image), { data: image.data }));
 
 /** Takes the images of a step, once the page has settled in its state. */
-async function taken(page: Page, step: Step): Promise<Taken[]> {
+async function taken(page: Page, step: Step, style: string): Promise<Taken[]> {
   await step.act?.(page);
   const target = step.of?.(page) ?? page;
   const look = {
     animations: 'disabled',
-    style: step.of ? `${UNSTABLE} ${NO_CANVAS}` : UNSTABLE,
+    style: step.of ? `${style} ${NO_CANVAS}` : style,
   } as const;
   const shoot = () => target.screenshot(look);
   const png = await settled(shoot, { pause: () => Bun.sleep(SETTLE_MS), tries: SETTLE_TRIES });
@@ -66,8 +87,11 @@ async function taken(page: Page, step: Step): Promise<Taken[]> {
   return [{ name: step.name, png }];
 }
 
-/** Imports the visit's chart through the Maps panel. */
+/** Waits for what the page starts from: the fleet in the list, or the chart in the Maps panel. */
 async function readied(page: Page, visit: Visit): Promise<void> {
+  const [first] = visit.fleet ?? [];
+  if (first) await page.getByText(listedAs(first), { exact: true }).first().waitFor();
+  if (!visit.chart) return;
   await page.locator('input[type=file]').setInputFiles(visit.chart.file);
   await page.getByRole('button', { name: visit.chart.title, exact: true }).waitFor();
 }
@@ -78,12 +102,17 @@ async function capture(visit: Visit, browser: Browser): Promise<Taken[]> {
     from: { url: `${URL_SERVED}?site=${SITE.lat},${SITE.lon}`, preview: false },
     scale: 1,
     settings: visit.settings,
-    prepare: (context) => context.clock.setFixedTime(CLOCK),
+    plotted: visit.plotted,
+    prepare: async (context) => {
+      await context.clock.setFixedTime(CLOCK);
+      if (visit.fleet) await fly(context, visit.fleet);
+    },
   });
   try {
     await readied(page, visit);
+    const style = visit.fleet ? '' : UNSTABLE;
     return await visit.steps.reduce<Promise<Taken[]>>(
-      async (images, step) => [...(await images), ...(await taken(page, step))],
+      async (images, step) => [...(await images), ...(await taken(page, step, style))],
       Promise.resolve([]),
     );
   } finally {

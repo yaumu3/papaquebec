@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { stoppedOnFailure, untilUp } from './browser';
+import { stoppedOnFailure, untilUp, storedBy } from './browser';
 
 /** Nothing listens there, so every ask is refused at once. */
 const CLOSED = 'http://127.0.0.1:1/';
@@ -87,5 +87,18 @@ describe('stoppedOnFailure', () => {
     // Assert
     expect(opened).toEqual({ value: 'page' });
     expect(stops).toBe(0);
+  });
+});
+
+describe('storedBy', () => {
+  it('stores the settings or the lanes when either is given, nothing when neither is', () => {
+    // Arrange
+    const options = [{}, { settings: { rangeNm: 40 } }, { plotted: ['surv'] }];
+
+    // Act
+    const stored = options.map(storedBy);
+
+    // Assert
+    expect(stored).toEqual([null, { settings: { rangeNm: 40 } }, { plotted: ['surv'] }]);
   });
 });
