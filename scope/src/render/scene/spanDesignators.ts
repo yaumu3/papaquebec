@@ -42,21 +42,16 @@ interface Placed extends Designator {
   reads: boolean;
 }
 
-/** Where a span's label sits and how it reads. */
-interface Geometry {
+/** A span, the designators along it, and whether it draws its label. */
+export interface SpanLabel {
+  id: string;
+  span: Span;
   middle: Midpoint;
   angle: number;
   /** The text was turned half a circle from the span's direction to read upright. */
   flipped: boolean;
   /** World length of the span. */
   length: number;
-}
-
-/** A span, the designators along it, and whether it draws its label. */
-export interface Entry {
-  id: string;
-  span: Span;
-  geometry: Geometry;
   /** The grid identity where the span's first path starts. */
   start: string;
   designators: Placed[];
@@ -64,7 +59,7 @@ export interface Entry {
   shown: boolean;
 }
 
-type Entries = Map<string, Entry>;
+type SpanLabels = Map<string, SpanLabel>;
 
 /** What the stages read: the build's input, the cuts at the stops and the text to measure. */
 interface Stage extends LabelsInput {
@@ -88,25 +83,37 @@ function designatorOf(path: ChartPath, density: LabelsInput['labelDensity']) {
   return { name, label, rank: DRAW_STACK.indexOf(path.layer), oneWay };
 }
 
-/** A designator on a span of an entry: `reads` when its route is flown the way the label reads. */
-function placedOn(designator: Designator, path: ChartPath, span: Span, entry: Entry): Placed {
-  const starts = startOf(path, span) === entry.start;
-  return { ...designator, reads: starts !== entry.geometry.flipped };
+/** A designator on a span's label: `reads` when its route is flown the way the label reads. */
+function placedOn(
+  designator: Designator,
+  path: ChartPath,
+  span: Span,
+  spanLabel: SpanLabel,
+): Placed {
+  const starts = startOf(path, span) === spanLabel.start;
+  return { ...designator, reads: starts !== spanLabel.flipped };
 }
 
-/** The entry of a span, found or made; none for a span with no length. */
-function entryOf(entries: Entries, path: ChartPath, span: Span, project: ProjectFn) {
+/** The label of a span, found or made; none for a span with no length. */
+function spanLabelOf(spanLabels: SpanLabels, path: ChartPath, span: Span, project: ProjectFn) {
   const id = spanIdentity(path, span);
-  const known = entries.get(id);
+  const known = spanLabels.get(id);
   if (known) return known;
   const line = geodesicLine(path.coordinates.slice(span.from, span.to + 1), project);
   const middle = midpointOf(line);
   if (!middle) return undefined;
-  const { angle, flipped } = readingAngle(middle.direction);
-  const geometry = { middle, angle, flipped, length: lengthOf(line) };
   const start = startOf(path, span);
-  const made: Entry = { id, span, geometry, start, designators: [], shown: false };
-  entries.set(id, made);
+  const made: SpanLabel = {
+    id,
+    span,
+    middle,
+    ...readingAngle(middle.direction),
+    length: lengthOf(line),
+    start,
+    designators: [],
+    shown: false,
+  };
+  spanLabels.set(id, made);
   return made;
 }
 
@@ -120,33 +127,39 @@ export function widthOf(designators: readonly Designator[], text: TextBatch): nu
 }
 
 /** What the span has to spare on the screen at the settled scale, less the cuts at its stops. */
-const roomOf = ({ geometry, span }: Entry, scale: number) =>
-  geometry.length * scale - span.cutBack - span.cutAhead;
+const roomOf = ({ length, span }: SpanLabel, scale: number) =>
+  length * scale - span.cutBack - span.cutAhead;
 
 /** The airway designators of the drawn parts, by the span they run along. */
-function airwayEntries(stage: Stage): Entries {
+function airwayLabels(stage: Stage): SpanLabels {
   const { topology, drawnItems, project, labelDensity, cuts } = stage;
   const drawn = partsOf(drawnItems);
-  const entries: Entries = new Map();
+  const spanLabels: SpanLabels = new Map();
   for (const path of topology.routes.paths) {
     const designator = isAirwayLayer(path.layer) && designatorOf(path, labelDensity);
     if (!designator || !drawn.has(path.part)) continue;
     for (const span of spansOf(path, cuts)) {
-      const entry = entryOf(entries, path, span, project);
-      const present = entry?.designators.some(
+      const spanLabel = spanLabelOf(spanLabels, path, span, project);
+      const present = spanLabel?.designators.some(
         (d) => d.name === designator.name && d.rank === designator.rank,
       );
-      if (entry && !present) entry.designators.push(placedOn(designator, path, span, entry));
+      if (spanLabel && !present)
+        spanLabel.designators.push(placedOn(designator, path, span, spanLabel));
     }
   }
-  return entries;
+  return spanLabels;
 }
 
 /** Tests each airway label for room at the settled scale, remembering the outcome per span. */
-function settleAirways(entries: Entries, stage: Stage) {
-  for (const entry of entries.values()) {
-    const threshold = widthOf(entry.designators, stage.text) + MARGIN_PX;
-    entry.shown = rememberFits(stage.shown, entry.id, roomOf(entry, stage.scale), threshold);
+function settleAirways(spanLabels: SpanLabels, stage: Stage) {
+  for (const spanLabel of spanLabels.values()) {
+    const threshold = widthOf(spanLabel.designators, stage.text) + MARGIN_PX;
+    spanLabel.shown = rememberFits(
+      stage.shown,
+      spanLabel.id,
+      roomOf(spanLabel, stage.scale),
+      threshold,
+    );
   }
 }
 
@@ -173,37 +186,37 @@ function* spansOfItem(item: ChartItem, { topology, cuts }: Stage) {
  * along the span included, passes the room test with the span's remembered state; the whole
  * label is then drawn. A span it fails keeps whether it draws its label.
  */
-function nameProcedure(item: ChartItem, entries: Entries, stage: Stage) {
+function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
   const { project, labelDensity, shown, scale, text } = stage;
   for (const { path, span } of spansOfItem(item, stage)) {
     const designator = designatorOf(path, labelDensity);
-    const entry = designator && entryOf(entries, path, span, project);
-    if (!entry) continue;
-    const named = [...entry.designators, placedOn(designator, path, span, entry)];
-    if (fits(roomOf(entry, scale), widthOf(named, text) + MARGIN_PX, shown.get(entry.id))) {
-      entry.designators = named;
-      entry.shown = true;
-      shown.set(entry.id, true);
+    const spanLabel = designator && spanLabelOf(spanLabels, path, span, project);
+    if (!spanLabel) continue;
+    const named = [...spanLabel.designators, placedOn(designator, path, span, spanLabel)];
+    if (fits(roomOf(spanLabel, scale), widthOf(named, text) + MARGIN_PX, shown.get(spanLabel.id))) {
+      spanLabel.designators = named;
+      spanLabel.shown = true;
+      shown.set(spanLabel.id, true);
       return;
     }
-    shown.set(entry.id, entry.shown);
+    shown.set(spanLabel.id, spanLabel.shown);
   }
 }
 
 /** What a label's rank in the draw stack is: that of its front designator. */
-const frontRank = ({ designators }: Entry) => Math.min(...designators.map((d) => d.rank));
+const frontRank = ({ designators }: SpanLabel) => Math.min(...designators.map((d) => d.rank));
 
 /**
  * The spans that draw a label, the one with the rearmost front designator first, each with its
  * designators in draw-stack order: every airway that fits its span, and each procedure on the
  * first span that has room for it as well. A procedure's span may come after an airway's in
- * the entries, so the order is by rank, not by insertion.
+ * the span labels, so the order is by rank, not by insertion.
  */
-export function designatedSpans(stage: Stage): Entry[] {
-  const entries = airwayEntries(stage);
-  settleAirways(entries, stage);
-  for (const item of procedureItems(stage.drawnItems)) nameProcedure(item, entries, stage);
-  const drawn = [...entries.values()].filter((entry) => entry.shown);
-  for (const entry of drawn) entry.designators = entry.designators.toSorted(byStack);
+export function designatedSpans(stage: Stage): SpanLabel[] {
+  const spanLabels = airwayLabels(stage);
+  settleAirways(spanLabels, stage);
+  for (const item of procedureItems(stage.drawnItems)) nameProcedure(item, spanLabels, stage);
+  const drawn = [...spanLabels.values()].filter((spanLabel) => spanLabel.shown);
+  for (const spanLabel of drawn) spanLabel.designators = spanLabel.designators.toSorted(byStack);
   return drawn.toReversed().toSorted((a, b) => frontRank(b) - frontRank(a));
 }

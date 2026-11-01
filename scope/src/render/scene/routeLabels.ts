@@ -8,7 +8,7 @@ import {
   CHEVRON_PX,
   CHEVRON_SLOT_PX,
   designatedSpans,
-  type Entry,
+  type SpanLabel,
   SEPARATOR_PX,
   widthOf,
 } from './spanDesignators';
@@ -36,7 +36,7 @@ const turned = (x: number, y: number, angle: number) => ({
 
 /** A chevron from `slot` along the label: a V, pointing the way the route is flown. */
 function putChevron(
-  { geometry: { middle, angle } }: Entry,
+  { middle, angle }: SpanLabel,
   slot: number,
   ahead: boolean,
   color: string,
@@ -59,11 +59,8 @@ function putChevron(
 }
 
 /** Puts the designators of a span along it, each with its chevron, on a gap cut in the line. */
-function putLabel(entry: Entry, out: Out) {
-  const {
-    geometry: { middle, angle },
-    designators,
-  } = entry;
+function putLabel(spanLabel: SpanLabel, out: Out) {
+  const { middle, angle, designators } = spanLabel;
   const total = widthOf(designators, out.text);
   let pen = -total / 2;
   for (const { name, label, oneWay, reads } of designators) {
@@ -77,7 +74,7 @@ function putLabel(entry: Entry, out: Out) {
     });
     if (oneWay) {
       const slot = before ? pen : pen + width + CHEVRON_CLEAR_PX;
-      putChevron(entry, slot, reads, label.color, out.chevrons);
+      putChevron(spanLabel, slot, reads, label.color, out.chevrons);
     }
     pen += width + (oneWay ? CHEVRON_PX : 0) + SEPARATOR_PX;
   }
@@ -106,6 +103,6 @@ export function buildRouteLabels(input: LabelsInput & FitInput): Batch[] {
     scale: input.settledScale(),
     text: out.text,
   };
-  for (const entry of designatedSpans(stage)) putLabel(entry, out);
+  for (const spanLabel of designatedSpans(stage)) putLabel(spanLabel, out);
   return [out.gaps.finish(), out.text.finish(), out.chevrons.finish()];
 }
