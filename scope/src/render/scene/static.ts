@@ -1,9 +1,9 @@
 import type { ProjectFn } from '../../lib/geo';
+import { geodesicLine } from '../../lib/geodesic';
 import type { CoastData } from '../../lib/mapdata';
 import type { AtlasInfo } from '../protocol';
 import type { Slots } from '../slots';
 import { type Anchor, LineBatch, TextBatch } from './pack';
-import { route } from './paths';
 import { ringRadii } from './rings';
 import { THEME } from './rules';
 
@@ -40,7 +40,7 @@ export function buildRings(input: RingsInput): Slots {
 export function buildCoast({ shown, coast, project }: CoastInput): Slots {
   const lines = new LineBatch(4096);
   if (shown) {
-    for (const line of coast.lines) lines.polyline(route(line, project), THEME.coast);
+    for (const line of coast.lines) lines.polyline(geodesicLine(line, project), THEME.coast);
   }
   return { coastLines: [lines.finish()] };
 }

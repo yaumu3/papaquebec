@@ -1,8 +1,8 @@
 import { type ChartItem, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
+import { geodesicLine } from '../../lib/geodesic';
 import { type Batch, Shape } from '../protocol';
 import { LineBatch, MarkerBatch } from './pack';
-import { route } from './paths';
 import { THEME } from './rules';
 
 interface TracesInput {
@@ -37,7 +37,7 @@ function traceItem(
       continue;
     }
     for (const outline of outlinesOf(geometry)) {
-      lines.polyline(route(outline, project), color, { width: TRACE_WIDTH_PX });
+      lines.polyline(geodesicLine(outline, project), color, { width: TRACE_WIDTH_PX });
     }
   }
 }

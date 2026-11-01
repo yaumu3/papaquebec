@@ -3,6 +3,7 @@
  * by Vincenty's formulae, and the lines and rings drawn along them.
  */
 import { type GeoPoint, type ProjectFn, type Vec2 } from './geo';
+import type { LonLat } from './mapdata';
 import { RAD } from './units';
 import init, { direct as directOf, inverse as inverseOf } from './wasm/geodesy';
 
@@ -93,6 +94,13 @@ export function geodesicPath(
   }
   return path;
 }
+
+/** `geodesicPath` through source positions, longitude first. */
+export const geodesicLine = (positions: readonly LonLat[], project: ProjectFn): Vec2[] =>
+  geodesicPath(
+    positions.map(([lon, lat]) => ({ lat, lon })),
+    project,
+  );
 
 /** The points that cut the geodesic from `a` to `b` into `pieces` equal parts, projected. */
 function inBetween(a: GeoPoint, b: GeoPoint, pieces: number, project: ProjectFn): Vec2[] {

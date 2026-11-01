@@ -2,7 +2,7 @@
 
 import type { ChartItem, ItemPart } from './chart';
 import { distanceToSegment, type ProjectFn, type Segment, type Vec2 } from './geo';
-import { geodesicPath } from './geodesic';
+import { geodesicLine } from './geodesic';
 import { footprintOf } from './labelStacks';
 import type { LonLat } from './mapdata';
 import { midpointOf } from './polyline';
@@ -143,10 +143,7 @@ export function areaPlaceOf(item: ChartItem, project: ProjectFn): AreaPlace | un
   if (rings && pole) return { ...pole, footprint: footprintOf(rings[0] ?? []) };
   const line = item.parts[0]?.geometry;
   if (line?.type !== 'LineString') return undefined;
-  const path = geodesicPath(
-    line.coordinates.map(([lon, lat]) => ({ lat, lon })),
-    project,
-  );
+  const path = geodesicLine(line.coordinates, project);
   const middle = midpointOf(path);
   return middle && { at: middle.at };
 }

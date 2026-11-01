@@ -1,5 +1,6 @@
 import type { ChartItem, ItemPart } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
+import { geodesicLine } from '../../lib/geodesic';
 import { isRouteLayer } from '../../lib/mapsetFormat';
 import { lengthOf } from '../../lib/polyline';
 import { type Cuts, NO_CUTS, type Span, spansOf, stopCuts } from '../../lib/stops';
@@ -14,7 +15,6 @@ import {
 } from '../../lib/topology';
 import { LAYER_STYLES, type LineLayerStyle } from './layerStyles';
 import { type Anchor, type LineBatch, type LineStyle, type SpanPlace } from './pack';
-import { route } from './paths';
 
 /** A line's form in the layer's style, refined by the part's kind and stratum. */
 function lineLook(style: LineLayerStyle, part: ItemPart): LineStyle {
@@ -32,7 +32,7 @@ function lineLook(style: LineLayerStyle, part: ItemPart): LineStyle {
 function placedRuns(path: ChartPath, span: Span, runs: Stretch[], project: ProjectFn) {
   const edges = path.coordinates
     .slice(span.from, span.to)
-    .map((at, i) => route([at, path.coordinates[span.from + i + 1] ?? at], project));
+    .map((at, i) => geodesicLine([at, path.coordinates[span.from + i + 1] ?? at], project));
   const reach = [0];
   for (const e of edges) reach.push((reach.at(-1) ?? 0) + lengthOf(e));
   const length = reach.at(-1) ?? 0;
@@ -59,7 +59,7 @@ function polylinesOf(
   if (runs.length === 0) return [];
   if (span.cutBack === 0 && span.cutAhead === 0) {
     return runs.map(({ from, to }) => ({
-      points: route(path.coordinates.slice(from, to + 1), project),
+      points: geodesicLine(path.coordinates.slice(from, to + 1), project),
     }));
   }
   return placedRuns(path, span, runs, project);

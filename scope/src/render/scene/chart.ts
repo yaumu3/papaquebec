@@ -1,5 +1,6 @@
 import { type ChartItem, type ItemPart, nameOf, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
+import { geodesicLine } from '../../lib/geodesic';
 import type { StyledLayer } from '../../lib/layers';
 import { NO_CUTS } from '../../lib/stops';
 import type { ChartPoint, Topology } from '../../lib/topology';
@@ -14,7 +15,6 @@ import {
   type LineLayerStyle,
 } from './layerStyles';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
-import { route } from './paths';
 import { drawRuns, routeCuts } from './runs';
 
 export interface ShapesInput {
@@ -50,7 +50,7 @@ function labelItem(
   const [first] = item.parts;
   const name = first && nameOf(first);
   if (!label || !first || name === undefined || !labelReaches(label, density)) return;
-  const path = route(outlinesOf(first.geometry)[0] ?? [], project);
+  const path = geodesicLine(outlinesOf(first.geometry)[0] ?? [], project);
   const at = label.at === 'middle' ? path[Math.floor(path.length / 2)] : path[0];
   if (at) putLabel(name, at, label, labels);
 }

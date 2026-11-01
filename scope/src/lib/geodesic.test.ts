@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { direct, geodesicCircle, geodesicPath, inverse } from './geodesic';
+import { direct, geodesicCircle, geodesicLine, geodesicPath, inverse } from './geodesic';
 
 describe('geodesicCircle', () => {
   it('closes a ring of points, starting due north', () => {
@@ -57,5 +57,28 @@ describe('geodesicPath', () => {
       return Math.hypot(mid.lon - (p.x + q.x) / 2, mid.lat - (p.y + q.y) / 2);
     });
     expect(Math.max(...bows)).toBeLessThan(tolerance);
+  });
+});
+
+describe('geodesicLine', () => {
+  it('is the geodesic path through positions given as longitude and latitude', () => {
+    // Arrange
+    const positions: [number, number][] = [
+      [130, 35],
+      [150, 35],
+    ];
+    const expected = geodesicPath(
+      [
+        { lat: 35, lon: 130 },
+        { lat: 35, lon: 150 },
+      ],
+      lonLat,
+    );
+
+    // Act
+    const line = geodesicLine(positions, lonLat);
+
+    // Assert
+    expect(line).toEqual(expected);
   });
 });
