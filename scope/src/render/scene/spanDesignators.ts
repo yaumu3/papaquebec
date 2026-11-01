@@ -1,6 +1,6 @@
 /** Which designators label which span of the routes. */
 
-import { type ChartItem, nameOf } from '../../lib/chart';
+import { type ChartItem, gridIdentity, nameOf } from '../../lib/chart';
 import { fits, rememberFits, type ShownMemory } from '../../lib/fits';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
@@ -15,6 +15,11 @@ import { partsOf } from './runs';
 
 /** CSS px between two designators of a label. */
 export const SEPARATOR_PX = 9;
+/** CSS px a chevron takes along a label, and the clear space between it and its name. */
+export const CHEVRON_SLOT_PX = 7;
+export const CHEVRON_CLEAR_PX = 3;
+/** CSS px a one-way designator takes beside its name. */
+export const CHEVRON_PX = CHEVRON_SLOT_PX + CHEVRON_CLEAR_PX;
 /** CSS px a label needs besides its text before it is shown: room for the line either side. */
 const MARGIN_PX = 28;
 
@@ -24,12 +29,25 @@ interface Designator {
   label: LabelStyle;
   /** Where its layer stands in the draw stack, front first. */
   rank: number;
+  /** Its route is flown one way only. */
+  oneWay: boolean;
+}
+
+/** The grid identity where a path starts a span. */
+const startOf = (path: ChartPath, span: Span): string =>
+  gridIdentity(path.coordinates[span.from] ?? [0, 0]);
+
+/** A designator on a span: whether its route is flown along the label's reading direction. */
+interface Placed extends Designator {
+  reads: boolean;
 }
 
 /** Where a span's label sits and how it reads. */
 interface Geometry {
   middle: Midpoint;
   angle: number;
+  /** The text was turned half a circle from the span's direction to read upright. */
+  flipped: boolean;
   /** World length of the span. */
   length: number;
 }
@@ -39,7 +57,9 @@ export interface Entry {
   id: string;
   span: Span;
   geometry: Geometry;
-  designators: Designator[];
+  /** The grid identity where the span's first path starts. */
+  start: string;
+  designators: Placed[];
 }
 
 type Entries = Map<string, Entry>;
@@ -61,7 +81,15 @@ function designatorOf(path: ChartPath, density: LabelsInput['labelDensity']) {
   const label = LAYER_STYLES[path.layer].label;
   const name = nameOf(path.part);
   if (!label || name === undefined || !labelReaches(label, density)) return undefined;
-  return { name, label, rank: DRAW_STACK.indexOf(path.layer) };
+  const { properties } = path.part;
+  const oneWay = 'oneWay' in properties && properties.oneWay === true;
+  return { name, label, rank: DRAW_STACK.indexOf(path.layer), oneWay };
+}
+
+/** A designator on a span of an entry: `reads` when its route is flown the way the label reads. */
+function placedOn(designator: Designator, path: ChartPath, span: Span, entry: Entry): Placed {
+  const starts = startOf(path, span) === entry.start;
+  return { ...designator, reads: starts !== entry.geometry.flipped };
 }
 
 /** The entry of a span, found or made; none for a span with no length. */
@@ -72,15 +100,20 @@ function entryOf(entries: Entries, path: ChartPath, span: Span, project: Project
   const line = geodesicLine(path.coordinates.slice(span.from, span.to + 1), project);
   const middle = midpointOf(line);
   if (!middle) return undefined;
-  const geometry = { middle, angle: readingAngle(middle.direction).angle, length: lengthOf(line) };
-  const made = { id, span, geometry, designators: [] };
+  const { angle, flipped } = readingAngle(middle.direction);
+  const geometry = { middle, angle, flipped, length: lengthOf(line) };
+  const start = startOf(path, span);
+  const made: Entry = { id, span, geometry, start, designators: [] };
   entries.set(id, made);
   return made;
 }
 
 /** The text a label of these designators takes, in CSS px. */
 export function widthOf(designators: readonly Designator[], text: TextBatch): number {
-  const names = designators.reduce((sum, d) => sum + text.measure(d.name, d.label.size), 0);
+  const names = designators.reduce(
+    (sum, d) => sum + text.measure(d.name, d.label.size) + (d.oneWay ? CHEVRON_PX : 0),
+    0,
+  );
   return names + SEPARATOR_PX * Math.max(0, designators.length - 1);
 }
 
@@ -101,7 +134,7 @@ function airwayEntries(stage: Stage): Entries {
       const present = entry?.designators.some(
         (d) => d.name === designator.name && d.rank === designator.rank,
       );
-      if (entry && !present) entry.designators.push(designator);
+      if (entry && !present) entry.designators.push(placedOn(designator, path, span, entry));
     }
   }
   return entries;
@@ -148,7 +181,7 @@ function nameProcedure(item: ChartItem, entries: Entries, stage: Stage) {
     const designator = designatorOf(path, labelDensity);
     const entry = designator && entryOf(entries, path, span, project);
     if (!entry) continue;
-    const named = [...entry.designators, designator];
+    const named = [...entry.designators, placedOn(designator, path, span, entry)];
     if (fits(roomOf(entry, scale), widthOf(named, text) + MARGIN_PX, shown.get(entry.id))) {
       entry.designators = named;
       shown.set(entry.id, true);

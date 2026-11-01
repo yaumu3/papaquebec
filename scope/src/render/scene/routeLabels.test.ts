@@ -39,7 +39,7 @@ function build(
   const topology = topologyOf(items);
   const drawnItems = drawnItemsOf(items, layers, stateOf, () => true);
   const drawnPoints = () => drawnPointsOf(topology, drawnItems);
-  const [gaps, text] = buildRouteLabels({
+  const [gaps, text, chevrons] = buildRouteLabels({
     topology,
     drawnPoints,
     project,
@@ -49,8 +49,8 @@ function build(
     atlas,
     ...fit,
   });
-  if (!gaps || !text) throw new Error('buildRouteLabels returned too few batches');
-  return { gaps, text };
+  if (!gaps || !text || !chevrons) throw new Error('buildRouteLabels returned too few batches');
+  return { gaps, text, chevrons };
 }
 
 /** The labels of a text batch: the glyphs that share an anchor, read in order. */
@@ -78,8 +78,35 @@ const stops = (layer: 'navaid' | 'fix', x: number) =>
 const airway = (layer: StyledLayer, name: string, ...at: [number, number][]) =>
   keyed(name, itemOf(layer, partOf(layer, line(...at), { name })));
 
+const oneWay = (layer: StyledLayer, name: string, ...at: [number, number][]) =>
+  keyed(name, itemOf(layer, partOf(layer, line(...at), { name, oneWay: true })));
+
 /** CSS px a run of `n` characters takes at 9 px in the fixture's atlas. */
 const widthOf = (n: number) => (n * atlas.advance * 9) / atlas.fontSize;
+
+/** The chevrons of a batch in their label's frame (turned back by `angle`): each tip and the x of its arms. */
+function chevronsIn(batch: Parameters<typeof instances>[0], angle: number) {
+  const frame = ({ x, y }: { x: number; y: number }) => ({
+    x: x * Math.cos(angle) + y * Math.sin(angle),
+    y: -x * Math.sin(angle) + y * Math.cos(angle),
+  });
+  const segments = instances(batch);
+  return Array.from({ length: segments.length / 2 }, (_, i) => {
+    const [arm, other] = [segments[2 * i], segments[2 * i + 1]];
+    return {
+      tip: frame(arm?.offsetB ?? { x: 0, y: 0 }),
+      arm: frame(arm?.offsetA ?? { x: 0, y: 0 }),
+      otherArm: frame(other?.offsetA ?? { x: 0, y: 0 }),
+      width: arm?.width,
+      color: arm?.color,
+      at: arm?.a,
+    };
+  });
+}
+
+/** CSS px a label of one-way designators of these lengths takes, chevrons and separators included. */
+const oneWayTotal = (...names: number[]) =>
+  names.reduce((sum, n) => sum + widthOf(n) + 10, 0) + 9 * (names.length - 1);
 
 describe('buildRouteLabels', () => {
   const west = airway('conv', 'V901', [3, 1], [1, 0.5], [0, 0.25]);
@@ -320,6 +347,99 @@ describe('buildRouteLabels', () => {
 
       // Assert
       expect(labelsIn(text).map((l) => l.text)).toEqual(['V901']);
+    });
+  });
+
+  describe('a one-way designator', () => {
+    it('has a chevron after it where its route is flown along the reading, and before it, pointing back, where it is flown against', () => {
+      // Arrange
+      const w = widthOf(4);
+      const rows: [Chart, { tipX: number; armX: number }[]][] = [
+        [
+          [oneWay('conv', 'V901', [0, 0], [2, 0])],
+          [{ tipX: -(w + 10) / 2 + w + 9, armX: -(w + 10) / 2 + w + 4 }],
+        ],
+        [
+          [oneWay('conv', 'V901', [2, 0], [0, 0])],
+          [{ tipX: -(w + 10) / 2 + 1, armX: -(w + 10) / 2 + 6 }],
+        ],
+      ];
+
+      // Act
+      const found = rows.map(([items]) => {
+        const { text, chevrons } = build(items, ['conv']);
+        return chevronsIn(chevrons, glyphs(text)[0]?.angle ?? NaN);
+      });
+
+      // Assert
+      found.forEach((chevs, i) => {
+        const [expected] = rows[i]?.[1] ?? [];
+        expect(chevs).toHaveLength(1);
+        expect(chevs[0]?.tip.x).toBeCloseTo(expected?.tipX ?? NaN, 6);
+        expect(chevs[0]?.arm.x).toBeCloseTo(expected?.armX ?? NaN, 6);
+        expect(chevs[0]?.otherArm.x).toBeCloseTo(expected?.armX ?? NaN, 6);
+        expect(chevs[0]?.arm.y).toBeCloseTo(-3.5, 6);
+        expect(chevs[0]?.otherArm.y).toBeCloseTo(3.5, 6);
+        expect(chevs[0]?.tip.y).toBeCloseTo(0, 6);
+        expect(chevs[0]?.width).toBeCloseTo(1.3, 5);
+      });
+    });
+
+    it('is read per designator when two share a span, in the colour of each', () => {
+      // Arrange
+      const items = [oneWay('conv', 'A1', [0, 0], [2, 0]), oneWay('rnav', 'B1', [2, 0], [0, 0])];
+      const w = widthOf(2);
+      const start = -oneWayTotal(2, 2) / 2;
+
+      // Act
+      const { text, chevrons } = build(items, ['conv', 'rnav']);
+
+      // Assert
+      const [first, second] = chevronsIn(chevrons, glyphs(text)[0]?.angle ?? NaN);
+      expect(first?.tip.x).toBeCloseTo(start + w + 9, 6);
+      expect(second?.tip.x).toBeCloseTo(start + w + 19 + 1, 6);
+      expect(first?.color).toEqual(packed('#9a6a4c'));
+      expect(second?.color).toEqual(packed('#4a8090'));
+    });
+
+    it('is flown along the reading on TAVRO-ZOLEK and against it on the way into QDG', () => {
+      // Arrange
+      const items = chartOf([parseMapSet(EXAMPLE)]);
+
+      // Act
+      const { text, chevrons } = build(items, ALL_LAYERS);
+
+      // Assert
+      const label = (name: string) => labelsIn(text).find((l) => l.text === name);
+      const joined = label('TAVRO2.ZOLEKA901');
+      const y903 = label('Y903');
+      const ofLabel = (l: typeof joined) =>
+        chevronsIn(chevrons, l?.glyphs[0]?.angle ?? NaN).filter(
+          (c) => c.at?.x === l?.at.x && c.at?.y === l?.at.y,
+        );
+      expect(ofLabel(joined)).toHaveLength(2);
+      expect(ofLabel(joined).every((c) => c.tip.x > c.arm.x)).toBe(true);
+      expect(ofLabel(y903)).toHaveLength(1);
+      expect(ofLabel(y903).every((c) => c.tip.x < c.arm.x)).toBe(true);
+    });
+
+    it('takes 10 px more room than the same designator without it', () => {
+      // Arrange
+      const threshold = widthOf(4) + 28;
+      const scale = (1.05 * threshold) / 2;
+      const fit = { settledScale: () => scale, shown: new Map() };
+      const routes = [
+        airway('conv', 'V901', [0, 0], [2, 0]),
+        oneWay('conv', 'V901', [0, 0], [2, 0]),
+      ];
+
+      // Act
+      const drawn = routes.map(
+        (route) => build([route], ['conv'], 'dense', allShown, fit).text.count,
+      );
+
+      // Assert
+      expect(drawn.map((n) => n > 0)).toEqual([true, false]);
     });
   });
 });

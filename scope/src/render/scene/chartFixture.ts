@@ -25,14 +25,15 @@ export const triangle = (x: number): Position[] => [
   [x, 0],
 ];
 
-/** What a test may add to a part: a kind, a name, or for an area a lower limit. */
+/** What a test may add to a part: a kind, a name, a lower limit for an area or the one-way flag of a route. */
 export interface Extra {
   kind?: string;
   name?: string;
   lower?: string;
+  oneWay?: boolean;
 }
 
-/** The properties each group of layers carries; `extra` adds a kind, a name or a lower limit. */
+/** The properties each group of layers carries; `extra` adds a kind, a name, a lower limit or the flag. */
 export function partOf(layer: StyledLayer, geometry: Geometry, extra: Extra = {}): ItemPart {
   const properties = isPointLayer(layer)
     ? { layer, id: 'Q', ...extra }
