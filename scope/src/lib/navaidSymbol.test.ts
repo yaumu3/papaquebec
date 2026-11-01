@@ -19,6 +19,11 @@ const outlineAt = (figure: Figure, index: number): Stroke => {
   if (!stroke) throw new Error(`no outline ${index}`);
   return stroke;
 };
+const figureAt = (figures: Figure[], index: number): Figure => {
+  const figure = figures[index];
+  if (!figure) throw new Error(`no figure ${index}`);
+  return figure;
+};
 const pointAt = (stroke: Stroke, index: number): Vec2 => {
   const point = stroke.points[index];
   if (!point) throw new Error(`no point ${index}`);
@@ -52,12 +57,13 @@ describe('navaidSymbol', () => {
 
   it('draws a VOR as a hexagon at 0.85 r with flat top and bottom', () => {
     // Arrange
-    const figure = navaidSymbol('VOR', SIZE);
+    const kind = 'VOR';
 
     // Act
-    const hexagon = outlineAt(figure, 0);
+    const figure = navaidSymbol(kind, SIZE);
 
     // Assert
+    const hexagon = outlineAt(figure, 0);
     expect(hexagon.points.every((p) => Math.abs(radiusOf(p) - 0.85 * R) < 1e-9)).toBe(true);
     expect(Math.max(...xs(hexagon))).toBeCloseTo(0.85 * R);
     expect(Math.min(...ys(hexagon))).toBeCloseTo(-0.85 * R * SIN60);
@@ -66,15 +72,15 @@ describe('navaidSymbol', () => {
 
   it('draws the DME rectangle and the VOR/DME one the same, with the hexagon flush inside', () => {
     // Arrange
-    const dme = navaidSymbol('DME', SIZE);
-    const both = navaidSymbol('VOR/DME', SIZE);
-    const [rectangle, hexagon] = outlines(both);
-    if (!rectangle || !hexagon) throw new Error('precondition: a rectangle and a hexagon');
+    const kinds = ['DME', 'VOR/DME'] as const;
 
     // Act
-    const dmeRectangle = outlineAt(dme, 0);
+    const figures = kinds.map((kind) => navaidSymbol(kind, SIZE));
 
     // Assert
+    const dmeRectangle = outlineAt(figureAt(figures, 0), 0);
+    const rectangle = outlineAt(figureAt(figures, 1), 0);
+    const hexagon = outlineAt(figureAt(figures, 1), 1);
     expect(dmeRectangle.points).toEqual(rectangle.points);
     expect(Math.max(...xs(rectangle))).toBeCloseTo(0.82 * R * 1.22);
     expect(Math.max(...ys(rectangle))).toBeCloseTo(0.82 * R * SIN60);
@@ -94,25 +100,19 @@ describe('navaidSymbol', () => {
       [5, { x: -Math.cos(Math.PI / 6), y: -0.5 }],
       [9, { x: Math.cos(Math.PI / 6), y: -0.5 }],
     ];
-    const outline = outlineAt(navaidSymbol('TACAN', SIZE), 0);
-    const at = (i: number) => pointAt(outline, i % 12);
 
     // Act
-    const measured = lobes.map(([i, normal]) => ({
-      normal,
-      depth: dist(at(i), at(i + 1)),
-      length: dist(at(i + 1), at(i + 2)),
-      out: { x: at(i + 1).x - at(i).x, y: at(i + 1).y - at(i).y },
-      skipsSide: dist(at(i), at(i + 3)),
-    }));
+    const figure = navaidSymbol('TACAN', SIZE);
 
     // Assert
-    for (const m of measured) {
-      expect(m.depth).toBeCloseTo(depth);
-      expect(m.length).toBeCloseTo(side);
-      expect(m.out.x / depth).toBeCloseTo(m.normal.x);
-      expect(m.out.y / depth).toBeCloseTo(m.normal.y);
-      expect(m.skipsSide).toBeCloseTo(side);
+    const outline = outlineAt(figure, 0);
+    const at = (i: number) => pointAt(outline, i % 12);
+    for (const [i, normal] of lobes) {
+      expect(dist(at(i), at(i + 1))).toBeCloseTo(depth);
+      expect(dist(at(i + 1), at(i + 2))).toBeCloseTo(side);
+      expect((at(i + 1).x - at(i).x) / depth).toBeCloseTo(normal.x);
+      expect((at(i + 1).y - at(i).y) / depth).toBeCloseTo(normal.y);
+      expect(dist(at(i), at(i + 3))).toBeCloseTo(side);
     }
   });
 
