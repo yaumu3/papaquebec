@@ -58,6 +58,22 @@ export function bandOf(parts: readonly ItemPart[]): { lower: string; upper: stri
   };
 }
 
+/** Whether a part files a limit, above or below. */
+const hasLimit = ({ properties: p }: ItemPart): boolean =>
+  ('lower' in p && p.lower !== undefined) || ('upper' in p && p.upper !== undefined);
+
+/**
+ * The item's band as the fraction a chart prints, upper over lower, each in hundreds of feet.
+ * None when no part files a limit.
+ */
+export function fractionOf(
+  parts: readonly ItemPart[],
+): { upper: string; lower: string } | undefined {
+  if (!parts.some(hasLimit)) return undefined;
+  const { lower, upper } = bandOf(parts);
+  return { upper: limitInHundreds(upper), lower: limitInHundreds(lower) };
+}
+
 /**
  * A sector's stratum written as a tag: `335−` from the surface up to
  * a limit, `335+` from a limit to unlimited, `250–335` between two limits, and no tag for

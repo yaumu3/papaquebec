@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ItemPart } from './chart';
-import { bandOf, isUpperStratum, limitInHundreds, stratumTag } from './stratum';
+import { bandOf, fractionOf, isUpperStratum, limitInHundreds, stratumTag } from './stratum';
 
 const area = (lower?: string): ItemPart => ({
   geometry: { type: 'Polygon', coordinates: [] },
@@ -146,5 +146,25 @@ describe('limitInHundreds', () => {
 
     // Assert
     expect(written).toEqual(rows.map(([, expected]) => expected));
+  });
+});
+
+describe('fractionOf', () => {
+  it('writes the item band as upper over lower, and nothing for an item with no limits', () => {
+    // Arrange
+    const rows: [ItemPart[], { upper: string; lower: string } | undefined][] = [
+      [[sector('SFC', 'FL240'), sector('SFC', 'FL160')], { upper: '240', lower: 'SFC' }],
+      [[sector('SFC', '3000FT')], { upper: '030', lower: 'SFC' }],
+      [[sector('GND', '12000FT')], { upper: '120', lower: 'SFC' }],
+      [[sector(undefined, 'FL335')], { upper: '335', lower: 'SFC' }],
+      [[sector('FL335')], { upper: 'UNL', lower: '335' }],
+      [[sector(), sector()], undefined],
+    ];
+
+    // Act
+    const fractions = rows.map(([parts]) => fractionOf(parts));
+
+    // Assert
+    expect(fractions).toEqual(rows.map(([, expected]) => expected));
   });
 });
