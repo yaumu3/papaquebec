@@ -230,6 +230,24 @@ describe('buildHighlight of a route', () => {
     expect(new Set(glyphs(text).map((g) => g.at.x))).toEqual(new Set([4]));
   });
 
+  it('lights a procedure on the span the chart named it on, not on its first span', () => {
+    // Arrange
+    const chart = [airway('sid', 'SID1', [0, 0], [2, 0], [10, 0]), navaid(2)];
+    const roomy = (widthOf(4) + 28) / 4;
+    const shown = chartLabels(chart, 'sid', [], roomy);
+    const input = inputOf(chart, [], 'dense', shown);
+    const item = itemKeyed(chart, 'SID1');
+    // Precondition: the chart names it once, on its second span only
+    const named = glyphs(routeBatches(shown)[1]).map((g) => g.at.x);
+
+    // Act
+    const [, text] = buildHighlight(item, undefined, input);
+
+    // Assert
+    expect(named).toEqual([6, 6, 6, 6]);
+    expect(glyphs(text).map((g) => g.at.x)).toEqual([6, 6, 6, 6]);
+  });
+
   it('lights a hidden designator inside the label its span has, the others in their colours', () => {
     // Arrange
     const item = itemKeyed(shared, 'V901');
