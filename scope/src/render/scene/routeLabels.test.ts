@@ -153,6 +153,22 @@ describe('buildRouteLabels', () => {
     ).toEqual(['A901V901Y902', 'V901Y902']);
   });
 
+  it('keeps a conventional and an RNAV airway of one designator apart', () => {
+    // Arrange
+    const items = [airway('conv', 'X1', [0, 0], [2, 0]), airway('rnav', 'X1', [0, 0], [2, 0])];
+
+    // Act
+    const { text } = build(items, ['conv', 'rnav']);
+
+    // Assert
+    const [label] = labelsIn(text);
+    expect(label?.text).toBe('X1X1');
+    expect(label?.glyphs.map((g) => g.color)).toEqual([
+      ...Array(2).fill(packed('#9a6a4c')),
+      ...Array(2).fill(packed('#4a8090')),
+    ]);
+  });
+
   it('labels a route once between its drawn stops, whatever fixes lie between', () => {
     // Arrange
     const items = [
