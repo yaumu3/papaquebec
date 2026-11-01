@@ -9,7 +9,7 @@ import { type TreeItem, itemsIn, treeItemsOf } from '../lib/treeItems';
 import { afterDot, type LayerLeaves } from '../lib/treeRows';
 import { searchTree, termsOf } from '../lib/treeSearch';
 import { isItemShown, itemsSetTo } from '../lib/visibility';
-import { layerState, setLayerState } from './layerVisibility';
+import { layerState, setLayerState } from './drawn';
 import { topology } from './mapsets';
 import { setSettings, settings } from './settings';
 

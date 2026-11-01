@@ -11,6 +11,7 @@ import {
   type RowState,
   rowStateOf,
 } from '../../lib/treeRows';
+import { layerState } from '../../state/drawn';
 import {
   found,
   groupLeaves,
@@ -21,7 +22,6 @@ import {
   toggleOpen,
   treeItems,
 } from '../../state/layerTree';
-import { layerState } from '../../state/layerVisibility';
 import { SectionTitle } from '../../ui/Section';
 import { ItemList } from './ItemList';
 import { Marked } from './Marked';

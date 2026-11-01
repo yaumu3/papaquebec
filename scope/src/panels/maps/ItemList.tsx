@@ -7,6 +7,7 @@ import { LAYER_TABLE } from '../../lib/layers';
 import type { ScopeLayer } from '../../lib/mapsetFormat';
 import { itemsIn, type TreeItem } from '../../lib/treeItems';
 import { isItemShown, type LayerState } from '../../lib/visibility';
+import { layerState } from '../../state/drawn';
 import {
   blurRow,
   enterRow,
@@ -16,7 +17,6 @@ import {
   tapItem,
   treeItems,
 } from '../../state/layerTree';
-import { layerState } from '../../state/layerVisibility';
 import { scrollView } from '../lanes/scroll';
 import { Marked } from './Marked';
 import { NavaidSymbol } from './NavaidSymbol';

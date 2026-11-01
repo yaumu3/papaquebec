@@ -8,7 +8,7 @@ import { extraLines } from '../render/scene/datablock';
 import { anchorPoint, rblPath } from '../render/scene/rbl';
 import { restingOffset } from '../render/scene/targets';
 import { toScreen, toWorld } from '../render/scene/view';
-import { drawnPoints } from '../state/drawnPoints';
+import { drawnPoints } from '../state/drawn';
 import { drawnBlocks, isFiltered, type Rbl, type RblAnchor, rbls } from '../state/scope';
 import type { Track } from '../state/track';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
