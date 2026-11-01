@@ -147,13 +147,6 @@ fn sdTriangle(p: vec2f) -> f32 {
   let dBase = -0.75 - p.y;
   return max(dLeft, dBase);
 }
-fn sdHexagon(p: vec2f) -> f32 {
-  let k = vec3f(-0.8660254, 0.5, 0.5773503);
-  var q = abs(p);
-  q = q - 2.0 * min(dot(k.xy, q), 0.0) * k.xy;
-  q = q - vec2f(clamp(q.x, -k.z, k.z), 1.0);
-  return length(q) * sign(q.y);
-}
 @fragment fn fs(in: Out) -> @location(0) vec4f {
   let p = in.local;
   let cssPx = u.dpr / in.halfPx; // one CSS px in shape units
@@ -168,9 +161,8 @@ fn sdHexagon(p: vec2f) -> f32 {
     case 2u: { d = sdDiamond(p); }                                  // filled diamond
     case 3u: { d = abs(sdDiamond(p)) - stroke; }                    // hollow diamond
     case 4u: { d = abs(sdTriangle(p)) - stroke; }                   // hollow triangle
-    case 5u: { d = min(abs(sdHexagon(p)) - stroke, sdSquare(p * 5.0)); } // hexagon + dot
+    case 5u: { d = sdCircle(p, 1.0); }                              // disc
     case 6u: { d = sdCircle(p, 0.35); }                             // dot
-    case 9u: { d = sdCircle(p, 1.0); }                              // disc
     case 7u: { d = abs(sdCircle(p, 0.85)) - stroke; }               // ring
     default: { d = abs(sdSquare(p)) - stroke; }                     // hollow square
   }

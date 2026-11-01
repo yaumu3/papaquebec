@@ -2,7 +2,12 @@ import type { JSX } from 'solid-js';
 
 import { isStyled, type ScopeLayer } from '../../lib/layers';
 import { Shape } from '../../render/protocol';
-import { isPointStyle, LAYER_STYLES, type LineLayerStyle } from '../../render/scene/layerStyles';
+import {
+  isPointStyle,
+  LAYER_STYLES,
+  type LineLayerStyle,
+  type PointLayerStyle,
+} from '../../render/scene/layerStyles';
 import { DEFAULT_LINE_WIDTH } from '../../render/scene/pack';
 import { THEME } from '../../render/scene/rules';
 
@@ -17,12 +22,11 @@ const svg = (inner: JSX.Element) => (
 const triangle = (scale: number) =>
   `12,${5 - 4 * scale} ${12 + 3.5 * scale},${5 + 2.5 * scale} ${12 - 3.5 * scale},${5 + 2.5 * scale}`;
 
-function marker(shape: Shape, size: number, color: string) {
+function marker(shape: PointLayerStyle['shape'], size: number, color: string) {
   if (shape === Shape.Ring) {
     return <circle cx="12" cy="5" r="3.5" fill="none" stroke={color} stroke-width={STROKE} />;
   }
-  const points =
-    shape === Shape.Hexagon ? '12,1 15.5,3 15.5,7 12,9 8.5,7 8.5,3' : triangle(size / 8);
+  const points = shape === 'symbol' ? '12,1 15.5,3 15.5,7 12,9 8.5,7 8.5,3' : triangle(size / 8);
   return <polygon points={points} fill="none" stroke={color} stroke-width={STROKE} />;
 }
 

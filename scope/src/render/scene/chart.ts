@@ -10,6 +10,7 @@ import type { AtlasInfo } from '../protocol';
 import type { CHART_SLICES, ShapeBatches } from '../slots';
 import { buildAreaLabels } from './areaLabels';
 import { type BuiltLabels, type LabelOut, putText } from './drawnLabels';
+import { putPointMark } from './figures';
 import { isPointStyle, LAYER_STYLES, labelReaches, type PointLayerStyle } from './layerStyles';
 import { LineBatch, MarkerBatch, TextBatch } from './pack';
 import { buildRouteLabels } from './routeLabels';
@@ -44,9 +45,10 @@ export interface FitInput {
 }
 
 /** A point at its place on the plane. */
-export const placedPoint = ({ key, id, at: [lon, lat] }: ChartPoint, project: ProjectFn) => ({
+export const placedPoint = ({ key, id, kind, at: [lon, lat] }: ChartPoint, project: ProjectFn) => ({
   key,
   id,
+  kind,
   at: project(lat, lon),
 });
 
@@ -76,8 +78,8 @@ export function buildShapes({
   for (const layer of layers.toReversed()) {
     const style = LAYER_STYLES[layer];
     if (!isPointStyle(style)) continue;
-    for (const { at } of pointsIn(layer, drawnPoints, project)) {
-      markers.marker(at, style.shape, style.size, style.color);
+    for (const { at, kind } of pointsIn(layer, drawnPoints, project)) {
+      putPointMark({ lines, markers }, at, style, kind, style.color);
     }
   }
   return { lines: lines.finish(), markers: markers.finish() };

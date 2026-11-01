@@ -3,7 +3,9 @@ import { describe, expect, it } from 'bun:test';
 import { type Chart, type ChartItem, chartOf } from '../../lib/chart';
 import { DRAW_STACK, drawnItemsOf, isStyled, type StyledLayer } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
+import { EXAMPLE } from '../../lib/mapsetCorpus';
 import { type Layer, POINT_LAYERS, ROUTE_LAYERS } from '../../lib/mapsetFormat';
+import { navaidSymbol } from '../../lib/navaidSymbol';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import type { LayerState } from '../../lib/visibility';
 import { allShown, shownExcept } from '../../lib/visibilityFixture';
@@ -29,6 +31,8 @@ import {
   triangle,
 } from './chartFixture';
 import type { DrawnLabel } from './drawnLabels';
+import { putFigure } from './figures';
+import { LineBatch, MarkerBatch } from './pack';
 
 const has = (layers: readonly string[], layer: string) => layers.includes(layer);
 
@@ -402,9 +406,9 @@ describe('buildShapes routes stop short of points', () => {
         ],
         ['conv', 'fix', 'navaid'],
         [
-          [0, 6, 7, 8],
-          [1, 4, 7, 8],
-          [3, 0, 7, 8],
+          [0, 6, 7, 9],
+          [1, 4, 7, 9],
+          [3, 0, 7, 9],
         ],
       ],
       [
@@ -473,7 +477,7 @@ describe('buildShapes routes stop short of points', () => {
     // Arrange
     const rows: [StyledLayer, number][] = [
       ['fix', 7],
-      ['navaid', 8],
+      ['navaid', 9],
       ['ad', 7.5],
       ['vfr', 6],
     ];
@@ -548,12 +552,97 @@ describe('buildShapes routes stop short of points', () => {
 const markerXs = ({ count, data }: Batch) =>
   Array.from({ length: count }, (_, i) => data[i * MARKER_STRIDE]);
 
+/** A navaid item of the given part kinds, one part at each position. */
+const navaidOf = (parts: [Position, string | undefined][]) =>
+  itemOf(
+    'navaid',
+    ...parts.map(([at, kind]) => partOf('navaid', point(at), kind === undefined ? {} : { kind })),
+  );
+
+/** What the points slice draws for navaid symbols: each of `symbols` at its position, in order. */
+function symbolsAt(symbols: [Position, string | undefined][]) {
+  const lines = new LineBatch();
+  const markers = new MarkerBatch();
+  for (const [[x, y], kind] of symbols) {
+    putFigure({ lines, markers }, { x, y }, navaidSymbol(kind, 12), '#808080');
+  }
+  return [Array.from(lines.finish().data), Array.from(markers.finish().data)];
+}
+
+const shapesOf = ({ lines, markers }: { lines: Batch; markers: Batch }) => [
+  Array.from(lines.data),
+  Array.from(markers.data),
+];
+
+describe('buildShapes navaids', () => {
+  it('draws each navaid kind as its own symbol', () => {
+    // Arrange
+    const kinds = ['VOR', 'DME', 'VOR/DME', 'TACAN', 'VORTAC', 'NDB'];
+    const at: Position = [139.5, 35.5];
+
+    // Act
+    const drawn = kinds.map((kind) => shapesOf(build([navaidOf([[at, kind]])])));
+
+    // Assert
+    expect(drawn).toEqual(kinds.map((kind) => symbolsAt([[at, kind]])));
+    expect(new Set(drawn.map((d) => JSON.stringify(d))).size).toBe(kinds.length);
+  });
+
+  it('draws an unknown kind and a missing one as the default circle', () => {
+    // Arrange
+    const kinds = ['TVOR', 'vor', undefined];
+    const at: Position = [139.5, 35.5];
+
+    // Act
+    const drawn = kinds.map((kind) => shapesOf(build([navaidOf([[at, kind]])])));
+
+    // Assert
+    expect(drawn).toEqual(kinds.map(() => symbolsAt([[at, undefined]])));
+  });
+
+  it("draws every part of a navaid with its first part's kind", () => {
+    // Arrange
+    const first: Position = [139.5, 35.5];
+    const second: Position = [139.6, 35.5];
+    const item = navaidOf([
+      [first, 'VOR'],
+      [second, 'NDB'],
+    ]);
+
+    // Act
+    const drawn = shapesOf(build([item]));
+
+    // Assert
+    expect(drawn).toEqual(
+      symbolsAt([
+        [first, 'VOR'],
+        [second, 'VOR'],
+      ]),
+    );
+  });
+
+  it("draws the example's QDG as VORTAC and QIK as VOR/DME", () => {
+    // Arrange
+    const chart = chartOf([parseMapSet(EXAMPLE)]);
+
+    // Act
+    const drawn = shapesOf(build(chart, ['navaid']));
+
+    // Assert
+    expect(drawn).toEqual(
+      symbolsAt([
+        [[130.4406, 33.5967], 'VORTAC'],
+        [[129.96, 33.73], 'VOR/DME'],
+      ]),
+    );
+  });
+});
+
 describe('buildShapes markers', () => {
   it('draws each kind of point with its own glyph, size and colour', () => {
     // Arrange
     const rows: [StyledLayer, Shape, number, string][] = [
       ['ad', Shape.Ring, 9, '#8a8a8a'],
-      ['navaid', Shape.Hexagon, 10, '#808080'],
       ['fix', Shape.Triangle, 8, '#707070'],
       ['vfr', Shape.Triangle, 6, '#5c5c5c'],
     ];

@@ -34,9 +34,9 @@ export interface LineLayerStyle {
   label?: LabelStyle;
 }
 
-/** How a layer of points is drawn. */
+/** How a layer of points is drawn: as a marker, or as the navaid symbol of the point's kind. */
 export interface PointLayerStyle {
-  shape: Shape;
+  shape: Shape | 'symbol';
   size: number;
   color: string;
   label: PointLabelStyle;
@@ -87,8 +87,8 @@ export const LAYER_STYLES = {
     label: { ...STATION_LABEL, color: THEME.adLabel },
   },
   navaid: {
-    shape: Shape.Hexagon,
-    size: 10,
+    shape: 'symbol',
+    size: 12,
     color: THEME.navaid,
     label: { ...STATION_LABEL, color: THEME.navaidLabel },
   },

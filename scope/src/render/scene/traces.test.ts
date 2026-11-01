@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ChartItem, ItemPart } from '../../lib/chart';
+import { navaidSymbol } from '../../lib/navaidSymbol';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
 import { packed, project } from './chartFixture';
+import { putFigure } from './figures';
 import { LAYER_STYLES } from './layerStyles';
+import { LineBatch, MarkerBatch } from './pack';
 import { THEME } from './rules';
 import { buildTraces } from './traces';
 
@@ -88,7 +91,7 @@ describe('buildTraces', () => {
     // Act
     const {
       traces: [, lines],
-      tracedPoints: [, dots],
+      tracedPoints: [, , , dots],
     } = tracesOf({ pointedAt: stepped, searched: [], project });
 
     // Assert
@@ -115,12 +118,12 @@ describe('buildTraces', () => {
 
   it("draws a point as its layer's own symbol, one for each part", () => {
     // Arrange
-    const layers = ['ad', 'navaid', 'fix', 'vfr'] as const;
+    const layers = ['ad', 'fix', 'vfr'] as const;
     const pointed = layers.map((layer) => point(layer, pointAt([1, 2]), pointAt([3, 4])));
 
     // Act
     const traced = pointed.map(
-      (pointedAt) => tracesOf({ pointedAt, searched: [], project }).tracedPoints[1],
+      (pointedAt) => tracesOf({ pointedAt, searched: [], project }).tracedPoints[3],
     );
 
     // Assert
@@ -134,6 +137,45 @@ describe('buildTraces', () => {
     expect(traced.map(markers)).toEqual(expected);
   });
 
+  it('draws a navaid as its own symbol, each part its own kind', () => {
+    // Arrange
+    const kinds = ['VORTAC', 'NDB'];
+    const at: Position[] = [
+      [1, 2],
+      [3, 4],
+    ];
+    const navaid: ChartItem = {
+      key: 'navaid',
+      layer: 'navaid',
+      parts: kinds.map((kind, i) => ({
+        geometry: pointAt(at[i] ?? [0, 0]),
+        properties: { layer: 'navaid', id: 'Q', kind },
+      })),
+    };
+    const expectedLines = new LineBatch();
+    const expectedMarkers = new MarkerBatch();
+    kinds.forEach((kind, i) => {
+      const [x, y] = at[i] ?? [0, 0];
+      putFigure(
+        { lines: expectedLines, markers: expectedMarkers },
+        { x, y },
+        navaidSymbol(kind, 12),
+        THEME.hover,
+      );
+    });
+
+    // Act
+    const { tracedPoints } = tracesOf({ pointedAt: navaid, searched: [], project });
+
+    // Assert
+    const [, , lines, dots] = tracedPoints;
+    expect([lines.kind, Array.from(lines.data)]).toEqual([
+      'lines',
+      Array.from(expectedLines.finish().data),
+    ]);
+    expect(Array.from(dots.data)).toEqual(Array.from(expectedMarkers.finish().data));
+  });
+
   it('draws nothing for a hold, whose racetrack comes later', () => {
     // Arrange
     const hold = item('hold', { layer: 'hold', turn: 'R', inboundMag: 90 }, pointAt([1, 2]));
@@ -141,7 +183,7 @@ describe('buildTraces', () => {
     // Act
     const {
       traces: [, lines],
-      tracedPoints: [, dots],
+      tracedPoints: [, , , dots],
     } = tracesOf({ pointedAt: hold, searched: [], project });
 
     // Assert
@@ -155,7 +197,7 @@ describe('buildTraces', () => {
     // Act
     const {
       traces: [, lines],
-      tracedPoints: [, dots],
+      tracedPoints: [, , , dots],
     } = tracesOf({ pointedAt: none, searched: [], project });
 
     // Assert
@@ -169,7 +211,7 @@ describe('buildTraces', () => {
     // Act
     const {
       traces: [lines],
-      tracedPoints: [dots],
+      tracedPoints: [, dots],
     } = tracesOf({ pointedAt: null, searched: found, project });
 
     // Assert
@@ -189,7 +231,7 @@ describe('buildTraces', () => {
     const { traces, tracedPoints } = tracesOf({ pointedAt: null, searched: [hold], project });
 
     // Assert
-    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0]);
+    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
   it('puts the search first and what is pointed at over it, an item in both drawn in both', () => {
@@ -200,7 +242,7 @@ describe('buildTraces', () => {
     // Act
     const {
       traces: [searchLines, pointedLines],
-      tracedPoints: [searchDots, pointedDots],
+      tracedPoints: [, searchDots, , pointedDots],
     } = tracesOf({
       pointedAt: both,
       searched: [onlySearched, both],
@@ -222,7 +264,7 @@ describe('buildTraces', () => {
     const { traces, tracedPoints } = tracesOf(none);
 
     // Assert
-    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0]);
+    expect([...traces, ...tracedPoints].map((b) => b.count)).toEqual([0, 0, 0, 0, 0, 0]);
   });
 
   it("puts a route's highlight in traces, after its lines, and none in tracedPoints", () => {
@@ -236,7 +278,7 @@ describe('buildTraces', () => {
     // Assert
     expect(traces.slice(2)).toEqual(highlight);
     expect(traces.slice(2).every((b, i) => b === highlight[i])).toBe(true);
-    expect(tracedPoints).toHaveLength(2);
+    expect(tracedPoints).toHaveLength(4);
   });
 
   it("puts a point's highlight in tracedPoints, after its symbol, and none in traces", () => {
@@ -248,8 +290,8 @@ describe('buildTraces', () => {
     const { traces, tracedPoints } = tracesOf(input);
 
     // Assert
-    expect(tracedPoints.slice(2)).toEqual(highlight);
-    expect(tracedPoints.slice(2).every((b, i) => b === highlight[i])).toBe(true);
+    expect(tracedPoints.slice(4)).toEqual(highlight);
+    expect(tracedPoints.slice(4).every((b, i) => b === highlight[i])).toBe(true);
     expect(traces).toHaveLength(2);
   });
 });

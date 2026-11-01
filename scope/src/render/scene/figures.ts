@@ -1,10 +1,12 @@
 import type { Figure } from '../../lib/figure';
 import type { Vec2 } from '../../lib/geo';
+import { navaidSymbol } from '../../lib/navaidSymbol';
 import { Shape } from '../protocol';
+import type { PointLayerStyle } from './layerStyles';
 import type { LineBatch, MarkerBatch } from './pack';
 
 /** The batches a figure draws into. */
-interface FigureOut {
+export interface FigureOut {
   lines: LineBatch;
   markers: MarkerBatch;
 }
@@ -28,4 +30,16 @@ export function putFigure(
   for (const { at: offset, radius } of discs) {
     markers.marker({ ...at, px: offset.x, py: offset.y }, Shape.Disc, 2 * radius, color);
   }
+}
+
+/** A point's mark: its layer's marker, or the navaid symbol of `kind`. */
+export function putPointMark(
+  out: FigureOut,
+  at: Vec2,
+  { shape, size }: Pick<PointLayerStyle, 'shape' | 'size'>,
+  kind: string | undefined,
+  color: string,
+): void {
+  if (shape === 'symbol') putFigure(out, at, navaidSymbol(kind, size), color);
+  else out.markers.marker(at, shape, size, color);
 }

@@ -255,7 +255,7 @@ describe('buildRouteLabels', () => {
     const items = [stops('navaid', 0), airway('conv', 'V901', [0, 0], [2, 0])];
     const layers: StyledLayer[] = ['conv', 'navaid'];
     const threshold = widthOf(4) + 28;
-    const cut = 10 / 2 + 3;
+    const cut = 12 / 2 + 3;
     const scaleOf = (multiple: number) => (multiple * threshold + cut) / 2;
     const rows: [number[], boolean][] = [
       [[1.01], true],

@@ -125,6 +125,9 @@ function xsInDrawOrder(
     .flatMap((b) => Array.from({ length: b.count }, (_, i) => Math.round(b.data[i * stride] ?? 0)));
 }
 
+/** A list with each run of equal values as one: a layer's many instances at one place. */
+const oneEach = (xs: readonly number[]) => xs.filter((x, i) => x !== xs[i - 1]);
+
 /** The kind of each non-empty batch, in the order the renderer draws them. */
 const kindsInDrawOrder = (slots: Slots): Batch['kind'][] =>
   SLOT_ORDER.flatMap((name) => slots[name] ?? [])
@@ -136,7 +139,7 @@ describe('the draw order of the chart', () => {
   const behind = DRAW_STACK.toReversed();
   const unlabelled: ReadonlySet<ScopeLayer> = new Set(['fir', 'adiz', 'dct', 'hold', 'coast']);
 
-  it('draws lines back to front through the stack, the base map first', () => {
+  it('draws lines back to front through the stack, the base map first, the navaid strokes last', () => {
     // Arrange
     const lineLayers = behind.filter((l) => !isPoint(l) && l !== 'hold');
 
@@ -144,7 +147,10 @@ describe('the draw order of the chart', () => {
     const slots = mapSlots(chart);
 
     // Assert
-    expect(xsInDrawOrder(slots, 'lines', SHAPE_SLOTS)).toEqual(lineLayers.map(at));
+    expect(oneEach(xsInDrawOrder(slots, 'lines', SHAPE_SLOTS))).toEqual([
+      ...lineLayers.map(at),
+      at('navaid'),
+    ]);
   });
 
   it('draws the markers back to front', () => {
