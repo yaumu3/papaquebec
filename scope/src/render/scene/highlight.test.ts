@@ -7,6 +7,10 @@ import { EXAMPLE } from '../../lib/mapsetCorpus';
 import type { Batch } from '../protocol';
 import {
   airway,
+  partOf,
+  line,
+  keyed,
+  itemOf,
   box,
   glyphs,
   labelWidth,
@@ -263,6 +267,36 @@ describe('the highlight of a route', () => {
     expect(lit.gaps.count).toBe(1);
     expect(gap?.offsetA.x).toBeCloseTo(-labelWidth(4) / 2 - 4, 6);
     expect(gap?.offsetB.x).toBeCloseTo(labelWidth(4) / 2 + 4, 6);
+  });
+
+  it("leaves no trace in the chart's labels of an item pointed at before", () => {
+    // Arrange
+    const chart = [airway('conv', 'V901', [0, 0], [1, 0]), airway('rnav', 'Y902', [0, 0], [1, 0])];
+    const scene = sceneOf(chart, { hidden: ['Y902'] });
+    scene.highlight(itemKeyed(chart, 'Y902'));
+
+    // Act
+    const lit = scene.highlight(itemKeyed(chart, 'V901'));
+
+    // Assert
+    expect(spelled(lit.text)).toBe('V901');
+  });
+
+  it('lights the chevron of a one-way designator with its name', () => {
+    // Arrange
+    const oneWay = keyed(
+      'C1',
+      itemOf('conv', partOf('conv', line([0, 0], [1, 0]), { name: 'C1', oneWay: true })),
+    );
+    const scene = sceneOf([oneWay]);
+
+    // Act
+    const lit = scene.highlight(oneWay);
+
+    // Assert
+    const arms = segments(lit.strokes);
+    expect(arms).toHaveLength(2);
+    expect(arms.map((arm) => arm.color)).toEqual([grey, grey]);
   });
 
   it('draws nothing for an item whose layer has no label', () => {

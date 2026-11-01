@@ -84,15 +84,17 @@ function placedOn(designator: Designator, span: RouteSpan, spanLabel: SpanLabel)
   return { ...designator, reads: (span.start === spanLabel.start) !== spanLabel.middle.flipped };
 }
 
-/** The label of a span, found or made; none for a span with no length. */
-function spanLabelOf(spanLabels: SpanLabels, span: RouteSpan) {
-  const known = spanLabels.get(span.id);
-  if (known) return known;
+/** A span's label with nothing on it yet; none for a span with no length. */
+function emptyLabel(span: RouteSpan): SpanLabel | undefined {
   const { middle } = span;
-  if (!middle) return undefined;
-  const made: SpanLabel = { ...span, middle, designators: [], shown: false };
-  spanLabels.set(span.id, made);
-  return made;
+  return middle && { ...span, middle, designators: [], shown: false };
+}
+
+/** The label of a span, found or made. */
+function spanLabelOf(spanLabels: SpanLabels, span: RouteSpan) {
+  const label = spanLabels.get(span.id) ?? emptyLabel(span);
+  if (label) spanLabels.set(span.id, label);
+  return label;
 }
 
 /** The text a label of these designators takes, in CSS px. */
@@ -188,29 +190,25 @@ function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
 }
 
 /**
- * The label of each span of an item with its designator on it: the chart's label of the span
- * where it has one, with the designator joined in draw-stack order, else the designator alone.
- * No room test and no density gate. The chart's labels are copied, not changed.
+ * The label of each span of an item with its designator on it: the chart's label of the span,
+ * found by its identity, with the designator joined in draw-stack order, else the designator
+ * alone. No room test and no density gate. The chart's labels are never changed.
  */
 export function itemLabels(
   item: ChartItem,
   stage: ItemReading,
   chartLabels: ReadonlyMap<string, SpanLabel>,
 ): SpanLabel[] {
-  const known: SpanLabels = new Map(
-    [...chartLabels].map(([id, label]) => [id, { ...label, designators: [...label.designators] }]),
-  );
   const labels: SpanLabels = new Map();
   for (const { path, span } of spansOfItem(item, stage)) {
     const designator = designatorOf(path, item.key);
-    if (!designator) continue;
-    const spanLabel = spanLabelOf(known, span);
-    if (!spanLabel) continue;
-    if (!spanLabel.designators.some((d) => d.key === item.key)) {
-      spanLabel.designators = [...spanLabel.designators, placedOn(designator, span, spanLabel)];
-    }
-    spanLabel.designators = spanLabel.designators.toSorted(byStack);
-    labels.set(spanLabel.id, spanLabel);
+    const label = labels.get(span.id) ?? chartLabels.get(span.id) ?? emptyLabel(span);
+    if (!designator || !label) continue;
+    const named = label.designators.some((d) => d.key === item.key);
+    const designators = named
+      ? label.designators
+      : [...label.designators, placedOn(designator, span, label)].toSorted(byStack);
+    labels.set(span.id, { ...label, designators });
   }
   return [...labels.values()];
 }
@@ -278,22 +276,32 @@ function putChevron(
   }
 }
 
-/** Puts the designators of a span along it, each with its chevron, on a gap cut in the line. */
-export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut) {
+/** An item a label draws in a colour of its own. */
+interface LitDesignator {
+  key: string;
+  color: string;
+}
+
+/**
+ * Puts the designators of a span along it, each with its chevron, on a gap cut in the line, the
+ * designator of the `lit` item in its colour.
+ */
+export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut, lit?: LitDesignator) {
   const { middle, designators } = spanLabel;
   const { angle } = middle;
   const total = widthOf(designators, out.text);
   const style = { baseline: 'middle', angle, halo: true } as const;
   let pen = -total / 2;
-  for (const { name, label, oneWay, reads } of designators) {
+  for (const { key, name, label, oneWay, reads } of designators) {
+    const color = key === lit?.key ? lit.color : label.color;
     const width = out.text.measure(name, label.size);
     const before = oneWay && !reads;
     const textAt = before ? pen + CHEVRON_PX : pen;
     const at = { ...middle.at, px: textAt, py: 0 };
-    out.text.text(name, at, label.size, label.color, style);
+    out.text.text(name, at, label.size, color, style);
     if (oneWay) {
       const slot = before ? pen : pen + width + CHEVRON_CLEAR_PX;
-      putChevron(spanLabel, slot, reads, label.color, out);
+      putChevron(spanLabel, slot, reads, color, out);
     }
     pen += width + (oneWay ? CHEVRON_PX : 0) + SEPARATOR_PX;
   }

@@ -19,14 +19,6 @@ type HighlightInput = Pick<LabelsInput, 'topology' | 'project' | 'routeSpans' | 
     areaNames: ReadonlyMap<string, Anchor>;
   };
 
-/** The label with the designators of the item `key` in the hover grey. */
-const lit = (label: SpanLabel, key: string): SpanLabel => ({
-  ...label,
-  designators: label.designators.map((d) =>
-    d.key === key ? { ...d, label: { ...d.label, color: PALETTE.hover } } : d,
-  ),
-});
-
 /** The labels a procedure is lit on: those its chart label lists, else its first span's. */
 function namedOnce(labels: SpanLabel[], key: string, spanLabels: HighlightInput['spanLabels']) {
   const listed = labels.filter((l) => spanLabels.get(l.id)?.designators.some((d) => d.key === key));
@@ -44,7 +36,7 @@ function putRouteLabels(
 ) {
   const labels = itemLabels(item, { topology, routeSpans }, spanLabels);
   const shown = isProcedureLayer(item.layer) ? namedOnce(labels, item.key, spanLabels) : labels;
-  for (const label of shown) putLabel(lit(label, item.key), out);
+  for (const label of shown) putLabel(label, out, { key: item.key, color: PALETTE.hover });
 }
 
 /** Puts the ident beside every part of a point item, drawn or not. */
