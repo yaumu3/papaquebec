@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { ChartItem, ItemPart } from '../../lib/chart';
-import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape } from '../protocol';
+import { type Batch, LINE_STRIDE, MARKER_STRIDE } from '../protocol';
 import { packed, project } from './chartFixture';
+import { LAYER_STYLES } from './layerStyles';
 import { THEME } from './rules';
 import { buildTraces } from './traces';
 
@@ -24,7 +25,9 @@ const area = (...parts: ItemPart['geometry'][]) =>
   item('tma', { layer: 'tma', name: 'Q' }, ...parts);
 const route = (...parts: ItemPart['geometry'][]) =>
   item('conv', { layer: 'conv', name: 'Q' }, ...parts);
-const fix = (...parts: ItemPart['geometry'][]) => item('fix', { layer: 'fix', id: 'Q' }, ...parts);
+const point = (layer: 'ad' | 'navaid' | 'fix' | 'vfr', ...parts: ItemPart['geometry'][]) =>
+  item(layer, { layer, id: 'Q' }, ...parts);
+const fix = (...parts: ItemPart['geometry'][]) => point('fix', ...parts);
 
 const square = (x: number, size: number): Position[] => [
   [x, 0],
@@ -53,7 +56,12 @@ function segments({ data, count }: Batch) {
 function markers({ data, count }: Batch) {
   return Array.from({ length: count }, (_, i) => {
     const o = i * MARKER_STRIDE;
-    return { at: [data[o], data[o + 1]], size: data[o + 4], shape: data[o + 5] };
+    return {
+      at: [data[o], data[o + 1]],
+      size: data[o + 4],
+      shape: data[o + 5],
+      color: Array.from(data.subarray(o + 6, o + 10)),
+    };
   });
 }
 
@@ -92,19 +100,23 @@ describe('buildTraces', () => {
     expect(segments(lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  it('draws a point as a ring of 9 px radius, one for each part', () => {
+  it("draws a point as its layer's own symbol, one for each part", () => {
     // Arrange
-    const pointed = fix(pointAt([1, 2]), pointAt([3, 4]));
+    const layers = ['ad', 'navaid', 'fix', 'vfr'] as const;
+    const pointed = layers.map((layer) => point(layer, pointAt([1, 2]), pointAt([3, 4])));
 
     // Act
-    const [, , lines, dots] = buildTraces({ pointedAt: pointed, searched: [], project });
+    const traced = pointed.map((pointedAt) => buildTraces({ pointedAt, searched: [], project })[3]);
 
     // Assert
-    expect(lines.count).toBe(0);
-    expect(markers(dots)).toEqual([
-      { at: [1, 2], size: 18, shape: Shape.TraceRing },
-      { at: [3, 4], size: 18, shape: Shape.TraceRing },
-    ]);
+    const expected = layers.map((layer) => {
+      const { shape, size } = LAYER_STYLES[layer];
+      return [
+        { at: [1, 2], size, shape, color: grey },
+        { at: [3, 4], size, shape, color: grey },
+      ];
+    });
+    expect(traced.map(markers)).toEqual(expected);
   });
 
   it('draws nothing for a hold, whose racetrack comes later', () => {
@@ -129,7 +141,7 @@ describe('buildTraces', () => {
     expect([lines.count, dots.count]).toEqual([0, 0]);
   });
 
-  it('draws what the search names at half strength, a ring at 8 px radius', () => {
+  it('draws what the search names at half strength, a point as its own symbol', () => {
     // Arrange
     const found = [area(lineOf([0, 0], [1, 0], [1, 1])), fix(pointAt([5, 6]))];
 
@@ -140,7 +152,8 @@ describe('buildTraces', () => {
     const drawn = segments(lines);
     expect(drawn.map((x) => x.color)).toEqual(drawn.map(() => faint));
     expect(drawn.map((x) => [x.width, x.pattern])).toEqual(drawn.map(() => [2, [0, 0, 0, 0]]));
-    expect(markers(dots)).toEqual([{ at: [5, 6], size: 16, shape: Shape.TraceRing }]);
+    const { shape, size } = LAYER_STYLES.fix;
+    expect(markers(dots)).toEqual([{ at: [5, 6], size, shape, color: faint }]);
     expect(faint[3]).toBeCloseTo(128 / 255, 2);
   });
 
@@ -169,9 +182,9 @@ describe('buildTraces', () => {
 
     // Assert
     expect(segments(searchLines)).toHaveLength(1);
-    expect(markers(searchDots).map((m) => m.size)).toEqual([16]);
+    expect(markers(searchDots).map((m) => m.color)).toEqual([faint]);
     expect(pointedLines.count).toBe(0);
-    expect(markers(pointedDots).map((m) => m.size)).toEqual([18]);
+    expect(markers(pointedDots).map((m) => m.color)).toEqual([grey]);
   });
 
   it('gives only empty batches when nothing is searched or pointed at', () => {

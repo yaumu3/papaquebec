@@ -1,7 +1,8 @@
 import { type ChartItem, outlinesOf } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { geodesicLine } from '../../lib/geodesic';
-import { type Batch, Shape } from '../protocol';
+import type { Batch } from '../protocol';
+import { isPointStyle, LAYER_STYLES } from './layerStyles';
 import { LineBatch, MarkerBatch } from './pack';
 import { THEME } from './rules';
 
@@ -14,17 +15,14 @@ interface TracesInput {
 }
 
 const TRACE_WIDTH_PX = 2;
-const POINTED_RING_PX = 9;
-const SEARCH_RING_PX = 8;
 
 /**
- * An item's full geometry: every outline of every part, not cut back at stops, and a point as a
- * ring. A hold has no trace until its racetrack comes with the symbols.
+ * An item's full geometry: every outline of every part, not cut back at stops, and a point as
+ * its layer's own symbol. A hold has no trace until its racetrack comes with the symbols.
  */
 function traceItem(
   item: ChartItem,
   color: string,
-  ringPx: number,
   project: ProjectFn,
   lines: LineBatch,
   markers: MarkerBatch,
@@ -33,7 +31,8 @@ function traceItem(
   for (const { geometry } of item.parts) {
     if (geometry.type === 'Point') {
       const [lon, lat] = geometry.coordinates;
-      markers.marker(project(lat, lon), Shape.TraceRing, ringPx * 2, color);
+      const style = LAYER_STYLES[item.layer];
+      if (isPointStyle(style)) markers.marker(project(lat, lon), style.shape, style.size, color);
       continue;
     }
     for (const outline of outlinesOf(geometry)) {
@@ -43,15 +42,10 @@ function traceItem(
 }
 
 /** One trace of `items`: their lines, then their markers. */
-function trace(
-  items: readonly ChartItem[],
-  color: string,
-  ringPx: number,
-  project: ProjectFn,
-): [Batch, Batch] {
+function trace(items: readonly ChartItem[], color: string, project: ProjectFn): [Batch, Batch] {
   const lines = new LineBatch(1);
   const markers = new MarkerBatch(1);
-  for (const item of items) traceItem(item, color, ringPx, project, lines, markers);
+  for (const item of items) traceItem(item, color, project, lines, markers);
   return [lines.finish(), markers.finish()];
 }
 
@@ -65,7 +59,7 @@ export function buildTraces({
   project,
 }: TracesInput): [Batch, Batch, Batch, Batch] {
   return [
-    ...trace(searched, THEME.hoverFaint, SEARCH_RING_PX, project),
-    ...trace(pointedAt ? [pointedAt] : [], THEME.hover, POINTED_RING_PX, project),
+    ...trace(searched, THEME.hoverFaint, project),
+    ...trace(pointedAt ? [pointedAt] : [], THEME.hover, project),
   ];
 }

@@ -171,7 +171,6 @@ fn sdHexagon(p: vec2f) -> f32 {
     case 5u: { d = min(abs(sdHexagon(p)) - stroke, sdSquare(p * 5.0)); } // hexagon + dot
     case 6u: { d = sdCircle(p, 0.35); }                             // dot
     case 7u: { d = abs(sdCircle(p, 0.85)) - stroke; }               // ring
-    case 9u: { d = abs(sdCircle(p, 1.0)) - cssPx; }                 // ring at the marker's radius, 2 CSS px
     default: { d = abs(sdSquare(p)) - stroke; }                     // hollow square
   }
   let aa = fwidth(d);
