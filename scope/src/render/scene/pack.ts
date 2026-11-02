@@ -41,9 +41,7 @@ export function parseColor(hex: string): Rgba {
 
 /** Writes `values` from `at`: for a few values `TypedArray.set` is much the slower. */
 function writeAll(into: Float32Array, at: number, values: readonly number[]): void {
-  values.forEach((value, i) => {
-    into[at + i] = value;
-  });
+  for (let i = 0; i < values.length; i++) into[at + i] = values[i] ?? 0;
 }
 
 /** Growable Float32Array of fixed-stride instances. */

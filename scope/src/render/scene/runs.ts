@@ -18,8 +18,8 @@ function placeIn(span: LineSpan, { from }: Stretch): SpanPlace | undefined {
   const { cutBack, cutAhead, line } = span;
   if (cutBack === 0 && cutAhead === 0) return undefined;
   const start = line.reach[span.from] ?? 0;
-  const [back, end] = [line.reach[from] ?? 0, line.reach[span.to] ?? 0];
-  return { back: back - start, length: end - start, cutBack, cutAhead };
+  const back = (line.reach[from] ?? 0) - start;
+  return { back, length: (line.reach[span.to] ?? 0) - start, cutBack, cutAhead };
 }
 
 /**
@@ -41,7 +41,8 @@ export function drawRuns<S extends LineSpan>(
       for (const run of runsOf(path, owners, span)) {
         // One stretch of the line: the dash runs on across its vertices.
         const { points, at } = span.line;
-        const [from, to] = [at[run.from] ?? 0, at[run.to] ?? 0];
+        const from = at[run.from] ?? 0;
+        const to = at[run.to] ?? 0;
         lines.stretch(points, from, to, style.color, look, placeIn(span, run));
       }
     }
