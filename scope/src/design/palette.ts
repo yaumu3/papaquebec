@@ -42,4 +42,6 @@ export const CHART_COLORS = {
   ringEdge: '#606060',
   ringLabel: '#555555',
   hoverFaint: `${PALETTE.hover}80`,
+  pointHover: '#e0e0e0',
+  pointHoverFaint: '#e0e0e080',
 } as const;

@@ -1,6 +1,6 @@
 /** The label to light up for the item the tree points at, drawn or not. */
 
-import { PALETTE } from '../../design/palette';
+import { CHART_COLORS, PALETTE } from '../../design/palette';
 import type { ChartItem } from '../../lib/chart';
 import { isPointStyle, isProcedureLayer, LAYER_TABLE } from '../../lib/layers';
 import { isPointLayer, isRouteLayer } from '../../lib/mapsetFormat';
@@ -48,15 +48,15 @@ function putPointLabels(
   const { style } = LAYER_TABLE[layer];
   if (!isPointStyle(style)) return;
   for (const point of topology.points.filter((p) => p.key === key)) {
-    putPointLabel(text, placedPoint(point, project), style.label, PALETTE.hover);
+    putPointLabel(text, placedPoint(point, project), style.label, CHART_COLORS.pointHover);
   }
 }
 
 /**
- * The batches that light an item's label in the hover grey: gaps, then text, then segments. A
- * route's label is the chart's, by span; a point's is its ident as the chart would place it. An
- * area's says what DENSE says at any density: on the name the chart drew, else centred on its
- * place, with no room test and no density gate.
+ * The batches that light an item's label: gaps, then text, then segments, in the hover grey and
+ * a point's brighter. A route's label is the chart's, by span; a point's is its ident as the chart
+ * would place it. An area's says what DENSE says at any density: on the name the chart drew, else
+ * centred on its place, with no room test and no density gate.
  */
 export function buildHighlight(item: ChartItem, input: HighlightInput): [Batch, Batch, Batch] {
   const out = {

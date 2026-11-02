@@ -21,14 +21,21 @@ interface TracesInput {
 
 const TRACE_WIDTH_PX = 2;
 
+/** The colours of one strength of trace: a point's stands out from the chart's greys. */
+type TraceColors = Record<'line' | 'point', string>;
+
+const POINTED = { line: PALETTE.hover, point: CHART_COLORS.pointHover };
+const NAMED = { line: CHART_COLORS.hoverFaint, point: CHART_COLORS.pointHoverFaint };
+
 /** What tracing an item reads besides the item. */
 type Tracing = Pick<TracesInput, 'project' | 'declinationAt'>;
 
 /** One trace of `items`: the lines of routes and areas, and the strokes and markers of points. */
-function trace(items: readonly ChartItem[], color: string, tracing: Tracing) {
+function trace(items: readonly ChartItem[], colors: TraceColors, tracing: Tracing) {
   const lines = new LineBatch(1);
   const symbols = { lines: new LineBatch(1), markers: new MarkerBatch(1) };
   for (const { layer, parts } of items) {
+    const color = isPointLayer(layer) ? colors.point : colors.line;
     for (const part of parts) {
       putPart(layer, part, color, { ...tracing, traceWidth: TRACE_WIDTH_PX }, { lines, symbols });
     }
@@ -47,8 +54,8 @@ function trace(items: readonly ChartItem[], color: string, tracing: Tracing) {
  * and the highlight of a point, over the chart's own. The search gets no label.
  */
 export function buildTraces({ pointedAt, searched, highlight, ...tracing }: TracesInput): Slots {
-  const named = trace(searched, CHART_COLORS.hoverFaint, tracing);
-  const pointed = trace(pointedAt ? [pointedAt] : [], PALETTE.hover, tracing);
+  const named = trace(searched, NAMED, tracing);
+  const pointed = trace(pointedAt ? [pointedAt] : [], POINTED, tracing);
   const lit = pointedAt && isPointLayer(pointedAt.layer);
   return {
     traces: [named.lines, pointed.lines, ...(lit ? [] : highlight)],

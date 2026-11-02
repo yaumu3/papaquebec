@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PALETTE } from '../../design/palette';
+import { CHART_COLORS, PALETTE } from '../../design/palette';
 import { type Chart, type ChartItem, chartOf, itemName } from '../../lib/chart';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
@@ -29,6 +29,7 @@ const stopped = [airway('conv', 'V901', [0, 0], [8, 0], [10, 0]), stopAt('navaid
 const shared = [airway('conv', 'V901', [0, 0], [2, 0]), airway('rnav', 'Y902', [0, 0], [2, 0])];
 
 const grey = packed(PALETTE.hover);
+const bright = packed(CHART_COLORS.pointHover);
 const rnavLabel = packed('#4a8090');
 
 /** How many glyphs of a text batch are in `color`. */
@@ -85,7 +86,7 @@ describe('the highlight of an area or a point', () => {
     );
   });
 
-  it('redraws the ident of a drawn point as the chart drew it, in the hover grey', () => {
+  it('redraws the ident of a drawn point as the chart drew it, brighter than the hover grey', () => {
     // Arrange
     const scene = sceneOf(fix);
     const { text } = scene.pointLabels();
@@ -96,7 +97,7 @@ describe('the highlight of an area or a point', () => {
     // Assert
     expect(lit.text.count).toBeGreaterThan(0);
     expect(withoutColor(glyphs(lit.text))).toEqual(withoutColor(glyphs(text)));
-    expect(glyphs(lit.text).map((g) => g.color)).toEqual(glyphs(lit.text).map(() => grey));
+    expect(glyphs(lit.text).map((g) => g.color)).toEqual(glyphs(lit.text).map(() => bright));
   });
 
   it('names a sector below the density that labels sectors, at its place', () => {

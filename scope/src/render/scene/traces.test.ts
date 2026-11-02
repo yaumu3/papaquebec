@@ -29,6 +29,8 @@ const shapeOf = ({ at, size, shape }: ReturnType<typeof markers>[number]) => ({ 
 
 const grey = packed(PALETTE.hover);
 const faint = packed(CHART_COLORS.hoverFaint);
+const bright = packed(CHART_COLORS.pointHover);
+const brightFaint = packed(CHART_COLORS.pointHoverFaint);
 
 const area = (...parts: ReturnType<typeof line>[]) =>
   itemOf('tma', ...parts.map((geometry) => partOf('tma', geometry)));
@@ -74,7 +76,7 @@ describe('the traces', () => {
     expect(segments(pointed.lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  it('draws a point as the chart draws it, one for each part, in the hover grey', () => {
+  it('draws a point as the chart draws it, one for each part, brighter than the hover grey', () => {
     // Arrange
     const layers = ['ad', 'fix', 'vfr'] as const;
     const items = layers.map((layer) =>
@@ -90,7 +92,7 @@ describe('the traces', () => {
       chartMarkers.map((rows) => rows.map(shapeOf)),
     );
     expect(traced.flatMap((batch) => markers(batch).map((m) => m.color))).toEqual(
-      traced.flatMap((batch) => markers(batch).map(() => grey)),
+      traced.flatMap((batch) => markers(batch).map(() => bright)),
     );
   });
 
@@ -166,8 +168,9 @@ describe('the traces', () => {
     expect(drawn.map((x) => x.color)).toEqual(drawn.map(() => faint));
     expect(drawn.map((x) => [x.width, x.pattern])).toEqual(drawn.map(() => [2, [0, 0, 0, 0]]));
     expect(markers(found.markers).map(shapeOf)).toEqual(chartMarkers.map(shapeOf));
-    expect(markers(found.markers).map((m) => m.color)).toEqual([faint]);
+    expect(markers(found.markers).map((m) => m.color)).toEqual([brightFaint]);
     expect(faint[3]).toBeCloseTo(128 / 255, 2);
+    expect(brightFaint[3]).toBeCloseTo(128 / 255, 2);
   });
 
   it('draws a hold the search names as its racetrack at half strength', () => {
@@ -193,9 +196,9 @@ describe('the traces', () => {
 
     // Assert
     expect(segments(searched.lines)).toHaveLength(1);
-    expect(markers(searched.markers).map((m) => m.color)).toEqual([faint]);
+    expect(markers(searched.markers).map((m) => m.color)).toEqual([brightFaint]);
     expect(pointed.lines.count).toBe(0);
-    expect(markers(pointed.markers).map((m) => m.color)).toEqual([grey]);
+    expect(markers(pointed.markers).map((m) => m.color)).toEqual([bright]);
   });
 
   it('gives only empty batches when nothing is searched or pointed at', () => {
