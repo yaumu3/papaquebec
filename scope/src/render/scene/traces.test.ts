@@ -224,7 +224,7 @@ describe('the traces', () => {
     // Assert
     expect(litTraces.map((b) => b.kind)).toEqual(['lines', 'text', 'lines']);
     expect(litTraces.filter((b) => b.kind === 'text').map(spelled)).toEqual(['V901']);
-    expect(litPoints).toHaveLength(0);
+    expect(litPoints.map((b) => b.count)).toEqual([0, 0, 0]);
   });
 
   it("puts a point's highlight among the traced points, and none in the traces", () => {
@@ -235,8 +235,8 @@ describe('the traces', () => {
     const { litTraces, litPoints } = tracesOf({ pointedAt, searched: [] });
 
     // Assert
-    expect(litPoints.map((b) => b.kind)).toEqual(['lines', 'text', 'lines']);
+    expect(litPoints.map((b) => b.kind)).toEqual(['lines', 'markers', 'text']);
     expect(litPoints.filter((b) => b.kind === 'text').map(spelled)).toEqual(['Q']);
-    expect(litTraces).toHaveLength(0);
+    expect(litTraces.map((b) => b.count)).toEqual([0, 0, 0]);
   });
 });

@@ -7,7 +7,7 @@ import { isPointLayer, isRouteLayer } from '../../lib/mapsetFormat';
 import type { Batch } from '../protocol';
 import { putAreaLabel } from './areaLabels';
 import { type LabelsInput, placedPoint, type PlaceInput, putPointLabel } from './chart';
-import { type Anchor, LineBatch, TextBatch } from './pack';
+import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { itemLabels, putLabel, type RouteLabelOut, type SpanLabel } from './spanDesignators';
 
 /** What the highlight reads: the chart as the scene holds it, and where its labels went. */
@@ -18,6 +18,14 @@ type HighlightInput = Pick<LabelsInput, 'topology' | 'project' | 'routeSpans' | 
     /** Where the chart drew each area item's name. */
     areaNames: ReadonlyMap<string, Anchor>;
   };
+
+/** What lights an item, a slot's worth each. */
+export interface Highlight {
+  /** A route's or an area's label, under the chart's points: gaps, text, then segments. */
+  label: [Batch, Batch, Batch];
+  /** The points lit, over the chart's own: the strokes and markers of symbols, then idents. */
+  points: [Batch, Batch, Batch];
+}
 
 /** The labels a procedure is lit on: those its chart label lists, else its first span's. */
 function namedOnce(labels: SpanLabel[], key: string, spanLabels: HighlightInput['spanLabels']) {
@@ -53,19 +61,23 @@ function putPointLabels(
 }
 
 /**
- * The batches that light an item's label: gaps, then text, then segments, in the hover grey and
- * a point's brighter. A route's label is the chart's, by span; a point's is its ident as the chart
+ * The batches that light an item's label, in the hover grey and a point's brighter. A route's label is the chart's, by span; a point's is its ident as the chart
  * would place it. An area's says what DENSE says at any density: on the name the chart drew, else
  * centred on its place, with no room test and no density gate.
  */
-export function buildHighlight(item: ChartItem, input: HighlightInput): [Batch, Batch, Batch] {
+export function buildHighlight(item: ChartItem, input: HighlightInput): Highlight {
   const out = {
     gaps: new LineBatch(1),
     text: new TextBatch(input.atlas, 1),
     strokes: new LineBatch(1),
   };
+  const symbols = { lines: new LineBatch(1), markers: new MarkerBatch(1) };
+  const idents = new TextBatch(input.atlas, 1);
   if (isRouteLayer(item.layer)) putRouteLabels(item, input, out);
-  else if (isPointLayer(item.layer)) putPointLabels(item, input, out.text);
+  else if (isPointLayer(item.layer)) putPointLabels(item, input, idents);
   else putAreaLabel(item, input.areaNames.get(item.key), input.placeOf, out, PALETTE.hover);
-  return [out.gaps.finish(), out.text.finish(), out.strokes.finish()];
+  return {
+    label: [out.gaps.finish(), out.text.finish(), out.strokes.finish()],
+    points: [symbols.lines.finish(), symbols.markers.finish(), idents.finish()],
+  };
 }

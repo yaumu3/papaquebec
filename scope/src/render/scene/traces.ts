@@ -3,9 +3,9 @@ import type { ChartItem } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
 import { isPointLayer } from '../../lib/mapsetFormat';
 import type { Declination } from '../../lib/wmm';
-import type { Batch } from '../protocol';
 import type { Slots } from '../slots';
 import { putPart } from './figures';
+import type { Highlight } from './highlight';
 import { LineBatch, MarkerBatch } from './pack';
 
 interface TracesInput {
@@ -13,8 +13,8 @@ interface TracesInput {
   pointedAt: ChartItem | null;
   /** The items the search names on their own rows. */
   searched: readonly ChartItem[];
-  /** The pointed item's label lit, ready to draw over its trace. */
-  highlight: readonly Batch[];
+  /** What lights the pointed item, ready to draw over its trace. */
+  highlight: Highlight | null;
   project: ProjectFn;
   declinationAt: () => Declination;
 }
@@ -49,22 +49,21 @@ function trace(items: readonly ChartItem[], colors: TraceColors, tracing: Tracin
 
 /**
  * What the search names at half strength, then what the tree points at over it at full strength,
- * and over that the highlight of its label, in two slots. The traces hold the lines and the
- * highlight of a route or an area, under the chart's points; the traced points hold the symbols
- * and the highlight of a point, over the chart's own. The search gets no label.
+ * and over that its highlight, in two slots. The traces hold the lines and the lit label of a
+ * route or an area, under the chart's points; the traced points hold the symbols and the lit
+ * points, over the chart's own. The search gets no label.
  */
 export function buildTraces({ pointedAt, searched, highlight, ...tracing }: TracesInput): Slots {
   const named = trace(searched, NAMED, tracing);
   const pointed = trace(pointedAt ? [pointedAt] : [], POINTED, tracing);
-  const lit = pointedAt && isPointLayer(pointedAt.layer);
   return {
-    traces: [named.lines, pointed.lines, ...(lit ? [] : highlight)],
+    traces: [named.lines, pointed.lines, ...(highlight?.label ?? [])],
     tracedPoints: [
       named.strokes,
       named.markers,
       pointed.strokes,
       pointed.markers,
-      ...(lit ? highlight : []),
+      ...(highlight?.points ?? []),
     ],
   };
 }

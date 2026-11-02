@@ -56,16 +56,16 @@ describe('the highlight of an area or a point', () => {
 
     // Act
     const lit = [
-      areaScene.highlight(itemKeyed(example, papaqKey)),
-      pointScene.highlight(itemKeyed(fix, 'F1')),
+      areaScene.highlight(itemKeyed(example, papaqKey)).text,
+      pointScene.highlight(itemKeyed(fix, 'F1')).points.idents,
     ];
 
     // Assert
-    expect(lit.map((l) => withoutColor(glyphs(l.text)))).toEqual([
+    expect(lit.map((text) => withoutColor(glyphs(text)))).toEqual([
       withoutColor(glyphs(shownArea.text)),
       withoutColor(glyphs(shownPoint.text)),
     ]);
-    expect(lit.map((l) => l.text.count > 0)).toEqual([true, true]);
+    expect(lit.map((text) => text.count > 0)).toEqual([true, true]);
   });
 
   it('redraws the text and the rule of a drawn area as the chart drew them, in the hover grey', () => {
@@ -92,12 +92,12 @@ describe('the highlight of an area or a point', () => {
     const { text } = scene.pointLabels();
 
     // Act
-    const lit = scene.highlight(itemKeyed(fix, 'F1'));
+    const { idents } = scene.highlight(itemKeyed(fix, 'F1')).points;
 
     // Assert
-    expect(lit.text.count).toBeGreaterThan(0);
-    expect(withoutColor(glyphs(lit.text))).toEqual(withoutColor(glyphs(text)));
-    expect(glyphs(lit.text).map((g) => g.color)).toEqual(glyphs(lit.text).map(() => bright));
+    expect(idents.count).toBeGreaterThan(0);
+    expect(withoutColor(glyphs(idents))).toEqual(withoutColor(glyphs(text)));
+    expect(glyphs(idents).map((g) => g.color)).toEqual(glyphs(idents).map(() => bright));
   });
 
   it('names a sector below the density that labels sectors, at its place', () => {

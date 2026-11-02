@@ -123,7 +123,7 @@ export function mountScene(canvas: HTMLCanvasElement, view: () => View): void {
       ? buildTraces({
           pointedAt: pointed,
           searched: searchedItems(),
-          highlight: pointed ? pointedHighlight(pointed) : [],
+          highlight: pointed ? pointedHighlight(pointed) : null,
           project: projectNm,
           declinationAt,
         })

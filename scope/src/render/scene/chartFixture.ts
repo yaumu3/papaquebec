@@ -359,9 +359,8 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
     return { lines, markers: marks };
   };
 
-  /** The batches that light an item's label: gaps, text, then segments. */
-  const highlight = (item: ChartItem) => {
-    const [gaps, text, strokes] = buildHighlight(item, {
+  const litBatches = (item: ChartItem) =>
+    buildHighlight(item, {
       spanLabels: labelsOf(labelled('routeLabels')).spanLabels ?? new Map(),
       areaNames: labelsOf(sliceOf(item.layer)).areaNames ?? new Map(),
       topology,
@@ -370,7 +369,18 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
       atlas,
       placeOf,
     });
-    return { gaps, text, strokes };
+
+  /** What lights an item: its label, and the symbols and idents of the points lit. */
+  const highlight = (item: ChartItem) => {
+    const { label, points } = litBatches(item);
+    const [gaps, text, strokes] = label;
+    const [symbolStrokes, symbolMarkers, idents] = points;
+    return {
+      gaps,
+      text,
+      strokes,
+      points: { strokes: symbolStrokes, markers: symbolMarkers, idents },
+    };
   };
 
   return {
@@ -416,11 +426,10 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
       pointedAt: ChartItem | null;
       searched: readonly ChartItem[];
     }) {
-      const lit = pointedAt ? highlight(pointedAt) : undefined;
       const { traces = [], tracedPoints = [] } = buildTraces({
         pointedAt,
         searched,
-        highlight: lit ? [lit.gaps, lit.text, lit.strokes] : [],
+        highlight: pointedAt ? litBatches(pointedAt) : null,
         project: plane,
         declinationAt,
       });

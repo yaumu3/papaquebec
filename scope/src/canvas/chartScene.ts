@@ -2,9 +2,9 @@ import { createMemo } from 'solid-js';
 
 import type { ChartItem } from '../lib/chart';
 import type { ShownMemory } from '../lib/fits';
-import type { AtlasInfo, Batch } from '../render/protocol';
+import type { AtlasInfo } from '../render/protocol';
 import { type BuiltLabels, buildShapes, CHART_SLICES, sliceOf } from '../render/scene/chart';
-import { buildHighlight } from '../render/scene/highlight';
+import { buildHighlight, type Highlight } from '../render/scene/highlight';
 import type { Slots } from '../render/slots';
 import { areaPlace, areaSpans, drawnItemsIn, drawnPoints, routeSpans } from '../state/drawn';
 import { declinationAt } from '../state/magnetic';
@@ -31,15 +31,15 @@ const inputOf = (layers: Parameters<typeof drawnItemsIn>[0]) => ({
  * only the labels read does not rebuild the lines. The route and area labels also follow the
  * settled scale, so a zoom that settles builds them again to test whether they still fit, and
  * they remember what they showed between builds. Each slice's labels are built once, in a memo;
- * the returned reader gives the batches that light an item's label, so a hover reads cached
- * state and never builds the labels.
+ * the returned reader gives the batches that light an item, so a hover reads cached state and
+ * never builds the labels.
  */
 export function showChart(
   show: Show,
   projected: () => boolean,
   settledScale: () => number,
   atlas: () => AtlasInfo | null,
-): (item: ChartItem) => Batch[] {
+): (item: ChartItem) => Highlight | null {
   const labels = new Map(
     CHART_SLICES.map((slice): [typeof slice, () => BuiltLabels | null] => {
       const shown: ShownMemory = new Map();
@@ -67,7 +67,7 @@ export function showChart(
   const labelsOf = (item: ChartItem) => labels.get(sliceOf(item.layer))?.();
   return (item) => {
     const info = atlas();
-    if (!info) return [];
+    if (!info) return null;
     return buildHighlight(item, {
       spanLabels: labels.get(sliceOf('conv'))?.()?.spanLabels ?? new Map(),
       areaNames: labelsOf(item)?.areaNames ?? new Map(),
