@@ -80,7 +80,7 @@ type VertexOf = (at: LonLat) => number;
 /** Gives one vertex number to every identity. */
 function vertexNumbering(): VertexOf {
   const numbers = new Map<number, number>();
-  return ([lon, lat]: LonLat) => numberOf(numbers, toGrid(lon) * IDENTITY_KEY_BASE + toGrid(lat));
+  return (at: LonLat) => numberOf(numbers, toGrid(at[0]) * IDENTITY_KEY_BASE + toGrid(at[1]));
 }
 
 /** An outline's positions and their vertices, without a position at its neighbour's identity. */

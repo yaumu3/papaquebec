@@ -11,8 +11,7 @@ import {
 } from '../../lib/layers';
 import { isChartLayer, type Layer } from '../../lib/mapsetFormat';
 import type { AreaPlace } from '../../lib/pole';
-import { pathSpans, type SpansOf } from '../../lib/routeSpans';
-import { NO_CUTS } from '../../lib/stops';
+import type { LineSpan, SpansOf } from '../../lib/routeSpans';
 import type { ChartPoint, Topology } from '../../lib/topology';
 import type { Declination } from '../../lib/wmm';
 import type { AtlasInfo, Batch } from '../protocol';
@@ -28,6 +27,8 @@ interface ShapesInput {
   /** The points that draw; read only for a point layer among `layers`. */
   drawnPoints: () => readonly ChartPoint[];
   project: ProjectFn;
+  /** The spans of the areas, which no point stops. */
+  areaSpans: SpansOf<LineSpan>;
   /** The spans of the routes; reading a drawn route's follows the points that stop it. */
   routeSpans: SpansOf;
   /** The slice's layers, front first, as in the draw stack. */
@@ -162,14 +163,14 @@ function holdColor({ properties }: ItemPart): string {
 /** The chart's lines and point markers of a slice, each back to front through the stack. */
 export function buildShapes(
   { shapes }: Slice,
-  { topology, drawnPoints, project, routeSpans, layers, drawnItems }: ShapesInput,
+  { topology, drawnPoints, project, areaSpans, routeSpans, layers, drawnItems }: ShapesInput,
   declinationAt: () => Declination,
 ): Slots {
   const lines = new LineBatch();
   const markers = new MarkerBatch();
   const symbols = { lines, markers };
   const drawn = partsOf(drawnItems);
-  drawRuns(topology.areas, drawn, pathSpans(NO_CUTS, project), lines);
+  drawRuns(topology.areas, drawn, areaSpans, lines);
   for (const { layer, parts } of drawnItems.filter((item) => item.layer === 'hold')) {
     for (const part of parts) {
       putPart(layer, part, holdColor(part), { project, declinationAt }, { lines, symbols });

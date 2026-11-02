@@ -7,6 +7,7 @@ import type { Layer, ScopeLayer } from './mapsetFormat';
 import { topologyOf } from './topology';
 import {
   afterDot,
+  FIRST_ROWS,
   groupCount,
   itemsIn,
   type LayerLeaves,
@@ -15,6 +16,7 @@ import {
   markedPieces,
   matches,
   type RowState,
+  rowsNow,
   rowStateOf,
   searchTree,
   type StateOf,
@@ -590,5 +592,20 @@ describe('searchTree', () => {
 
     // Assert
     expect(results).toEqual(rows.map(([, expected]) => expected));
+  });
+});
+
+describe('rowsNow', () => {
+  const keys = Array.from({ length: 40 }, (_, i) => `K${i}`);
+
+  it('holds back the rows past the view until the list has drawn', () => {
+    // Arrange
+    const states = [false, true];
+
+    // Act
+    const counts = states.map((drawn) => rowsNow(keys, drawn).length);
+
+    // Assert
+    expect(counts).toEqual([FIRST_ROWS, keys.length]);
   });
 });

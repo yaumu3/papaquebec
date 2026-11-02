@@ -2,10 +2,11 @@ import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show }
 
 import { isMouse } from '../../canvas/input/devices/mouse';
 import { cx } from '../../design/cx';
+import { afterFrame } from '../../lib/afterFrame';
 import { itemKind } from '../../lib/chart';
 import { LAYER_TABLE } from '../../lib/layers';
 import type { ScopeLayer } from '../../lib/mapsetFormat';
-import { itemsIn, type TreeItem } from '../../lib/tree';
+import { itemsIn, rowsNow, type TreeItem } from '../../lib/tree';
 import { isItemShown, type LayerState } from '../../lib/visibility';
 import { layerState } from '../../state/drawn';
 import {
@@ -83,18 +84,26 @@ export function ItemList(props: { layer: ScopeLayer }) {
   const byKey = createMemo(
     () => new Map(itemsIn(treeItems(), props.layer).map((item) => [item.key, item])),
   );
-  const keys = createMemo(() => listedItems(props.layer).map((item) => item.key));
+  const [drawn, setDrawn] = createSignal(false);
+  const keys = createMemo(() =>
+    rowsNow(
+      listedItems(props.layer).map((item) => item.key),
+      drawn(),
+    ),
+  );
   const [more, setMore] = createSignal(false);
   let list: HTMLDivElement | undefined;
   const measure = () => {
     if (list) setMore(scrollView(list.scrollTop, list.clientHeight, list.scrollHeight).cutBottom);
   };
-  // The rows have changed by the time this runs; a hidden list has no size and fades nothing.
+  // At the frame: read here it would lay out every list's rows once more, for each list.
+  // A hidden list has no size and fades nothing.
   createEffect(() => {
     keys();
-    measure();
+    requestAnimationFrame(measure);
   });
   onMount(() => {
+    void afterFrame().then(() => setDrawn(true));
     if (!list) return;
     const observer = new ResizeObserver(measure);
     observer.observe(list);

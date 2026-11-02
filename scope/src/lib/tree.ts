@@ -77,6 +77,13 @@ export function treeItemsOf({ chart, points }: Topology): TreeItems {
   return new Map([...layers].map(([layer, items]) => [layer, items.toSorted(byNameThenTag)]));
 }
 
+/** The rows a list puts down at once: its eight in view and as many past them. */
+export const FIRST_ROWS = 16;
+
+/** The rows of a list: until it has drawn, those that can be seen. */
+export const rowsNow = (keys: readonly string[], drawn: boolean): readonly string[] =>
+  drawn ? keys : keys.slice(0, FIRST_ROWS);
+
 export type RowState = 'on' | 'off' | 'mixed';
 
 /**

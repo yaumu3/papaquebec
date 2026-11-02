@@ -61,17 +61,31 @@ function sphericalMidpoint(a: GeoPoint, b: GeoPoint): GeoPoint {
 function offLine(p: Vec2, a: Vec2, b: Vec2): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const len = Math.hypot(dx, dy);
+  const len = Math.sqrt(dx * dx + dy * dy);
   return len === 0 ? 0 : Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
 }
 
 /**
- * A line through `points` projected so it follows the geodesics between them. An edge whose
- * straight chord would bow more than `tolerance` (in plane units) from its geodesic is split
- * along it; the bow shrinks with the square of the pieces, so a few suffice. The bow is judged
- * from the spherical midpoint, cheap enough for every edge of the map; the pieces come from the
- * ellipsoid.
+ * The points an edge from `a` to `b`, at `pa` and `pb` on the plane, needs between its ends to
+ * follow its geodesic. An edge whose straight chord would bow more than `tolerance` (in plane
+ * units) from its geodesic is split along it; the bow shrinks with the square of the pieces, so a
+ * few suffice. The bow is judged from the spherical midpoint, cheap enough for every edge of the
+ * map; the pieces come from the ellipsoid.
  */
+export function pointsBetween(
+  a: GeoPoint,
+  pa: Vec2,
+  b: GeoPoint,
+  pb: Vec2,
+  project: ProjectFn,
+  tolerance = PATH_TOLERANCE_NM,
+): Vec2[] {
+  const m = sphericalMidpoint(a, b);
+  const bow = offLine(project(m.lat, m.lon), pa, pb);
+  return bow > tolerance ? inBetween(a, b, Math.ceil(Math.sqrt(bow / tolerance)), project) : [];
+}
+
+/** A line through `points` projected so it follows the geodesics between them. */
 export function geodesicPath(
   points: readonly GeoPoint[],
   project: ProjectFn,
@@ -84,11 +98,7 @@ export function geodesicPath(
   const path = [pa];
   for (const b of rest) {
     const pb = project(b.lat, b.lon);
-    const m = sphericalMidpoint(a, b);
-    const bow = offLine(project(m.lat, m.lon), pa, pb);
-    if (bow > tolerance)
-      path.push(...inBetween(a, b, Math.ceil(Math.sqrt(bow / tolerance)), project));
-    path.push(pb);
+    path.push(...pointsBetween(a, pa, b, pb, project, tolerance), pb);
     a = b;
     pa = pb;
   }

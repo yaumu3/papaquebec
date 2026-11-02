@@ -67,6 +67,16 @@ function spyStore(initial: StoredMapSet[] = [], refusing = false) {
   return { store, records, writes };
 }
 
+/** A draw that finishes when the test says. */
+function heldDraw() {
+  let finish: (() => void) | undefined;
+  const afterDraw = () =>
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+  return { afterDraw, finishDraw: () => finish?.() };
+}
+
 /** The list of disabled sets, as the settings hold it. */
 function flagsOf(initial: readonly string[] = []) {
   let list = initial;
@@ -84,6 +94,31 @@ const created = (spy = spyStore(), storage = memoryStorage(), flags = flagsOf())
   flags,
   sets: createMapSets(flags, storage, Promise.resolve(spy.store), ticking()),
 });
+/** Sets whose first draw finishes when the test says. */
+function withHeldDraw(spy = spyStore()) {
+  const { afterDraw, finishDraw } = heldDraw();
+  const opening = Promise.resolve(spy.store);
+  const sets = createMapSets(flagsOf(), memoryStorage(), opening, ticking(), afterDraw);
+  return { ...spy, sets, finishDraw };
+}
+/** Sets that hold each import's task for the test to run. */
+function withHeldTask(spy = spyStore()) {
+  const tasks: (() => void)[] = [];
+  const sets = createMapSets(
+    flagsOf(),
+    memoryStorage(),
+    Promise.resolve(spy.store),
+    ticking(),
+    () => Promise.resolve(),
+    (task) => tasks.push(task),
+  );
+  return { sets, tasks };
+}
+/** Lets a held draw finish, and every write it holds up run. */
+async function writesAfter(finishDraw: () => void) {
+  finishDraw();
+  await Bun.sleep(0);
+}
 /** The ids of the points the chart holds on a layer. */
 const idsOf = (sets: ReturnType<typeof createMapSets>, layer: string) =>
   sets
@@ -292,6 +327,94 @@ describe('storage of imported sets', () => {
     expect(sets.isEnabled('my-fixes')).toBe(true);
   });
 
+  it('holds an import back from the store until the chart has drawn', async () => {
+    // Arrange
+    const { sets, writes } = withHeldDraw();
+    importing(sets, fixes);
+
+    // Act
+    await Bun.sleep(0);
+
+    // Assert
+    expect(writes).toEqual([]);
+  });
+
+  it('writes an import once the chart has drawn', async () => {
+    // Arrange
+    const { sets, writes, finishDraw } = withHeldDraw();
+    importing(sets, fixes);
+
+    // Act
+    await writesAfter(finishDraw);
+
+    // Assert
+    expect(writes).toEqual(['put my-fixes']);
+  });
+
+  it('holds an import back from the list until the task the pacing gives it', () => {
+    // Arrange
+    const { sets } = withHeldTask();
+
+    // Act
+    importing(sets, fixes);
+
+    // Assert
+    expect(sets.mapSets().map((s) => s.identity)).toEqual([BUILTIN_ID]);
+  });
+
+  it('adds an import in the task the pacing gives it', () => {
+    // Arrange
+    const { sets, tasks } = withHeldTask();
+    importing(sets, fixes);
+
+    // Act
+    tasks.forEach((task) => task());
+
+    // Assert
+    expect(sets.mapSets().map((s) => s.identity)).toEqual(['my-fixes', BUILTIN_ID]);
+  });
+
+  it('rejects what it kept when the chart fails to build in its task', async () => {
+    // Arrange
+    const spy = spyStore();
+    const refusing = {
+      disabled: () => ['my-fixes'],
+      setDisabled() {
+        throw new Error('no chart');
+      },
+    };
+    const sets = createMapSets(
+      refusing,
+      memoryStorage(),
+      Promise.resolve(spy.store),
+      ticking(),
+      () => Promise.resolve(),
+      (task) => setTimeout(task),
+    );
+
+    const out = importing(sets, fixes);
+
+    // Act
+    const failure = await Promise.resolve(out.ok ? out.kept : null).catch(String);
+
+    // Assert
+    expect(failure).toBe('Error: no chart');
+  });
+
+  it('removes a set imported a moment ago from the store as well', async () => {
+    // Arrange
+    const { sets, writes, records, finishDraw } = withHeldDraw();
+    importing(sets, fixes);
+    sets.removeMapSet('my-fixes');
+
+    // Act
+    await writesAfter(finishDraw);
+
+    // Assert
+    expect(writes).toEqual(['put my-fixes', 'delete my-fixes']);
+    expect([...records.keys()]).toEqual([]);
+  });
+
   it('deletes the one record to remove a set', async () => {
     // Arrange
     const { sets, writes, records } = created();
@@ -458,6 +581,7 @@ describe('importNote', () => {
       { ok: false as const, message: 'title: expected string' },
       { ok: true as const, kept: Promise.resolve(false) },
       { ok: true as const, kept: Promise.resolve(true) },
+      { ok: true as const, kept: Promise.reject(new Error('no chart')) },
     ];
 
     // Act
@@ -468,6 +592,7 @@ describe('importNote', () => {
       'title: expected string',
       'imported for this session only: browser storage is full',
       null,
+      'could not draw this set',
     ]);
   });
 });

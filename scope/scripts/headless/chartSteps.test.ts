@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
+import { chartOf } from '../../src/lib/chart';
 import { validateMapSet } from '../../src/lib/mapset';
 import { EXAMPLE } from '../../src/lib/mapsetCorpus';
+import type { RouteSpan } from '../../src/lib/routeSpans';
 import { chartSteps, timeOf } from './chartSteps';
 
 const SITE = { lat: 33.5859, lon: 130.4508 };
@@ -24,6 +26,8 @@ describe('chartSteps', () => {
     expect(names).toEqual([
       'merge',
       'topology',
+      'geodesics',
+      'route spans',
       'drawn items',
       'drawn points',
       'area places',
@@ -83,6 +87,43 @@ describe('chartSteps', () => {
     // Assert
     expect(sizes[1]).not.toContain(sizes[0]);
     expect(sizes[3]).not.toContain(sizes[2]);
+  });
+});
+
+const isSpan = (made: unknown): made is RouteSpan =>
+  typeof made === 'object' && made !== null && 'middle' in made;
+
+const middles = (made: unknown) =>
+  (Array.isArray(made) ? made.flat() : []).filter(isSpan).map((span) => span.middle);
+
+describe('the route spans step', () => {
+  it('measures every span anew on each run, as a first draw does', () => {
+    // Arrange
+    const step = chartSteps(exampleSet(), SITE, () => 0).find(({ name }) => name === 'route spans');
+
+    // Act
+    const [first, second] = [middles(step?.run()), middles(step?.run())];
+
+    // Assert
+    expect(first.length).toBeGreaterThan(0);
+    expect(second).toEqual(first);
+    expect(second[0]).not.toBe(first[0]);
+  });
+});
+
+describe('the area places step', () => {
+  it('places only the items whose layer is labelled at the density', () => {
+    // Arrange
+    const data = exampleSet();
+    const step = chartSteps(data, SITE, () => 0).find(({ name }) => name === 'area places');
+    const sectors = chartOf([data]).filter((item) => item.layer === 'sector');
+
+    // Act
+    const places = step?.run();
+
+    // Assert
+    expect(sectors.length).toBeGreaterThan(0);
+    expect(places).toHaveLength(sectors.length);
   });
 });
 

@@ -1,5 +1,7 @@
 /** What the load test's `--map`, `--layers` and `--density` ask for, read before a page opens. */
-import { readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { chartOf } from '../../src/lib/chart';
 import type { GeoPoint } from '../../src/lib/geo';
@@ -73,13 +75,18 @@ function mapFromFile(path: string): LoadedMap {
   return loaded(valid.data, path);
 }
 
+/**
+ * The set as a file on disk: given as bytes, Playwright decodes them in the page in one long task
+ * that ends as the import starts, and which the import's report would count as its own. Each load
+ * has a file of its own until the process exits: Playwright reads it long after this writes it.
+ */
 function syntheticMap(site: GeoPoint, scale: number): LoadedMap {
   const { data } = syntheticMapSet({ site, scale });
-  return loaded(data, {
-    name: 'synthetic.mapset.geojson',
-    mimeType: 'application/geo+json',
-    buffer: Buffer.from(JSON.stringify(data)),
-  });
+  const dir = mkdtempSync(join(tmpdir(), 'papaquebec-bench-'));
+  process.on('exit', () => rmSync(dir, { recursive: true, force: true }));
+  const path = join(dir, 'synthetic.mapset.geojson');
+  writeFileSync(path, JSON.stringify(data));
+  return loaded(data, path);
 }
 
 /** The map a run imports, sized on this side rather than read from the page. */

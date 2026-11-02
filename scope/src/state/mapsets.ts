@@ -1,6 +1,6 @@
-import type { Accessor } from 'solid-js';
-import { createStore, unwrap } from 'solid-js/store';
+import { type Accessor, createSignal } from 'solid-js';
 
+import { afterFrame } from '../lib/afterFrame';
 import { chartOf } from '../lib/chart';
 import { isRecord } from '../lib/guards';
 import { type MapSetData, setIdentity, validateMapSet } from '../lib/mapset';
@@ -18,7 +18,10 @@ export interface MapSet {
   imported: number;
 }
 
-/** `kept` settles false when the set draws this session but could not be stored for the next. */
+/**
+ * `kept` settles false when the set draws this session but could not be stored for the next, and
+ * rejects when its chart could not be built.
+ */
 export type ImportResult = { ok: true; kept: Promise<boolean> } | { ok: false; message: string };
 
 export interface MapSets {
@@ -87,6 +90,8 @@ export function createMapSets(
   storage: Storage | null,
   opening: Promise<MapSetStore>,
   now: () => number = Date.now,
+  afterDraw: () => Promise<void> = () => Promise.resolve(),
+  nextTask: (task: () => void) => void = (task) => task(),
 ): MapSets {
   const placeholder: MapSetData = {
     type: 'FeatureCollection',
@@ -94,16 +99,15 @@ export function createMapSets(
     title: 'openAIP',
     features: [],
   };
-  const [store, setStore] = createStore<{ sets: MapSet[] }>({
-    sets: [
-      {
-        identity: BUILTIN_ID,
-        data: placeholder,
-        builtin: true,
-        imported: 0,
-      },
-    ],
-  });
+  // A signal, not a store: a store would wrap and walk every coordinate of a set.
+  const [sets, setSets] = createSignal<MapSet[]>([
+    {
+      identity: BUILTIN_ID,
+      data: placeholder,
+      builtin: true,
+      imported: 0,
+    },
+  ]);
 
   const isEnabled = (identity: string) => !flags.disabled().includes(identity);
   /** Takes a set off the list; a set not on it changes nothing, so no reader runs again. */
@@ -114,18 +118,24 @@ export function createMapSets(
   const adoptOff = (identities: readonly string[]) =>
     flags.setDisabled([...new Set([...flags.disabled(), ...identities])]);
 
-  /** Read as plain data: a rebuild through store proxies tracks every coordinate. */
   const topology = byReference(
-    () => store.sets.filter((s) => isEnabled(s.identity)).map((s) => unwrap(s.data)),
+    () =>
+      sets()
+        .filter((s) => isEnabled(s.identity))
+        .map((s) => s.data),
     (data) => topologyOf(chartOf(data)),
   );
 
+  /** What every write waits for: writing clones a whole set, which would hold up its first draw. */
+  let drawing = Promise.resolve();
   /** Runs a write on the store once it is open; false when it cannot be opened or refuses. */
   const stored = (write: (open: MapSetStore) => Promise<void>): Promise<boolean> =>
-    opening.then(write).then(
-      () => true,
-      () => false,
-    );
+    Promise.all([opening, drawing])
+      .then(([open]) => write(open))
+      .then(
+        () => true,
+        () => false,
+      );
   const oldFlag = storage && readJson(storage, OLD_FLAG_KEY);
   if (isRecord(oldFlag) && oldFlag.builtinEnabled === false) adoptOff([BUILTIN_ID]);
 
@@ -134,10 +144,10 @@ export function createMapSets(
     .then((records) => {
       if (oldFlag) adoptOff(offInRecords(records));
       const loaded = records.map(setFrom).filter((s) => s !== null);
-      setStore('sets', (sets) =>
+      setSets((own) =>
         byPrecedence([
-          ...sets,
-          ...loaded.filter((s) => !sets.some((own) => own.identity === s.identity)),
+          ...own,
+          ...loaded.filter((s) => !own.some(({ identity }) => identity === s.identity)),
         ]),
       );
     })
@@ -145,13 +155,12 @@ export function createMapSets(
     .then(() => storage?.removeItem(OLD_FLAG_KEY));
 
   return {
-    mapSets: () => store.sets,
+    mapSets: sets,
     isEnabled,
     topology,
     hydrated,
     setBuiltinMapSet(data) {
-      // Assigned whole, since a value set at its `data` path would merge into the placeholder.
-      setStore('sets', (sets) => sets.map((set) => (set.builtin ? { ...set, data } : set)));
+      setSets((own) => own.map((set) => (set.builtin ? { ...set, data } : set)));
     },
     importMapSet(text) {
       let raw: unknown;
@@ -167,19 +176,30 @@ export function createMapSets(
       const { data } = valid;
       const imported = now();
       const set: MapSet = { identity, data, builtin: false, imported };
-      setStore('sets', (sets) => [set, ...sets.filter((s) => s.identity !== identity)]);
-      enable(identity);
-      return { ok: true, kept: stored((open) => open.put({ identity, imported, data })) };
+      // The chart builds in a task of its own, so the parse does not add to the page's longest.
+      const kept = new Promise<boolean>((settle, fail) => {
+        nextTask(() => {
+          try {
+            setSets((own) => [set, ...own.filter((s) => s.identity !== identity)]);
+            enable(identity);
+            drawing = afterDraw();
+            settle(stored((open) => open.put({ identity, imported, data })));
+          } catch (error) {
+            fail(error);
+          }
+        });
+      });
+      return { ok: true, kept };
     },
     toggleMapSet(identity) {
       if (isEnabled(identity)) flags.setDisabled([...flags.disabled(), identity]);
       else enable(identity);
     },
     removeMapSet(identity) {
-      if (store.sets.some((s) => s.identity === identity && !s.builtin)) {
+      if (sets().some((s) => s.identity === identity && !s.builtin)) {
         void stored((open) => open.delete(identity));
       }
-      setStore('sets', (sets) => sets.filter((s) => s.identity !== identity || s.builtin));
+      setSets((own) => own.filter((s) => s.identity !== identity || s.builtin));
       enable(identity);
     },
   };
@@ -188,7 +208,12 @@ export function createMapSets(
 /** What the Maps panel says after an import; null when there is nothing to say. */
 export async function importNote(result: ImportResult): Promise<string | null> {
   if (!result.ok) return result.message;
-  return (await result.kept) ? null : 'imported for this session only: browser storage is full';
+  try {
+    return (await result.kept) ? null : 'imported for this session only: browser storage is full';
+  } catch (error) {
+    console.warn('a map set failed to draw', error);
+    return 'could not draw this set';
+  }
 }
 
 /** Removing takes two clicks on the same control: the first arms it, the second acts. */
@@ -199,13 +224,16 @@ export function armRemoval(
   return armed === clicked ? { armed: null, remove: clicked } : { armed: clicked, remove: null };
 }
 
-const sets = createMapSets(
+const mapsets = createMapSets(
   {
     disabled: () => settings.disabledSets,
     setDisabled: (identities) => setSettings('disabledSets', [...identities]),
   },
   typeof localStorage === 'undefined' ? null : localStorage,
   openMapSetStore(globalThis.indexedDB),
+  Date.now,
+  afterFrame,
+  (task) => setTimeout(task),
 );
 export const {
   mapSets,
@@ -215,4 +243,4 @@ export const {
   importMapSet,
   toggleMapSet,
   removeMapSet,
-} = sets;
+} = mapsets;

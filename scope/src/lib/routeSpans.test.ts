@@ -3,7 +3,8 @@ import { describe, expect, it } from 'bun:test';
 import { line, partOf, project } from '../render/scene/chartFixture';
 import type { ProjectFn } from './geo';
 import { geodesicLine } from './geodesic';
-import { pathSpans } from './routeSpans';
+import { pathLines } from './pathLines';
+import { pathSpans, type RouteSpan, uncutSpans } from './routeSpans';
 import { NO_CUTS } from './stops';
 import { type ChartPath, topologyOf } from './topology';
 
@@ -22,9 +23,18 @@ const pathThrough = (...at: [number, number][]): ChartPath => {
   return path;
 };
 
-/** The edges of a span as one polyline. */
-const joined = (edges: readonly (readonly { x: number; y: number }[])[]) =>
-  edges.flatMap((edge, i) => (i === 0 ? edge : edge.slice(1)));
+/** The lines of a path alone. */
+const linesOf = (path: ChartPath, plane: ProjectFn) =>
+  pathLines({ paths: [path], edgeCount: Math.max(...path.edges) + 1 }, plane);
+
+/** The points of a span as one polyline. */
+function pointsOf({ line: { points, at }, from, to }: RouteSpan) {
+  const pairs: { x: number; y: number }[] = [];
+  for (let i = at[from] ?? 0; i <= (at[to] ?? 0); i += 2) {
+    pairs.push({ x: points[i] ?? NaN, y: points[i + 1] ?? NaN });
+  }
+  return pairs;
+}
 
 describe('pathSpans', () => {
   it('gives each edge the points one geodesic over the span gives it', () => {
@@ -37,23 +47,48 @@ describe('pathSpans', () => {
     const path = pathThrough(...at);
 
     // Act
-    const [span] = pathSpans(NO_CUTS, nm)(path);
+    const [span] = pathSpans(NO_CUTS, linesOf(path, nm))(path);
 
     // Assert
-    expect(joined(span?.edges ?? [])).toEqual(geodesicLine(at, nm));
-    expect(span?.edges.length).toBe(2);
+    expect(span && pointsOf(span)).toEqual(geodesicLine(at, nm));
   });
 
-  it('reaches each vertex by the length of the edges before it', () => {
+  it('measures a span by the length of its edges', () => {
     // Arrange
     const path = pathThrough([0, 0], [3, 0], [3, 4]);
 
     // Act
-    const [span] = pathSpans(NO_CUTS, project)(path);
+    const [span] = pathSpans(NO_CUTS, linesOf(path, project))(path);
 
     // Assert
-    expect(span?.reach).toEqual([0, 3, 7]);
     expect(span?.length).toBe(7);
+  });
+
+  it('keeps what it measured of a stretch for builds with other cuts at its ends', () => {
+    // Arrange
+    const path = pathThrough([0, 0], [3, 0], [3, 4]);
+    const lineOf = linesOf(path, project);
+    const [before] = pathSpans(NO_CUTS, lineOf)(path);
+    const stopped = new Map([[path.vertices[2] ?? -1, 7]]);
+
+    // Act
+    const [after] = pathSpans(stopped, lineOf)(path);
+
+    // Assert
+    expect(after?.cutAhead).toBe(7);
+    expect(before?.cutAhead).toBe(0);
+    expect(after?.middle).toBe(before?.middle);
+  });
+
+  it('keeps each path whole when nothing stops it', () => {
+    // Arrange
+    const path = pathThrough([0, 0], [3, 0], [3, 4]);
+
+    // Act
+    const spans = uncutSpans(linesOf(path, project))(path);
+
+    // Assert
+    expect(spans.map((s) => [s.from, s.to, s.cutBack, s.cutAhead])).toEqual([[0, 2, 0, 0]]);
   });
 
   it('splits a path at its stops, each span with its own cuts and reach', () => {
@@ -62,7 +97,7 @@ describe('pathSpans', () => {
     const cuts = new Map([[path.vertices[1] ?? -1, 7]]);
 
     // Act
-    const spans = pathSpans(cuts, project)(path);
+    const spans = pathSpans(cuts, linesOf(path, project))(path);
 
     // Assert
     expect(spans.map((s) => [s.from, s.to, s.cutBack, s.cutAhead, s.length])).toEqual([
@@ -77,7 +112,9 @@ describe('pathSpans', () => {
     const backwards = pathThrough([2, 0], [0, 0]);
 
     // Act
-    const spans = [forwards, backwards].map((path) => pathSpans(NO_CUTS, project)(path)[0]);
+    const spans = [forwards, backwards].map(
+      (path) => pathSpans(NO_CUTS, linesOf(path, project))(path)[0],
+    );
 
     // Assert
     expect(spans.map((s) => [s?.middle?.at, s?.middle?.flipped])).toEqual([
@@ -92,7 +129,9 @@ describe('pathSpans', () => {
     const backwards = pathThrough([2, 0], [0, 0]);
 
     // Act
-    const ids = [forwards, backwards].map((path) => pathSpans(NO_CUTS, project)(path)[0]?.id);
+    const ids = [forwards, backwards].map(
+      (path) => pathSpans(NO_CUTS, linesOf(path, project))(path)[0]?.id,
+    );
 
     // Assert
     expect(ids[0]).toBe(ids[1] ?? '');
@@ -101,7 +140,7 @@ describe('pathSpans', () => {
   it('walks a path once however often it is asked', () => {
     // Arrange
     const path = pathThrough([0, 0], [2, 0]);
-    const spansOf = pathSpans(NO_CUTS, project);
+    const spansOf = pathSpans(NO_CUTS, linesOf(path, project));
 
     // Act
     const [first, second] = [spansOf(path), spansOf(path)];

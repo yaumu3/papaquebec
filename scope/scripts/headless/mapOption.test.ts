@@ -75,8 +75,19 @@ describe('loadMap', () => {
     // Assert
     expect(map?.chart.title).toBe('Synthetic national set, N = 1');
     expect(map?.size.points).toBe(1490);
-    expect(map?.chart.file).toMatchObject({ name: 'synthetic.mapset.geojson' });
+    expect(map?.chart.file).toEndWith('/synthetic.mapset.geojson');
     expect(map?.searched).toBe('QAAAA');
+  });
+
+  it('gives each load a file of its own, so that runs cannot overwrite each other', () => {
+    // Arrange
+    const option = { from: 'synthetic', scale: 1 } as const;
+
+    // Act
+    const [first, second] = [loadMap(option, SITE), loadMap(option, SITE)];
+
+    // Assert
+    expect(first?.chart.file).not.toEqual(second?.chart.file ?? '');
   });
 
   it('reads a file by its path, and refuses one that does not parse', () => {

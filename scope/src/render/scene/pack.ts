@@ -39,6 +39,11 @@ export function parseColor(hex: string): Rgba {
   return rgba;
 }
 
+/** Writes `values` from `at`: for a few values `TypedArray.set` is much the slower. */
+function writeAll(into: Float32Array, at: number, values: readonly number[]): void {
+  for (let i = 0; i < values.length; i++) into[at + i] = values[i] ?? 0;
+}
+
 /** Growable Float32Array of fixed-stride instances. */
 class InstanceBuffer {
   private data: Float32Array;
@@ -125,9 +130,9 @@ export class LineBatch {
     d[at + 7] = b.py ?? 0;
     d[at + 8] = style.width ?? DEFAULT_LINE_WIDTH;
     d[at + 9] = along;
-    d.set(style.dash ?? [], at + 10);
-    d.set(parseColor(color), at + 14);
-    d.set(span, at + 18);
+    writeAll(d, at + 10, style.dash ?? []);
+    writeAll(d, at + 14, parseColor(color));
+    writeAll(d, at + 18, span);
   }
 
   polyline(
@@ -141,16 +146,49 @@ export class LineBatch {
       const a = points[i - 1];
       const b = points[i];
       if (!a || !b) continue;
-      const chord = chordOf(a, b);
-      const span = place && [
-        place.back + along,
-        place.length - place.back - along - chord,
-        place.cutBack,
-        place.cutAhead,
-      ];
-      this.segment(a, b, color, style, along, span);
-      along += chord;
+      along += this.link(a, b, color, style, along, place);
     }
+  }
+
+  /** `polyline` along x then y in `points`, from the x at `from` to the x at `to`. */
+  stretch(
+    points: ArrayLike<number>,
+    from: number,
+    to: number,
+    color: string,
+    style: LineStyle = {},
+    place?: SpanPlace,
+  ): void {
+    const a = { x: 0, y: 0 };
+    const b = { x: points[from] ?? 0, y: points[from + 1] ?? 0 };
+    let along = 0;
+    for (let i = from + 2; i <= to; i += 2) {
+      a.x = b.x;
+      a.y = b.y;
+      b.x = points[i] ?? 0;
+      b.y = points[i + 1] ?? 0;
+      along += this.link(a, b, color, style, along, place);
+    }
+  }
+
+  /** A polyline's segment `along` from its start, placed in its span; gives the segment's length. */
+  private link(
+    a: Anchor,
+    b: Anchor,
+    color: string,
+    style: LineStyle,
+    along: number,
+    place?: SpanPlace,
+  ): number {
+    const chord = chordOf(a, b);
+    const span = place && [
+      place.back + along,
+      place.length - place.back - along - chord,
+      place.cutBack,
+      place.cutAhead,
+    ];
+    this.segment(a, b, color, style, along, span);
+    return chord;
   }
 
   finish(): Batch {

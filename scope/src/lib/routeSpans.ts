@@ -1,57 +1,81 @@
 /** The drawn form of a path's spans, walked once: the lines, the labels and the highlight read it. */
 
 import { gridIdentity } from './chart';
-import type { ProjectFn, Vec2 } from './geo';
-import { geodesicLine } from './geodesic';
-import { lengthOf, type Midpoint, midpointOf, type Reading, readingAngle } from './polyline';
-import { type Cuts, type Span, spanIdentity, spansOf } from './stops';
+import type { Vec2 } from './geo';
+import type { LineOf, Measured, PathLine } from './pathLines';
+import { pointAlong, readingAngle } from './polyline';
+import { type Cuts, NO_CUTS, type Span, spanIdentity, spansOf } from './stops';
 import type { ChartPath } from './topology';
 
-/** A span of a path as the scope draws it. */
-export interface RouteSpan extends Span {
-  /** Shared by every path that runs this span, in either direction. */
-  id: string;
-  /** Each edge's geodesic on the plane, so a run can take any of them and stay one line. */
-  edges: readonly (readonly Vec2[])[];
-  /** The world distance from the span's start to each of its vertices. */
-  reach: readonly number[];
-  /** World length of the span. */
-  length: number;
-  /** The grid identity where the span starts on this path. */
-  start: string;
-  /** Half-way along, and how text reads there; none for a span with no length. */
-  middle?: Midpoint & Reading;
+/** A span of a path on the plane: all that drawing its runs reads. */
+export interface LineSpan extends Span {
+  /** Its path's line, so a run can take any stretch of it and stay one line. */
+  line: PathLine;
 }
 
-/** The spans of a path, walked the first time they are asked for. */
-export type SpansOf = (path: ChartPath) => readonly RouteSpan[];
+/** A span of a route, with what its label reads. */
+export type RouteSpan = LineSpan & Measured;
 
-function routeSpan(path: ChartPath, span: Span, project: ProjectFn): RouteSpan {
-  const edges = path.coordinates
-    .slice(span.from, span.to)
-    .map((at, i) => geodesicLine([at, path.coordinates[span.from + i + 1] ?? at], project));
-  const reach = [0];
-  for (const edge of edges) reach.push((reach.at(-1) ?? 0) + lengthOf(edge));
-  const middle = midpointOf(edges.flatMap((edge, i) => (i === 0 ? edge : edge.slice(1))));
+/** The spans of a path, walked the first time they are asked for. */
+export type SpansOf<S extends LineSpan = RouteSpan> = (path: ChartPath) => readonly S[];
+
+/** The points of the edge after vertex `i`. */
+function edgePoints({ points, at }: PathLine, i: number): Vec2[] {
+  const edge: Vec2[] = [];
+  for (let p = at[i] ?? 0; p <= (at[i + 1] ?? 0); p += 2) {
+    edge.push({ x: points[p] ?? 0, y: points[p + 1] ?? 0 });
+  }
+  return edge;
+}
+
+/** Half-way along a span of `length`; none for a span with no length. */
+function middleOf(line: PathLine, { from, to }: Span, length: number) {
+  const reachOf = (vertex: number) => (line.reach[vertex] ?? 0) - (line.reach[from] ?? 0);
+  if (length === 0) return undefined;
+  let edge = from;
+  while (edge + 1 < to && reachOf(edge + 1) <= length / 2) edge++;
+  return pointAlong(edgePoints(line, edge), length / 2 - reachOf(edge));
+}
+
+function measuredSpan(path: ChartPath, span: Span, line: PathLine): Measured {
+  const length = (line.reach[span.to] ?? 0) - (line.reach[span.from] ?? 0);
+  const middle = middleOf(line, span, length);
   return {
-    ...span,
     id: spanIdentity(path, span),
-    edges,
-    reach,
-    length: reach.at(-1) ?? 0,
+    length,
     start: gridIdentity(path.coordinates[span.from] ?? [0, 0]),
     ...(middle && { middle: { ...middle, ...readingAngle(middle.direction) } }),
   };
 }
 
-/** The spans of each path between the stops `cuts` names, kept once walked. */
-export function pathSpans(cuts: Cuts, project: ProjectFn): SpansOf {
-  const walked = new Map<ChartPath, readonly RouteSpan[]>();
+function routeSpan(path: ChartPath, span: Span, line: PathLine): RouteSpan {
+  const key = span.from * line.reach.length + span.to;
+  const known = line.measured.get(key);
+  if (known) return { ...span, ...known, line };
+  const measured = measuredSpan(path, span, line);
+  line.measured.set(key, measured);
+  return { ...span, ...measured, line };
+}
+
+/** Keeps each path's spans once made. */
+function keptSpans<S extends LineSpan>(make: (path: ChartPath) => readonly S[]): SpansOf<S> {
+  const walked = new Map<ChartPath, readonly S[]>();
   return (path) => {
     const known = walked.get(path);
     if (known) return known;
-    const spans = spansOf(path, cuts).map((span) => routeSpan(path, span, project));
+    const spans = make(path);
     walked.set(path, spans);
     return spans;
   };
 }
+
+/** The spans of each path between the stops `cuts` names, kept once walked. */
+export const pathSpans = (cuts: Cuts, lineOf: LineOf): SpansOf =>
+  keptSpans((path) => spansOf(path, cuts).map((span) => routeSpan(path, span, lineOf(path))));
+
+/** The spans of paths that nothing stops, as the areas are: each path whole. */
+export const uncutSpans = (lineOf: LineOf): SpansOf<LineSpan> =>
+  keptSpans((path) => {
+    const line = lineOf(path);
+    return spansOf(path, NO_CUTS).map((span) => Object.assign(span, { line }));
+  });

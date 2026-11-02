@@ -6,7 +6,7 @@ import type { AtlasInfo, Batch } from '../render/protocol';
 import { type BuiltLabels, buildShapes, CHART_SLICES, sliceOf } from '../render/scene/chart';
 import { buildHighlight } from '../render/scene/highlight';
 import type { Slots } from '../render/slots';
-import { areaPlace, drawnItemsIn, drawnPoints, routeSpans } from '../state/drawn';
+import { areaPlace, areaSpans, drawnItemsIn, drawnPoints, routeSpans } from '../state/drawn';
 import { declinationAt } from '../state/magnetic';
 import { topology } from '../state/mapsets';
 import { settings } from '../state/settings';
@@ -20,6 +20,7 @@ const inputOf = (layers: Parameters<typeof drawnItemsIn>[0]) => ({
   topology: topology(),
   drawnPoints,
   project: projectNm,
+  areaSpans,
   routeSpans,
   layers,
   drawnItems: drawnItemsIn(layers),

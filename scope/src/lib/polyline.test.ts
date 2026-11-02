@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import type { Vec2 } from './geo';
-import { lengthOf, midpointOf, readingAngle } from './polyline';
+import { lengthOf, midpointOf, pointAlong, readingAngle } from './polyline';
 
 describe('lengthOf', () => {
   it('sums the chords of a polyline', () => {
@@ -79,6 +79,22 @@ describe('midpointOf', () => {
   });
 });
 
+describe('pointAlong, past the end', () => {
+  it('gives the end of the last piece', () => {
+    // Arrange
+    const line = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+    ];
+
+    // Act
+    const point = pointAlong(line, 5);
+
+    // Assert
+    expect(point).toEqual({ at: { x: 2, y: 0 }, direction: { x: 1, y: 0 } });
+  });
+});
+
 describe('readingAngle', () => {
   it('turns a world direction to an upright screen angle, flipping what would read upside down', () => {
     // Arrange
@@ -98,5 +114,39 @@ describe('readingAngle', () => {
     // Assert
     expect(readings.map((r) => r.flipped)).toEqual(cases.map(([, , flipped]) => flipped));
     readings.forEach(({ angle }, i) => expect(angle).toBeCloseTo(cases[i]?.[1] ?? NaN, 12));
+  });
+});
+
+describe('pointAlong', () => {
+  const bend = [
+    { x: 0, y: 0 },
+    { x: 2, y: 0 },
+    { x: 2, y: 2 },
+  ];
+
+  it('finds the point at a distance, on the piece ahead at a vertex', () => {
+    // Arrange
+    const distances = [1, 2, 3];
+
+    // Act
+    const points = distances.map((distance) => pointAlong(bend, distance));
+
+    // Assert
+    expect(points).toEqual([
+      { at: { x: 1, y: 0 }, direction: { x: 1, y: 0 } },
+      { at: { x: 2, y: 0 }, direction: { x: 0, y: 1 } },
+      { at: { x: 2, y: 1 }, direction: { x: 0, y: 1 } },
+    ]);
+  });
+
+  it('stays on the last piece at the very end, where rounding may put a distance', () => {
+    // Arrange
+    const distance = 4;
+
+    // Act
+    const point = pointAlong(bend, distance);
+
+    // Assert
+    expect(point).toEqual({ at: { x: 2, y: 2 }, direction: { x: 0, y: 1 } });
   });
 });

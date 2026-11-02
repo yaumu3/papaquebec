@@ -8,8 +8,9 @@ import {
   type PointLayer,
   POINT_LAYERS,
 } from '../../lib/mapsetFormat';
+import { pathLines } from '../../lib/pathLines';
 import { type AreaPlace, areaPlaceOf } from '../../lib/pole';
-import { pathSpans, type SpansOf } from '../../lib/routeSpans';
+import { pathSpans, type SpansOf, uncutSpans } from '../../lib/routeSpans';
 import { stopCuts } from '../../lib/stops';
 import { drawnPointsOf, topologyOf } from '../../lib/topology';
 import { type LayerState, drawnItemsOf } from '../../lib/visibility';
@@ -309,11 +310,13 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
     onPointsRead();
     return drawnPointsOf(topology, drawnIn(POINT_LAYERS));
   };
+  const routeLines = pathLines(topology.routes, plane);
+  const areaSpans = uncutSpans(pathLines(topology.areas, plane));
   const spansMade: { spansOf?: SpansOf } = {};
   const routeSpans: SpansOf = (path) => {
     spansMade.spansOf ??= pathSpans(
       stopCuts(drawnPoints(), (layer) => LAYER_TABLE[layer].style.size),
-      plane,
+      routeLines,
     );
     return spansMade.spansOf(path);
   };
@@ -323,6 +326,7 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
       topology,
       drawnPoints,
       project: plane,
+      areaSpans,
       routeSpans,
       layers: among,
       drawnItems: drawnIn(among),

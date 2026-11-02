@@ -154,6 +154,10 @@
   overflow-y: auto;
   scrollbar-width: thin;
 }
+.item {
+  content-visibility: auto;
+  contain-intrinsic-block-size: auto var(--item-h);
+}
 .more {
   mask-image: linear-gradient(to bottom, #000 calc(100% - var(--item-h)), transparent);
 }
