@@ -8,7 +8,7 @@ default-members = ["crates/web"]
 version = "0.1.0"
 edition = "2024"
 license = "MIT"
-rust-version = "1.98"
+rust-version = "1.99"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
