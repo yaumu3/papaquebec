@@ -69,12 +69,12 @@ function spyStore(initial: StoredMapSet[] = [], refusing = false) {
 
 /** A draw that finishes when the test says. */
 function heldDraw() {
-  let finish = () => {};
+  let finish: (() => void) | undefined;
   const afterDraw = () =>
     new Promise<void>((resolve) => {
       finish = resolve;
     });
-  return { afterDraw, finishDraw: () => finish() };
+  return { afterDraw, finishDraw: () => finish?.() };
 }
 
 /** The list of disabled sets, as the settings hold it. */
