@@ -103,6 +103,6 @@ mod tests {
             (None, f64::INFINITY, false)
         );
         assert!(b.altitude_ft.is_nan());
-        assert!(b.history.is_empty());
+        assert_eq!(b.history, [] as [Vec2; 0]);
     }
 }
