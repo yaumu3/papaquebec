@@ -106,6 +106,10 @@ function widthOf(designators: readonly Designator[], text: TextBatch): number {
   return names + SEPARATOR_PX * Math.max(0, designators.length - 1);
 }
 
+/** The CSS px a label of these designators needs of its span before it is shown. */
+const thresholdOf = (designators: readonly Designator[], text: TextBatch) =>
+  widthOf(designators, text) + MARGIN_PX;
+
 /** What the span has to spare on the screen at the settled scale, less the cuts at its stops. */
 const roomOf = ({ length, cutBack, cutAhead }: SpanLabel, scale: number) =>
   length * scale - cutBack - cutAhead;
@@ -139,13 +143,9 @@ type ItemReading = Pick<Stage, 'topology' | 'routeSpans'>;
 /** Tests each airway label for room at the settled scale, remembering the outcome per span. */
 function settleAirways(spanLabels: SpanLabels, stage: Stage) {
   for (const spanLabel of spanLabels.values()) {
-    const threshold = widthOf(spanLabel.designators, stage.text) + MARGIN_PX;
-    spanLabel.shown = rememberFits(
-      stage.shown,
-      spanLabel.id,
-      roomOf(spanLabel, stage.scale),
-      threshold,
-    );
+    const threshold = thresholdOf(spanLabel.designators, stage.text);
+    const room = roomOf(spanLabel, stage.scale);
+    spanLabel.shown = rememberFits(stage.shown, spanLabel.id, room, threshold);
   }
 }
 
@@ -179,7 +179,7 @@ function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
     const spanLabel = designator && spanLabelOf(spanLabels, span);
     if (!spanLabel) continue;
     const named = [...spanLabel.designators, placedOn(designator, span, spanLabel)];
-    if (fits(roomOf(spanLabel, scale), widthOf(named, text) + MARGIN_PX, shown.get(spanLabel.id))) {
+    if (fits(roomOf(spanLabel, scale), thresholdOf(named, text), shown.get(spanLabel.id))) {
       spanLabel.designators = named;
       spanLabel.shown = true;
       shown.set(spanLabel.id, true);
