@@ -13,6 +13,9 @@ export const PALETTE = {
   hover: '#a0a0a0',
 } as const;
 
+/** A lit point, brighter than the hover grey, which is an aerodrome label's own colour. */
+const POINT_HOVER = '#e0e0e0';
+
 /** The colours of the chart and the base map: the canvas alone draws them, so no token carries them. */
 export const CHART_COLORS = {
   coast: '#707070',
@@ -42,6 +45,6 @@ export const CHART_COLORS = {
   ringEdge: '#606060',
   ringLabel: '#555555',
   hoverFaint: `${PALETTE.hover}80`,
-  pointHover: '#e0e0e0',
-  pointHoverFaint: '#e0e0e080',
+  pointHover: POINT_HOVER,
+  pointHoverFaint: `${POINT_HOVER}80`,
 } as const;

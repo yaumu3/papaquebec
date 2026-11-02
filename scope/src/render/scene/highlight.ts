@@ -49,7 +49,7 @@ function putRouteLabels(
   }
 }
 
-/** Puts the ident of each of `points`, drawn or not, and its symbol when `symbols` are asked for. */
+/** Puts the ident of each of `points`, drawn or not, and its symbol when `symbols` is given. */
 function putPoints(
   points: readonly ChartPoint[],
   project: ProjectFn,
@@ -67,8 +67,9 @@ function putPoints(
 /**
  * The batches that light an item, in the hover grey and a point brighter. A route lights its label
  * and the points it passes. A route's label is the chart's, by span, where the span has room for
- * it; a point's is its ident as the chart would place it. An area's says what DENSE says at any density: on the name the chart drew,
- * else centred on its place, with no room test and no density gate.
+ * it; a point's is its ident as the chart would place it. An area's says what DENSE says at any
+ * density: on the name the chart drew, else centred on its place, with no room test and no
+ * density gate.
  */
 export function buildHighlight(item: ChartItem, input: HighlightInput): Highlight {
   const out = {

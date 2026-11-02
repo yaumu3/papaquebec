@@ -306,8 +306,8 @@ function namedOnce(
 /**
  * The labels to redraw for an item, whole: on every span of an airway that has room for its
  * designator by the chart's own test and memory, and for a procedure on the spans the chart
- * names it on, else on the first with room. No density gate. Other spans keep the chart's label over the trace, and the item's chevron
- * if it has room. The chart's labels are never changed.
+ * names it on, else on the first with room. No density gate. Other spans keep the chart's label
+ * over the trace, and the item's chevron if it has room. The chart's labels are never changed.
  */
 export function itemLabels(
   item: ChartItem,
@@ -433,8 +433,9 @@ export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut, lit?: LitDesi
  * drawn procedure is named once, on the first span that has room for it. A label that does not
  * fit its span at the settled scale is left out: its width and 28 px must fit the span's length
  * on screen less the stop cuts. Only names follow the density and that test: a drawn one-way
- * route keeps its chevron wherever one fits, labelled layer or not. Returns the gaps cut in the lines, the text, then the
- * chevrons, back to front through the draw stack, and the span labels drawn.
+ * route keeps its chevron wherever one fits, labelled layer or not. Returns the gaps cut in the
+ * lines, the text, then the chevrons, back to front through the draw stack, and the span labels
+ * drawn.
  */
 export function buildRouteLabels(input: LabelsInput & FitInput): BuiltLabels {
   const out: RouteLabelOut = {
