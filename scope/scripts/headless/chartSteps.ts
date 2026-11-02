@@ -157,6 +157,7 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
       areaNames: new Map(),
       topology,
       routeSpans: stage.spans,
+      settledScale: () => SETTLED_SCALE,
       project,
       atlas: ATLAS,
       placeOf,

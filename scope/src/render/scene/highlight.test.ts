@@ -181,19 +181,74 @@ describe('the highlight of a route', () => {
     expect(inColor(lit.text, grey)).toBe(8);
   });
 
-  it('adds the designator on a span the chart left out, to those it drew', () => {
-    // Arrange
+  describe('on a span too short for its label', () => {
     const scale = (labelWidth(4) + 28) / 4;
-    const scene = sceneOf(stopped, { scale });
-    const chartRuns = spelled(scene.routeLabels().text);
 
-    // Act
-    const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+    it('omits the label, on a drawn route', () => {
+      // Arrange
+      const scene = sceneOf(stopped, { scale });
+      const chartRuns = spelled(scene.routeLabels().text);
 
-    // Assert
-    expect(chartRuns).toBe('V901');
-    expect(glyphs(lit.text)).toHaveLength(8);
-    expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4, 9]));
+      // Act
+      const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+
+      // Assert
+      expect(chartRuns).toBe('V901');
+      expect(spelled(lit.text)).toBe('V901');
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+      expect(lit.gaps.count).toBe(1);
+    });
+
+    it('omits the label, on a hidden route at a density that names none', () => {
+      // Arrange
+      const scene = sceneOf(stopped, { scale, hidden: ['V901'], density: 'off' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+    });
+
+    it('draws no label when no span has room', () => {
+      // Arrange
+      const scene = sceneOf(stopped, { scale: 1 });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+
+      // Assert
+      expect([lit.gaps.count, lit.text.count]).toEqual([0, 0]);
+    });
+
+    it('names a procedure on the first span that has room', () => {
+      // Arrange
+      const chart = [
+        airway('sid', 'SID1', [0, 0], [2, 0], [10, 0]),
+        stopAt('navaid', [2, 0], 'N2'),
+      ];
+      const hiddenScene = sceneOf(chart, { hidden: ['SID1'], scale });
+
+      // Act
+      const lit = hiddenScene.highlight(itemKeyed(chart, 'SID1'));
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([6]));
+    });
+
+    it("keeps the chart's label over the trace, unlit, where the designator would not fit in it", () => {
+      // Arrange
+      const roomForOne = (labelWidth(4) + 28 + 1) / 2;
+      const scene = sceneOf(shared, { hidden: ['V901'], scale: roomForOne });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(shared, 'V901'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('Y902');
+      expect([inColor(lit.text, grey), inColor(lit.text, rnavLabel)]).toEqual([0, 4]);
+      expect(lit.gaps.count).toBe(1);
+    });
   });
 
   it('names a procedure the chart did not draw once, on its first span', () => {
@@ -256,7 +311,7 @@ describe('the highlight of a route', () => {
 
   it('centres a designator alone, in a gap of its own, where the chart has no label', () => {
     // Arrange
-    const scene = sceneOf(shared, { hidden: ['V901'], scale: 1 });
+    const scene = sceneOf(shared, { hidden: ['V901', 'Y902'] });
     const chartLabels = scene.routeLabels().text.count;
 
     // Act

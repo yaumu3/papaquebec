@@ -74,6 +74,7 @@ export function showChart(
       topology: topology(),
       project: projectNm,
       routeSpans,
+      settledScale,
       atlas: info,
       placeOf: areaPlace,
     });

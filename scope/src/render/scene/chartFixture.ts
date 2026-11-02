@@ -365,6 +365,7 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
       areaNames: labelsOf(sliceOf(item.layer)).areaNames ?? new Map(),
       topology,
       routeSpans,
+      settledScale: () => scale,
       project: plane,
       atlas,
       placeOf,

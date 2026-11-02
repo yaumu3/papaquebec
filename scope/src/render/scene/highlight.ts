@@ -3,18 +3,25 @@
 import { CHART_COLORS, PALETTE } from '../../design/palette';
 import type { ChartItem } from '../../lib/chart';
 import type { ProjectFn } from '../../lib/geo';
-import { isProcedureLayer, LAYER_TABLE } from '../../lib/layers';
+import { LAYER_TABLE } from '../../lib/layers';
 import { isPointLayer, isRouteLayer } from '../../lib/mapsetFormat';
 import { type ChartPoint, pointsAlong } from '../../lib/topology';
 import type { Batch } from '../protocol';
 import { putAreaLabel } from './areaLabels';
-import { type LabelsInput, placedPoint, type PlaceInput, putPointLabel } from './chart';
+import {
+  type FitInput,
+  type LabelsInput,
+  placedPoint,
+  type PlaceInput,
+  putPointLabel,
+} from './chart';
 import { type FigureOut, putPointMark } from './figures';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { itemLabels, putLabel, type RouteLabelOut, type SpanLabel } from './spanDesignators';
 
 /** What the highlight reads: the chart as the scene holds it, and where its labels went. */
 type HighlightInput = Pick<LabelsInput, 'topology' | 'project' | 'routeSpans' | 'atlas'> &
+  Pick<FitInput, 'settledScale'> &
   PlaceInput & {
     /** The span labels the chart draws for routes, by span identity. */
     spanLabels: ReadonlyMap<string, SpanLabel>;
@@ -30,24 +37,16 @@ export interface Highlight {
   points: [Batch, Batch, Batch];
 }
 
-/** The labels a procedure is lit on: those its chart label lists, else its first span's. */
-function namedOnce(labels: SpanLabel[], key: string, spanLabels: HighlightInput['spanLabels']) {
-  const listed = labels.filter((l) => spanLabels.get(l.id)?.designators.some((d) => d.key === key));
-  return listed.length > 0 ? listed : labels.slice(0, 1);
-}
-
-/**
- * Puts the span labels a route's designator is on, whole, with it lit: on every span of an airway,
- * and for a procedure on the spans whose chart label lists it, else on its first span only.
- */
+/** Puts the span labels of a route, whole, with its designator lit. */
 function putRouteLabels(
   item: ChartItem,
-  { topology, routeSpans, spanLabels }: HighlightInput,
+  { topology, routeSpans, spanLabels, settledScale }: HighlightInput,
   out: RouteLabelOut,
 ) {
-  const labels = itemLabels(item, { topology, routeSpans }, spanLabels);
-  const shown = isProcedureLayer(item.layer) ? namedOnce(labels, item.key, spanLabels) : labels;
-  for (const label of shown) putLabel(label, out, { key: item.key, color: PALETTE.hover });
+  const stage = { topology, routeSpans, scale: settledScale(), text: out.text };
+  for (const label of itemLabels(item, stage, spanLabels)) {
+    putLabel(label, out, { key: item.key, color: PALETTE.hover });
+  }
 }
 
 /** Puts the ident of each of `points`, drawn or not, and its symbol when `symbols` are asked for. */
@@ -67,8 +66,8 @@ function putPoints(
 
 /**
  * The batches that light an item, in the hover grey and a point brighter. A route lights its label
- * and the points it passes. A route's label is the chart's, by span; a point's is its ident as the
- * chart would place it. An area's says what DENSE says at any density: on the name the chart drew,
+ * and the points it passes. A route's label is the chart's, by span, where the span has room for
+ * it; a point's is its ident as the chart would place it. An area's says what DENSE says at any density: on the name the chart drew,
  * else centred on its place, with no room test and no density gate.
  */
 export function buildHighlight(item: ChartItem, input: HighlightInput): Highlight {

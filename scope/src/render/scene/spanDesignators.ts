@@ -189,28 +189,68 @@ function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
   }
 }
 
-/**
- * The label of each span of an item with its designator on it: the chart's label of the span,
- * found by its identity, with the designator joined in draw-stack order, else the designator
- * alone. No room test and no density gate. The chart's labels are never changed.
- */
-export function itemLabels(
+/** What lighting an item reads: its spans, the settled scale, and the text to measure. */
+type LitReading = ItemReading & Pick<Stage, 'scale' | 'text'>;
+
+/** A span of an item as it can be lit: its label with the item's designator, or without it. */
+interface LitSpan {
+  named: SpanLabel;
+  unnamed: SpanLabel;
+}
+
+/** The chart's label of each span of an item, or none, by its identity, with and without it. */
+function litSpans(
   item: ChartItem,
   stage: ItemReading,
   chartLabels: ReadonlyMap<string, SpanLabel>,
-): SpanLabel[] {
-  const labels: SpanLabels = new Map();
+): LitSpan[] {
+  const lit = new Map<string, LitSpan>();
   for (const { path, span } of spansOfItem(item, stage)) {
     const designator = designatorOf(path, item.key);
-    const label = labels.get(span.id) ?? chartLabels.get(span.id) ?? emptyLabel(span);
-    if (!designator || !label) continue;
-    const named = label.designators.some((d) => d.key === item.key);
-    const designators = named
-      ? label.designators
-      : [...label.designators, placedOn(designator, span, label)].toSorted(byStack);
-    labels.set(span.id, { ...label, designators });
+    const label = chartLabels.get(span.id) ?? emptyLabel(span);
+    if (!designator || !label || lit.has(span.id)) continue;
+    const others = label.designators.filter((d) => d.key !== item.key);
+    const designators = [...others, placedOn(designator, span, label)].toSorted(byStack);
+    lit.set(span.id, {
+      named: { ...label, designators },
+      unnamed: { ...label, designators: others },
+    });
   }
-  return [...labels.values()];
+  return [...lit.values()];
+}
+
+/** The spans a procedure is named on: those the chart names it on, else the first of them. */
+function namedOnce(
+  spans: LitSpan[],
+  key: string,
+  chartLabels: ReadonlyMap<string, SpanLabel>,
+): LitSpan[] {
+  const listed = spans.filter(({ named }) =>
+    chartLabels.get(named.id)?.designators.some((d) => d.key === key),
+  );
+  return listed.length > 0 ? listed : spans.slice(0, 1);
+}
+
+/**
+ * The labels to redraw for an item, whole: on every span of an airway that has room for its
+ * designator, and for a procedure on the spans the chart names it on, else on the first with
+ * room. No density gate. Other spans keep the chart's label, over the trace. The chart's labels
+ * are never changed.
+ */
+export function itemLabels(
+  item: ChartItem,
+  stage: LitReading,
+  chartLabels: ReadonlyMap<string, SpanLabel>,
+): SpanLabel[] {
+  const { scale, text } = stage;
+  const spans = litSpans(item, stage, chartLabels);
+  const roomy = spans.filter(({ named }) =>
+    fits(roomOf(named, scale), thresholdOf(named.designators, text)),
+  );
+  const shown = isProcedureLayer(item.layer) ? namedOnce(roomy, item.key, chartLabels) : roomy;
+  return spans
+    .map((span) => (shown.includes(span) ? span.named : span.unnamed))
+    .filter((label) => label.designators.length > 0);
 }
 
 /** What a label's rank in the draw stack is: that of its front designator. */
