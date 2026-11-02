@@ -1,5 +1,6 @@
 import { type Accessor, createSignal } from 'solid-js';
 
+import { afterFrame } from '../lib/afterFrame';
 import { chartOf } from '../lib/chart';
 import { isRecord } from '../lib/guards';
 import { type MapSetData, setIdentity, validateMapSet } from '../lib/mapset';
@@ -210,19 +211,6 @@ export function armRemoval(
 ): { armed: string | null; remove: string | null } {
   return armed === clicked ? { armed: null, remove: clicked } : { armed: clicked, remove: null };
 }
-
-/** How long a hidden page, which draws no frames, waits instead, in ms. */
-const NO_FRAME_MS = 250;
-
-/** Resolves once the next frame is out of the way. */
-const afterFrame = () =>
-  new Promise<void>((done) => {
-    const timer = setTimeout(done, NO_FRAME_MS);
-    requestAnimationFrame(() => {
-      clearTimeout(timer);
-      setTimeout(done);
-    });
-  });
 
 const mapsets = createMapSets(
   {
