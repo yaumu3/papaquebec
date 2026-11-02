@@ -322,6 +322,31 @@ describe('storage of imported sets', () => {
     expect(spy.writes).toEqual(['put my-fixes']);
   });
 
+  it('adds an import in the task the pacing gives it, after the parse', async () => {
+    // Arrange
+    const spy = spyStore();
+    const tasks: (() => void)[] = [];
+    const sets = createMapSets(
+      flagsOf(),
+      memoryStorage(),
+      Promise.resolve(spy.store),
+      ticking(),
+      () => Promise.resolve(),
+      (task) => tasks.push(task),
+    );
+    const out = importing(sets, fixes);
+    const before = sets.mapSets().map((s) => s.identity);
+
+    // Act
+    tasks.forEach((task) => task());
+    const kept = out.ok ? await out.kept : null;
+
+    // Assert
+    expect(before).toEqual([BUILTIN_ID]);
+    expect(sets.mapSets().map((s) => s.identity)).toEqual(['my-fixes', BUILTIN_ID]);
+    expect(kept).toBe(true);
+  });
+
   it('removes a set imported a moment ago from the store as well', async () => {
     // Arrange
     const spy = spyStore();

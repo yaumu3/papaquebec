@@ -87,6 +87,7 @@ export function createMapSets(
   opening: Promise<MapSetStore>,
   now: () => number = Date.now,
   afterDraw: () => Promise<void> = () => Promise.resolve(),
+  nextTask: (task: () => void) => void = (task) => task(),
 ): MapSets {
   const placeholder: MapSetData = {
     type: 'FeatureCollection',
@@ -171,10 +172,16 @@ export function createMapSets(
       const { data } = valid;
       const imported = now();
       const set: MapSet = { identity, data, builtin: false, imported };
-      setSets((own) => [set, ...own.filter((s) => s.identity !== identity)]);
-      enable(identity);
-      drawing = afterDraw();
-      return { ok: true, kept: stored((open) => open.put({ identity, imported, data })) };
+      // The chart builds in a task of its own, so the parse does not add to the page's longest.
+      const kept = new Promise<boolean>((settle) => {
+        nextTask(() => {
+          setSets((own) => [set, ...own.filter((s) => s.identity !== identity)]);
+          enable(identity);
+          drawing = afterDraw();
+          settle(stored((open) => open.put({ identity, imported, data })));
+        });
+      });
+      return { ok: true, kept };
     },
     toggleMapSet(identity) {
       if (isEnabled(identity)) flags.setDisabled([...flags.disabled(), identity]);
@@ -226,6 +233,7 @@ const mapsets = createMapSets(
   openMapSetStore(globalThis.indexedDB),
   Date.now,
   afterFrame,
+  (task) => setTimeout(task),
 );
 export const {
   mapSets,
