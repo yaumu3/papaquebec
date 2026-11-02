@@ -25,6 +25,7 @@ describe('chartSteps', () => {
     expect(names).toEqual([
       'merge',
       'topology',
+      'geodesics',
       'drawn items',
       'drawn points',
       'area places',

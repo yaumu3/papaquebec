@@ -9,8 +9,9 @@ import type { GeoPoint, ProjectFn } from '../../src/lib/geo';
 import { DRAW_STACK, type LabelDensity, labelReaches, LAYER_TABLE } from '../../src/lib/layers';
 import type { MapSetData } from '../../src/lib/mapset';
 import { isChartLayer, isPointLayer, type Layer } from '../../src/lib/mapsetFormat';
+import { type LineOf, pathLines } from '../../src/lib/pathLines';
 import { type AreaPlace, areaPlaceOf } from '../../src/lib/pole';
-import { pathSpans, type SpansOf } from '../../src/lib/routeSpans';
+import { type LineSpan, pathSpans, type SpansOf, uncutSpans } from '../../src/lib/routeSpans';
 import { stopCuts } from '../../src/lib/stops';
 import { drawnPointsOf, type Topology, topologyOf } from '../../src/lib/topology';
 import { drawnItemsOf, everyItemSet, type LayerState } from '../../src/lib/visibility';
@@ -52,6 +53,20 @@ const allBut =
   (layer) =>
     layer === of ? { mode: true, exceptions: new Set([key]) } : everyItemSet(true);
 
+/** What every state of the layers shares, as the memos do. */
+interface Lines {
+  routes: LineOf;
+  areaSpans: SpansOf<LineSpan>;
+}
+
+/** Every geodesic of a topology, walked, and the areas' spans. */
+function walkedLines({ areas, routes }: Topology, project: ProjectFn): Lines {
+  const lines = { areas: pathLines(project), routes: pathLines(project) };
+  for (const path of areas.paths) lines.areas(path);
+  for (const path of routes.paths) lines.routes(path);
+  return { routes: lines.routes, areaSpans: uncutSpans(lines.areas) };
+}
+
 /** What a slice is built from, for what draws under one state of the layers. */
 class Stage {
   readonly drawn: readonly ChartItem[];
@@ -62,6 +77,7 @@ class Stage {
   constructor(
     readonly topology: Topology,
     readonly project: ProjectFn,
+    readonly lines: Lines,
     stateOf: StateOf,
   ) {
     this.drawn = drawnItemsOf(topology.chart, CHART_LAYERS, stateOf, () => true);
@@ -76,7 +92,7 @@ class Stage {
   freshSpans(): SpansOf {
     return pathSpans(
       stopCuts(this.points, (layer) => LAYER_TABLE[layer].style.size),
-      this.project,
+      this.lines.routes,
     );
   }
 
@@ -85,6 +101,7 @@ class Stage {
       topology: this.topology,
       drawnPoints: () => this.points,
       project: this.project,
+      areaSpans: this.lines.areaSpans,
       routeSpans,
       layers,
       drawnItems: this.drawn.filter((item) => layers.includes(item.layer)),
@@ -110,7 +127,8 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
   const declinationAt = () => declination;
   const chart = chartOf([data]);
   const topology = topologyOf(chart);
-  const stage = new Stage(topology, project, everyLayerOn);
+  const lines = walkedLines(topology, project);
+  const stage = new Stage(topology, project, lines, everyLayerOn);
   const places = new Map<string, AreaPlace | undefined>();
   const placeOf = (item: ChartItem) => {
     if (!places.has(item.key)) places.set(item.key, areaPlaceOf(item, project));
@@ -145,6 +163,7 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
   return [
     { name: 'merge', run: () => chartOf([data]) },
     { name: 'topology', run: () => topologyOf(chart) },
+    { name: 'geodesics', run: () => walkedLines(topology, project) },
     { name: 'drawn items', run: () => drawnItemsOf(chart, CHART_LAYERS, everyLayerOn, () => true) },
     {
       name: 'drawn points',
@@ -176,13 +195,13 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
       run: () =>
         sliceBuilt(
           sliceOf(areaItem.layer),
-          new Stage(topology, project, allBut(areaItem.key, areaItem.layer)),
+          new Stage(topology, project, lines, allBut(areaItem.key, areaItem.layer)),
         ),
     },
     {
       name: 'toggle points',
       run: () => {
-        const off = new Stage(topology, project, fixesOff);
+        const off = new Stage(topology, project, lines, fixesOff);
         return [sliceBuilt(sliceOf('fix'), off), sliceBuilt(sliceOf(route.layer), off)];
       },
     },
