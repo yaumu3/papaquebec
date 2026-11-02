@@ -1,20 +1,21 @@
 {
   "tolerance": 3,
   "medianMs": {
-    "merge": 2,
-    "topology": 17,
+    "merge": 1,
+    "topology": 15,
+    "geodesics": 30,
     "drawn items": 1,
     "drawn points": 1,
-    "area places": 152,
-    "shapes areaLines": 61,
-    "shapes routeLines": 48,
-    "shapes pointMarkers": 2,
+    "area places": 21,
+    "shapes areaLines": 5,
+    "shapes routeLines": 7,
+    "shapes pointMarkers": 1,
     "labels areaLabels": 1,
     "labels routeLabels": 5,
     "labels pointLabels": 1,
     "highlight": 1,
     "trace": 1,
-    "toggle item": 63,
-    "toggle points": 86
+    "toggle item": 6,
+    "toggle points": 9
   }
 }
