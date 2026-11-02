@@ -14,6 +14,7 @@ import type { CDPSession, Page } from 'playwright';
 
 import { openScope } from './browser';
 import { inclusiveMs } from './profile';
+import { installRecorder, type Recording } from './recorder';
 
 const { values: opt } = parseArgs({
   options: {
@@ -29,50 +30,6 @@ const { values: opt } = parseArgs({
     json: { type: 'string' },
   },
 });
-
-interface Sample {
-  frames: number[];
-  longTasks: number[];
-  /** Per message kind: how many were posted to the worker and the bytes of batches they carried. */
-  messages: Record<string, { n: number; bytes: number }>;
-}
-
-/**
- * Installed once: a long-task observer, a frame-interval recorder and a tap on messages to the
- * render worker, which the scenarios start and stop.
- */
-const RECORDER = `(() => {
-  const s = { recording: false, frames: [], longTasks: [], messages: {}, last: 0 };
-  const post = Worker.prototype.postMessage;
-  Worker.prototype.postMessage = function (m, ...rest) {
-    if (s.recording && m && typeof m.type === 'string') {
-      const key = m.type === 'slot' ? 'slot:' + m.name : m.type;
-      const bytes = (m.batches ?? []).reduce((a, b) => a + b.data.byteLength, 0);
-      const e = (s.messages[key] ??= { n: 0, bytes: 0 });
-      e.n += 1;
-      e.bytes += bytes;
-    }
-    return post.call(this, m, ...rest);
-  };
-  new PerformanceObserver((l) => {
-    if (s.recording) for (const e of l.getEntries()) s.longTasks.push(e.duration);
-  }).observe({ type: 'longtask' });
-  const tick = (t) => {
-    if (s.recording && s.last) s.frames.push(t - s.last);
-    s.last = t;
-    requestAnimationFrame(tick);
-  };
-  requestAnimationFrame(tick);
-  window.__bench = {
-    start() {
-      Object.assign(s, { recording: true, frames: [], longTasks: [], messages: {}, last: 0 });
-    },
-    stop() {
-      s.recording = false;
-      return { frames: s.frames, longTasks: s.longTasks, messages: s.messages };
-    },
-  };
-})()`;
 
 const seconds = Number(opt.seconds);
 const traced = opt.fn.split(',').filter(Boolean);
@@ -216,7 +173,7 @@ const pct = (xs: number[], p: number) => {
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 const f1 = (n: number) => n.toFixed(1);
 
-function summarize(name: string, s: Sample, ms: Map<string, number>) {
+function summarize(name: string, s: Recording, ms: Map<string, number>) {
   return {
     scenario: name,
     frames: s.frames.length,
@@ -237,7 +194,7 @@ const { page, log, close } = await openScope({
 });
 try {
   await page.waitForTimeout(Number(opt.warmup));
-  await page.evaluate(RECORDER);
+  await page.evaluate(installRecorder);
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Profiler.enable');
@@ -245,9 +202,9 @@ try {
   const results = await inSequence(Object.entries(scenarios), async ([name, ready]) => {
     const run = await ready(page);
     const [sample, ms] = await profiled(cdp, page, async () => {
-      await page.evaluate('window.__bench.start()');
+      await page.evaluate(() => window.benchRecorder.start());
       await run();
-      return page.evaluate<Sample>('window.__bench.stop()');
+      return page.evaluate(() => window.benchRecorder.stop());
     });
     return summarize(name, sample, ms);
   });
