@@ -49,12 +49,12 @@ interface Placed extends Designator {
   reads: boolean;
 }
 
-/** A span of some length, the designators along it, and whether it draws its label. */
+/** A span of some length, the designators along it, and whether it names them. */
 export interface SpanLabel extends RouteSpan {
   middle: NonNullable<RouteSpan['middle']>;
   designators: Placed[];
   /** The span names its designators: its airways fit, or a procedure joined it. */
-  shown: boolean;
+  named: boolean;
 }
 
 type SpanLabels = Map<string, SpanLabel>;
@@ -112,7 +112,7 @@ function placedOn(designator: Designator, span: RouteSpan, spanLabel: SpanLabel)
 /** A span's label with nothing on it yet; none for a span with no length. */
 function emptyLabel(span: RouteSpan): SpanLabel | undefined {
   const { middle } = span;
-  return middle && { ...span, middle, designators: [], shown: false };
+  return middle && { ...span, middle, designators: [], named: false };
 }
 
 /** The label of a span, found or made. */
@@ -178,7 +178,7 @@ function settleAirways(spanLabels: SpanLabels, stage: Stage) {
   for (const spanLabel of spanLabels.values()) {
     const threshold = thresholdOf(spanLabel.designators, stage.text);
     const room = roomOf(spanLabel, stage.scale);
-    spanLabel.shown = rememberFits(stage.shown, spanLabel.id, room, threshold);
+    spanLabel.named = rememberFits(stage.shown, spanLabel.id, room, threshold);
   }
 }
 
@@ -214,11 +214,11 @@ function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
     const named = [...spanLabel.designators, placedOn(designator, span, spanLabel)];
     if (fits(roomOf(spanLabel, scale), thresholdOf(named, text), shown.get(spanLabel.id))) {
       spanLabel.designators = named;
-      spanLabel.shown = true;
+      spanLabel.named = true;
       shown.set(spanLabel.id, true);
       return;
     }
-    shown.set(spanLabel.id, spanLabel.shown);
+    shown.set(spanLabel.id, spanLabel.named);
   }
 }
 
@@ -339,7 +339,7 @@ function designatedSpans(stage: Stage): SpanLabel[] {
   settleAirways(spanLabels, stage);
   for (const item of procedureItems(stage.drawnItems)) nameProcedure(item, spanLabels, stage);
   for (const spanLabel of spanLabels.values()) {
-    if (!spanLabel.shown) spanLabel.designators = [];
+    if (!spanLabel.named) spanLabel.designators = [];
   }
   putChevrons(spanLabels, stage);
   const drawn = [...spanLabels.values()].filter((spanLabel) => spanLabel.designators.length > 0);
