@@ -63,12 +63,17 @@ function copyEdge(points: number[], from: PathLine, slot: number, forward: boole
 
 /** The length of the chords between two places in `points`. */
 function lengthBetween(points: readonly number[], from: number, to: number): number {
+  const [a, b] = [
+    { x: 0, y: 0 },
+    { x: 0, y: 0 },
+  ];
   let length = 0;
   for (let i = from; i < to; i += 2) {
-    length += chordOf(
-      { x: points[i] ?? 0, y: points[i + 1] ?? 0 },
-      { x: points[i + 2] ?? 0, y: points[i + 3] ?? 0 },
-    );
+    a.x = points[i] ?? 0;
+    a.y = points[i + 1] ?? 0;
+    b.x = points[i + 2] ?? 0;
+    b.y = points[i + 3] ?? 0;
+    length += chordOf(a, b);
   }
   return length;
 }

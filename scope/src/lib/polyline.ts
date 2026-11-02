@@ -2,8 +2,11 @@
 
 import type { Vec2 } from './geo';
 
-/** The distance between two points. */
-export const chordOf = (a: Vec2, b: Vec2): number => Math.hypot(b.x - a.x, b.y - a.y);
+/** The distance between two points; a chart's chords are many, and `Math.hypot` is slow. */
+export function chordOf(a: Vec2, b: Vec2): number {
+  const [dx, dy] = [b.x - a.x, b.y - a.y];
+  return Math.sqrt(dx * dx + dy * dy);
+}
 
 /** The length of a polyline: the sum of its chords. */
 export const lengthOf = (points: readonly Vec2[]): number =>

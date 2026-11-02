@@ -61,7 +61,7 @@ function sphericalMidpoint(a: GeoPoint, b: GeoPoint): GeoPoint {
 function offLine(p: Vec2, a: Vec2, b: Vec2): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const len = Math.hypot(dx, dy);
+  const len = Math.sqrt(dx * dx + dy * dy);
   return len === 0 ? 0 : Math.abs((p.x - a.x) * dy - (p.y - a.y) * dx) / len;
 }
 
