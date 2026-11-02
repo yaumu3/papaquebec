@@ -39,6 +39,13 @@ export function parseColor(hex: string): Rgba {
   return rgba;
 }
 
+/** Writes `values` from `at`: for a few values `TypedArray.set` is much the slower. */
+function writeAll(into: Float32Array, at: number, values: readonly number[]): void {
+  values.forEach((value, i) => {
+    into[at + i] = value;
+  });
+}
+
 /** Growable Float32Array of fixed-stride instances. */
 class InstanceBuffer {
   private data: Float32Array;
@@ -125,9 +132,9 @@ export class LineBatch {
     d[at + 7] = b.py ?? 0;
     d[at + 8] = style.width ?? DEFAULT_LINE_WIDTH;
     d[at + 9] = along;
-    d.set(style.dash ?? [], at + 10);
-    d.set(parseColor(color), at + 14);
-    d.set(span, at + 18);
+    writeAll(d, at + 10, style.dash ?? []);
+    writeAll(d, at + 14, parseColor(color));
+    writeAll(d, at + 18, span);
   }
 
   polyline(
