@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { CHART_COLORS } from '../../design/palette';
-import { chartOf } from '../../lib/chart';
+import { type ChartItem, chartOf } from '../../lib/chart';
 import type { ShownMemory } from '../../lib/fits';
 import type { LabelDensity } from '../../lib/layers';
 import { parseMapSet } from '../../lib/mapset';
@@ -436,5 +436,24 @@ describe('the stacks of area labels', () => {
     // Assert
     expect(alone.every((n) => n > 0)).toBe(true);
     expect(stacked).toEqual([0, 0]);
+  });
+
+  it('places no item of a layer whose density is not reached', () => {
+    // Arrange
+    const chart = [
+      single('tma', polygon(el), { name: 'DENSE ONLY' }, 'tma'),
+      single('sector', polygon(el), { name: 'NORMAL' }, 'sector'),
+    ];
+    const placed: string[] = [];
+    const placeOf = (item: ChartItem) => {
+      placed.push(item.key);
+      return undefined;
+    };
+
+    // Act
+    areaLabels(chart, { density: 'normal', placeOf });
+
+    // Assert
+    expect(placed).toEqual(['sector']);
   });
 });
