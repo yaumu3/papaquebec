@@ -89,10 +89,11 @@ export function ItemList(props: { layer: ScopeLayer }) {
   const measure = () => {
     if (list) setMore(scrollView(list.scrollTop, list.clientHeight, list.scrollHeight).cutBottom);
   };
-  // The rows have changed by the time this runs; a hidden list has no size and fades nothing.
+  // At the frame: read here it would lay out every list's rows once more, for each list.
+  // A hidden list has no size and fades nothing.
   createEffect(() => {
     keys();
-    measure();
+    requestAnimationFrame(measure);
   });
   onMount(() => {
     if (!list) return;
