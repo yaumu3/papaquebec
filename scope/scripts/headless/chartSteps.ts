@@ -89,10 +89,10 @@ class Stage {
   }
 
   /** The spans before any build has walked them. */
-  freshSpans(): SpansOf {
+  freshSpans(lineOf: LineOf = this.lines.routes): SpansOf {
     return pathSpans(
       stopCuts(this.points, (layer) => LAYER_TABLE[layer].style.size),
-      this.lines.routes,
+      lineOf,
     );
   }
 
@@ -129,6 +129,8 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
   const topology = topologyOf(chart);
   const lines = walkedLines(topology, project);
   const stage = new Stage(topology, project, lines, everyLayerOn);
+  /** Lines of its own for the step that forgets what they measured, which the rest keep. */
+  const unmeasured = pathLines(topology.routes, project);
   const places = new Map<string, AreaPlace | undefined>();
   const placeOf = (item: ChartItem) => {
     if (!places.has(item.key)) places.set(item.key, areaPlaceOf(item, project));
@@ -164,6 +166,13 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
     { name: 'merge', run: () => chartOf([data]) },
     { name: 'topology', run: () => topologyOf(chart) },
     { name: 'geodesics', run: () => walkedLines(topology, project) },
+    {
+      name: 'route spans',
+      run: () => {
+        for (const path of topology.routes.paths) unmeasured(path).measured.clear();
+        return topology.routes.paths.map(stage.freshSpans(unmeasured));
+      },
+    },
     { name: 'drawn items', run: () => drawnItemsOf(chart, CHART_LAYERS, everyLayerOn, () => true) },
     {
       name: 'drawn points',

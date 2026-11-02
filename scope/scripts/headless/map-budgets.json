@@ -3,19 +3,20 @@
   "medianMs": {
     "merge": 1,
     "topology": 15,
-    "geodesics": 30,
+    "geodesics": 31,
+    "route spans": 8,
     "drawn items": 1,
     "drawn points": 1,
-    "area places": 21,
+    "area places": 23,
     "shapes areaLines": 5,
-    "shapes routeLines": 7,
+    "shapes routeLines": 6,
     "shapes pointMarkers": 1,
     "labels areaLabels": 1,
     "labels routeLabels": 5,
     "labels pointLabels": 1,
     "highlight": 1,
     "trace": 1,
-    "toggle item": 6,
-    "toggle points": 9
+    "toggle item": 5,
+    "toggle points": 8
   }
 }
