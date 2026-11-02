@@ -6,7 +6,7 @@
 import { pxPerNmFor } from '../../src/canvas/view';
 import { type Chart, chartOf, type ChartItem } from '../../src/lib/chart';
 import type { GeoPoint, ProjectFn } from '../../src/lib/geo';
-import { DRAW_STACK, LAYER_TABLE } from '../../src/lib/layers';
+import { DRAW_STACK, type LabelDensity, labelReaches, LAYER_TABLE } from '../../src/lib/layers';
 import type { MapSetData } from '../../src/lib/mapset';
 import { isChartLayer, isPointLayer, type Layer } from '../../src/lib/mapsetFormat';
 import { type AreaPlace, areaPlaceOf } from '../../src/lib/pole';
@@ -29,6 +29,9 @@ const ATLAS = { ...fixtureAtlas, advance: fixtureAtlas.fontSize * ADVANCE_EM };
 
 /** The scale labels are settled at: the load test's window at the default range. */
 const SETTLED_SCALE = pxPerNmFor(1600, 1000, 40);
+
+/** The density the labels are built at, as the scope starts. */
+const LABEL_DENSITY: LabelDensity = 'normal';
 
 const CHART_LAYERS = DRAW_STACK.filter(isChartLayer);
 
@@ -89,6 +92,12 @@ class Stage {
   }
 }
 
+/** Whether the area labels name an item at the density, and so ask for its place. */
+function isLabelledArea({ layer }: ChartItem): boolean {
+  const { label } = LAYER_TABLE[layer].style;
+  return sliceOf(layer).labels === 'areaLabels' && !!label && labelReaches(label, LABEL_DENSITY);
+}
+
 const firstOf = (chart: Chart, ...layers: readonly Layer[]): ChartItem => {
   const item = chart.find(({ layer }) => layers.includes(layer));
   if (!item) throw new Error(`the set has nothing on ${layers.join(', ')}`);
@@ -112,7 +121,7 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
   const labelsOf = (slice: Slice, on: Stage) =>
     slice.buildLabels({
       ...on.inputOf(slice),
-      labelDensity: 'normal',
+      labelDensity: LABEL_DENSITY,
       atlas: ATLAS,
       settledScale: () => SETTLED_SCALE,
       placeOf,
@@ -145,7 +154,10 @@ export function chartSteps(data: MapSetData, site: GeoPoint, declination: Declin
           stage.drawn.filter((i) => isPointLayer(i.layer)),
         ),
     },
-    { name: 'area places', run: () => chart.map((item) => areaPlaceOf(item, project)) },
+    {
+      name: 'area places',
+      run: () => chart.filter(isLabelledArea).map((item) => areaPlaceOf(item, project)),
+    },
     ...CHART_SLICES.map((slice) => ({
       name: `shapes ${slice.shapes}`,
       run: () => shapesOf(slice, stage),

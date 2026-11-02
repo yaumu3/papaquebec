@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
+import { chartOf } from '../../src/lib/chart';
 import { validateMapSet } from '../../src/lib/mapset';
 import { EXAMPLE } from '../../src/lib/mapsetCorpus';
 import { chartSteps, timeOf } from './chartSteps';
@@ -83,6 +84,22 @@ describe('chartSteps', () => {
     // Assert
     expect(sizes[1]).not.toContain(sizes[0]);
     expect(sizes[3]).not.toContain(sizes[2]);
+  });
+});
+
+describe('the area places step', () => {
+  it('places only the items whose layer is labelled at the density', () => {
+    // Arrange
+    const data = exampleSet();
+    const step = chartSteps(data, SITE, () => 0).find(({ name }) => name === 'area places');
+    const sectors = chartOf([data]).filter((item) => item.layer === 'sector');
+
+    // Act
+    const places = step?.run();
+
+    // Assert
+    expect(sectors.length).toBeGreaterThan(0);
+    expect(places).toHaveLength(sectors.length);
   });
 });
 
