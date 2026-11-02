@@ -12,6 +12,8 @@ import { parseArgs } from 'node:util';
 
 import type { CDPSession, Page } from 'playwright';
 
+import { ZOOM_SETTLE_MS } from '../../src/canvas/settle';
+import { ACTION_SLOTS } from './actions';
 import { openScope } from './browser';
 import { bundleIn, fnProblems } from './fnCheck';
 import { inclusiveMs } from './profile';
@@ -76,7 +78,7 @@ const { page, log, close } = await openScope({
 });
 try {
   await page.waitForTimeout(Number(opt.warmup));
-  await page.evaluate(installRecorder);
+  await page.evaluate(installRecorder, { settleMs: ZOOM_SETTLE_MS, actionSlots: ACTION_SLOTS });
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Profiler.enable');
