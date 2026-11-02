@@ -37,11 +37,8 @@ import { settings } from '../state/settings';
 import { projectNm, trackStore, unprojectNm } from '../state/tracks';
 import { type Show, showChart } from './chartScene';
 import { RBL_SNAP_PX, targetAt } from './hit';
-import { debounce } from './settle';
+import { debounce, ZOOM_SETTLE_MS } from './settle';
 import { halfLongEdgeNm } from './view';
-
-/** How long a zoom must rest before data blocks are laid out again at the new scale. */
-const ZOOM_SETTLE_MS = 150;
 
 /** Whether the site is known, so map data can be projected onto the scope. */
 const projected = () => projectionVersion() > 0;

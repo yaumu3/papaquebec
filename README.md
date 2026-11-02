@@ -102,6 +102,7 @@ mise run check:visual       # the scope's screenshots against their baselines
 mise run update:visual      # rewrite those baselines
 mise run bench              # a load test, see below
 mise run bench:blocks       # score the data block placer on the sim's scenarios
+mise run bench:map          # time the chart builders on a national-scale set, no browser
 ```
 
 The sim needs no receiver: it stands in for one, sending the messages its fleet would broadcast
@@ -118,12 +119,21 @@ Query parameters:
 - `?site=<lat>,<lon>` overrides the receiver position.
 
 GitHub Actions runs the same checks and builds the image on every push to `main` and every pull
-request. Two headless scripts describe their flags in their headers:
+request. Three headless scripts describe their flags in their headers:
 
 - `bun scripts/headless/screenshot.ts` drives a build in headless Chromium with WebGPU and saves a frame
   plus the console log; with `--sim` it starts a server of its own that flies the sim and serves
   the build. `bun run screenshot` regenerates the README picture that way.
-- `mise run bench` is a load test with extra sim traffic, always on a server of its own.
+- `mise run bench` is a load test with extra sim traffic, always on a server of its own. With
+  `--map` it first imports a map set through the Maps panel, `--map synthetic` being one the size
+  of a national AIP, and adds map scenarios with a time to frame for each action.
+- `mise run bench:map` times the pure chart builders on that synthetic set, with no browser or GPU.
+  `--check` holds the medians to the budgets in `scope/scripts/headless/map-budgets.json`, and
+  `--update` rewrites them.
+
+Neither of those two runs in CI: timings on shared runners are too noisy, and the load test needs a
+GPU. Real AIP data is not committed, so `bun scripts/headless/build-synthetic.ts --out <file>` writes
+the synthetic set to a file, to import into a dev server by hand.
 
 The visual tests run in a pinned Playwright container, with Apple's `container` where it is
 installed and Docker elsewhere, so a Mac and CI compare the same pixels. Each image is a baseline in

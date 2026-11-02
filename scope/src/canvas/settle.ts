@@ -1,3 +1,6 @@
+/** How long a zoom must rest before data blocks are laid out again at the new scale. */
+export const ZOOM_SETTLE_MS = 150;
+
 export interface Timer {
   set: (fn: () => void, ms: number) => number;
   clear: (id: number) => void;

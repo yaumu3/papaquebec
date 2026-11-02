@@ -24,7 +24,7 @@ import { parseArgs } from 'node:util';
 import type { Browser, BrowserContext, Page, Route } from 'playwright';
 import { PNG } from 'pngjs';
 
-import { launch, openScope, startPreview } from '../headless/browser';
+import { importChart, launch, openScope, startPreview } from '../headless/browser';
 import { compareImages, cropImage, type Image, type Limits } from './imageDiff';
 import { filterOf, orphansAmong, settled, unknownFilters } from './run';
 import { SITE, type Step, type Visit, VISITS } from './shots';
@@ -104,9 +104,7 @@ async function taken(page: Page, step: Step, style: string): Promise<Taken[]> {
 async function readied(page: Page, visit: Visit): Promise<void> {
   const [first] = visit.fleet ?? [];
   if (first) await page.getByText(listedAs(first), { exact: true }).first().waitFor();
-  if (!visit.chart) return;
-  await page.locator('input[type=file]').setInputFiles(visit.chart.file);
-  await page.getByRole('button', { name: visit.chart.title, exact: true }).waitFor();
+  if (visit.chart) await importChart(page, visit.chart);
 }
 
 async function capture(visit: Visit, browser: Browser): Promise<Taken[]> {
