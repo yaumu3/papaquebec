@@ -14,6 +14,7 @@ import {
   clockTime,
   formatModes,
   formatRoll,
+  latLonText,
   modeNames,
   degreesText,
   padBearing,
@@ -157,6 +158,22 @@ describe('formatMmSs / padBearing', () => {
     // Assert
     expect(t).toEqual(['0:00', '1:05', '59:59', '>1h', '--:--', '--:--']);
     expect(b).toEqual(['360', '360', '005', '359', '360', '360', '360']);
+  });
+});
+
+describe('latLonText', () => {
+  it('reads latitude then longitude to five places, south and west signed', () => {
+    // Arrange
+    const places = [
+      { lat: 35.73266, lon: 139.99644 },
+      { lat: -33.9, lon: -70.8 },
+    ];
+
+    // Act
+    const texts = places.map(latLonText);
+
+    // Assert
+    expect(texts).toEqual(['35.73266 139.99644', '-33.90000 -70.80000']);
   });
 });
 
