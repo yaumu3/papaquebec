@@ -52,6 +52,11 @@ interface Tapped {
   batches?: { data: ArrayBufferView }[];
 }
 
+/** How long an action may take to post before it counts as having posted nothing, in ms. */
+export const NO_POST_MS = 3000;
+/** How long a chart slot must stay unposted for an action to have finished, past a zoom's settling. */
+export const REST_MS = 500;
+
 export interface RecorderOptions {
   /** The delay of the zoom settle timer, the only timer of its length. */
   settleMs: number;

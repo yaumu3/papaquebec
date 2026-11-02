@@ -1,6 +1,9 @@
 /** What the load test does to the page: each scenario acts on it through the UI. */
 import type { Page } from 'playwright';
 
+import { type Chart, importChart } from './browser';
+import { type InputKind, NO_POST_MS, REST_MS } from './recorder';
+
 interface Point {
   x: number;
   y: number;
@@ -108,3 +111,27 @@ export const loadScenarios = (seconds: number): Record<string, Scenario> => ({
       );
   },
 });
+
+/** Takes one action: `act` gives the input, and the recorder waits until the action has finished. */
+async function timed(
+  page: Page,
+  label: string,
+  input: InputKind,
+  act: () => Promise<unknown>,
+  waitMs = NO_POST_MS,
+): Promise<void> {
+  await page.evaluate(([l, i]) => window.benchRecorder.action(l, i), [label, input] as const);
+  await act();
+  await page.evaluate(([w, r]) => window.benchRecorder.acted(w, r), [waitMs, REST_MS] as const);
+}
+
+/** A large set is parsed, validated and built before its first post. */
+const IMPORT_WAIT_MS = 120_000;
+
+/** Loading the set from the Maps panel: the file's `change`, to the chart's slots posted. */
+export const importScenario =
+  (chart: Chart): Scenario =>
+  (page) =>
+    Promise.resolve(() =>
+      timed(page, chart.title, 'change', () => importChart(page, chart), IMPORT_WAIT_MS),
+    );

@@ -13,13 +13,16 @@ import { parseArgs } from 'node:util';
 import type { CDPSession, Page } from 'playwright';
 
 import { ZOOM_SETTLE_MS } from '../../src/canvas/settle';
+import { LABEL_DENSITIES } from '../../src/lib/layers';
+import { resolveSite } from '../map/site';
 import { ACTION_SLOTS } from './actions';
 import { openScope } from './browser';
 import { bundleIn, fnProblems } from './fnCheck';
+import { benchSettings, loadMap, parseMapOption } from './mapOption';
 import { inclusiveMs } from './profile';
 import { installRecorder } from './recorder';
 import { rowsOf, summarize } from './report';
-import { loadScenarios } from './scenarios';
+import { importScenario, loadScenarios } from './scenarios';
 
 const { values: opt } = parseArgs({
   options: {
@@ -34,10 +37,23 @@ const { values: opt } = parseArgs({
         'drawnPointsOf,areaPlaceOf,buildShapes,buildAreaLabels,buildRouteLabels,buildPointLabels,' +
         'buildTraces,buildHighlight,blockSubjects,buildTargets,buildHover,buildOverlays',
     },
+    map: { type: 'string', default: 'none' },
+    layers: { type: 'string', default: 'default' },
+    density: { type: 'string', default: 'normal' },
     json: { type: 'string' },
   },
 });
 
+/** One of `choices`, which `--flag` must name. */
+function oneOf<T extends string>(flag: string, text: string, choices: readonly T[]): T {
+  const choice = choices.find((c) => c === text);
+  if (!choice) throw new Error(`${flag} takes ${choices.join(', ')}, not ${text}`);
+  return choice;
+}
+
+const layers = oneOf('--layers', opt.layers, ['default', 'all'] as const);
+const density = oneOf('--density', opt.density, LABEL_DENSITIES);
+const map = loadMap(parseMapOption(opt.map), resolveSite(opt.site.split(','), {}));
 const traced = opt.fn.split(',').filter(Boolean);
 const problems = fnProblems(traced, bundleIn('dist'));
 if (problems.length > 0) {
@@ -75,6 +91,7 @@ function inSequence<T, R>(items: readonly T[], fn: (item: T) => Promise<R>): Pro
 const { page, log, close } = await openScope({
   from: { sim: { speed: 1, extra: Number(opt.extra), site: opt.site } },
   scale: 2,
+  settings: benchSettings({ map: map !== null, layers, density }),
 });
 try {
   await page.waitForTimeout(Number(opt.warmup));
@@ -84,7 +101,10 @@ try {
   await cdp.send('Profiler.enable');
   await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
   const results = await inSequence(
-    Object.entries(loadScenarios(Number(opt.seconds))),
+    Object.entries({
+      ...(map ? { import: importScenario(map.chart) } : {}),
+      ...loadScenarios(Number(opt.seconds)),
+    }),
     async ([name, ready]) => {
       const run = await ready(page);
       const [sample, ms] = await profiled(cdp, page, async () => {
@@ -97,8 +117,12 @@ try {
   );
   const status = await page.evaluate(() => document.querySelector('#top-bar')?.textContent ?? '');
   console.log(status);
+  if (map) console.log(`map    ${JSON.stringify(map.size)}`);
   console.log(results.flatMap(rowsOf).join('\n'));
-  if (opt.json) writeFileSync(opt.json, JSON.stringify(results, null, 2));
+  if (opt.json) {
+    const report = map ? { map: map.size, scenarios: results } : results;
+    writeFileSync(opt.json, JSON.stringify(report, null, 2));
+  }
   const errors = log.filter((l) => l.includes('error'));
   if (errors.length) console.log(errors.join('\n'));
 } finally {
