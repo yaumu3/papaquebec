@@ -376,7 +376,7 @@ describe('the highlight of a route', () => {
       expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
       expect(new Set(armsOf(lit).map((arm) => arm.a.x))).toEqual(new Set([4, 9]));
       expect(armsOf(lit).map((arm) => arm.color)).toEqual(armsOf(lit).map(() => grey));
-      expect(lit.gaps.count).toBe(2);
+      expect(lit.gaps.count).toBe(1);
     });
 
     it('lights no chevron on a span too short for one', () => {

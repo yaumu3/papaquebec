@@ -432,18 +432,16 @@ describe('the route labels', () => {
       expect(chevron?.arm.x).toBeCloseTo(2.5, 6);
     });
 
-    it('cuts a gap of its own: its slot and 4 px each side', () => {
+    it('cuts no gap in the line, standing alone', () => {
       // Arrange
       const options = { density: 'off' } as const;
 
       // Act
-      const { gaps } = routeLabels([route], options);
+      const { gaps, chevrons } = routeLabels([route], options);
 
       // Assert
-      const [gap] = segments(gaps);
-      expect(gaps.count).toBe(1);
-      expect(gap?.offsetA.x).toBeCloseTo(-7.5, 6);
-      expect(gap?.offsetB.x).toBeCloseTo(7.5, 6);
+      expect(chevrons.count).toBe(2);
+      expect(gaps.count).toBe(0);
     });
 
     it('stays alone where its label does not fit the span', () => {

@@ -379,7 +379,7 @@ interface LitDesignator {
 
 /**
  * Puts the designators of a span along it, each with its chevron, on a gap cut in the line, the
- * designator of the `lit` item in its colour.
+ * designator of the `lit` item in its colour. Chevrons alone sit on the line, with no gap.
  */
 export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut, lit?: LitDesignator) {
   const { middle, designators } = spanLabel;
@@ -401,6 +401,7 @@ export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut, lit?: LitDesi
     }
     pen += advance + SEPARATOR_PX;
   }
+  if (!designators.some((d) => d.name)) return;
   const half = total / 2 + GAP_MARGIN_PX;
   const end = (sign: number) => ({ ...middle.at, ...turned(sign * half, 0, angle) });
   out.gaps.segment(end(-1), end(1), PALETTE.bg, { width: GAP_HEIGHT_PX });
