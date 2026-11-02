@@ -75,7 +75,7 @@ describe('loadMap', () => {
     // Assert
     expect(map?.chart.title).toBe('Synthetic national set, N = 1');
     expect(map?.size.points).toBe(1490);
-    expect(map?.chart.file).toMatchObject({ name: 'synthetic.mapset.geojson' });
+    expect(map?.chart.file).toEndWith('/synthetic.mapset.geojson');
     expect(map?.searched).toBe('QAAAA');
   });
 
