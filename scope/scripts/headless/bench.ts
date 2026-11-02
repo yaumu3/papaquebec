@@ -13,6 +13,7 @@ import { parseArgs } from 'node:util';
 import type { CDPSession, Page } from 'playwright';
 
 import { openScope } from './browser';
+import { bundleIn, fnProblems } from './fnCheck';
 import { inclusiveMs } from './profile';
 import { installRecorder } from './recorder';
 import { rowsOf, summarize } from './report';
@@ -27,13 +28,20 @@ const { values: opt } = parseArgs({
     fn: {
       type: 'string',
       default:
-        'buildRings,buildCoast,buildChart,blockSubjects,buildTargets,buildHover,buildOverlays,setSlot',
+        'buildRings,buildCoast,validateMapSet,chartOf,topologyOf,treeItemsOf,searchTree,drawnItemsOf,' +
+        'drawnPointsOf,areaPlaceOf,buildShapes,buildAreaLabels,buildRouteLabels,buildPointLabels,' +
+        'buildTraces,buildHighlight,blockSubjects,buildTargets,buildHover,buildOverlays',
     },
     json: { type: 'string' },
   },
 });
 
 const traced = opt.fn.split(',').filter(Boolean);
+const problems = fnProblems(traced, bundleIn('dist'));
+if (problems.length > 0) {
+  console.error(problems.join('\n'));
+  process.exit(1);
+}
 
 /**
  * Runs `work` under the CPU profiler and reports what it gave with the time in each traced
