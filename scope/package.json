@@ -26,7 +26,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@bufbuild/buf": "^1.73.0",
+    "@bufbuild/buf": "^1.75.0",
     "@bufbuild/protoc-gen-es": "^2.16.0",
     "@resvg/resvg-js": "^2.6.2",
     "@types/bun": "latest",
@@ -35,12 +35,12 @@
     "ajv": "^8.20.0",
     "fake-indexeddb": "^6.2.7",
     "oxfmt": "^0.68.0",
-    "oxlint": "^1.83.0",
-    "oxlint-tsgolint": "^7.0.2002",
+    "oxlint": "^1.90.0",
+    "oxlint-tsgolint": "^7.0.2005",
     "playwright": "^1.63.0",
     "pngjs": "^7.0.0",
     "typescript": "^7.0.2",
-    "vite": "^8.3.0",
-    "vite-plugin-solid": "^2.11.14"
+    "vite": "^8.3.5",
+    "vite-plugin-solid": "^2.11.15"
   }
 }

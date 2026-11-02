@@ -352,9 +352,9 @@ export const LAYER_GROUPS: readonly { title: string; layers: readonly ScopeLayer
 }));
 
 /** Each layer's mode until the operator says otherwise. */
+// oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every layer has a row
 export const DEFAULT_SHOWN = Object.fromEntries(
   PANEL_ORDER.map((layer) => [layer, LAYER_TABLE[layer].shown]),
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- every layer has a row
 ) as Record<ScopeLayer, boolean>;
 
 export const isAirwayLayer = (layer: ScopeLayer): boolean => LAYER_TABLE[layer].airway === true;
