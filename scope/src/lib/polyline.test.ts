@@ -79,6 +79,22 @@ describe('midpointOf', () => {
   });
 });
 
+describe('pointAlong, past the end', () => {
+  it('gives the end of the last piece', () => {
+    // Arrange
+    const line = [
+      { x: 0, y: 0 },
+      { x: 2, y: 0 },
+    ];
+
+    // Act
+    const point = pointAlong(line, 5);
+
+    // Assert
+    expect(point).toEqual({ at: { x: 2, y: 0 }, direction: { x: 1, y: 0 } });
+  });
+});
+
 describe('readingAngle', () => {
   it('turns a world direction to an upright screen angle, flipping what would read upside down', () => {
     // Arrange

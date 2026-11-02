@@ -34,7 +34,7 @@ export function pointAlong(points: readonly Vec2[], distance: number): Midpoint 
       behind += chord;
       continue;
     }
-    const t = (distance - behind) / chord;
+    const t = Math.min(1, (distance - behind) / chord);
     const direction = { x: (b.x - a.x) / chord, y: (b.y - a.y) / chord };
     return { at: { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t }, direction };
   }
