@@ -30,7 +30,7 @@ const GRID_PER_DEGREE = 1e5;
 export const toGrid = (degrees: number): number => Math.round(degrees * GRID_PER_DEGREE);
 
 /** What names a position: the cells of its longitude and latitude, as one string. */
-export const gridIdentity = ([lon, lat]: LonLat): string => `${toGrid(lon)},${toGrid(lat)}`;
+export const gridIdentity = (at: LonLat): string => `${toGrid(at[0])},${toGrid(at[1])}`;
 
 /** The name a part is filed under, if its layer gives one. */
 export const nameOf = ({ properties: p }: ItemPart): string | undefined =>

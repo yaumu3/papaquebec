@@ -4,7 +4,8 @@ import type { Vec2 } from './geo';
 
 /** The distance between two points; a chart's chords are many, and `Math.hypot` is slow. */
 export function chordOf(a: Vec2, b: Vec2): number {
-  const [dx, dy] = [b.x - a.x, b.y - a.y];
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
   return Math.sqrt(dx * dx + dy * dy);
 }
 

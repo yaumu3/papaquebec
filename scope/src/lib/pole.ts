@@ -49,13 +49,15 @@ interface Chunk {
 function chunkOf(edges: readonly Segment[]): Chunk {
   const min = { x: Infinity, y: Infinity };
   const max = { x: -Infinity, y: -Infinity };
+  const stretch = ({ x, y }: Vec2) => {
+    min.x = Math.min(min.x, x);
+    min.y = Math.min(min.y, y);
+    max.x = Math.max(max.x, x);
+    max.y = Math.max(max.y, y);
+  };
   for (const edge of edges) {
-    for (const { x, y } of edge) {
-      min.x = Math.min(min.x, x);
-      min.y = Math.min(min.y, y);
-      max.x = Math.max(max.x, x);
-      max.y = Math.max(max.y, y);
-    }
+    stretch(edge[0]);
+    stretch(edge[1]);
   }
   return { edges, min, max };
 }
@@ -104,7 +106,9 @@ export const roomsAmong: RoomAt = (rings) => {
       const near = nearestSquare(p, chunk) <= bound * WITH_ROUNDING;
       const across = p.y >= min.y && p.y <= max.y && p.x <= max.x;
       if (!near && !across) continue;
-      for (const [a, b] of edges) {
+      for (const edge of edges) {
+        const a = edge[0];
+        const b = edge[1];
         if (across && a.y > p.y !== b.y > p.y) {
           if (p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) crossings++;
         }
@@ -190,7 +194,7 @@ export interface AreaPlace {
 }
 
 const projected = (ring: readonly LonLat[], project: ProjectFn): Vec2[] =>
-  ring.map(([lon, lat]) => project(lat, lon));
+  ring.map((at) => project(at[1], at[0]));
 
 /** The polygon part with the largest exterior ring, measured on the plane. */
 function largestPolygon(parts: readonly ItemPart[], project: ProjectFn) {

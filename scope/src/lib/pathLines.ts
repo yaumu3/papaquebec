@@ -26,26 +26,16 @@ export interface PathLine {
 export type LineOf = (path: ChartPath) => PathLine;
 
 /** Goes on along an edge not yet walked, starting the line if nothing has. */
-function walkEdge(
-  points: number[],
-  [aLon, aLat]: LonLat,
-  [bLon, bLat]: LonLat,
-  project: ProjectFn,
-) {
+function walkEdge(points: number[], from: LonLat, to: LonLat, project: ProjectFn) {
+  const a = { lat: from[1], lon: from[0] };
+  const b = { lat: to[1], lon: to[0] };
   const pa =
     points.length > 0
       ? { x: points[points.length - 2] ?? 0, y: points[points.length - 1] ?? 0 }
-      : project(aLat, aLon);
+      : project(a.lat, a.lon);
   if (points.length === 0) points.push(pa.x, pa.y);
-  const pb = project(bLat, bLon);
-  const between = pointsBetween(
-    { lat: aLat, lon: aLon },
-    pa,
-    { lat: bLat, lon: bLon },
-    pb,
-    project,
-  );
-  for (const { x, y } of between) points.push(x, y);
+  const pb = project(b.lat, b.lon);
+  for (const { x, y } of pointsBetween(a, pa, b, pb, project)) points.push(x, y);
   points.push(pb.x, pb.y);
 }
 
@@ -53,7 +43,8 @@ function walkEdge(
 function copyEdge(points: number[], from: PathLine, slot: number, forward: boolean) {
   const first = from.at[slot] ?? 0;
   const last = from.at[slot + 1] ?? 0;
-  const [start, step] = forward ? [first, 2] : [last, -2];
+  const start = forward ? first : last;
+  const step = forward ? 2 : -2;
   const count = (last - first) / 2 + 1;
   for (let n = points.length === 0 ? 0 : 1; n < count; n++) {
     const at = start + n * step;
@@ -63,10 +54,8 @@ function copyEdge(points: number[], from: PathLine, slot: number, forward: boole
 
 /** The length of the chords between two places in `points`. */
 function lengthBetween(points: readonly number[], from: number, to: number): number {
-  const [a, b] = [
-    { x: 0, y: 0 },
-    { x: 0, y: 0 },
-  ];
+  const a = { x: 0, y: 0 };
+  const b = { x: 0, y: 0 };
   let length = 0;
   for (let i = from; i < to; i += 2) {
     a.x = points[i] ?? 0;
