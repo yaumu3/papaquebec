@@ -6,6 +6,7 @@ import type { Locator, Page } from 'playwright';
 
 import { DRAW_STACK, LAYER_GROUPS } from '../../src/lib/layers';
 import { FL_MAX } from '../../src/state/filter';
+import type { Chart } from '../headless/browser';
 import { cellOf, onScope, type Place, type Sheet } from './grid';
 import type { Clip } from './imageDiff';
 import { SPECIMEN_TITLE, specimenSheet } from './specimens';
@@ -33,14 +34,9 @@ export interface Step {
   crops?: readonly Crop[];
 }
 
-/** What a page imports through the Maps panel before its steps. */
-interface Chart {
-  title: string;
-  file: { name: string; mimeType: string; buffer: Buffer } | string;
-}
-
 export interface Visit {
   settings: Record<string, unknown>;
+  /** What the page imports before its steps. */
   chart?: Chart;
   /** Flown over a scope with no chart. */
   fleet?: readonly Flight[];

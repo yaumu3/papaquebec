@@ -182,3 +182,15 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
     };
   });
 }
+
+/** What a page imports through the Maps panel. */
+export interface Chart {
+  title: string;
+  file: { name: string; mimeType: string; buffer: Buffer } | string;
+}
+
+/** Imports a map set through the Maps panel, resolved once its title is listed among the sources. */
+export async function importChart(page: Page, { file, title }: Chart): Promise<void> {
+  await page.locator('input[type=file]').setInputFiles(file);
+  await page.getByRole('button', { name: title, exact: true }).waitFor();
+}
