@@ -113,6 +113,14 @@ describe('ndFrame', () => {
 const texts = (r: NdReadouts) =>
   [r.gs, r.tas, r.wind, r.sel, r.hdg, r.tat, r.sat].map((x) => x.text);
 
+const wind = (speedAt: number) =>
+  makeSample(NOW, {
+    seen: 1,
+    windDir: 276,
+    windSpeed: 40,
+    heard: { windDir: FRESH, windSpeed: speedAt },
+  });
+
 describe('ndReadouts', () => {
   it('reads every value of the corners, the wind magnetic and the heading as reported', () => {
     // Arrange
@@ -190,13 +198,6 @@ describe('ndReadouts', () => {
 
   it('is as old as the oldest of the inputs of a derived value', () => {
     // Arrange
-    const wind = (speedAt: number) =>
-      makeSample(NOW, {
-        seen: 1,
-        windDir: 276,
-        windSpeed: 40,
-        heard: { windDir: FRESH, windSpeed: speedAt },
-      });
     const rows = [wind(NOW - LAPSE_SEC - 1), wind(NOW - LAPSE_SEC + 1), wind(FRESH)];
 
     // Act

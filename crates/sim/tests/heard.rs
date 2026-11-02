@@ -376,7 +376,7 @@ fn turning_arrivals_carry_their_roll_and_track_rate() {
         .collect();
 
     // Assert: whoever turns rolls the same way, within what an airliner banks
-    assert!(!turning.is_empty());
+    assert_ne!(turning, [] as [(f64, Option<f64>); 0]);
     let banked = |(rate, roll): &(f64, Option<f64>)| {
         roll.is_some_and(|roll| roll.signum() == rate.signum() && roll.abs() <= 35.0)
     };

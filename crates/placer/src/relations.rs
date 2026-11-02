@@ -231,7 +231,7 @@ mod tests {
 
         // Assert
         assert_eq!(leader, [None, None]);
-        assert!(chains.is_empty());
+        assert_eq!(chains, [] as [Vec<usize>; 0]);
     }
 
     #[test]

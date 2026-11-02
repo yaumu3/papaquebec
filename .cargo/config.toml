@@ -1,0 +1,3 @@
+# Stable Cargo honours this from 1.100; before that it warns, and `mise run check:crates` enforces it.
+[registry]
+global-min-publish-age = "3 days"

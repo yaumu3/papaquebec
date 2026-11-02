@@ -1,12 +1,15 @@
+[settings]
+minimum_release_age = "3d"
+
 [tools]
 bun = "1.4"
-rust = { version = "1.98", components = [
+rust = { version = "1.99", components = [
   "clippy",
   "rustfmt",
 ], targets = [
   "wasm32-unknown-unknown",
 ] }
-"github:wasm-bindgen/wasm-bindgen" = "0.2.129"
+"github:wasm-bindgen/wasm-bindgen" = "0.2.130"
 
 [tasks."dev:web"]
 description = "The server, over plain http for the dev server to pass requests on to"
@@ -28,8 +31,14 @@ depends = ["dev:web", "dev:scope"]
 description = "The scope and its server flying the synthetic fleet around PQ_SITE (RJTT by default)"
 run = 'PQ_SIM="${PQ_SITE:-35.5533,139.7811}" mise run dev'
 
+[tasks."check:crates"]
+description = "Refuse a crate in Cargo.lock younger than the minimum age in .cargo/config.toml"
+dir = "scope"
+run = "bun scripts/crates/age.ts"
+
 [tasks."check:server"]
 description = "The checks of the server's crates, as CI runs them"
+depends = ["check:crates"]
 run = [
   "cargo fmt --all --check",
   "cargo clippy --workspace --all-targets --locked -- -D warnings",
