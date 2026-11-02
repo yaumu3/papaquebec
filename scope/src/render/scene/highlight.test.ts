@@ -583,6 +583,19 @@ describe('the highlight of a route', () => {
     });
   });
 
+  it('lights the chevron alone of a one-way route whose layer has no label', () => {
+    // Arrange
+    const dct = oneWay('dct', 'D1', [0, 0], [2, 0]);
+    const scene = sceneOf([dct], { hidden: ['D1'] });
+
+    // Act
+    const lit = scene.highlight(dct);
+
+    // Assert
+    expect([lit.gaps.count, lit.text.count]).toEqual([0, 0]);
+    expect(armsOf(lit).map((arm) => arm.color)).toEqual([grey, grey]);
+  });
+
   it('draws nothing for an item whose layer has no label', () => {
     // Arrange
     const chart = [airway('dct', 'D1', [0, 0], [2, 0])];

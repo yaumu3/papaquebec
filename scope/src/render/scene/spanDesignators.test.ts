@@ -485,6 +485,18 @@ describe('the route labels', () => {
       expect(drawn).toEqual(rows.map(([, expected]) => expected));
     });
 
+    it('is drawn in the line colour for a route whose layer has no label', () => {
+      // Arrange
+      const dct = oneWay('dct', 'D1', [0, 0], [2, 0]);
+
+      // Act
+      const { text, chevrons } = routeLabels([dct], { density: 'dense' });
+
+      // Assert
+      expect(text.count).toBe(0);
+      expect(chevronsIn(chevrons, 0).map((c) => c.color)).toEqual([packed('#82573c')]);
+    });
+
     it('is not drawn for a hidden route, nor for a route flown both ways', () => {
       // Arrange
       const rows: [Chart, SceneOptions][] = [
