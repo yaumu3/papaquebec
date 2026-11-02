@@ -60,6 +60,22 @@ describe('pathSpans', () => {
     expect(span?.length).toBe(7);
   });
 
+  it('keeps what it measured of a stretch for builds with other cuts at its ends', () => {
+    // Arrange
+    const path = pathThrough([0, 0], [3, 0], [3, 4]);
+    const lineOf = pathLines(project);
+    const [before] = pathSpans(NO_CUTS, lineOf)(path);
+    const stopped = new Map([[path.vertices[2] ?? -1, 7]]);
+
+    // Act
+    const [after] = pathSpans(stopped, lineOf)(path);
+
+    // Assert
+    expect(after?.cutAhead).toBe(7);
+    expect(before?.cutAhead).toBe(0);
+    expect(after?.middle).toBe(before?.middle);
+  });
+
   it('keeps each path whole when nothing stops it', () => {
     // Arrange
     const path = pathThrough([0, 0], [3, 0], [3, 4]);

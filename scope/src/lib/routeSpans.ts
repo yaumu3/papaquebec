@@ -46,17 +46,30 @@ function middleOf(line: PathLine, { from, to }: Span, length: number) {
   return pointAlong(edgePoints(line, edge), length / 2 - reachOf(edge));
 }
 
-function routeSpan(path: ChartPath, span: Span, line: PathLine): RouteSpan {
+/** What a span's ends alone decide, so that a change of the points that stop it keeps it. */
+type Measured = Pick<RouteSpan, 'id' | 'length' | 'start' | 'middle'>;
+
+function measuredSpan(path: ChartPath, span: Span, line: PathLine): Measured {
   const length = (line.reach[span.to] ?? 0) - (line.reach[span.from] ?? 0);
   const middle = middleOf(line, span, length);
   return {
-    ...span,
     id: spanIdentity(path, span),
-    line,
     length,
     start: gridIdentity(path.coordinates[span.from] ?? [0, 0]),
     ...(middle && { middle: { ...middle, ...readingAngle(middle.direction) } }),
   };
+}
+
+/** Each line's stretches measured so far, by their ends. */
+const stretches = new WeakMap<PathLine, Map<number, Measured>>();
+
+function routeSpan(path: ChartPath, span: Span, line: PathLine): RouteSpan {
+  const known = stretches.get(line) ?? new Map<number, Measured>();
+  stretches.set(line, known);
+  const key = span.from * line.reach.length + span.to;
+  const measured = known.get(key) ?? measuredSpan(path, span, line);
+  known.set(key, measured);
+  return { ...span, ...measured, line };
 }
 
 /** Keeps each path's spans once made. */
