@@ -140,6 +140,9 @@ describe('laneTraces on the ground', () => {
   });
 });
 
+const readCourse = (s: Sample) => ({ trk: s.track, hdg: s.heading });
+const has = (s: Sample) => s.heading !== undefined;
+
 describe('atTicks', () => {
   it('reads a sample under the lapse from the tick, none exactly the lapse or more', () => {
     // Arrange
@@ -156,8 +159,6 @@ describe('atTicks', () => {
     expect(barbs).toEqual([1, 0, 0]);
   });
 
-  const read = (s: Sample) => ({ trk: s.track, hdg: s.heading });
-  const has = (s: Sample) => s.heading !== undefined;
   type Read = { t: number; trk: number | undefined; hdg: number | undefined };
 
   it('prefers a sample with a heading within its reach, but never one a gap away', () => {
@@ -183,7 +184,7 @@ describe('atTicks', () => {
 
     // Act
     const reads = rows.map(([samples, tick, withinSec]) =>
-      atTicks(samples, [tick], read, { has, withinSec }),
+      atTicks(samples, [tick], readCourse, { has, withinSec }),
     );
 
     // Assert

@@ -11,6 +11,9 @@ import { type PickerAnchor, pickerBox } from './pickerPlace';
 
 import s from './Picker.module.css';
 
+/** The mouse events that follow a touch would move the focus to the page. */
+const keepFocus = (e: MouseEvent) => e.preventDefault();
+
 /**
  * The lanes by group as chips, to switch the lane `own` to another or, with none, to add one;
  * under a rule, a lane's own row of moves. It floats over the page at a point, kept inside the
@@ -55,8 +58,6 @@ export function Picker(props: {
   const onScroll = (e: Event) => {
     if (!(e.target instanceof Node && el.contains(e.target))) close();
   };
-  /** The mouse events that follow a touch would move the focus to the page. */
-  const keepFocus = (e: MouseEvent) => e.preventDefault();
   /** What it is for, which stands lit. */
   const anchorBox = props.anchor.getBoundingClientRect();
   const lit = props.clip ? clipBox(anchorBox, props.clip) : anchorBox;
