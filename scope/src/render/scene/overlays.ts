@@ -1,3 +1,4 @@
+import { latLonText } from '../../lib/format';
 import type { ProjectFn, UnprojectFn } from '../../lib/geo';
 import { geodesicPath } from '../../lib/geodesic';
 import type { Declination } from '../../lib/wmm';
@@ -58,7 +59,7 @@ function drawRangeCursor(
     from = t ? trackPoint(t) : null;
   } else {
     const label =
-      origin.kind === 'fix' ? origin.name : `${origin.x.toFixed(1)}, ${origin.y.toFixed(1)}`;
+      origin.kind === 'fix' ? origin.name : latLonText(input.unproject(origin.x, origin.y));
     from = freePoint({ x: origin.x, y: origin.y }, label, input.unproject);
   }
   if (!from) return;

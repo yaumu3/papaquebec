@@ -9,6 +9,7 @@ import {
   formatModes,
   formatRoll,
   degreesText,
+  latLonText,
   sourceName,
 } from '../lib/format';
 import type { GeoPoint } from '../lib/geo';
@@ -40,7 +41,7 @@ export const POSITION_LABEL = 'POSITION';
 
 /** The position as a reading. */
 export function positionReading(at: GeoPoint | undefined): Reading {
-  return at === undefined ? NONE : { v: `${at.lat.toFixed(5)} ${at.lon.toFixed(5)}` };
+  return at === undefined ? NONE : { v: latLonText(at) };
 }
 
 const num = (v: number | undefined, unit: string, digits = 0): Reading =>

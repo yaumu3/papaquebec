@@ -1,5 +1,5 @@
 import type { PositionSource } from './aircraft';
-import { NM_IN_METERS } from './geo';
+import { type GeoPoint, NM_IN_METERS } from './geo';
 
 export type ClimbState = 'climbing' | 'descending' | 'level';
 
@@ -151,6 +151,9 @@ export function padBearing(deg: number): string {
 
 /** A bearing as padBearing writes it, with its degree mark. */
 export const degreesText = (deg: number): string => `${padBearing(deg)}°`;
+
+/** Latitude then longitude in signed degrees, to about a metre. */
+export const latLonText = (at: GeoPoint): string => `${at.lat.toFixed(5)} ${at.lon.toFixed(5)}`;
 
 export function padTrack(deg: number | undefined): string {
   return deg === undefined ? '---' : padBearing(deg);

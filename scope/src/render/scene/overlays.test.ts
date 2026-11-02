@@ -80,8 +80,9 @@ describe('buildOverlays', () => {
   });
 });
 
-/** A glyph anchored at world `at`: where it is inked relative to the anchor, CSS px, its size and color. */
+/** A glyph anchored at world `at`: which it is, where it is inked relative to the anchor, CSS px, its size and color. */
 interface Glyph {
+  char: string;
   left: number;
   right: number;
   top: number;
@@ -101,8 +102,11 @@ function inked(batches: Batch[], at: Vec2): Glyph[] {
     const scale = (d[o + 4] ?? 0) / atlas.cellW;
     const buf = atlas.buffer * scale;
     const left = (d[o + 2] ?? 0) + buf;
+    const col = Math.round(((d[o + 6] ?? 0) * atlas.width) / atlas.cellW);
+    const row = Math.round(((d[o + 7] ?? 0) * atlas.height) / atlas.cellH);
     const top = (d[o + 3] ?? 0) + buf;
     out.push({
+      char: atlas.chars.charAt(row * atlas.columns + col),
       left,
       right: left + atlas.advance * scale,
       top,
@@ -128,5 +132,21 @@ describe('the range cursor readout', () => {
     // Assert
     const top = Math.min(...glyphs.map((g) => g.top));
     expect(glyphs.filter((g) => g.top === top).length).toBe('49.1'.length);
+  });
+
+  it('names a free origin by its latitude and longitude', () => {
+    // Arrange
+    const input = overlays({
+      rangeCursor: { kind: 'free', x: 130.25, y: 35.5 },
+      pointer: { cx: 500, cy: 300 },
+    });
+
+    // Act
+    const glyphs = inked(buildOverlays(input), { x: 131, y: 35 });
+
+    // Assert: a space draws no glyph
+    const bottom = Math.max(...glyphs.map((g) => g.top));
+    const name = glyphs.filter((g) => g.top === bottom).map((g) => g.char);
+    expect(name.join('')).toBe('35.50000130.25000');
   });
 });
