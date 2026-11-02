@@ -38,9 +38,23 @@ export interface MapSize {
 
 export interface LoadedMap {
   chart: Chart;
-  data: MapSetData;
   size: MapSize;
+  /** A name the tree's search finds: a fix's if the set has one. */
+  searched: string;
 }
+
+function searchedIn({ features }: MapSetData): string {
+  const named = features.flatMap(({ properties: p }) => ('id' in p ? [p] : []));
+  const { id } = named.find((p) => p.layer === 'fix') ?? named[0] ?? {};
+  return id ?? 'A';
+}
+
+/** What a run needs of a set it loads from `file`. */
+const loaded = (data: MapSetData, file: Chart['file']): LoadedMap => ({
+  chart: { title: data.title, file },
+  size: sizeOf(data),
+  searched: searchedIn(data),
+});
 
 function sizeOf(data: MapSetData): MapSize {
   const { chart, areas, routes, points } = topologyOf(chartOf([data]));
@@ -56,18 +70,16 @@ function sizeOf(data: MapSetData): MapSize {
 function mapFromFile(path: string): LoadedMap {
   const valid = validateMapSet(JSON.parse(readFileSync(path, 'utf8')));
   if (!valid.ok) throw new Error(`${path}: ${valid.message}`);
-  const { data } = valid;
-  return { chart: { title: data.title, file: path }, data, size: sizeOf(data) };
+  return loaded(valid.data, path);
 }
 
 function syntheticMap(site: GeoPoint, scale: number): LoadedMap {
   const { data } = syntheticMapSet({ site, scale });
-  const file = {
+  return loaded(data, {
     name: 'synthetic.mapset.geojson',
     mimeType: 'application/geo+json',
     buffer: Buffer.from(JSON.stringify(data)),
-  };
-  return { chart: { title: data.title, file }, data, size: sizeOf(data) };
+  });
 }
 
 /** The map a run imports, sized on this side rather than read from the page. */

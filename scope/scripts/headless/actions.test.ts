@@ -58,11 +58,11 @@ describe('actionTimes', () => {
     expect(time?.toFrame).toBe(15);
   });
 
-  it('leaves a post before the input or from the next action out of an action', () => {
+  it('leaves a post before the input or past the finish out of an action', () => {
     // Arrange
     const r = recording({
       actions: [
-        { at: 100, label: 'one', input: 'click' },
+        { at: 100, label: 'one', input: 'click', until: 300 },
         { at: 300, label: 'two', input: 'click' },
       ],
       inputs: [click(110), click(310)],
@@ -79,6 +79,44 @@ describe('actionTimes', () => {
 
     // Assert
     expect(times.map((t) => t.toFrame)).toEqual([20, 20]);
+  });
+
+  it('leaves out what a scenario does between one finished action and the next', () => {
+    // Arrange
+    const r = recording({
+      actions: [
+        { at: 100, label: 'one', input: 'click', until: 700 },
+        { at: 900, label: 'two', input: 'click' },
+      ],
+      inputs: [click(110), click(910)],
+      posts: [
+        { at: 120, slot: 'areaLines' },
+        { at: 800, slot: 'traces' },
+      ],
+      draws: [130, 810],
+    });
+
+    // Act
+    const [time] = actionTimes(r);
+
+    // Assert
+    expect(time?.toFrame).toBe(20);
+  });
+
+  it('gives no time to an action whose only post came before its input', () => {
+    // Arrange
+    const r = recording({
+      actions: [{ at: 100, label: 'FIXES', input: 'click', until: 200 }],
+      inputs: [click(110)],
+      posts: [{ at: 105, slot: 'traces' }],
+      draws: [106, 120],
+    });
+
+    // Act
+    const [time] = actionTimes(r);
+
+    // Assert
+    expect(time?.toFrame).toBeNull();
   });
 
   it('times from the input the action waits for, not an earlier kind', () => {

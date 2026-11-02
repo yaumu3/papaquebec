@@ -33,7 +33,7 @@ export type Summary = ReturnType<typeof summarize>;
 
 /** A row of actions: the time to frame and the long tasks of each, those that posted no chart slot apart. */
 const actionRow = (title: string, a: ActionSummary) =>
-  `         ${title.padEnd(10)}×${a.actions}  ` +
+  `         ${title.padEnd(12)}×${a.actions}  ` +
   `to frame p50 ${f1(a.toFrameP50)} max ${f1(a.toFrameMax)} ms  ` +
   `long p50 ${f1(a.longTaskP50)} max ${f1(a.longTaskMax)} ms  longest ${f1(a.longestMs)} ms` +
   (a.noPost > 0 ? `  no chart post ×${a.noPost}` : '');

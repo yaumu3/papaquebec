@@ -13,6 +13,8 @@ export interface ActionMark {
   at: number;
   label: string;
   input: InputKind;
+  /** When it had finished; what the scenario does after that is not the action's. */
+  until?: number;
 }
 
 /** What one scenario leaves behind. */
@@ -159,7 +161,12 @@ export function installRecorder({ settleMs, actionSlots }: RecorderOptions): voi
         return t - lastPost >= (lastDraw >= lastPost ? restMs : waitMs);
       };
       return new Promise((resolve) => {
-        const poll = () => (finished() ? resolve() : setTimer(poll, 20));
+        const poll = () => {
+          if (!finished()) return setTimer(poll, 20);
+          const mark = now?.actions.at(-1);
+          if (mark) mark.until = performance.now();
+          return resolve();
+        };
         poll();
       });
     },

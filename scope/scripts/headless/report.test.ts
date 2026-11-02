@@ -96,7 +96,7 @@ describe('rowsOf', () => {
       'toggle',
       recording({
         actions: [
-          { at: 100, label: 'SECTORS', input: 'click' },
+          { at: 100, label: 'SECTORS', input: 'click', until: 200 },
           { at: 200, label: 'FIXES', input: 'click' },
         ],
         inputs: [
@@ -114,9 +114,9 @@ describe('rowsOf', () => {
 
     // Assert
     expect(rows.slice(3)).toEqual([
-      '         actions   ×2  to frame p50 20.0 max 20.0 ms  long p50 0.0 max 0.0 ms  longest 0.0 ms  no chart post ×1',
-      '         SECTORS   ×1  to frame p50 20.0 max 20.0 ms  long p50 0.0 max 0.0 ms  longest 0.0 ms',
-      '         FIXES     ×1  to frame p50 0.0 max 0.0 ms  long p50 0.0 max 0.0 ms  longest 0.0 ms  no chart post ×1',
+      '         actions     ×2  to frame p50 20.0 max 20.0 ms  long p50 0.0 max 0.0 ms  longest 0.0 ms  no chart post ×1',
+      '         SECTORS     ×1  to frame p50 20.0 max 20.0 ms  long p50 0.0 max 0.0 ms  longest 0.0 ms',
+      '         FIXES       ×1  to frame p50 0.0 max 0.0 ms  long p50 0.0 max 0.0 ms  longest 0.0 ms  no chart post ×1',
     ]);
   });
 });

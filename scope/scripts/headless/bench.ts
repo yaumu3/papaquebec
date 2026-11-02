@@ -1,11 +1,21 @@
 /**
  * Load test: the built scope in headless Chromium, fed by a server flying the sim with extra
- * traffic, driven through idle, pan, zoom and hover. Reports main-thread frame intervals and long tasks, the
- * messages posted to the render worker (one `slot:<name>` per slot rebuild) with their bytes,
- * and the sampled time in each function named in `--fn`, callees included. Function names need
- * the unminified build `bun run bench` makes.
+ * traffic, driven through idle, pan, zoom and hover. Reports main-thread frame intervals and long
+ * tasks, the messages posted to the render worker (one `slot:<name>` per slot rebuild) with their
+ * bytes, and the sampled time in each function named in `--fn`, callees included. A name in
+ * `--fn` must be that of one function declared in the build, which keeps names only in the
+ * unminified build `bun run bench` makes.
  *
  *   bun run bench [--extra 300] [--seconds 3] [--warmup 6000] [--fn a,b] [--json out.json]
+ *     [--site lat,lon] [--map none|example|synthetic[=N]|<file>] [--layers default|all]
+ *     [--density normal] [--scenarios a,b]
+ *
+ * `--map` imports a map set through the Maps panel as the first scenario, `import`; `synthetic` is
+ * the national-scale set of `synthetic.ts`, N times over. The map scenarios then run after the
+ * others, with a time to frame for each action: `toggle`, `settle`, `range`, `search`, `point`.
+ * The time runs from the input to the first draw after the action's last post to a chart, label,
+ * trace or highlight slot. `settle` is timed from the settle delay firing; `range` crosses the
+ * navaid threshold, and its time holds that delay, since its labels wait for it too.
  */
 import { writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
@@ -22,7 +32,13 @@ import { benchSettings, loadMap, parseMapOption } from './mapOption';
 import { inclusiveMs } from './profile';
 import { installRecorder } from './recorder';
 import { rowsOf, summarize } from './report';
-import { importScenario, loadScenarios } from './scenarios';
+import {
+  chosenScenarios,
+  importScenario,
+  inSequence,
+  loadScenarios,
+  mapScenarios,
+} from './scenarios';
 
 const { values: opt } = parseArgs({
   options: {
@@ -40,6 +56,7 @@ const { values: opt } = parseArgs({
     map: { type: 'string', default: 'none' },
     layers: { type: 'string', default: 'default' },
     density: { type: 'string', default: 'normal' },
+    scenarios: { type: 'string' },
     json: { type: 'string' },
   },
 });
@@ -54,6 +71,14 @@ function oneOf<T extends string>(flag: string, text: string, choices: readonly T
 const layers = oneOf('--layers', opt.layers, ['default', 'all'] as const);
 const density = oneOf('--density', opt.density, LABEL_DENSITIES);
 const map = loadMap(parseMapOption(opt.map), resolveSite(opt.site.split(','), {}));
+const scenarios = chosenScenarios(
+  {
+    ...(map ? { import: importScenario(map.chart) } : {}),
+    ...loadScenarios(Number(opt.seconds)),
+    ...(map ? mapScenarios(map.searched) : {}),
+  },
+  opt.scenarios,
+);
 const traced = opt.fn.split(',').filter(Boolean);
 const problems = fnProblems(traced, bundleIn('dist'));
 if (problems.length > 0) {
@@ -80,14 +105,6 @@ async function profiled<T>(
   return [done, inclusiveMs(profile, traced)];
 }
 
-/** `fn` over `items`, one after another. */
-function inSequence<T, R>(items: readonly T[], fn: (item: T) => Promise<R>): Promise<R[]> {
-  return items.reduce<Promise<R[]>>(
-    async (done, item) => [...(await done), await fn(item)],
-    Promise.resolve([]),
-  );
-}
-
 const { page, log, close } = await openScope({
   from: { sim: { speed: 1, extra: Number(opt.extra), site: opt.site } },
   scale: 2,
@@ -100,21 +117,15 @@ try {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Profiler.enable');
   await cdp.send('Profiler.setSamplingInterval', { interval: 100 });
-  const results = await inSequence(
-    Object.entries({
-      ...(map ? { import: importScenario(map.chart) } : {}),
-      ...loadScenarios(Number(opt.seconds)),
-    }),
-    async ([name, ready]) => {
-      const run = await ready(page);
-      const [sample, ms] = await profiled(cdp, page, async () => {
-        await page.evaluate(() => window.benchRecorder.start());
-        await run();
-        return page.evaluate(() => window.benchRecorder.stop());
-      });
-      return summarize(name, sample, ms);
-    },
-  );
+  const results = await inSequence(scenarios, async ([name, ready]) => {
+    const run = await ready(page);
+    const [sample, ms] = await profiled(cdp, page, async () => {
+      await page.evaluate(() => window.benchRecorder.start());
+      await run();
+      return page.evaluate(() => window.benchRecorder.stop());
+    });
+    return summarize(name, sample, ms);
+  });
   const status = await page.evaluate(() => document.querySelector('#top-bar')?.textContent ?? '');
   console.log(status);
   if (map) console.log(`map    ${JSON.stringify(map.size)}`);

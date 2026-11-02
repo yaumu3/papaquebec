@@ -32,7 +32,7 @@ const noTime = (label: string): ActionTime => ({
   longestMs: 0,
 });
 
-function timeOf({ label, input, at }: ActionMark, until: number, r: Recording): ActionTime {
+function timeOf({ label, input, at, until = Infinity }: ActionMark, r: Recording): ActionTime {
   const within = (t: number) => t >= at && t < until;
   const started = r.inputs.find((i) => i.kind === input && within(i.at))?.at;
   if (started === undefined) return noTime(label);
@@ -50,9 +50,8 @@ function timeOf({ label, input, at }: ActionMark, until: number, r: Recording): 
   };
 }
 
-/** Each action of a recording, in order: its window closes where the next action begins. */
-export const actionTimes = (r: Recording): ActionTime[] =>
-  r.actions.map((mark, i) => timeOf(mark, r.actions[i + 1]?.at ?? Infinity, r));
+/** Each action of a recording, in order. */
+export const actionTimes = (r: Recording): ActionTime[] => r.actions.map((mark) => timeOf(mark, r));
 
 /** The p50 and max of some actions' times to frame and long tasks, with those that posted nothing apart. */
 export function summaryOf(times: readonly ActionTime[]) {
