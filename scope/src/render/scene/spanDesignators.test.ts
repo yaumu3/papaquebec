@@ -522,9 +522,8 @@ describe('the route labels', () => {
       const { text, chevrons } = routeLabels(chart, { density: 'normal' });
 
       // Assert
-      const found = chevronsIn(chevrons, 0);
       expect(textRuns(text).map((l) => l.text)).toEqual(['V901']);
-      expect(found.map((c) => c.color)).toEqual([procedureLabel]);
+      expect(chevronsIn(chevrons, 0).map((c) => c.color)).toEqual([procedureLabel]);
     });
 
     it('does not cost an airway the room its label needs', () => {

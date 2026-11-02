@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { CHART_COLORS, PALETTE } from '../../design/palette';
+import type { Batch } from '../protocol';
 import {
   airway,
   box,
@@ -23,6 +24,10 @@ import {
 const navaid = (kind: string, at: Position) =>
   itemOf('navaid', partOf('navaid', point(at), { kind }));
 const WEST = () => () => -7;
+
+/** What each text batch among `batches` says. */
+const spellings = (batches: readonly Batch[]) =>
+  batches.filter((b) => b.kind === 'text').map(spelled);
 
 /** A marker without its colour. */
 const shapeOf = ({ at, size, shape }: ReturnType<typeof markers>[number]) => ({ at, size, shape });
@@ -237,10 +242,8 @@ describe('the traces', () => {
     const { litTraces, litPoints } = scene.traces({ pointedAt: route, searched: [] });
 
     // Assert
-    const spell = (batches: typeof litPoints) =>
-      batches.filter((b) => b.kind === 'text').map(spelled);
-    expect(spell(litPoints)).toEqual(['F1']);
-    expect(spell(litTraces)).toEqual(['V901V901']);
+    expect(spellings(litPoints)).toEqual(['F1']);
+    expect(spellings(litTraces)).toEqual(['V901V901']);
   });
 
   it("puts a point's highlight among the traced points, and none in the traces", () => {

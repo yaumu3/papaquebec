@@ -43,6 +43,12 @@ const inColor = (text: Batch, color: number[]) =>
 /** A one-way SID through these positions. */
 const procedure = (at: [number, number][]) => [oneWay('sid', 'S1', ...at)];
 
+/** The colour of every row the lit points draw: markers, symbol strokes, then idents. */
+const colorsOf = (points: ReturnType<ReturnType<typeof sceneOf>['highlight']>['points']) =>
+  [...markers(points.markers), ...segments(points.strokes), ...glyphs(points.idents)].map(
+    (row) => row.color,
+  );
+
 /** The chevron arms a highlight draws. */
 const armsOf = (lit: ReturnType<ReturnType<typeof sceneOf>['highlight']>) => segments(lit.strokes);
 
@@ -465,10 +471,9 @@ describe('the highlight of a route', () => {
       const scene = sceneOf(both, { density: 'normal' });
 
       // Act
-      const lit = scene.highlight(itemKeyed(both, 'S2'));
+      const colors = armsOf(scene.highlight(itemKeyed(both, 'S2'))).map((arm) => arm.color.join());
 
       // Assert
-      const colors = armsOf(lit).map((arm) => arm.color.join());
       expect(colors.filter((c) => c === grey.join())).toHaveLength(2);
       expect(colors).toHaveLength(4);
     });
@@ -538,12 +543,7 @@ describe('the highlight of a route', () => {
       expect(withoutColor(markers(points.markers))).toEqual(withoutColor(chartMarkers));
       expect(withoutColor(segments(points.strokes))).toEqual(withoutColor(chartStrokes));
       expect(withoutColor(glyphs(points.idents))).toEqual(withoutColor(glyphs(chartIdents)));
-      const colors = [
-        ...markers(points.markers),
-        ...segments(points.strokes),
-        ...glyphs(points.idents),
-      ].map((row) => row.color);
-      expect(colors).toEqual(colors.map(() => bright));
+      expect(colorsOf(points)).toEqual(colorsOf(points).map(() => bright));
     });
 
     it('lights one the chart hides, at a density that names none', () => {
