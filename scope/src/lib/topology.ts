@@ -207,6 +207,16 @@ export function runsOf(path: ChartPath, owners: Int32Array, within: Stretch): St
   return runs;
 }
 
+/** The points standing at a vertex of the item's route lines, drawn or not. */
+export function pointsAlong({ parts }: ChartItem, topology: Topology): ChartPoint[] {
+  const own = new Set(parts);
+  const vertices = new Set<number>();
+  for (const path of topology.routes.paths) {
+    if (own.has(path.part)) for (const vertex of path.vertices) vertices.add(vertex);
+  }
+  return topology.points.filter((point) => vertices.has(point.vertex));
+}
+
 /** The points of the items that draw. */
 export function drawnPointsOf(topology: Topology, items: readonly ChartItem[]): ChartPoint[] {
   const drawn = new Set(items.map((item) => item.key));

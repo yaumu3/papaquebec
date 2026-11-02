@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { CHART_COLORS, PALETTE } from '../../design/palette';
+import type { Batch } from '../protocol';
 import {
   airway,
   box,
@@ -24,11 +25,17 @@ const navaid = (kind: string, at: Position) =>
   itemOf('navaid', partOf('navaid', point(at), { kind }));
 const WEST = () => () => -7;
 
+/** What each text batch among `batches` says. */
+const spellings = (batches: readonly Batch[]) =>
+  batches.filter((b) => b.kind === 'text').map(spelled);
+
 /** A marker without its colour. */
 const shapeOf = ({ at, size, shape }: ReturnType<typeof markers>[number]) => ({ at, size, shape });
 
 const grey = packed(PALETTE.hover);
 const faint = packed(CHART_COLORS.hoverFaint);
+const bright = packed(CHART_COLORS.pointHover);
+const brightFaint = packed(CHART_COLORS.pointHoverFaint);
 
 const area = (...parts: ReturnType<typeof line>[]) =>
   itemOf('tma', ...parts.map((geometry) => partOf('tma', geometry)));
@@ -74,7 +81,7 @@ describe('the traces', () => {
     expect(segments(pointed.lines).flatMap((s) => s.span)).toEqual([0, 0, 0, 0, 0, 0, 0, 0]);
   });
 
-  it('draws a point as the chart draws it, one for each part, in the hover grey', () => {
+  it('draws a point as the chart draws it, one for each part, brighter than the hover grey', () => {
     // Arrange
     const layers = ['ad', 'fix', 'vfr'] as const;
     const items = layers.map((layer) =>
@@ -90,7 +97,7 @@ describe('the traces', () => {
       chartMarkers.map((rows) => rows.map(shapeOf)),
     );
     expect(traced.flatMap((batch) => markers(batch).map((m) => m.color))).toEqual(
-      traced.flatMap((batch) => markers(batch).map(() => grey)),
+      traced.flatMap((batch) => markers(batch).map(() => bright)),
     );
   });
 
@@ -166,8 +173,9 @@ describe('the traces', () => {
     expect(drawn.map((x) => x.color)).toEqual(drawn.map(() => faint));
     expect(drawn.map((x) => [x.width, x.pattern])).toEqual(drawn.map(() => [2, [0, 0, 0, 0]]));
     expect(markers(found.markers).map(shapeOf)).toEqual(chartMarkers.map(shapeOf));
-    expect(markers(found.markers).map((m) => m.color)).toEqual([faint]);
+    expect(markers(found.markers).map((m) => m.color)).toEqual([brightFaint]);
     expect(faint[3]).toBeCloseTo(128 / 255, 2);
+    expect(brightFaint[3]).toBeCloseTo(128 / 255, 2);
   });
 
   it('draws a hold the search names as its racetrack at half strength', () => {
@@ -193,9 +201,9 @@ describe('the traces', () => {
 
     // Assert
     expect(segments(searched.lines)).toHaveLength(1);
-    expect(markers(searched.markers).map((m) => m.color)).toEqual([faint]);
+    expect(markers(searched.markers).map((m) => m.color)).toEqual([brightFaint]);
     expect(pointed.lines.count).toBe(0);
-    expect(markers(pointed.markers).map((m) => m.color)).toEqual([grey]);
+    expect(markers(pointed.markers).map((m) => m.color)).toEqual([bright]);
   });
 
   it('gives only empty batches when nothing is searched or pointed at', () => {
@@ -221,7 +229,21 @@ describe('the traces', () => {
     // Assert
     expect(litTraces.map((b) => b.kind)).toEqual(['lines', 'text', 'lines']);
     expect(litTraces.filter((b) => b.kind === 'text').map(spelled)).toEqual(['V901']);
-    expect(litPoints).toHaveLength(0);
+    expect(litPoints.map((b) => b.count)).toEqual([0, 0, 0]);
+  });
+
+  it('puts the points a route passes among the traced points, its label in the traces', () => {
+    // Arrange
+    const route = airway('conv', 'V901', [0, 0], [1, 0], [2, 0]);
+    const passed = single('fix', point([1, 0]), { id: 'F1' }, 'F1');
+    const scene = sceneOf([route, passed]);
+
+    // Act
+    const { litTraces, litPoints } = scene.traces({ pointedAt: route, searched: [] });
+
+    // Assert
+    expect(spellings(litPoints)).toEqual(['F1']);
+    expect(spellings(litTraces)).toEqual(['V901V901']);
   });
 
   it("puts a point's highlight among the traced points, and none in the traces", () => {
@@ -232,8 +254,8 @@ describe('the traces', () => {
     const { litTraces, litPoints } = tracesOf({ pointedAt, searched: [] });
 
     // Assert
-    expect(litPoints.map((b) => b.kind)).toEqual(['lines', 'text', 'lines']);
+    expect(litPoints.map((b) => b.kind)).toEqual(['lines', 'markers', 'text']);
     expect(litPoints.filter((b) => b.kind === 'text').map(spelled)).toEqual(['Q']);
-    expect(litTraces).toHaveLength(0);
+    expect(litTraces.map((b) => b.count)).toEqual([0, 0, 0]);
   });
 });

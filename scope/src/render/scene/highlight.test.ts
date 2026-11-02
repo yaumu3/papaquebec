@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
-import { PALETTE } from '../../design/palette';
+import { CHART_COLORS, PALETTE } from '../../design/palette';
 import { type Chart, type ChartItem, chartOf, itemName } from '../../lib/chart';
+import type { ShownMemory } from '../../lib/fits';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import type { Batch } from '../protocol';
@@ -14,6 +15,8 @@ import {
   box,
   glyphs,
   labelWidth,
+  markers,
+  oneWay,
   packed,
   point,
   polygon,
@@ -29,11 +32,25 @@ const stopped = [airway('conv', 'V901', [0, 0], [8, 0], [10, 0]), stopAt('navaid
 const shared = [airway('conv', 'V901', [0, 0], [2, 0]), airway('rnav', 'Y902', [0, 0], [2, 0])];
 
 const grey = packed(PALETTE.hover);
+const bright = packed(CHART_COLORS.pointHover);
 const rnavLabel = packed('#4a8090');
+const procedureLabel = packed('#40707c');
 
 /** How many glyphs of a text batch are in `color`. */
 const inColor = (text: Batch, color: number[]) =>
   glyphs(text).filter((g) => g.color.join() === color.join()).length;
+
+/** A one-way SID through these positions. */
+const procedure = (at: [number, number][]) => [oneWay('sid', 'S1', ...at)];
+
+/** The colour of every row the lit points draw: markers, symbol strokes, then idents. */
+const colorsOf = (points: ReturnType<ReturnType<typeof sceneOf>['highlight']>['points']) =>
+  [...markers(points.markers), ...segments(points.strokes), ...glyphs(points.idents)].map(
+    (row) => row.color,
+  );
+
+/** The chevron arms a highlight draws. */
+const armsOf = (lit: ReturnType<ReturnType<typeof sceneOf>['highlight']>) => segments(lit.strokes);
 
 const itemKeyed = (chart: Chart, key: string): ChartItem => {
   const item = chart.find((i) => i.key === key);
@@ -55,16 +72,16 @@ describe('the highlight of an area or a point', () => {
 
     // Act
     const lit = [
-      areaScene.highlight(itemKeyed(example, papaqKey)),
-      pointScene.highlight(itemKeyed(fix, 'F1')),
+      areaScene.highlight(itemKeyed(example, papaqKey)).text,
+      pointScene.highlight(itemKeyed(fix, 'F1')).points.idents,
     ];
 
     // Assert
-    expect(lit.map((l) => withoutColor(glyphs(l.text)))).toEqual([
+    expect(lit.map((text) => withoutColor(glyphs(text)))).toEqual([
       withoutColor(glyphs(shownArea.text)),
       withoutColor(glyphs(shownPoint.text)),
     ]);
-    expect(lit.map((l) => l.text.count > 0)).toEqual([true, true]);
+    expect(lit.map((text) => text.count > 0)).toEqual([true, true]);
   });
 
   it('redraws the text and the rule of a drawn area as the chart drew them, in the hover grey', () => {
@@ -85,18 +102,18 @@ describe('the highlight of an area or a point', () => {
     );
   });
 
-  it('redraws the ident of a drawn point as the chart drew it, in the hover grey', () => {
+  it('redraws the ident of a drawn point as the chart drew it, brighter than the hover grey', () => {
     // Arrange
     const scene = sceneOf(fix);
     const { text } = scene.pointLabels();
 
     // Act
-    const lit = scene.highlight(itemKeyed(fix, 'F1'));
+    const { idents } = scene.highlight(itemKeyed(fix, 'F1')).points;
 
     // Assert
-    expect(lit.text.count).toBeGreaterThan(0);
-    expect(withoutColor(glyphs(lit.text))).toEqual(withoutColor(glyphs(text)));
-    expect(glyphs(lit.text).map((g) => g.color)).toEqual(glyphs(lit.text).map(() => grey));
+    expect(idents.count).toBeGreaterThan(0);
+    expect(withoutColor(glyphs(idents))).toEqual(withoutColor(glyphs(text)));
+    expect(glyphs(idents).map((g) => g.color)).toEqual(glyphs(idents).map(() => bright));
   });
 
   it('names a sector below the density that labels sectors, at its place', () => {
@@ -179,19 +196,93 @@ describe('the highlight of a route', () => {
     expect(inColor(lit.text, grey)).toBe(8);
   });
 
-  it('adds the designator on a span the chart left out, to those it drew', () => {
-    // Arrange
+  describe('on a span too short for its label', () => {
     const scale = (labelWidth(4) + 28) / 4;
-    const scene = sceneOf(stopped, { scale });
-    const chartRuns = spelled(scene.routeLabels().text);
 
-    // Act
-    const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+    it('omits the label, on a drawn route', () => {
+      // Arrange
+      const scene = sceneOf(stopped, { scale });
+      const chartRuns = spelled(scene.routeLabels().text);
 
-    // Assert
-    expect(chartRuns).toBe('V901');
-    expect(glyphs(lit.text)).toHaveLength(8);
-    expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4, 9]));
+      // Act
+      const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+
+      // Assert
+      expect(chartRuns).toBe('V901');
+      expect(spelled(lit.text)).toBe('V901');
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+      expect(lit.gaps.count).toBe(1);
+    });
+
+    it('omits the label, on a hidden route at a density that names none', () => {
+      // Arrange
+      const scene = sceneOf(stopped, { scale, hidden: ['V901'], density: 'off' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+    });
+
+    it("keeps the chart's hysteresis: hidden where the chart still hides it in the band", () => {
+      // Arrange
+      const chart = [stopAt('navaid', [0, 0]), airway('conv', 'V901', [0, 0], [2, 0])];
+      const threshold = labelWidth(4) + 28;
+      const scaleOf = (multiple: number) => (multiple * threshold + 9) / 2;
+      const shown: ShownMemory = new Map();
+      sceneOf(chart, { scale: scaleOf(0.99), shown }).routeLabels();
+      const scene = sceneOf(chart, { scale: scaleOf(1.05), shown });
+      // Precondition: the chart keeps the label hidden inside the band
+      const chartText = scene.routeLabels().text.count;
+
+      // Act
+      const lit = scene.highlight(itemKeyed(chart, 'V901'));
+
+      // Assert
+      expect(chartText).toBe(0);
+      expect(lit.text.count).toBe(0);
+    });
+
+    it('draws no label when no span has room', () => {
+      // Arrange
+      const scene = sceneOf(stopped, { scale: 1 });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(stopped, 'V901'));
+
+      // Assert
+      expect([lit.gaps.count, lit.text.count]).toEqual([0, 0]);
+    });
+
+    it('names a procedure on the first span that has room', () => {
+      // Arrange
+      const chart = [
+        airway('sid', 'SID1', [0, 0], [2, 0], [10, 0]),
+        stopAt('navaid', [2, 0], 'N2'),
+      ];
+      const hiddenScene = sceneOf(chart, { hidden: ['SID1'], scale });
+
+      // Act
+      const lit = hiddenScene.highlight(itemKeyed(chart, 'SID1'));
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([6]));
+    });
+
+    it("keeps the chart's label over the trace, unlit, where the designator would not fit in it", () => {
+      // Arrange
+      const roomForOne = (labelWidth(4) + 28 + 1) / 2;
+      const scene = sceneOf(shared, { hidden: ['V901'], scale: roomForOne });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(shared, 'V901'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('Y902');
+      expect([inColor(lit.text, grey), inColor(lit.text, rnavLabel)]).toEqual([0, 4]);
+      expect(lit.gaps.count).toBe(1);
+    });
   });
 
   it('names a procedure the chart did not draw once, on its first span', () => {
@@ -254,7 +345,7 @@ describe('the highlight of a route', () => {
 
   it('centres a designator alone, in a gap of its own, where the chart has no label', () => {
     // Arrange
-    const scene = sceneOf(shared, { hidden: ['V901'], scale: 1 });
+    const scene = sceneOf(shared, { hidden: ['V901', 'Y902'] });
     const chartLabels = scene.routeLabels().text.count;
 
     // Act
@@ -284,19 +375,245 @@ describe('the highlight of a route', () => {
 
   it('lights the chevron of a one-way designator with its name', () => {
     // Arrange
-    const oneWay = keyed(
-      'C1',
-      itemOf('conv', partOf('conv', line([0, 0], [1, 0]), { name: 'C1', oneWay: true })),
-    );
-    const scene = sceneOf([oneWay]);
+    const route = oneWay('conv', 'C1', [0, 0], [1, 0]);
+    const scene = sceneOf([route]);
 
     // Act
-    const lit = scene.highlight(oneWay);
+    const lit = scene.highlight(route);
 
     // Assert
     const arms = segments(lit.strokes);
     expect(arms).toHaveLength(2);
     expect(arms.map((arm) => arm.color)).toEqual([grey, grey]);
+  });
+
+  describe('flown one way', () => {
+    const route = oneWay('conv', 'V901', [0, 0], [8, 0], [10, 0]);
+    const chart = [route, stopAt('navaid', [8, 0], 'N8')];
+
+    it('lights its chevron alone on a span too short for its label', () => {
+      // Arrange
+      const scene = sceneOf(chart, { scale: 25 });
+
+      // Act
+      const lit = scene.highlight(route);
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+      expect(new Set(armsOf(lit).map((arm) => arm.a.x))).toEqual(new Set([4, 9]));
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual(armsOf(lit).map(() => grey));
+      expect(lit.gaps.count).toBe(1);
+    });
+
+    it('lights no chevron on a span too short for one', () => {
+      // Arrange
+      const scene = sceneOf(chart, { scale: 10 });
+
+      // Act
+      const lit = scene.highlight(route);
+
+      // Assert
+      expect(new Set(armsOf(lit).map((arm) => arm.a.x))).toEqual(new Set([4]));
+    });
+
+    it('names a route the chart shows only as a chevron, with that one chevron', () => {
+      // Arrange
+      const chevronOnly = procedure([
+        [0, 0],
+        [2, 0],
+      ]);
+      const scene = sceneOf(chevronOnly, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(chevronOnly, 'S1'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('S1');
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual([grey, grey]);
+      expect(lit.gaps.count).toBe(1);
+    });
+
+    it('names a procedure once, though the chart draws its chevron on every span', () => {
+      // Arrange
+      const twoSpans = [
+        ...procedure([
+          [0, 0],
+          [8, 0],
+          [10, 0],
+        ]),
+        stopAt('navaid', [8, 0], 'N8'),
+      ];
+      const scene = sceneOf(twoSpans, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(twoSpans, 'S1'));
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+      expect(new Set(armsOf(lit).map((arm) => arm.a.x))).toEqual(new Set([4, 9]));
+    });
+
+    it("takes the place of another route's chevron pointing the same way", () => {
+      // Arrange
+      const both = [oneWay('sid', 'S1', [0, 0], [2, 0]), oneWay('sid', 'S2', [0, 0], [2, 0])];
+      const scene = sceneOf(both, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, 'S2'));
+
+      // Assert
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual([grey, grey]);
+    });
+
+    it("leaves another route's chevron pointing the other way", () => {
+      // Arrange
+      const both = [oneWay('sid', 'S1', [0, 0], [2, 0]), oneWay('sid', 'S2', [2, 0], [0, 0])];
+      const scene = sceneOf(both, { density: 'normal' });
+
+      // Act
+      const colors = armsOf(scene.highlight(itemKeyed(both, 'S2'))).map((arm) => arm.color.join());
+
+      // Assert
+      expect(colors.filter((c) => c === grey.join())).toHaveLength(2);
+      expect(colors).toHaveLength(4);
+    });
+
+    it("keeps another route's name pointing the same way", () => {
+      // Arrange
+      const both = [oneWay('conv', 'A1', [0, 0], [2, 0]), oneWay('conv', 'B1', [0, 0], [2, 0])];
+      const scene = sceneOf(both);
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, 'A1'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('A1B1');
+      expect(armsOf(lit)).toHaveLength(4);
+    });
+
+    it('names an airway on the room its name needs, whatever chevrons its label carries', () => {
+      // Arrange
+      const name = 'AIRWAY901';
+      const both = [airway('conv', name, [0, 0], [2, 0]), oneWay('sid', 'S1', [0, 0], [2, 0])];
+      const scale = (labelWidth(name.length) + 28) / 2;
+      const scene = sceneOf(both, { density: 'normal', scale });
+      // Precondition: the chart's label carries the chevron of the procedure
+      const chartChevrons = scene.routeLabels().chevrons.count;
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, name));
+
+      // Assert
+      expect(chartChevrons).toBe(2);
+      expect(spelled(lit.text)).toBe(name);
+      expect(inColor(lit.text, grey)).toBe(name.length);
+    });
+
+    it("keeps another route's chevron for a route flown both ways", () => {
+      // Arrange
+      const both = [airway('sid', 'S3', [0, 0], [2, 0]), oneWay('sid', 'S1', [0, 0], [2, 0])];
+      const scene = sceneOf(both, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, 'S3'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('S3');
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual([procedureLabel, procedureLabel]);
+    });
+  });
+
+  describe('the points it passes', () => {
+    const route = airway('conv', 'V901', [0, 0], [1, 0], [2, 0]);
+    const fix = single('fix', point([1, 0]), { id: 'F1' }, 'F1');
+    const navaid = single('navaid', point([2, 0]), { id: 'N2' }, 'N2');
+    const chart = [route, fix, navaid];
+
+    it('lights each one, symbol and ident, as the chart draws it and brighter', () => {
+      // Arrange
+      const scene = sceneOf(chart);
+      const chartMarkers = markers(sceneOf([fix, navaid]).shapes().markers);
+      const chartStrokes = segments(sceneOf([fix, navaid]).shapes().lines);
+      const chartIdents = scene.pointLabels().text;
+
+      // Act
+      const { points } = scene.highlight(route);
+
+      // Assert
+      expect(withoutColor(markers(points.markers))).toEqual(withoutColor(chartMarkers));
+      expect(withoutColor(segments(points.strokes))).toEqual(withoutColor(chartStrokes));
+      expect(withoutColor(glyphs(points.idents))).toEqual(withoutColor(glyphs(chartIdents)));
+      expect(colorsOf(points)).toEqual(colorsOf(points).map(() => bright));
+    });
+
+    it('lights one the chart hides, at a density that names none', () => {
+      // Arrange
+      const scene = sceneOf(chart, { hidden: ['F1', 'N2'], density: 'off' });
+
+      // Act
+      const { points } = scene.highlight(route);
+
+      // Assert
+      expect(spelled(points.idents)).toBe('F1N2');
+      expect(markers(points.markers).map((m) => m.at.x)).toEqual([1, 2]);
+    });
+
+    it('lights a point once however many parts of the route pass it', () => {
+      // Arrange
+      const parts = keyed(
+        'R',
+        itemOf(
+          'conv',
+          partOf('conv', line([0, 0], [1, 0]), { name: 'R' }),
+          partOf('conv', line([1, 0], [2, 0]), { name: 'R' }),
+        ),
+      );
+      const scene = sceneOf([parts, fix]);
+
+      // Act
+      const { points } = scene.highlight(parts);
+
+      // Assert
+      expect(spelled(points.idents)).toBe('F1');
+    });
+
+    it('leaves a point off the route dark, however near', () => {
+      // Arrange
+      const beside = single('fix', point([1, 0.5]), { id: 'F2' }, 'F2');
+      const scene = sceneOf([route, beside]);
+
+      // Act
+      const { points } = scene.highlight(route);
+
+      // Assert
+      expect([points.markers.count, points.idents.count]).toEqual([0, 0]);
+    });
+
+    it('lights no point on an area that has one at a corner', () => {
+      // Arrange
+      const sector = single('sector', polygon(box(0, 4)), { name: 'SEC' }, 'SEC');
+      const corner = single('fix', point([0, 0]), { id: 'F3' }, 'F3');
+      const scene = sceneOf([sector, corner]);
+
+      // Act
+      const { points } = scene.highlight(sector);
+
+      // Assert
+      expect([points.markers.count, points.idents.count]).toEqual([0, 0]);
+    });
+  });
+
+  it('lights the chevron alone of a one-way route whose layer has no label', () => {
+    // Arrange
+    const dct = oneWay('dct', 'D1', [0, 0], [2, 0]);
+    const scene = sceneOf([dct], { hidden: ['D1'] });
+
+    // Act
+    const lit = scene.highlight(dct);
+
+    // Assert
+    expect([lit.gaps.count, lit.text.count]).toEqual([0, 0]);
+    expect(armsOf(lit).map((arm) => arm.color)).toEqual([grey, grey]);
   });
 
   it('draws nothing for an item whose layer has no label', () => {
