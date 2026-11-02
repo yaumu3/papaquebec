@@ -18,7 +18,10 @@ export interface MapSet {
   imported: number;
 }
 
-/** `kept` settles false when the set draws this session but could not be stored for the next. */
+/**
+ * `kept` settles false when the set draws this session but could not be stored for the next, and
+ * rejects when its chart could not be built.
+ */
 export type ImportResult = { ok: true; kept: Promise<boolean> } | { ok: false; message: string };
 
 export interface MapSets {
@@ -174,12 +177,16 @@ export function createMapSets(
       const imported = now();
       const set: MapSet = { identity, data, builtin: false, imported };
       // The chart builds in a task of its own, so the parse does not add to the page's longest.
-      const kept = new Promise<boolean>((settle) => {
+      const kept = new Promise<boolean>((settle, fail) => {
         nextTask(() => {
-          setSets((own) => [set, ...own.filter((s) => s.identity !== identity)]);
-          enable(identity);
-          drawing = afterDraw();
-          settle(stored((open) => open.put({ identity, imported, data })));
+          try {
+            setSets((own) => [set, ...own.filter((s) => s.identity !== identity)]);
+            enable(identity);
+            drawing = afterDraw();
+            settle(stored((open) => open.put({ identity, imported, data })));
+          } catch (error) {
+            fail(error);
+          }
         });
       });
       return { ok: true, kept };
@@ -201,7 +208,12 @@ export function createMapSets(
 /** What the Maps panel says after an import; null when there is nothing to say. */
 export async function importNote(result: ImportResult): Promise<string | null> {
   if (!result.ok) return result.message;
-  return (await result.kept) ? null : 'imported for this session only: browser storage is full';
+  try {
+    return (await result.kept) ? null : 'imported for this session only: browser storage is full';
+  } catch (error) {
+    console.warn('a map set failed to draw', error);
+    return 'could not draw this set';
+  }
 }
 
 /** Removing takes two clicks on the same control: the first arms it, the second acts. */

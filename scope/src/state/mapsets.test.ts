@@ -353,6 +353,33 @@ describe('storage of imported sets', () => {
     expect(kept).toBe(true);
   });
 
+  it('rejects what it kept when the chart fails to build in its task', async () => {
+    // Arrange
+    const spy = spyStore();
+    const refusing = {
+      disabled: () => ['my-fixes'],
+      setDisabled() {
+        throw new Error('no chart');
+      },
+    };
+    const sets = createMapSets(
+      refusing,
+      memoryStorage(),
+      Promise.resolve(spy.store),
+      ticking(),
+      () => Promise.resolve(),
+      (task) => setTimeout(task),
+    );
+
+    const out = importing(sets, fixes);
+
+    // Act
+    const failure = await Promise.resolve(out.ok ? out.kept : null).catch(String);
+
+    // Assert
+    expect(failure).toBe('Error: no chart');
+  });
+
   it('removes a set imported a moment ago from the store as well', async () => {
     // Arrange
     const spy = spyStore();
@@ -543,6 +570,7 @@ describe('importNote', () => {
       { ok: false as const, message: 'title: expected string' },
       { ok: true as const, kept: Promise.resolve(false) },
       { ok: true as const, kept: Promise.resolve(true) },
+      { ok: true as const, kept: Promise.reject(new Error('no chart')) },
     ];
 
     // Act
@@ -553,6 +581,7 @@ describe('importNote', () => {
       'title: expected string',
       'imported for this session only: browser storage is full',
       null,
+      'could not draw this set',
     ]);
   });
 });
