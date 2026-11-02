@@ -67,6 +67,16 @@ function spyStore(initial: StoredMapSet[] = [], refusing = false) {
   return { store, records, writes };
 }
 
+/** A draw that finishes when the test says. */
+function heldDraw() {
+  let finish = () => {};
+  const afterDraw = () =>
+    new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+  return { afterDraw, finishDraw: () => finish() };
+}
+
 /** The list of disabled sets, as the settings hold it. */
 function flagsOf(initial: readonly string[] = []) {
   let list = initial;
@@ -295,11 +305,7 @@ describe('storage of imported sets', () => {
   it('writes an import only once the chart has drawn', async () => {
     // Arrange
     const spy = spyStore();
-    let drawn = () => {};
-    const afterDraw = () =>
-      new Promise<void>((resolve) => {
-        drawn = resolve;
-      });
+    const { afterDraw, finishDraw } = heldDraw();
     const sets = createMapSets(
       flagsOf(),
       memoryStorage(),
@@ -313,7 +319,7 @@ describe('storage of imported sets', () => {
     const before = [...spy.writes];
 
     // Act
-    drawn();
+    finishDraw();
     const kept = out.ok ? await out.kept : null;
 
     // Assert
@@ -350,11 +356,7 @@ describe('storage of imported sets', () => {
   it('removes a set imported a moment ago from the store as well', async () => {
     // Arrange
     const spy = spyStore();
-    let drawn = () => {};
-    const afterDraw = () =>
-      new Promise<void>((resolve) => {
-        drawn = resolve;
-      });
+    const { afterDraw, finishDraw } = heldDraw();
     const sets = createMapSets(
       flagsOf(),
       memoryStorage(),
@@ -366,7 +368,7 @@ describe('storage of imported sets', () => {
 
     // Act
     sets.removeMapSet('my-fixes');
-    drawn();
+    finishDraw();
     if (out.ok) await out.kept;
     await Bun.sleep(0);
 

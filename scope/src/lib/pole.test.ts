@@ -76,6 +76,11 @@ describe('poleOf', () => {
   });
 });
 
+const everyEdge: RoomAt = (rings) => (p) => {
+  const room = distanceToEdges(p, rings);
+  return inside(p, rings) ? room : -room;
+};
+
 describe('the edge index', () => {
   /** A cog: many short edges, as a sector has, around a deep notch. */
   const cog = Array.from({ length: 240 }, (_, i): Vec2 => {
@@ -84,10 +89,6 @@ describe('the edge index', () => {
     return { x: radius * Math.cos(turn), y: radius * Math.sin(turn) };
   });
   const notch = ring([-5, -5], [5, -5], [5, 5], [-5, 5]);
-  const everyEdge: RoomAt = (rings) => (p) => {
-    const room = distanceToEdges(p, rings);
-    return inside(p, rings) ? room : -room;
-  };
   const cases: Vec2[][][] = [
     [ring([0, 0], [1, 0], [1, 1], [0, 1])],
     [ring([0, 0], [3, 0], [3, 1], [1, 1], [1, 3], [0, 3])],
