@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
       || exit 1; \
     done
 
-FROM oven/bun:1-alpine AS build
+FROM oven/bun:1.4.4-alpine@sha256:4cf82f5686b196504fe119db3fcd9185b191f82ece82c40680e597228ec6070a AS build
 WORKDIR /app
 COPY scope/package.json scope/bun.lock ./
 # Caches that outlive the build, so a rebuild fetches and compiles only what changed.
@@ -49,7 +49,7 @@ COPY --from=wasm /wasm/wmm ./src/lib/wasm
 COPY --from=wasm /wasm/geodesy ./src/lib/wasm
 RUN bun run build
 
-FROM oven/bun:1-alpine
+FROM oven/bun:1.4.4-alpine@sha256:4cf82f5686b196504fe119db3fcd9185b191f82ece82c40680e597228ec6070a
 # The server ignores the signal to stop as the first process, so tini is that instead; it
 # downloads the aircraft database over https, by the certificates the system trusts.
 RUN apk add --no-cache tini ca-certificates
