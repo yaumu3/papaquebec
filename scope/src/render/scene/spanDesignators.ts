@@ -24,6 +24,8 @@ const CHEVRON_CLEAR_PX = 3;
 const CHEVRON_PX = CHEVRON_SLOT_PX + CHEVRON_CLEAR_PX;
 /** CSS px a label needs besides its text before it is shown: room for the line either side. */
 const MARGIN_PX = 28;
+/** CSS px a chevron alone needs before it is shown. */
+const CHEVRON_ROOM_PX = CHEVRON_SLOT_PX + MARGIN_PX;
 
 /** One name on a label, in its layer's label style. */
 interface Designator {
@@ -37,7 +39,10 @@ interface Designator {
   oneWay: boolean;
 }
 
-/** A designator on a span: whether its route is flown along the label's reading direction. */
+/**
+ * A designator on a span: whether its route is flown along the label's reading direction. With
+ * no name it is its chevron alone.
+ */
 interface Placed extends Designator {
   reads: boolean;
 }
@@ -46,7 +51,7 @@ interface Placed extends Designator {
 export interface SpanLabel extends RouteSpan {
   middle: NonNullable<RouteSpan['middle']>;
   designators: Placed[];
-  /** The span draws its label: its airways fit, or a procedure joined it. */
+  /** The span names its designators: its airways fit, or a procedure joined it. */
   shown: boolean;
 }
 
@@ -79,6 +84,10 @@ function reachedDesignatorOf(path: ChartPath, key: string, density: LabelsInput[
   return designator && labelReaches(designator.label, density) ? designator : undefined;
 }
 
+/** The item key of each part of `items`. */
+const keysOf = (items: readonly ChartItem[]) =>
+  new Map(items.flatMap((item) => item.parts.map((part) => [part, item.key])));
+
 /** A designator on a span's label: `reads` when its route is flown the way the label reads. */
 function placedOn(designator: Designator, span: RouteSpan, spanLabel: SpanLabel): Placed {
   return { ...designator, reads: (span.start === spanLabel.start) !== spanLabel.middle.flipped };
@@ -97,18 +106,27 @@ function spanLabelOf(spanLabels: SpanLabels, span: RouteSpan) {
   return label;
 }
 
+/** The designator as its chevron alone. */
+const chevronAlone = (designator: Placed): Placed => ({ ...designator, name: '' });
+
+/** CSS px a designator takes along a label, its chevron included. */
+function advanceOf({ name, label, oneWay }: Designator, text: TextBatch) {
+  if (!name) return CHEVRON_SLOT_PX;
+  return text.measure(name, label.size) + (oneWay ? CHEVRON_PX : 0);
+}
+
 /** The text a label of these designators takes, in CSS px. */
 function widthOf(designators: readonly Designator[], text: TextBatch): number {
-  const names = designators.reduce(
-    (sum, d) => sum + text.measure(d.name, d.label.size) + (d.oneWay ? CHEVRON_PX : 0),
-    0,
-  );
+  const names = designators.reduce((sum, d) => sum + advanceOf(d, text), 0);
   return names + SEPARATOR_PX * Math.max(0, designators.length - 1);
 }
 
-/** The CSS px a label of these designators needs of its span before it is shown. */
+/** The CSS px a label needs of its span before it is shown; lone chevrons ask for none of it. */
 const thresholdOf = (designators: readonly Designator[], text: TextBatch) =>
-  widthOf(designators, text) + MARGIN_PX;
+  widthOf(
+    designators.filter((d) => d.name),
+    text,
+  ) + MARGIN_PX;
 
 /** What the span has to spare on the screen at the settled scale, less the cuts at its stops. */
 const roomOf = ({ length, cutBack, cutAhead }: SpanLabel, scale: number) =>
@@ -117,7 +135,7 @@ const roomOf = ({ length, cutBack, cutAhead }: SpanLabel, scale: number) =>
 /** The airway designators of the drawn parts, by the span they run along. */
 function airwayLabels(stage: Stage): SpanLabels {
   const { topology, drawnItems, routeSpans, labelDensity } = stage;
-  const keys = new Map(drawnItems.flatMap((item) => item.parts.map((part) => [part, item.key])));
+  const keys = keysOf(drawnItems);
   const spanLabels: SpanLabels = new Map();
   for (const path of topology.routes.paths) {
     const key = keys.get(path.part);
@@ -189,19 +207,49 @@ function nameProcedure(item: ChartItem, spanLabels: SpanLabels, stage: Stage) {
   }
 }
 
+/** Whether a designator's chevron points the way `placed`'s does. */
+const pointsLike = ({ oneWay, reads }: Placed, placed: Placed) => oneWay && reads === placed.reads;
+
+/**
+ * Puts the chevron of each drawn one-way route on every span of it that has room for one, at any
+ * density: beside what the span's label names, once a way.
+ */
+function putChevrons(spanLabels: SpanLabels, stage: Stage) {
+  const { topology, drawnItems, routeSpans, shown, scale } = stage;
+  const keys = keysOf(drawnItems);
+  for (const path of topology.routes.paths) {
+    const key = keys.get(path.part);
+    const designator = key !== undefined && designatorOf(path, key);
+    if (!designator || !designator.oneWay) continue;
+    for (const span of routeSpans(path)) {
+      const spanLabel = spanLabelOf(spanLabels, span);
+      if (!spanLabel) continue;
+      const room = roomOf(spanLabel, scale);
+      if (!rememberFits(shown, `chevron ${span.id}`, room, CHEVRON_ROOM_PX)) continue;
+      const placed = placedOn(designator, span, spanLabel);
+      if (spanLabel.designators.some((d) => pointsLike(d, placed))) continue;
+      spanLabel.designators.push(chevronAlone(placed));
+    }
+  }
+}
+
 /** What lighting an item reads: its spans, the settled scale, and the text to measure. */
 type LitReading = ItemReading & Pick<Stage, 'scale' | 'text'>;
 
-/** A span of an item as it can be lit: its label with the item's designator, or without it. */
+/** A span of an item as it can be lit: its label with the item's name, or without it. */
 interface LitSpan {
   named: SpanLabel;
   unnamed: SpanLabel;
 }
 
-/** The chart's label of each span of an item, or none, by its identity, with and without it. */
+/**
+ * The chart's label of each span of an item, or none, by its identity, with and without its name.
+ * The item's chevron takes the place of one the chart drew there for another route, and without
+ * its name it stays if the span has room for it.
+ */
 function litSpans(
   item: ChartItem,
-  stage: ItemReading,
+  stage: LitReading,
   chartLabels: ReadonlyMap<string, SpanLabel>,
 ): LitSpan[] {
   const lit = new Map<string, LitSpan>();
@@ -209,11 +257,14 @@ function litSpans(
     const designator = designatorOf(path, item.key);
     const label = chartLabels.get(span.id) ?? emptyLabel(span);
     if (!designator || !label || lit.has(span.id)) continue;
-    const others = label.designators.filter((d) => d.key !== item.key);
-    const designators = [...others, placedOn(designator, span, label)].toSorted(byStack);
+    const placed = placedOn(designator, span, label);
+    const replaced = (d: Placed) => placed.oneWay && !d.name && pointsLike(d, placed);
+    const others = label.designators.filter((d) => d.key !== item.key && !replaced(d));
+    const joined = (d: Placed) => [...others, d].toSorted(byStack);
+    const chevronFits = placed.oneWay && fits(roomOf(label, stage.scale), CHEVRON_ROOM_PX);
     lit.set(span.id, {
-      named: { ...label, designators },
-      unnamed: { ...label, designators: others },
+      named: { ...label, designators: joined(placed) },
+      unnamed: { ...label, designators: chevronFits ? joined(chevronAlone(placed)) : others },
     });
   }
   return [...lit.values()];
@@ -226,7 +277,7 @@ function namedOnce(
   chartLabels: ReadonlyMap<string, SpanLabel>,
 ): LitSpan[] {
   const listed = spans.filter(({ named }) =>
-    chartLabels.get(named.id)?.designators.some((d) => d.key === key),
+    chartLabels.get(named.id)?.designators.some((d) => d.key === key && d.name),
   );
   return listed.length > 0 ? listed : spans.slice(0, 1);
 }
@@ -234,8 +285,8 @@ function namedOnce(
 /**
  * The labels to redraw for an item, whole: on every span of an airway that has room for its
  * designator, and for a procedure on the spans the chart names it on, else on the first with
- * room. No density gate. Other spans keep the chart's label, over the trace. The chart's labels
- * are never changed.
+ * room. No density gate. Other spans keep the chart's label over the trace, and the item's chevron
+ * if it has room. The chart's labels are never changed.
  */
 export function itemLabels(
   item: ChartItem,
@@ -258,15 +309,19 @@ const frontRank = ({ designators }: SpanLabel) => Math.min(...designators.map((d
 
 /**
  * The spans that draw a label, the one with the rearmost front designator first, each with its
- * designators in draw-stack order: every airway that fits its span, and each procedure on the
- * first span that has room for it as well. A procedure's span may come after an airway's in
- * the span labels, so the order is by rank, not by insertion.
+ * designators in draw-stack order: every airway that fits its span, each procedure on the first
+ * span that has room for it as well, and the chevrons of the one-way routes. A procedure's span
+ * may come after an airway's in the span labels, so the order is by rank, not by insertion.
  */
 function designatedSpans(stage: Stage): SpanLabel[] {
   const spanLabels = airwayLabels(stage);
   settleAirways(spanLabels, stage);
   for (const item of procedureItems(stage.drawnItems)) nameProcedure(item, spanLabels, stage);
-  const drawn = [...spanLabels.values()].filter((spanLabel) => spanLabel.shown);
+  for (const spanLabel of spanLabels.values()) {
+    if (!spanLabel.shown) spanLabel.designators = [];
+  }
+  putChevrons(spanLabels, stage);
+  const drawn = [...spanLabels.values()].filter((spanLabel) => spanLabel.designators.length > 0);
   for (const spanLabel of drawn) spanLabel.designators = spanLabel.designators.toSorted(byStack);
   return drawn.toReversed().toSorted((a, b) => frontRank(b) - frontRank(a));
 }
@@ -332,18 +387,19 @@ export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut, lit?: LitDesi
   const total = widthOf(designators, out.text);
   const style = { baseline: 'middle', angle, halo: true } as const;
   let pen = -total / 2;
-  for (const { key, name, label, oneWay, reads } of designators) {
+  for (const designator of designators) {
+    const { key, name, label, oneWay, reads } = designator;
     const color = key === lit?.key ? lit.color : label.color;
-    const width = out.text.measure(name, label.size);
+    const advance = advanceOf(designator, out.text);
     const before = oneWay && !reads;
     const textAt = before ? pen + CHEVRON_PX : pen;
     const at = { ...middle.at, px: textAt, py: 0 };
     out.text.text(name, at, label.size, color, style);
     if (oneWay) {
-      const slot = before ? pen : pen + width + CHEVRON_CLEAR_PX;
+      const slot = before ? pen : pen + advance - CHEVRON_SLOT_PX;
       putChevron(spanLabel, slot, reads, color, out);
     }
-    pen += width + (oneWay ? CHEVRON_PX : 0) + SEPARATOR_PX;
+    pen += advance + SEPARATOR_PX;
   }
   const half = total / 2 + GAP_MARGIN_PX;
   const end = (sign: number) => ({ ...middle.at, ...turned(sign * half, 0, angle) });
@@ -355,8 +411,9 @@ export function putLabel(spanLabel: SpanLabel, out: RouteLabelOut, lit?: LitDesi
  * designator that runs along it, centred on the span's midpoint and set along it, and each
  * drawn procedure is named once, on the first span that has room for it. A label that does not
  * fit its span at the settled scale is left out: its width and 28 px must fit the span's length
- * on screen less the stop cuts. Returns the gaps cut in the lines, the text, then the chevrons
- * of the one-way routes, back to front through the draw stack, and the span labels drawn.
+ * on screen less the stop cuts. Only names follow the density and that test: a drawn one-way
+ * route keeps its chevron wherever one fits. Returns the gaps cut in the lines, the text, then the
+ * chevrons, back to front through the draw stack, and the span labels drawn.
  */
 export function buildRouteLabels(input: LabelsInput & FitInput): BuiltLabels {
   const out: RouteLabelOut = {

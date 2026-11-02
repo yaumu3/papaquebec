@@ -44,6 +44,10 @@ function chevronsIn(batch: Batch, angle: number) {
   });
 }
 
+/** The chevrons of a chart's route labels, in the frame of a label along the x axis. */
+const chevronsOf = (chart: Chart, options: SceneOptions = {}) =>
+  chevronsIn(routeLabels(chart, options).chevrons, 0);
+
 /** CSS px a label of one-way designators of these lengths takes, chevrons and separators included. */
 const oneWayTotal = (...names: number[]) =>
   names.reduce((sum, n) => sum + labelWidth(n) + 10, 0) + 9 * (names.length - 1);
@@ -392,6 +396,173 @@ describe('the route labels', () => {
 
       // Assert
       expect(drawn.map((n) => n > 0)).toEqual([true, false]);
+    });
+  });
+
+  describe('the chevron of a one-way route', () => {
+    const route = oneWay('conv', 'V901', [0, 0], [2, 0]);
+    const procedureLabel = packed('#40707c');
+
+    it('stays alone at the middle of its span where the density names nothing', () => {
+      // Arrange
+      const densities = ['off', 'sparse'] as const;
+
+      // Act
+      const drawn = densities.map((density) => routeLabels([route], { density }));
+
+      // Assert
+      for (const { text, chevrons } of drawn) {
+        const [chevron] = chevronsIn(chevrons, 0);
+        expect(text.count).toBe(0);
+        expect(chevron?.at).toEqual({ x: 1, y: 0 });
+        expect(chevron?.tip.x).toBeCloseTo(2.5, 6);
+        expect(chevron?.arm.x).toBeCloseTo(-2.5, 6);
+      }
+    });
+
+    it('points back along a line flown against its reading', () => {
+      // Arrange
+      const against = oneWay('conv', 'V901', [2, 0], [0, 0]);
+
+      // Act
+      const [chevron] = chevronsOf([against], { density: 'off' });
+
+      // Assert
+      expect(chevron?.tip.x).toBeCloseTo(-2.5, 6);
+      expect(chevron?.arm.x).toBeCloseTo(2.5, 6);
+    });
+
+    it('cuts a gap of its own: its slot and 4 px each side', () => {
+      // Arrange
+      const options = { density: 'off' } as const;
+
+      // Act
+      const { gaps } = routeLabels([route], options);
+
+      // Assert
+      const [gap] = segments(gaps);
+      expect(gaps.count).toBe(1);
+      expect(gap?.offsetA.x).toBeCloseTo(-7.5, 6);
+      expect(gap?.offsetB.x).toBeCloseTo(7.5, 6);
+    });
+
+    it('stays alone where its label does not fit the span', () => {
+      // Arrange
+      const scale = 20;
+
+      // Act
+      const { text, chevrons } = routeLabels([route], { scale });
+
+      // Assert
+      expect(text.count).toBe(0);
+      expect(chevronsIn(chevrons, 0)).toHaveLength(1);
+    });
+
+    it('shows from its threshold, hides below, and keeps its state between', () => {
+      // Arrange
+      const threshold = 7 + 28;
+      const scaleOf = (multiple: number) => (multiple * threshold) / 2;
+      const rows: [number[], boolean][] = [
+        [[1.01], true],
+        [[0.99], false],
+        [[1.2, 1.05], true],
+        [[0.99, 1.05], false],
+        [[0.99, 1.05, 1.2], true],
+      ];
+      const memories = rows.map(([multiples]) => {
+        const shown: ShownMemory = new Map();
+        for (const multiple of multiples.slice(0, -1)) {
+          routeLabels([route], { scale: scaleOf(multiple), shown });
+        }
+        return shown;
+      });
+
+      // Act
+      const drawn = rows.map(([multiples], i) => {
+        const scale = scaleOf(multiples.at(-1) ?? 0);
+        return chevronsOf([route], { scale, shown: memories[i] ?? new Map() }).length > 0;
+      });
+
+      // Assert
+      expect(drawn).toEqual(rows.map(([, expected]) => expected));
+    });
+
+    it('is not drawn for a hidden route, nor for a route flown both ways', () => {
+      // Arrange
+      const rows: [Chart, SceneOptions][] = [
+        [[route], { density: 'off', hidden: ['V901'] }],
+        [[airway('conv', 'V901', [0, 0], [2, 0])], { density: 'off' }],
+      ];
+
+      // Act
+      const drawn = rows.map(([chart, options]) => routeLabels(chart, options));
+
+      // Assert
+      expect(drawn.map(({ gaps, chevrons }) => [gaps.count, chevrons.count])).toEqual([
+        [0, 0],
+        [0, 0],
+      ]);
+    });
+
+    it('joins the label of an airway where the density does not name its own route', () => {
+      // Arrange
+      const chart = [airway('conv', 'V901', [0, 0], [2, 0]), oneWay('sid', 'S1', [0, 0], [2, 0])];
+
+      // Act
+      const { text, chevrons } = routeLabels(chart, { density: 'normal' });
+
+      // Assert
+      const found = chevronsIn(chevrons, 0);
+      expect(textRuns(text).map((l) => l.text)).toEqual(['V901']);
+      expect(found.map((c) => c.color)).toEqual([procedureLabel]);
+    });
+
+    it('does not cost an airway the room its label needs', () => {
+      // Arrange
+      const chart = [airway('conv', 'V901', [0, 0], [2, 0]), oneWay('sid', 'S1', [0, 0], [2, 0])];
+      const scale = (labelWidth(4) + 28) / 2;
+
+      // Act
+      const { text } = routeLabels(chart, { density: 'normal', scale });
+
+      // Assert
+      expect(textRuns(text).map((l) => l.text)).toEqual(['V901']);
+    });
+
+    it('marks every span of a procedure named on one of them', () => {
+      // Arrange
+      const chart = [oneWay('sid', 'S1', [0, 0], [2, 0], [4, 0]), stopAt('fix', [2, 0], 'f1')];
+
+      // Act
+      const { text, chevrons } = routeLabels(chart);
+
+      // Assert
+      expect(textRuns(text).map((l) => l.text)).toEqual(['S1']);
+      expect(
+        chevronsIn(chevrons, 0)
+          .map((c) => c.at?.x ?? NaN)
+          .toSorted((a, b) => a - b),
+      ).toEqual([1, 3]);
+    });
+
+    it('is drawn once a way on a span, whoever flies it', () => {
+      // Arrange
+      const [back, sameWay, otherWay] = [
+        oneWay('conv', 'V901', [2, 0], [0, 0]),
+        oneWay('sid', 'S2', [0, 0], [2, 0]),
+        oneWay('sid', 'S3', [2, 0], [0, 0]),
+      ];
+      const rows: Chart[] = [
+        [route, sameWay],
+        [route, otherWay],
+        [back, otherWay],
+      ];
+
+      // Act
+      const counts = rows.map((chart) => chevronsOf(chart, { density: 'normal' }).length);
+
+      // Assert
+      expect(counts).toEqual([1, 2, 1]);
     });
   });
 });

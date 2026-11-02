@@ -161,6 +161,11 @@ export const VISITS: readonly Visit[] = [
     steps: [{ name: 'map/every-layer', act: togglePanels }],
   },
   {
+    settings: { rangeNm: NEAR_NM, labelDensity: 'off', shownLayers: EVERY_LAYER },
+    chart: EXAMPLE,
+    steps: [{ name: 'map/density-off', act: togglePanels }],
+  },
+  {
     settings: { rangeNm: WIDE_NM, labelDensity: 'dense', shownLayers: EVERY_LAYER },
     chart: EXAMPLE,
     steps: [{ name: 'map/wide', act: togglePanels }],

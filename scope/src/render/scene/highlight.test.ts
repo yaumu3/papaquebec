@@ -15,6 +15,7 @@ import {
   glyphs,
   labelWidth,
   markers,
+  oneWay,
   packed,
   point,
   polygon,
@@ -32,10 +33,17 @@ const shared = [airway('conv', 'V901', [0, 0], [2, 0]), airway('rnav', 'Y902', [
 const grey = packed(PALETTE.hover);
 const bright = packed(CHART_COLORS.pointHover);
 const rnavLabel = packed('#4a8090');
+const procedureLabel = packed('#40707c');
 
 /** How many glyphs of a text batch are in `color`. */
 const inColor = (text: Batch, color: number[]) =>
   glyphs(text).filter((g) => g.color.join() === color.join()).length;
+
+/** A one-way SID through these positions. */
+const procedure = (at: [number, number][]) => [oneWay('sid', 'S1', ...at)];
+
+/** The chevron arms a highlight draws. */
+const armsOf = (lit: ReturnType<ReturnType<typeof sceneOf>['highlight']>) => segments(lit.strokes);
 
 const itemKeyed = (chart: Chart, key: string): ChartItem => {
   const item = chart.find((i) => i.key === key);
@@ -341,19 +349,153 @@ describe('the highlight of a route', () => {
 
   it('lights the chevron of a one-way designator with its name', () => {
     // Arrange
-    const oneWay = keyed(
-      'C1',
-      itemOf('conv', partOf('conv', line([0, 0], [1, 0]), { name: 'C1', oneWay: true })),
-    );
-    const scene = sceneOf([oneWay]);
+    const route = oneWay('conv', 'C1', [0, 0], [1, 0]);
+    const scene = sceneOf([route]);
 
     // Act
-    const lit = scene.highlight(oneWay);
+    const lit = scene.highlight(route);
 
     // Assert
     const arms = segments(lit.strokes);
     expect(arms).toHaveLength(2);
     expect(arms.map((arm) => arm.color)).toEqual([grey, grey]);
+  });
+
+  describe('flown one way', () => {
+    const route = oneWay('conv', 'V901', [0, 0], [8, 0], [10, 0]);
+    const chart = [route, stopAt('navaid', [8, 0], 'N8')];
+
+    it('lights its chevron alone on a span too short for its label', () => {
+      // Arrange
+      const scene = sceneOf(chart, { scale: 25 });
+
+      // Act
+      const lit = scene.highlight(route);
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+      expect(new Set(armsOf(lit).map((arm) => arm.a.x))).toEqual(new Set([4, 9]));
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual(armsOf(lit).map(() => grey));
+      expect(lit.gaps.count).toBe(2);
+    });
+
+    it('lights no chevron on a span too short for one', () => {
+      // Arrange
+      const scene = sceneOf(chart, { scale: 10 });
+
+      // Act
+      const lit = scene.highlight(route);
+
+      // Assert
+      expect(new Set(armsOf(lit).map((arm) => arm.a.x))).toEqual(new Set([4]));
+    });
+
+    it('names a route the chart shows only as a chevron, with that one chevron', () => {
+      // Arrange
+      const chevronOnly = procedure([
+        [0, 0],
+        [2, 0],
+      ]);
+      const scene = sceneOf(chevronOnly, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(chevronOnly, 'S1'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('S1');
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual([grey, grey]);
+      expect(lit.gaps.count).toBe(1);
+    });
+
+    it('names a procedure once, though the chart draws its chevron on every span', () => {
+      // Arrange
+      const twoSpans = [
+        ...procedure([
+          [0, 0],
+          [8, 0],
+          [10, 0],
+        ]),
+        stopAt('navaid', [8, 0], 'N8'),
+      ];
+      const scene = sceneOf(twoSpans, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(twoSpans, 'S1'));
+
+      // Assert
+      expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+      expect(new Set(armsOf(lit).map((arm) => arm.a.x))).toEqual(new Set([4, 9]));
+    });
+
+    it("takes the place of another route's chevron pointing the same way", () => {
+      // Arrange
+      const both = [oneWay('sid', 'S1', [0, 0], [2, 0]), oneWay('sid', 'S2', [0, 0], [2, 0])];
+      const scene = sceneOf(both, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, 'S2'));
+
+      // Assert
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual([grey, grey]);
+    });
+
+    it("leaves another route's chevron pointing the other way", () => {
+      // Arrange
+      const both = [oneWay('sid', 'S1', [0, 0], [2, 0]), oneWay('sid', 'S2', [2, 0], [0, 0])];
+      const scene = sceneOf(both, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, 'S2'));
+
+      // Assert
+      const colors = armsOf(lit).map((arm) => arm.color.join());
+      expect(colors.filter((c) => c === grey.join())).toHaveLength(2);
+      expect(colors).toHaveLength(4);
+    });
+
+    it("keeps another route's name pointing the same way", () => {
+      // Arrange
+      const both = [oneWay('conv', 'A1', [0, 0], [2, 0]), oneWay('conv', 'B1', [0, 0], [2, 0])];
+      const scene = sceneOf(both);
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, 'A1'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('A1B1');
+      expect(armsOf(lit)).toHaveLength(4);
+    });
+
+    it('names an airway on the room its name needs, whatever chevrons its label carries', () => {
+      // Arrange
+      const name = 'AIRWAY901';
+      const both = [airway('conv', name, [0, 0], [2, 0]), oneWay('sid', 'S1', [0, 0], [2, 0])];
+      const scale = (labelWidth(name.length) + 28) / 2;
+      const scene = sceneOf(both, { density: 'normal', scale });
+      // Precondition: the chart's label carries the chevron of the procedure
+      const chartChevrons = scene.routeLabels().chevrons.count;
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, name));
+
+      // Assert
+      expect(chartChevrons).toBe(2);
+      expect(spelled(lit.text)).toBe(name);
+      expect(inColor(lit.text, grey)).toBe(name.length);
+    });
+
+    it("keeps another route's chevron for a route flown both ways", () => {
+      // Arrange
+      const both = [airway('sid', 'S3', [0, 0], [2, 0]), oneWay('sid', 'S1', [0, 0], [2, 0])];
+      const scene = sceneOf(both, { density: 'normal' });
+
+      // Act
+      const lit = scene.highlight(itemKeyed(both, 'S3'));
+
+      // Assert
+      expect(spelled(lit.text)).toBe('S3');
+      expect(armsOf(lit).map((arm) => arm.color)).toEqual([procedureLabel, procedureLabel]);
+    });
   });
 
   describe('the points it passes', () => {
