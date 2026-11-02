@@ -79,6 +79,17 @@ describe('loadMap', () => {
     expect(map?.searched).toBe('QAAAA');
   });
 
+  it('gives each load a file of its own, so that runs cannot overwrite each other', () => {
+    // Arrange
+    const option = { from: 'synthetic', scale: 1 } as const;
+
+    // Act
+    const [first, second] = [loadMap(option, SITE), loadMap(option, SITE)];
+
+    // Assert
+    expect(first?.chart.file).not.toEqual(second?.chart.file ?? '');
+  });
+
   it('reads a file by its path, and refuses one that does not parse', () => {
     // Arrange
     const option = { from: 'file', path: 'package.json' } as const;
