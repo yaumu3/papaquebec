@@ -59,11 +59,12 @@ export interface SpanLabel extends RouteSpan {
 
 type SpanLabels = Map<string, SpanLabel>;
 
-/** What the stages read: the build's input and the text to measure. */
+/** What the stages read: the build's input, the text to measure, and the item key of each part. */
 interface Stage extends LabelsInput {
   shown: ShownMemory;
   scale: number;
   text: TextBatch;
+  keys: ReadonlyMap<ChartPath['part'], string>;
 }
 
 /** Draw-stack order, then by name. */
@@ -149,8 +150,7 @@ const roomOf = ({ length, cutBack, cutAhead }: SpanLabel, scale: number) =>
 
 /** The airway designators of the drawn parts, by the span they run along. */
 function airwayLabels(stage: Stage): SpanLabels {
-  const { topology, drawnItems, routeSpans, labelDensity } = stage;
-  const keys = keysOf(drawnItems);
+  const { topology, keys, routeSpans, labelDensity } = stage;
   const spanLabels: SpanLabels = new Map();
   for (const path of topology.routes.paths) {
     const key = keys.get(path.part);
@@ -230,8 +230,7 @@ const pointsLike = ({ oneWay, reads }: Placed, placed: Placed) => oneWay && read
  * density: beside what the span's label names, once a way.
  */
 function putChevrons(spanLabels: SpanLabels, stage: Stage) {
-  const { topology, drawnItems, routeSpans, shown, scale } = stage;
-  const keys = keysOf(drawnItems);
+  const { topology, keys, routeSpans, shown, scale } = stage;
   for (const path of topology.routes.paths) {
     const key = keys.get(path.part);
     const chevron = key !== undefined && chevronOf(path, key);
@@ -443,7 +442,12 @@ export function buildRouteLabels(input: LabelsInput & FitInput): BuiltLabels {
     text: new TextBatch(input.atlas),
     strokes: new LineBatch(),
   };
-  const spanLabels = designatedSpans({ ...input, scale: input.settledScale(), text: out.text });
+  const spanLabels = designatedSpans({
+    ...input,
+    scale: input.settledScale(),
+    text: out.text,
+    keys: keysOf(input.drawnItems),
+  });
   for (const spanLabel of spanLabels) putLabel(spanLabel, out);
   return {
     batches: [out.gaps.finish(), out.text.finish(), out.strokes.finish()],
