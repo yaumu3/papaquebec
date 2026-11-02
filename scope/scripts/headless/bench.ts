@@ -29,16 +29,35 @@ import { ACTION_SLOTS } from './actions';
 import { openScope } from './browser';
 import { bundleIn, fnProblems } from './fnCheck';
 import { benchSettings, loadMap, parseMapOption } from './mapOption';
+import { importScenario, mapScenarios } from './mapScenarios';
 import { inclusiveMs } from './profile';
 import { installRecorder } from './recorder';
 import { rowsOf, summarize } from './report';
-import {
-  chosenScenarios,
-  importScenario,
-  inSequence,
-  loadScenarios,
-  mapScenarios,
-} from './scenarios';
+import { chosenScenarios, inSequence, loadScenarios } from './scenarios';
+
+/** The builders of the scene: named declarations, a builder run in a memo by what it calls. */
+const PROFILED = [
+  'buildRings',
+  'buildCoast',
+  'validateMapSet',
+  'chartOf',
+  'topologyOf',
+  'treeItemsOf',
+  'searchTree',
+  'drawnItemsOf',
+  'drawnPointsOf',
+  'areaPlaceOf',
+  'buildShapes',
+  'buildAreaLabels',
+  'buildRouteLabels',
+  'buildPointLabels',
+  'buildTraces',
+  'buildHighlight',
+  'blockSubjects',
+  'buildTargets',
+  'buildHover',
+  'buildOverlays',
+];
 
 const { values: opt } = parseArgs({
   options: {
@@ -46,13 +65,7 @@ const { values: opt } = parseArgs({
     site: { type: 'string', default: '35.5533,139.7811' }, // RJTT
     seconds: { type: 'string', default: '3' },
     warmup: { type: 'string', default: '6000' },
-    fn: {
-      type: 'string',
-      default:
-        'buildRings,buildCoast,validateMapSet,chartOf,topologyOf,treeItemsOf,searchTree,drawnItemsOf,' +
-        'drawnPointsOf,areaPlaceOf,buildShapes,buildAreaLabels,buildRouteLabels,buildPointLabels,' +
-        'buildTraces,buildHighlight,blockSubjects,buildTargets,buildHover,buildOverlays',
-    },
+    fn: { type: 'string', default: PROFILED.join(',') },
     map: { type: 'string', default: 'none' },
     layers: { type: 'string', default: 'default' },
     density: { type: 'string', default: 'normal' },
