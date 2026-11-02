@@ -67,6 +67,12 @@ run = "bun run bench"
 description = "Score the data block placer on the sim's scenarios against the greedy baseline; --check for the thresholds"
 run = "cargo run -q --release -p sim --bin bench --"
 
+[tasks."bench:map"]
+description = "Time the chart builders on the synthetic set, no browser; --check for the budgets, --update to rewrite them"
+depends = ["wasm"]
+dir = "scope"
+run = "bun scripts/headless/bench-map.ts"
+
 [tasks.wasm]
 description = "The placer, the magnetic model and the geodesics as WebAssembly for the scope, with their bindings, into scope/src/render/layout/wasm and scope/src/lib/wasm"
 sources = ["crates/placer/**/*", "crates/wmm/**/*", "crates/geodesy/**/*", "Cargo.lock"]
