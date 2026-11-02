@@ -14,6 +14,7 @@ import {
   box,
   glyphs,
   labelWidth,
+  markers,
   packed,
   point,
   polygon,
@@ -298,6 +299,91 @@ describe('the highlight of a route', () => {
     const arms = segments(lit.strokes);
     expect(arms).toHaveLength(2);
     expect(arms.map((arm) => arm.color)).toEqual([grey, grey]);
+  });
+
+  describe('the points it passes', () => {
+    const route = airway('conv', 'V901', [0, 0], [1, 0], [2, 0]);
+    const fix = single('fix', point([1, 0]), { id: 'F1' }, 'F1');
+    const navaid = single('navaid', point([2, 0]), { id: 'N2' }, 'N2');
+    const chart = [route, fix, navaid];
+
+    it('lights each one, symbol and ident, as the chart draws it and brighter', () => {
+      // Arrange
+      const scene = sceneOf(chart);
+      const chartMarkers = markers(sceneOf([fix, navaid]).shapes().markers);
+      const chartStrokes = segments(sceneOf([fix, navaid]).shapes().lines);
+      const chartIdents = scene.pointLabels().text;
+
+      // Act
+      const { points } = scene.highlight(route);
+
+      // Assert
+      expect(withoutColor(markers(points.markers))).toEqual(withoutColor(chartMarkers));
+      expect(withoutColor(segments(points.strokes))).toEqual(withoutColor(chartStrokes));
+      expect(withoutColor(glyphs(points.idents))).toEqual(withoutColor(glyphs(chartIdents)));
+      const colors = [
+        ...markers(points.markers),
+        ...segments(points.strokes),
+        ...glyphs(points.idents),
+      ].map((row) => row.color);
+      expect(colors).toEqual(colors.map(() => bright));
+    });
+
+    it('lights one the chart hides, at a density that names none', () => {
+      // Arrange
+      const scene = sceneOf(chart, { hidden: ['F1', 'N2'], density: 'off' });
+
+      // Act
+      const { points } = scene.highlight(route);
+
+      // Assert
+      expect(spelled(points.idents)).toBe('F1N2');
+      expect(markers(points.markers).map((m) => m.at.x)).toEqual([1, 2]);
+    });
+
+    it('lights a point once however many parts of the route pass it', () => {
+      // Arrange
+      const parts = keyed(
+        'R',
+        itemOf(
+          'conv',
+          partOf('conv', line([0, 0], [1, 0]), { name: 'R' }),
+          partOf('conv', line([1, 0], [2, 0]), { name: 'R' }),
+        ),
+      );
+      const scene = sceneOf([parts, fix]);
+
+      // Act
+      const { points } = scene.highlight(parts);
+
+      // Assert
+      expect(spelled(points.idents)).toBe('F1');
+    });
+
+    it('leaves a point off the route dark, however near', () => {
+      // Arrange
+      const beside = single('fix', point([1, 0.5]), { id: 'F2' }, 'F2');
+      const scene = sceneOf([route, beside]);
+
+      // Act
+      const { points } = scene.highlight(route);
+
+      // Assert
+      expect([points.markers.count, points.idents.count]).toEqual([0, 0]);
+    });
+
+    it('lights no point on an area that has one at a corner', () => {
+      // Arrange
+      const sector = single('sector', polygon(box(0, 4)), { name: 'SEC' }, 'SEC');
+      const corner = single('fix', point([0, 0]), { id: 'F3' }, 'F3');
+      const scene = sceneOf([sector, corner]);
+
+      // Act
+      const { points } = scene.highlight(sector);
+
+      // Assert
+      expect([points.markers.count, points.idents.count]).toEqual([0, 0]);
+    });
   });
 
   it('draws nothing for an item whose layer has no label', () => {

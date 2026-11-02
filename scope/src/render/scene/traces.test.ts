@@ -227,6 +227,22 @@ describe('the traces', () => {
     expect(litPoints.map((b) => b.count)).toEqual([0, 0, 0]);
   });
 
+  it('puts the points a route passes among the traced points, its label in the traces', () => {
+    // Arrange
+    const route = airway('conv', 'V901', [0, 0], [1, 0], [2, 0]);
+    const passed = single('fix', point([1, 0]), { id: 'F1' }, 'F1');
+    const scene = sceneOf([route, passed]);
+
+    // Act
+    const { litTraces, litPoints } = scene.traces({ pointedAt: route, searched: [] });
+
+    // Assert
+    const spell = (batches: typeof litPoints) =>
+      batches.filter((b) => b.kind === 'text').map(spelled);
+    expect(spell(litPoints)).toEqual(['F1']);
+    expect(spell(litTraces)).toEqual(['V901V901']);
+  });
+
   it("puts a point's highlight among the traced points, and none in the traces", () => {
     // Arrange
     const pointedAt = single('fix', point([1, 2]));

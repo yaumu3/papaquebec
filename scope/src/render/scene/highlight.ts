@@ -2,11 +2,14 @@
 
 import { CHART_COLORS, PALETTE } from '../../design/palette';
 import type { ChartItem } from '../../lib/chart';
-import { isPointStyle, isProcedureLayer, LAYER_TABLE } from '../../lib/layers';
+import type { ProjectFn } from '../../lib/geo';
+import { isProcedureLayer, LAYER_TABLE } from '../../lib/layers';
 import { isPointLayer, isRouteLayer } from '../../lib/mapsetFormat';
+import { type ChartPoint, pointsAlong } from '../../lib/topology';
 import type { Batch } from '../protocol';
 import { putAreaLabel } from './areaLabels';
 import { type LabelsInput, placedPoint, type PlaceInput, putPointLabel } from './chart';
+import { type FigureOut, putPointMark } from './figures';
 import { type Anchor, LineBatch, MarkerBatch, TextBatch } from './pack';
 import { itemLabels, putLabel, type RouteLabelOut, type SpanLabel } from './spanDesignators';
 
@@ -47,23 +50,26 @@ function putRouteLabels(
   for (const label of shown) putLabel(label, out, { key: item.key, color: PALETTE.hover });
 }
 
-/** Puts the ident beside every part of a point item, drawn or not. */
-function putPointLabels(
-  { key, layer }: ChartItem,
-  { topology, project }: HighlightInput,
-  text: TextBatch,
+/** Puts the ident of each of `points`, drawn or not, and its symbol when `symbols` are asked for. */
+function putPoints(
+  points: readonly ChartPoint[],
+  project: ProjectFn,
+  idents: TextBatch,
+  symbols?: FigureOut,
 ) {
-  const { style } = LAYER_TABLE[layer];
-  if (!isPointStyle(style)) return;
-  for (const point of topology.points.filter((p) => p.key === key)) {
-    putPointLabel(text, placedPoint(point, project), style.label, CHART_COLORS.pointHover);
+  for (const point of points) {
+    const { style } = LAYER_TABLE[point.layer];
+    const placed = placedPoint(point, project);
+    putPointLabel(idents, placed, style.label, CHART_COLORS.pointHover);
+    if (symbols) putPointMark(symbols, placed.at, style, point.kind, CHART_COLORS.pointHover);
   }
 }
 
 /**
- * The batches that light an item's label, in the hover grey and a point's brighter. A route's label is the chart's, by span; a point's is its ident as the chart
- * would place it. An area's says what DENSE says at any density: on the name the chart drew, else
- * centred on its place, with no room test and no density gate.
+ * The batches that light an item, in the hover grey and a point brighter. A route lights its label
+ * and the points it passes. A route's label is the chart's, by span; a point's is its ident as the
+ * chart would place it. An area's says what DENSE says at any density: on the name the chart drew,
+ * else centred on its place, with no room test and no density gate.
  */
 export function buildHighlight(item: ChartItem, input: HighlightInput): Highlight {
   const out = {
@@ -73,9 +79,17 @@ export function buildHighlight(item: ChartItem, input: HighlightInput): Highligh
   };
   const symbols = { lines: new LineBatch(1), markers: new MarkerBatch(1) };
   const idents = new TextBatch(input.atlas, 1);
-  if (isRouteLayer(item.layer)) putRouteLabels(item, input, out);
-  else if (isPointLayer(item.layer)) putPointLabels(item, input, idents);
-  else putAreaLabel(item, input.areaNames.get(item.key), input.placeOf, out, PALETTE.hover);
+  const { topology, project } = input;
+  if (isRouteLayer(item.layer)) {
+    putRouteLabels(item, input, out);
+    putPoints(pointsAlong(item, topology), project, idents, symbols);
+  } else if (isPointLayer(item.layer)) {
+    putPoints(
+      topology.points.filter((p) => p.key === item.key),
+      project,
+      idents,
+    );
+  } else putAreaLabel(item, input.areaNames.get(item.key), input.placeOf, out, PALETTE.hover);
   return {
     label: [out.gaps.finish(), out.text.finish(), out.strokes.finish()],
     points: [symbols.lines.finish(), symbols.markers.finish(), idents.finish()],
