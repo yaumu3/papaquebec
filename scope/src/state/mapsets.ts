@@ -86,6 +86,7 @@ export function createMapSets(
   storage: Storage | null,
   opening: Promise<MapSetStore>,
   now: () => number = Date.now,
+  afterDraw: () => Promise<void> = () => Promise.resolve(),
 ): MapSets {
   const placeholder: MapSetData = {
     type: 'FeatureCollection',
@@ -120,12 +121,16 @@ export function createMapSets(
     (data) => topologyOf(chartOf(data)),
   );
 
+  /** What every write waits for: writing clones a whole set, which would hold up its first draw. */
+  let drawing = Promise.resolve();
   /** Runs a write on the store once it is open; false when it cannot be opened or refuses. */
   const stored = (write: (open: MapSetStore) => Promise<void>): Promise<boolean> =>
-    opening.then(write).then(
-      () => true,
-      () => false,
-    );
+    Promise.all([opening, drawing])
+      .then(([open]) => write(open))
+      .then(
+        () => true,
+        () => false,
+      );
   const oldFlag = storage && readJson(storage, OLD_FLAG_KEY);
   if (isRecord(oldFlag) && oldFlag.builtinEnabled === false) adoptOff([BUILTIN_ID]);
 
@@ -168,6 +173,7 @@ export function createMapSets(
       const set: MapSet = { identity, data, builtin: false, imported };
       setSets((own) => [set, ...own.filter((s) => s.identity !== identity)]);
       enable(identity);
+      drawing = afterDraw();
       return { ok: true, kept: stored((open) => open.put({ identity, imported, data })) };
     },
     toggleMapSet(identity) {
@@ -198,6 +204,19 @@ export function armRemoval(
   return armed === clicked ? { armed: null, remove: clicked } : { armed: clicked, remove: null };
 }
 
+/** How long a hidden page, which draws no frames, waits instead, in ms. */
+const NO_FRAME_MS = 250;
+
+/** Resolves once the next frame is out of the way. */
+const afterFrame = () =>
+  new Promise<void>((done) => {
+    const timer = setTimeout(done, NO_FRAME_MS);
+    requestAnimationFrame(() => {
+      clearTimeout(timer);
+      setTimeout(done);
+    });
+  });
+
 const mapsets = createMapSets(
   {
     disabled: () => settings.disabledSets,
@@ -205,6 +224,8 @@ const mapsets = createMapSets(
   },
   typeof localStorage === 'undefined' ? null : localStorage,
   openMapSetStore(globalThis.indexedDB),
+  Date.now,
+  afterFrame,
 );
 export const {
   mapSets,

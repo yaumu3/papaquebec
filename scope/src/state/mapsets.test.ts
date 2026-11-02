@@ -292,6 +292,64 @@ describe('storage of imported sets', () => {
     expect(sets.isEnabled('my-fixes')).toBe(true);
   });
 
+  it('writes an import only once the chart has drawn', async () => {
+    // Arrange
+    const spy = spyStore();
+    let drawn = () => {};
+    const afterDraw = () =>
+      new Promise<void>((resolve) => {
+        drawn = resolve;
+      });
+    const sets = createMapSets(
+      flagsOf(),
+      memoryStorage(),
+      Promise.resolve(spy.store),
+      ticking(),
+      afterDraw,
+    );
+    await sets.hydrated;
+    const out = importing(sets, fixes);
+    await sets.hydrated;
+    const before = [...spy.writes];
+
+    // Act
+    drawn();
+    const kept = out.ok ? await out.kept : null;
+
+    // Assert
+    expect(before).toEqual([]);
+    expect(kept).toBe(true);
+    expect(spy.writes).toEqual(['put my-fixes']);
+  });
+
+  it('removes a set imported a moment ago from the store as well', async () => {
+    // Arrange
+    const spy = spyStore();
+    let drawn = () => {};
+    const afterDraw = () =>
+      new Promise<void>((resolve) => {
+        drawn = resolve;
+      });
+    const sets = createMapSets(
+      flagsOf(),
+      memoryStorage(),
+      Promise.resolve(spy.store),
+      ticking(),
+      afterDraw,
+    );
+    const out = importing(sets, fixes);
+
+    // Act
+    sets.removeMapSet('my-fixes');
+    drawn();
+    if (out.ok) await out.kept;
+    await Bun.sleep(0);
+
+    // Assert
+    expect(spy.writes).toEqual(['put my-fixes', 'delete my-fixes']);
+    expect([...spy.records.keys()]).toEqual([]);
+  });
+
   it('deletes the one record to remove a set', async () => {
     // Arrange
     const { sets, writes, records } = created();
