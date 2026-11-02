@@ -94,6 +94,31 @@ const created = (spy = spyStore(), storage = memoryStorage(), flags = flagsOf())
   flags,
   sets: createMapSets(flags, storage, Promise.resolve(spy.store), ticking()),
 });
+/** Sets whose first draw finishes when the test says. */
+function withHeldDraw(spy = spyStore()) {
+  const { afterDraw, finishDraw } = heldDraw();
+  const opening = Promise.resolve(spy.store);
+  const sets = createMapSets(flagsOf(), memoryStorage(), opening, ticking(), afterDraw);
+  return { ...spy, sets, finishDraw };
+}
+/** Sets that hold each import's task for the test to run. */
+function withHeldTask(spy = spyStore()) {
+  const tasks: (() => void)[] = [];
+  const sets = createMapSets(
+    flagsOf(),
+    memoryStorage(),
+    Promise.resolve(spy.store),
+    ticking(),
+    () => Promise.resolve(),
+    (task) => tasks.push(task),
+  );
+  return { sets, tasks };
+}
+/** Lets a held draw finish, and every write it holds up run. */
+async function writesAfter(finishDraw: () => void) {
+  finishDraw();
+  await Bun.sleep(0);
+}
 /** The ids of the points the chart holds on a layer. */
 const idsOf = (sets: ReturnType<typeof createMapSets>, layer: string) =>
   sets
@@ -302,55 +327,51 @@ describe('storage of imported sets', () => {
     expect(sets.isEnabled('my-fixes')).toBe(true);
   });
 
-  it('writes an import only once the chart has drawn', async () => {
+  it('holds an import back from the store until the chart has drawn', async () => {
     // Arrange
-    const spy = spyStore();
-    const { afterDraw, finishDraw } = heldDraw();
-    const sets = createMapSets(
-      flagsOf(),
-      memoryStorage(),
-      Promise.resolve(spy.store),
-      ticking(),
-      afterDraw,
-    );
-    await sets.hydrated;
-    const out = importing(sets, fixes);
-    await sets.hydrated;
-    const before = [...spy.writes];
+    const { sets, writes } = withHeldDraw();
+    importing(sets, fixes);
 
     // Act
-    finishDraw();
-    const kept = out.ok ? await out.kept : null;
+    await Bun.sleep(0);
 
     // Assert
-    expect(before).toEqual([]);
-    expect(kept).toBe(true);
-    expect(spy.writes).toEqual(['put my-fixes']);
+    expect(writes).toEqual([]);
   });
 
-  it('adds an import in the task the pacing gives it, after the parse', async () => {
+  it('writes an import once the chart has drawn', async () => {
     // Arrange
-    const spy = spyStore();
-    const tasks: (() => void)[] = [];
-    const sets = createMapSets(
-      flagsOf(),
-      memoryStorage(),
-      Promise.resolve(spy.store),
-      ticking(),
-      () => Promise.resolve(),
-      (task) => tasks.push(task),
-    );
-    const out = importing(sets, fixes);
-    const before = sets.mapSets().map((s) => s.identity);
+    const { sets, writes, finishDraw } = withHeldDraw();
+    importing(sets, fixes);
+
+    // Act
+    await writesAfter(finishDraw);
+
+    // Assert
+    expect(writes).toEqual(['put my-fixes']);
+  });
+
+  it('holds an import back from the list until the task the pacing gives it', () => {
+    // Arrange
+    const { sets } = withHeldTask();
+
+    // Act
+    importing(sets, fixes);
+
+    // Assert
+    expect(sets.mapSets().map((s) => s.identity)).toEqual([BUILTIN_ID]);
+  });
+
+  it('adds an import in the task the pacing gives it', () => {
+    // Arrange
+    const { sets, tasks } = withHeldTask();
+    importing(sets, fixes);
 
     // Act
     tasks.forEach((task) => task());
-    const kept = out.ok ? await out.kept : null;
 
     // Assert
-    expect(before).toEqual([BUILTIN_ID]);
     expect(sets.mapSets().map((s) => s.identity)).toEqual(['my-fixes', BUILTIN_ID]);
-    expect(kept).toBe(true);
   });
 
   it('rejects what it kept when the chart fails to build in its task', async () => {
@@ -382,26 +403,16 @@ describe('storage of imported sets', () => {
 
   it('removes a set imported a moment ago from the store as well', async () => {
     // Arrange
-    const spy = spyStore();
-    const { afterDraw, finishDraw } = heldDraw();
-    const sets = createMapSets(
-      flagsOf(),
-      memoryStorage(),
-      Promise.resolve(spy.store),
-      ticking(),
-      afterDraw,
-    );
-    const out = importing(sets, fixes);
+    const { sets, writes, records, finishDraw } = withHeldDraw();
+    importing(sets, fixes);
+    sets.removeMapSet('my-fixes');
 
     // Act
-    sets.removeMapSet('my-fixes');
-    finishDraw();
-    if (out.ok) await out.kept;
-    await Bun.sleep(0);
+    await writesAfter(finishDraw);
 
     // Assert
-    expect(spy.writes).toEqual(['put my-fixes', 'delete my-fixes']);
-    expect([...spy.records.keys()]).toEqual([]);
+    expect(writes).toEqual(['put my-fixes', 'delete my-fixes']);
+    expect([...records.keys()]).toEqual([]);
   });
 
   it('deletes the one record to remove a set', async () => {
