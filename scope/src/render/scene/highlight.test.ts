@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { CHART_COLORS, PALETTE } from '../../design/palette';
 import { type Chart, type ChartItem, chartOf, itemName } from '../../lib/chart';
+import type { ShownMemory } from '../../lib/fits';
 import { parseMapSet } from '../../lib/mapset';
 import { EXAMPLE } from '../../lib/mapsetCorpus';
 import type { Batch } from '../protocol';
@@ -216,6 +217,25 @@ describe('the highlight of a route', () => {
 
       // Assert
       expect(new Set(glyphs(lit.text).map((g) => g.at.x))).toEqual(new Set([4]));
+    });
+
+    it("keeps the chart's hysteresis: hidden where the chart still hides it in the band", () => {
+      // Arrange
+      const chart = [stopAt('navaid', [0, 0]), airway('conv', 'V901', [0, 0], [2, 0])];
+      const threshold = labelWidth(4) + 28;
+      const scaleOf = (multiple: number) => (multiple * threshold + 9) / 2;
+      const shown: ShownMemory = new Map();
+      sceneOf(chart, { scale: scaleOf(0.99), shown }).routeLabels();
+      const scene = sceneOf(chart, { scale: scaleOf(1.05), shown });
+      // Precondition: the chart keeps the label hidden inside the band
+      const chartText = scene.routeLabels().text.count;
+
+      // Act
+      const lit = scene.highlight(itemKeyed(chart, 'V901'));
+
+      // Assert
+      expect(chartText).toBe(0);
+      expect(lit.text.count).toBe(0);
     });
 
     it('draws no label when no span has room', () => {

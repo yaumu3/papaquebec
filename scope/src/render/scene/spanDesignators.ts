@@ -248,8 +248,11 @@ function putChevrons(spanLabels: SpanLabels, stage: Stage) {
   }
 }
 
-/** What lighting an item reads: its spans, the settled scale, and the text to measure. */
-type LitReading = ItemReading & Pick<Stage, 'scale' | 'text'>;
+/**
+ * What lighting an item reads: its spans, the settled scale, the text to measure, and what the
+ * chart's labels showed last, read and never written, so a lit label agrees with the chart's.
+ */
+type LitReading = ItemReading & Pick<Stage, 'scale' | 'text' | 'shown'>;
 
 /** A span of an item as it can be lit: its label with the item's name, or without it. */
 interface LitSpan {
@@ -277,7 +280,9 @@ function litSpans(
     const replaced = (d: Placed) => placed.oneWay && !d.name && pointsLike(d, placed);
     const others = label.designators.filter((d) => d.key !== item.key && !replaced(d));
     const joined = (d: Placed) => [...others, d].toSorted(byStack);
-    const chevronFits = placed.oneWay && fits(roomOf(label, stage.scale), CHEVRON_ROOM_PX);
+    const chevronFits =
+      placed.oneWay &&
+      fits(roomOf(label, stage.scale), CHEVRON_ROOM_PX, stage.shown.get(`chevron ${label.id}`));
     const unnamed = { ...label, designators: chevronFits ? joined(chevronAlone(placed)) : others };
     lit.set(span.id, {
       named: placed.name ? { ...label, designators: joined(placed) } : unnamed,
@@ -301,8 +306,8 @@ function namedOnce(
 
 /**
  * The labels to redraw for an item, whole: on every span of an airway that has room for its
- * designator, and for a procedure on the spans the chart names it on, else on the first with
- * room. No density gate. Other spans keep the chart's label over the trace, and the item's chevron
+ * designator by the chart's own test and memory, and for a procedure on the spans the chart
+ * names it on, else on the first with room. No density gate. Other spans keep the chart's label over the trace, and the item's chevron
  * if it has room. The chart's labels are never changed.
  */
 export function itemLabels(
@@ -310,14 +315,14 @@ export function itemLabels(
   stage: LitReading,
   chartLabels: ReadonlyMap<string, SpanLabel>,
 ): SpanLabel[] {
-  const { scale, text } = stage;
+  const { scale, text, shown } = stage;
   const spans = litSpans(item, stage, chartLabels);
   const roomy = spans.filter(({ named }) =>
-    fits(roomOf(named, scale), thresholdOf(named.designators, text)),
+    fits(roomOf(named, scale), thresholdOf(named.designators, text), shown.get(named.id)),
   );
-  const shown = isProcedureLayer(item.layer) ? namedOnce(roomy, item.key, chartLabels) : roomy;
+  const lit = isProcedureLayer(item.layer) ? namedOnce(roomy, item.key, chartLabels) : roomy;
   return spans
-    .map((span) => (shown.includes(span) ? span.named : span.unnamed))
+    .map((span) => (lit.includes(span) ? span.named : span.unnamed))
     .filter((label) => label.designators.length > 0);
 }
 

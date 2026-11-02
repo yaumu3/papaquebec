@@ -40,9 +40,13 @@ export function showChart(
   settledScale: () => number,
   atlas: () => AtlasInfo | null,
 ): (item: ChartItem) => Highlight | null {
+  /** What each slice's labels showed last; the highlight reads the route slice's. */
+  const memories = new Map(
+    CHART_SLICES.map((slice): [typeof slice, ShownMemory] => [slice, new Map()]),
+  );
   const labels = new Map(
     CHART_SLICES.map((slice): [typeof slice, () => BuiltLabels | null] => {
-      const shown: ShownMemory = new Map();
+      const shown = memories.get(slice) ?? new Map();
       show(() => (projected() ? buildShapes(slice, inputOf(slice.layers), declinationAt) : null));
       const built = createMemo(() => {
         const a = atlas();
@@ -75,6 +79,7 @@ export function showChart(
       project: projectNm,
       routeSpans,
       settledScale,
+      shown: memories.get(sliceOf('conv')) ?? new Map(),
       atlas: info,
       placeOf: areaPlace,
     });

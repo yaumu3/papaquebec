@@ -21,7 +21,7 @@ import { itemLabels, putLabel, type RouteLabelOut, type SpanLabel } from './span
 
 /** What the highlight reads: the chart as the scene holds it, and where its labels went. */
 type HighlightInput = Pick<LabelsInput, 'topology' | 'project' | 'routeSpans' | 'atlas'> &
-  Pick<FitInput, 'settledScale'> &
+  Pick<FitInput, 'settledScale' | 'shown'> &
   PlaceInput & {
     /** The span labels the chart draws for routes, by span identity. */
     spanLabels: ReadonlyMap<string, SpanLabel>;
@@ -40,10 +40,10 @@ export interface Highlight {
 /** Puts the span labels of a route, whole, with its designator lit. */
 function putRouteLabels(
   item: ChartItem,
-  { topology, routeSpans, spanLabels, settledScale }: HighlightInput,
+  { topology, routeSpans, spanLabels, settledScale, shown }: HighlightInput,
   out: RouteLabelOut,
 ) {
-  const stage = { topology, routeSpans, scale: settledScale(), text: out.text };
+  const stage = { topology, routeSpans, scale: settledScale(), text: out.text, shown };
   for (const label of itemLabels(item, stage, spanLabels)) {
     putLabel(label, out, { key: item.key, color: PALETTE.hover });
   }

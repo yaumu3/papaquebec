@@ -366,6 +366,7 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
       topology,
       routeSpans,
       settledScale: () => scale,
+      shown,
       project: plane,
       atlas,
       placeOf,
