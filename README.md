@@ -210,9 +210,11 @@ The panel's `LAYERS` tree lists groups, layers and each layer's items:
   - A term matches the start of a word.
   - A layer or group name keeps all its items.
   - The search is not remembered.
-- The scope traces in grey the item pointed at, drawn or not.
+- The scope traces in grey the item pointed at, drawn or not, and lights its label where it fits.
   - A search also traces the items it finds by name or tag.
+  - A point lights up brighter than the grey; a pointed route lights the points it passes.
   - A hold traces as its racetrack, without the chevrons.
+- A one-way route carries a chevron at any `LABEL DENSITY`; the density only decides its name.
 
 The schema is [`scope/schema/mapset.schema.json`](scope/schema/mapset.schema.json), with a set that
 uses every layer in [`example.mapset.geojson`](scope/schema/example.mapset.geojson) and the rules
