@@ -2,8 +2,8 @@
 
 import { gridIdentity } from './chart';
 import type { Vec2 } from './geo';
-import type { LineOf, PathLine } from './pathLines';
-import { type Midpoint, pointAlong, type Reading, readingAngle } from './polyline';
+import type { LineOf, Measured, PathLine } from './pathLines';
+import { pointAlong, readingAngle } from './polyline';
 import { type Cuts, NO_CUTS, type Span, spanIdentity, spansOf } from './stops';
 import type { ChartPath } from './topology';
 
@@ -14,16 +14,7 @@ export interface LineSpan extends Span {
 }
 
 /** A span of a route, with what its label reads. */
-export interface RouteSpan extends LineSpan {
-  /** Shared by every path that runs this span, in either direction. */
-  id: string;
-  /** World length of the span. */
-  length: number;
-  /** The grid identity where the span starts on this path. */
-  start: string;
-  /** Half-way along, and how text reads there; none for a span with no length. */
-  middle?: Midpoint & Reading;
-}
+export type RouteSpan = LineSpan & Measured;
 
 /** The spans of a path, walked the first time they are asked for. */
 export type SpansOf<S extends LineSpan = RouteSpan> = (path: ChartPath) => readonly S[];
@@ -46,9 +37,6 @@ function middleOf(line: PathLine, { from, to }: Span, length: number) {
   return pointAlong(edgePoints(line, edge), length / 2 - reachOf(edge));
 }
 
-/** What a span's ends alone decide, so that a change of the points that stop it keeps it. */
-type Measured = Pick<RouteSpan, 'id' | 'length' | 'start' | 'middle'>;
-
 function measuredSpan(path: ChartPath, span: Span, line: PathLine): Measured {
   const length = (line.reach[span.to] ?? 0) - (line.reach[span.from] ?? 0);
   const middle = middleOf(line, span, length);
@@ -60,15 +48,12 @@ function measuredSpan(path: ChartPath, span: Span, line: PathLine): Measured {
   };
 }
 
-/** Each line's stretches measured so far, by their ends. */
-const stretches = new WeakMap<PathLine, Map<number, Measured>>();
-
 function routeSpan(path: ChartPath, span: Span, line: PathLine): RouteSpan {
-  const known = stretches.get(line) ?? new Map<number, Measured>();
-  stretches.set(line, known);
   const key = span.from * line.reach.length + span.to;
-  const measured = known.get(key) ?? measuredSpan(path, span, line);
-  known.set(key, measured);
+  const known = line.measured.get(key);
+  if (known) return { ...span, ...known, line };
+  const measured = measuredSpan(path, span, line);
+  line.measured.set(key, measured);
   return { ...span, ...measured, line };
 }
 

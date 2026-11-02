@@ -7,8 +7,20 @@
 import type { ProjectFn } from './geo';
 import { pointsBetween } from './geodesic';
 import type { LonLat } from './mapdata';
-import { chordOf } from './polyline';
+import { chordOf, type Midpoint, type Reading } from './polyline';
 import type { ChartPath } from './topology';
+
+/** What a stretch of a path's ends decide, so that a change of the points that stop it keeps it. */
+export interface Measured {
+  /** Shared by every path that runs this stretch, in either direction. */
+  id: string;
+  /** World length of the stretch. */
+  length: number;
+  /** The grid identity where the stretch starts on this path. */
+  start: string;
+  /** Half-way along, and how text reads there; none for a stretch with no length. */
+  middle?: Midpoint & Reading;
+}
 
 /** A path on the plane. */
 export interface PathLine {
@@ -20,6 +32,8 @@ export interface PathLine {
   at: Int32Array;
   /** The world distance from the path's start to each vertex. */
   reach: Float64Array;
+  /** The stretches measured so far, by their ends. */
+  measured: Map<number, Measured>;
 }
 
 /** The line of a path, walked the first time it is asked for. */
@@ -103,6 +117,7 @@ export function pathLines(project: ProjectFn): LineOf {
       points: into,
       at: new Int32Array(path.vertices.length),
       reach: new Float64Array(path.vertices.length),
+      measured: new Map(),
     };
     walk(path, line, into);
     line.points = new Float64Array(into);
