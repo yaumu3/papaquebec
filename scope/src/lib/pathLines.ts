@@ -8,7 +8,7 @@ import type { ProjectFn } from './geo';
 import { pointsBetween } from './geodesic';
 import type { LonLat } from './mapdata';
 import { chordOf, type Midpoint, type Reading } from './polyline';
-import type { ChartPath } from './topology';
+import type { ChartPath, Network } from './topology';
 
 /** What a stretch of a path's ends decide, so that a change of the points that stop it keeps it. */
 export interface Measured {
@@ -81,15 +81,13 @@ function lengthBetween(points: readonly number[], from: number, to: number): num
   return length;
 }
 
-/**
- * The lines of the paths of one network, kept once walked: edges are numbered within a network,
- * and the lines hold as long as its topology and `project` do.
- */
-export function pathLines(project: ProjectFn): LineOf {
+/** The lines of a network's paths, kept once walked, for as long as it and `project` hold. */
+export function pathLines(network: Network, project: ProjectFn): LineOf {
+  const members = new Set(network.paths);
   const walked = new Map<ChartPath, PathLine>();
   /** Per edge, the line that first ran it and which of its edges that was. */
   const homes: PathLine[] = [];
-  const slots: number[] = [];
+  const slots = new Int32Array(network.edgeCount);
 
   const walk = ({ coordinates, vertices, edges }: ChartPath, line: PathLine, into: number[]) => {
     for (let i = 0; i < edges.length; i++) {
@@ -111,6 +109,7 @@ export function pathLines(project: ProjectFn): LineOf {
   return (path) => {
     const known = walked.get(path);
     if (known) return known;
+    if (!members.has(path)) throw new Error('a path of another network');
     const into: number[] = [];
     const line: PathLine = {
       vertices: path.vertices,

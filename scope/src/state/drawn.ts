@@ -42,9 +42,9 @@ export const { drawnItemsIn, drawnPoints, areaSpans, routeSpans, areaPlace } = c
   const points = createMemo(() => drawnPointsOf(topology(), drawnItems(POINT_LAYERS)));
   /** Each network's geodesics, kept until the chart or the projection changes. */
   const lines = createMemo(() => {
-    topology();
+    const { areas, routes } = topology();
     projectionVersion();
-    return { areas: pathLines(projectNm), routes: pathLines(projectNm) };
+    return { areas: pathLines(areas, projectNm), routes: pathLines(routes, projectNm) };
   });
   const uncut = createMemo(() => uncutSpans(lines().areas));
   const spans = createMemo((): SpansOf => {

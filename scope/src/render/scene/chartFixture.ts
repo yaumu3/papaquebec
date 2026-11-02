@@ -310,8 +310,8 @@ export function sceneOf(chart: Chart, options: SceneOptions = {}) {
     onPointsRead();
     return drawnPointsOf(topology, drawnIn(POINT_LAYERS));
   };
-  const routeLines = pathLines(plane);
-  const areaSpans = uncutSpans(pathLines(plane));
+  const routeLines = pathLines(topology.routes, plane);
+  const areaSpans = uncutSpans(pathLines(topology.areas, plane));
   const spansMade: { spansOf?: SpansOf } = {};
   const routeSpans: SpansOf = (path) => {
     spansMade.spansOf ??= pathSpans(

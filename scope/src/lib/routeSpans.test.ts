@@ -23,6 +23,10 @@ const pathThrough = (...at: [number, number][]): ChartPath => {
   return path;
 };
 
+/** The lines of a path alone. */
+const linesOf = (path: ChartPath, plane: ProjectFn) =>
+  pathLines({ paths: [path], edgeCount: Math.max(...path.edges) + 1 }, plane);
+
 /** The points of a span as one polyline. */
 function pointsOf({ line: { points, at }, from, to }: RouteSpan) {
   const pairs: { x: number; y: number }[] = [];
@@ -43,7 +47,7 @@ describe('pathSpans', () => {
     const path = pathThrough(...at);
 
     // Act
-    const [span] = pathSpans(NO_CUTS, pathLines(nm))(path);
+    const [span] = pathSpans(NO_CUTS, linesOf(path, nm))(path);
 
     // Assert
     expect(span && pointsOf(span)).toEqual(geodesicLine(at, nm));
@@ -54,7 +58,7 @@ describe('pathSpans', () => {
     const path = pathThrough([0, 0], [3, 0], [3, 4]);
 
     // Act
-    const [span] = pathSpans(NO_CUTS, pathLines(project))(path);
+    const [span] = pathSpans(NO_CUTS, linesOf(path, project))(path);
 
     // Assert
     expect(span?.length).toBe(7);
@@ -63,7 +67,7 @@ describe('pathSpans', () => {
   it('keeps what it measured of a stretch for builds with other cuts at its ends', () => {
     // Arrange
     const path = pathThrough([0, 0], [3, 0], [3, 4]);
-    const lineOf = pathLines(project);
+    const lineOf = linesOf(path, project);
     const [before] = pathSpans(NO_CUTS, lineOf)(path);
     const stopped = new Map([[path.vertices[2] ?? -1, 7]]);
 
@@ -81,7 +85,7 @@ describe('pathSpans', () => {
     const path = pathThrough([0, 0], [3, 0], [3, 4]);
 
     // Act
-    const spans = uncutSpans(pathLines(project))(path);
+    const spans = uncutSpans(linesOf(path, project))(path);
 
     // Assert
     expect(spans.map((s) => [s.from, s.to, s.cutBack, s.cutAhead])).toEqual([[0, 2, 0, 0]]);
@@ -93,7 +97,7 @@ describe('pathSpans', () => {
     const cuts = new Map([[path.vertices[1] ?? -1, 7]]);
 
     // Act
-    const spans = pathSpans(cuts, pathLines(project))(path);
+    const spans = pathSpans(cuts, linesOf(path, project))(path);
 
     // Assert
     expect(spans.map((s) => [s.from, s.to, s.cutBack, s.cutAhead, s.length])).toEqual([
@@ -109,7 +113,7 @@ describe('pathSpans', () => {
 
     // Act
     const spans = [forwards, backwards].map(
-      (path) => pathSpans(NO_CUTS, pathLines(project))(path)[0],
+      (path) => pathSpans(NO_CUTS, linesOf(path, project))(path)[0],
     );
 
     // Assert
@@ -126,7 +130,7 @@ describe('pathSpans', () => {
 
     // Act
     const ids = [forwards, backwards].map(
-      (path) => pathSpans(NO_CUTS, pathLines(project))(path)[0]?.id,
+      (path) => pathSpans(NO_CUTS, linesOf(path, project))(path)[0]?.id,
     );
 
     // Assert
@@ -136,7 +140,7 @@ describe('pathSpans', () => {
   it('walks a path once however often it is asked', () => {
     // Arrange
     const path = pathThrough([0, 0], [2, 0]);
-    const spansOf = pathSpans(NO_CUTS, pathLines(project));
+    const spansOf = pathSpans(NO_CUTS, linesOf(path, project));
 
     // Act
     const [first, second] = [spansOf(path), spansOf(path)];

@@ -9,7 +9,7 @@ import type { LonLat } from './mapdata';
 import { type PathLine, pathLines } from './pathLines';
 import { pathSpans } from './routeSpans';
 import { NO_CUTS } from './stops';
-import { type ChartPath, topologyOf } from './topology';
+import { type ChartPath, type Network, topologyOf } from './topology';
 
 /** A flat plane in NM, near enough to the earth that a long edge bows and is subdivided. */
 const nm: ProjectFn = (lat, lon) => ({
@@ -27,14 +27,14 @@ function counting(plane: ProjectFn) {
   return { asked, counted };
 }
 
-const routesThrough = (...paths: LonLat[][]): readonly ChartPath[] =>
+const routesThrough = (...paths: LonLat[][]): Network =>
   topologyOf(
     paths.map((at, i) => ({
       key: `R${i}`,
       layer: 'conv',
       parts: [partOf('conv', line(...at), { name: `R${i}` })],
     })),
-  ).routes.paths;
+  ).routes;
 
 const pointsOf = ({ points, at }: PathLine, from = 0, to = at.length - 1): Vec2[] => {
   const pairs: Vec2[] = [];
@@ -59,11 +59,12 @@ describe('pathLines', () => {
 
   it('walks a path as one array of the points its geodesic gives', () => {
     // Arrange
-    const [path] = routesThrough(longWay);
+    const network = routesThrough(longWay);
+    const [path] = network.paths;
     if (!path) throw new Error('no path');
 
     // Act
-    const walked = pathLines(nm)(path);
+    const walked = pathLines(network, nm)(path);
 
     // Assert
     expect(pointsOf(walked)).toEqual(geodesicLine(longWay, nm));
@@ -72,11 +73,12 @@ describe('pathLines', () => {
 
   it('marks where each vertex falls among the points', () => {
     // Arrange
-    const [path] = routesThrough(longWay);
+    const network = routesThrough(longWay);
+    const [path] = network.paths;
     if (!path) throw new Error('no path');
 
     // Act
-    const walked = pathLines(nm)(path);
+    const walked = pathLines(network, nm)(path);
 
     // Assert
     expect(pointsOf(walked, 0, 1).at(-1)).toEqual(nm(45, 140));
@@ -85,15 +87,16 @@ describe('pathLines', () => {
 
   it('reaches each vertex by the length of the edges before it', () => {
     // Arrange
-    const [path] = routesThrough([
+    const network = routesThrough([
       [0, 0],
       [3, 0],
       [3, 4],
     ]);
+    const [path] = network.paths;
     if (!path) throw new Error('no path');
 
     // Act
-    const walked = pathLines(project)(path);
+    const walked = pathLines(network, project)(path);
 
     // Assert
     expect([...walked.reach]).toEqual([0, 3, 7]);
@@ -101,10 +104,11 @@ describe('pathLines', () => {
 
   it('computes each edge once, however often its path is asked for', () => {
     // Arrange
-    const [path] = routesThrough(longWay);
+    const network = routesThrough(longWay);
+    const [path] = network.paths;
     if (!path) throw new Error('no path');
     const { asked, counted } = counting(nm);
-    const lineOf = pathLines(counted);
+    const lineOf = pathLines(network, counted);
     lineOf(path);
     const afterFirst = asked.calls;
 
@@ -119,14 +123,15 @@ describe('pathLines', () => {
 
   it('computes an edge again for another projection', () => {
     // Arrange
-    const [path] = routesThrough(longWay);
+    const network = routesThrough(longWay);
+    const [path] = network.paths;
     if (!path) throw new Error('no path');
     const { asked, counted } = counting(nm);
-    pathLines(counted)(path);
+    pathLines(network, counted)(path);
     const afterFirst = asked.calls;
 
     // Act
-    pathLines(counted)(path);
+    pathLines(network, counted)(path);
 
     // Assert
     expect(asked.calls).toBe(afterFirst * 2);
@@ -134,9 +139,10 @@ describe('pathLines', () => {
 
   it('computes an edge shared by two paths once', () => {
     // Arrange
-    const [first, second] = pathsOf(routesThrough(longWay, longWay.slice(0, 2)));
+    const network = routesThrough(longWay, longWay.slice(0, 2));
+    const [first, second] = pathsOf(network.paths);
     const { asked, counted } = counting(nm);
-    const lineOf = pathLines(counted);
+    const lineOf = pathLines(network, counted);
     lineOf(first);
     const afterFirst = asked.calls;
 
@@ -150,9 +156,10 @@ describe('pathLines', () => {
 
   it('reads a shared edge backwards for a path that runs it the other way', () => {
     // Arrange
-    const [first, second] = pathsOf(routesThrough(longWay, longWay.toReversed()));
+    const network = routesThrough(longWay, longWay.toReversed());
+    const [first, second] = pathsOf(network.paths);
     const { asked, counted } = counting(nm);
-    const lineOf = pathLines(counted);
+    const lineOf = pathLines(network, counted);
     lineOf(first);
     const afterFirst = asked.calls;
 
@@ -166,10 +173,9 @@ describe('pathLines', () => {
 
   it('computes the edges a later path adds, from where the shared ones end', () => {
     // Arrange
-    const [first, second] = pathsOf(
-      routesThrough(longWay.slice(0, 2), [...longWay.slice(0, 2), [160, 40]]),
-    );
-    const lineOf = pathLines(nm);
+    const network = routesThrough(longWay.slice(0, 2), [...longWay.slice(0, 2), [160, 40]]);
+    const [first, second] = pathsOf(network.paths);
+    const lineOf = pathLines(network, nm);
     lineOf(first);
 
     // Act
@@ -181,15 +187,16 @@ describe('pathLines', () => {
 
   it('keeps an edge a path runs twice, there and back', () => {
     // Arrange
-    const [path] = routesThrough([
+    const network = routesThrough([
       [0, 0],
       [3, 0],
       [0, 0],
     ]);
+    const [path] = network.paths;
     if (!path) throw new Error('no path');
 
     // Act
-    const walked = pathLines(project)(path);
+    const walked = pathLines(network, project)(path);
 
     // Assert
     expect(pointsOf(walked)).toEqual([
@@ -209,7 +216,7 @@ describe('pathLines', () => {
     }));
     const { routes } = topologyOf(chart);
     const { asked, counted } = counting(nm);
-    const lineOf = pathLines(counted);
+    const lineOf = pathLines(routes, counted);
     const stop = new Map([[routes.paths[0]?.vertices[1] ?? -1, 5]]);
     drawRuns(routes, partsOf(chart), pathSpans(NO_CUTS, lineOf), new LineBatch());
     const afterFirst = asked.calls;
@@ -231,7 +238,7 @@ describe('pathLines', () => {
     }));
     const { areas } = topologyOf(chart);
     const { asked, counted } = counting(project);
-    const spansOf = pathSpans(NO_CUTS, pathLines(counted));
+    const spansOf = pathSpans(NO_CUTS, pathLines(areas, counted));
     drawRuns(areas, partsOf(chart), spansOf, new LineBatch());
     const afterFirst = asked.calls;
 
@@ -243,17 +250,31 @@ describe('pathLines', () => {
     expect(asked.calls).toBe(afterFirst);
   });
 
+  it('refuses a path of another network, whose edge numbers are not its own', () => {
+    // Arrange
+    const network = routesThrough(longWay);
+    const [foreign] = routesThrough(longWay).paths;
+    if (!foreign) throw new Error('no path');
+    const lineOf = pathLines(network, nm);
+
+    // Act
+    const walking = () => lineOf(foreign);
+
+    // Assert
+    expect(walking).toThrow('another network');
+  });
+
   it('walks a ring back to its first point', () => {
     // Arrange
     const ring = box(0, 2);
-    const {
-      areas: { paths },
-    } = topologyOf([{ key: 'T', layer: 'tma', parts: [partOf('tma', polygon(ring))] }]);
-    const [path] = paths;
+    const { areas } = topologyOf([
+      { key: 'T', layer: 'tma', parts: [partOf('tma', polygon(ring))] },
+    ]);
+    const [path] = areas.paths;
     if (!path) throw new Error('no path');
 
     // Act
-    const walked = pathLines(project)(path);
+    const walked = pathLines(areas, project)(path);
 
     // Assert
     expect(pointsOf(walked)).toEqual(ring.map(([x, y]) => ({ x, y })));

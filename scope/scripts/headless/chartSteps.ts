@@ -61,7 +61,7 @@ interface Lines {
 
 /** Every geodesic of a topology, walked, and the areas' spans. */
 function walkedLines({ areas, routes }: Topology, project: ProjectFn): Lines {
-  const lines = { areas: pathLines(project), routes: pathLines(project) };
+  const lines = { areas: pathLines(areas, project), routes: pathLines(routes, project) };
   for (const path of areas.paths) lines.areas(path);
   for (const path of routes.paths) lines.routes(path);
   return { routes: lines.routes, areaSpans: uncutSpans(lines.areas) };
