@@ -4,6 +4,7 @@ import { PALETTE } from '../../design/palette';
 import { type ChartItem, itemName, nameOf } from '../../lib/chart';
 import { fits, rememberFits, type ShownMemory } from '../../lib/fits';
 import {
+  DEFAULT_LINE_WIDTH,
   isAirwayLayer,
   isProcedureLayer,
   type LabelStyle,
@@ -329,10 +330,9 @@ function designatedSpans(stage: Stage): SpanLabel[] {
 /** The gap in the line: CSS px past the text each side, and across. */
 const GAP_MARGIN_PX = 4;
 const GAP_HEIGHT_PX = 12;
-/** A chevron's V: CSS px deep along the reading, across, and its stroke. */
+/** A chevron's V: CSS px deep along the reading, and across. Its stroke is the line's. */
 const CHEVRON_DEPTH_PX = 5;
 const CHEVRON_ACROSS_PX = 7;
-const CHEVRON_STROKE_PX = 1.3;
 
 /** What a label draws: the gaps cut in the lines, its text, and the chevrons beside the text. */
 export interface RouteLabelOut {
@@ -367,7 +367,7 @@ function putChevron(
   const at = (x: number, y: number) => ({ ...middle.at, ...turned(x, y, middle.angle) });
   for (const side of [-1, 1]) {
     const arm = at(arms, (side * CHEVRON_ACROSS_PX) / 2);
-    out.strokes.segment(arm, at(tip, 0), color, { width: CHEVRON_STROKE_PX });
+    out.strokes.segment(arm, at(tip, 0), color, { width: DEFAULT_LINE_WIDTH });
   }
 }
 

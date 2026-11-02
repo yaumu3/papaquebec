@@ -340,7 +340,7 @@ describe('the route labels', () => {
         expect(chevs[0]?.arm.y).toBeCloseTo(-3.5, 6);
         expect(chevs[0]?.otherArm.y).toBeCloseTo(3.5, 6);
         expect(chevs[0]?.tip.y).toBeCloseTo(0, 6);
-        expect(chevs[0]?.width).toBeCloseTo(1.3, 5);
+        expect(chevs[0]?.width).toBe(1);
       });
     });
 
