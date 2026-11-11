@@ -210,8 +210,8 @@ const carryPitch = (linePx: number): number => {
 };
 
 /**
- * The window of a carry wheel's digit of `px` ending at `edge`, on the baseline of a readout line
- * of `linePx` centred on `yc`: the box's inner height, the resting row put by its baseline.
+ * The window of a carry wheel's digit of `px` ending at `edge`, in a readout line of `linePx`
+ * centred on `yc`: the box's inner height, the resting row centred on `yc` whatever its size.
  */
 const carryCell = (yc: number, linePx: number, edge: number, px: number): WheelCell => {
   const pitch = carryPitch(linePx);
@@ -223,7 +223,7 @@ const carryCell = (yc: number, linePx: number, edge: number, px: number): WheelC
     lineH: pitch,
     above: 1,
     px,
-    restTop: INNER_HALF_PX + baselineDepth(linePx) - pitch / 2 - MONO_MID_TO_BASELINE_EM * px,
+    restTop: INNER_HALF_PX - pitch / 2,
   };
 };
 
