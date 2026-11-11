@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { pfdGeometry, selDigits } from './geometry';
+import { altitudeReadout, pfdGeometry, selDigits, type WheelCell } from './geometry';
 
 describe('pfdGeometry', () => {
   it('places the columns and rows from the width, and the height from the shared rule', () => {
@@ -69,5 +69,22 @@ describe('selDigits', () => {
       { hi: '32', lo: '000' },
       { hi: '4', lo: '500' },
     ]);
+  });
+});
+
+/** The middle of a wheel's row at rest, down the display. */
+const restMiddle = (cell: WheelCell): number => cell.y + cell.restTop + cell.lineH / 2;
+
+describe('altitudeReadout', () => {
+  it('centres every digit at rest on the centre line, whatever its size', () => {
+    // Arrange
+    const g = pfdGeometry(346);
+
+    // Act
+    const at = altitudeReadout(g);
+
+    // Assert
+    const wheels = [at.tenThousands, at.thousands, at.hundreds, at.drum];
+    expect(wheels.map(restMiddle)).toEqual([g.yc, g.yc, g.yc, g.yc]);
   });
 });
