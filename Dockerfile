@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Builds the scope and its server, and serves them over https next to a receiver; see
 # README.md, Deployment.
-FROM rust:1.99.1-alpine@sha256:7e9e2d068a107a2adafd19930011178d14a78326053cd4c3a9f7ad3fd049557d AS server
+FROM rust:1.100.0-alpine@sha256:8d0e82abfdf9a38071e07cabc5afba4ddbe077631a80e4e742a760c38beadc33 AS server
 RUN apk add --no-cache musl-dev
 WORKDIR /src
 COPY Cargo.toml Cargo.lock ./
@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --locked && cp target/release/papaquebec /papaquebec
 
 # Apart from the server, so the scope builds while the server compiles.
-FROM rust:1.99.1-alpine@sha256:7e9e2d068a107a2adafd19930011178d14a78326053cd4c3a9f7ad3fd049557d AS wasm
+FROM rust:1.100.0-alpine@sha256:8d0e82abfdf9a38071e07cabc5afba4ddbe077631a80e4e742a760c38beadc33 AS wasm
 RUN apk add --no-cache musl-dev && rustup target add wasm32-unknown-unknown
 WORKDIR /src
 COPY Cargo.lock ./

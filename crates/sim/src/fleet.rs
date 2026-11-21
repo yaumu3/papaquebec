@@ -699,7 +699,7 @@ impl Flying {
             selected_altitude_fms_ft: None,
             selected_heading_deg: plan.sel_heading,
             baro_setting_hpa: self.sel_alt.map(|_| 1013.6),
-            modes: self.modes().map(ModesReported::from).unwrap_or_default(),
+            modes: self.modes().map_or_default(ModesReported::from),
         };
         let reports = target != TargetState::default();
         reports.then_some(TargetStateAndStatus {

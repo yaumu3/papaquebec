@@ -425,7 +425,7 @@ pub fn build_tables(scene: &Scene, energy: &Energy) -> Tables {
     for (sec, weight) in horizons {
         let now = sec == 0.0;
         let laid: Vec<Laid> = subjects.iter().map(|s| lay(s, sec)).collect();
-        let mut neighbours: Vec<Vec<usize>> = (0..n).map(|_| Vec::new()).collect();
+        let mut neighbours: Vec<Vec<usize>> = Vec::from_fn(n, |_| Vec::new());
         for i in 0..n {
             for j in i + 1..n {
                 let (la, lb) = (&laid[i], &laid[j]);

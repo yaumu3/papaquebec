@@ -375,7 +375,7 @@ fn main() -> ExitCode {
                 .collect();
             let outer = r
                 .outer
-                .map_or(String::new(), |o| format!("  outer {:.0}%", 100.0 * o));
+                .map_or_default(|o| format!("  outer {:.0}%", 100.0 * o));
             println!(
                 "{:<9}{:<9}{}  moves/min {:.2}{outer}",
                 scenario.name(),

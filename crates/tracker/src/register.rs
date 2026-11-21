@@ -261,7 +261,7 @@ impl Field for SelectedVerticalIntention {
             selected_heading_deg: None,
             // In steps of 0.1 hPa from 800 hPa.
             baro_setting_hpa: baro.map(|bits| f64::from(8000 + bits.get(1, 12)) / 10.0),
-            modes: modes.map_or(ModesReported::default(), |bits| ModesReported {
+            modes: modes.map_or_default(|bits| ModesReported {
                 vnav: Some(bits.flag(1)),
                 altitude_hold: Some(bits.flag(2)),
                 approach: Some(bits.flag(3)),
