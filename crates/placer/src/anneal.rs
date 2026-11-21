@@ -25,7 +25,7 @@ struct Link {
 }
 
 fn links_of(tables: &Tables, n: usize) -> Vec<Vec<Link>> {
-    let mut links: Vec<Vec<Link>> = (0..n).map(|_| Vec::new()).collect();
+    let mut links: Vec<Vec<Link>> = Vec::from_fn(n, |_| Vec::new());
     for (pair, p) in tables.pairs.iter().enumerate() {
         links[p.i].push(Link {
             other: p.j,
