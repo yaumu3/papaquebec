@@ -763,7 +763,7 @@ impl Field for TargetStateAndStatus {
                 .then(|| f64::from(me.get(31, 39)) * 180.0 / 256.0),
             // In steps of 0.8 hPa from 800 hPa.
             baro_setting_hpa: steps(21, 29).map(|steps| f64::from(8000 + steps * 8) / 10.0),
-            modes: modes.map(ModesReported::from).unwrap_or_default(),
+            modes: modes.map_or_default(ModesReported::from),
         };
         Some(Self {
             target,
