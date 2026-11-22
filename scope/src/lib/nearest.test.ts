@@ -1,27 +1,40 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { nearestInTime } from './nearest';
 
 describe('nearestInTime', () => {
-  it('finds the item nearest in time, the earlier of two as near, and none among none', () => {
-    // Arrange
-    const items = [{ t: 100 }, { t: 110 }, { t: 120 }];
+  it('finds the item nearest in time, the earlier of two as near, whatever order they come in', () => {
+    // Arrange: times close enough together that two are often as near
+    const anyTime = fc.integer({ min: -20, max: 20 });
+    const anyItems = fc.array(
+      anyTime.map((t) => ({ t })),
+      { minLength: 1 },
+    );
 
-    // Act
-    const found = [nearestInTime(items, 113), nearestInTime(items, 115), nearestInTime([], 115)];
+    fc.assert(
+      fc.property(anyItems, anyTime, (items, t) => {
+        // Act
+        const found = nearestInTime(items, t);
 
-    // Assert
-    expect(found.map((i) => i?.t)).toEqual([110, 110, undefined]);
+        // Assert
+        const off = (item: { t: number }) => Math.abs(item.t - t);
+        const nearest = Math.min(...items.map(off));
+        const asNear = items.filter((item) => off(item) === nearest);
+        expect(found?.t).toBe(Math.min(...asNear.map((item) => item.t)));
+      }),
+    );
   });
 
-  it('takes the earlier of two as near whatever order they come in', () => {
+  it('finds none among none', () => {
     // Arrange
-    const items = [{ t: 120 }, { t: 100 }];
+    const items: { t: number }[] = [];
 
     // Act
-    const found = nearestInTime(items, 110);
+    const found = nearestInTime(items, 115);
 
     // Assert
-    expect(found?.t).toBe(100);
+    expect(found).toBeNull();
   });
 });
