@@ -9,6 +9,7 @@ const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): Ke
   altKey: false,
   ctrlKey: false,
   metaKey: false,
+  defaultPrevented: false,
   target,
 });
 
@@ -52,6 +53,35 @@ describe('keyHandler', () => {
       ['togglePanel', 'list'],
       ['togglePanel', 'detail'],
     ]);
+  });
+
+  it('steps the selection with the up and down arrows', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const presses = ['ArrowDown', 'ArrowUp', 'ArrowLeft'];
+
+    // Act
+    for (const k of presses) onKey(key(k));
+
+    // Assert
+    expect(calls).toEqual([
+      ['stepSelection', 1],
+      ['stepSelection', -1],
+    ]);
+  });
+
+  it('leaves a key another handler has already taken', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const taken = { ...key('ArrowDown'), defaultPrevented: true };
+
+    // Act
+    onKey(taken);
+
+    // Assert
+    expect(calls).toEqual([]);
   });
 
   it('deletes the last RBL, or all of them with Shift', () => {

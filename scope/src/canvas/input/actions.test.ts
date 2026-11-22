@@ -18,6 +18,7 @@ import {
   setAboutVisible,
   setHintVisible,
   setHovered,
+  setListSort,
   setMenu,
   setModeText,
   setPointer,
@@ -284,6 +285,52 @@ describe('createActions', () => {
 
     // Assert
     expect(aboutVisible()).toBe(false);
+  });
+
+  it('steps the selection through the list in its order', () => {
+    // Arrange
+    const a = subject();
+    trackStore.ingest({
+      now: 1000,
+      messages: 0,
+      aircraft: [aircraft('d00123'), aircraft('d00456')],
+    });
+    setListSort({ key: 'id', dir: 'desc' });
+    const steps = [1, 1, 1, -1] as const;
+
+    // Act
+    const visited = steps.map((direction) => {
+      a.stepSelection(direction);
+      return selected();
+    });
+
+    // Assert
+    expect(visited).toEqual(['d00456', 'd00123', 'd00456', 'd00123']);
+  });
+
+  it('drops the selection on cancel when nothing else is open', () => {
+    // Arrange
+    const a = subject();
+    setSelected('d00123');
+
+    // Act
+    a.cancel();
+
+    // Assert
+    expect(selected()).toBeNull();
+  });
+
+  it('keeps the selection on a cancel that closes something', () => {
+    // Arrange
+    const a = subject();
+    setSelected('d00123');
+    setMenu({ x: 0, y: 0, items: [] });
+
+    // Act
+    a.cancel();
+
+    // Assert
+    expect(selected()).toBe('d00123');
   });
 
   it('opens the about dialog, as its button does', () => {

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { distanceFromSite, sortTracks } from './listSort';
+import { distanceFromSite, sortTracks, stepThrough } from './listSort';
 import { setDeclinationAt } from './magnetic';
 import { resetDeclination } from './sampleFixture';
 import type { Track } from './track';
@@ -146,5 +146,50 @@ describe('sortTracks', () => {
 
     // Assert
     expect(tracks.map((t) => t.hex)).toEqual(['b', 'a']);
+  });
+});
+
+describe('stepThrough', () => {
+  it('moves one row down or up from the current one, round from either end to the other', () => {
+    // Arrange
+    const hexes = ['a', 'b', 'c'];
+    const steps: [string, 1 | -1][] = [
+      ['a', 1],
+      ['b', -1],
+      ['c', 1],
+      ['a', -1],
+    ];
+
+    // Act
+    const out = steps.map(([current, direction]) => stepThrough(hexes, current, direction));
+
+    // Assert
+    expect(out).toEqual(['b', 'a', 'a', 'c']);
+  });
+
+  it('enters from the top going down and from the bottom going up', () => {
+    // Arrange
+    const hexes = ['a', 'b', 'c'];
+    const from: (string | null)[] = [null, 'gone'];
+
+    // Act
+    const out = from.flatMap((current) => [
+      stepThrough(hexes, current, 1),
+      stepThrough(hexes, current, -1),
+    ]);
+
+    // Assert
+    expect(out).toEqual(['a', 'c', 'a', 'c']);
+  });
+
+  it('has nothing to step to in an empty list', () => {
+    // Arrange
+    const hexes: string[] = [];
+
+    // Act
+    const out = stepThrough(hexes, 'a', 1);
+
+    // Assert
+    expect(out).toBeNull();
   });
 });

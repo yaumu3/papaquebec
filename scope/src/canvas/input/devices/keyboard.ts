@@ -5,7 +5,7 @@ import { listen } from '../dom';
 /** The parts of a `KeyboardEvent` the shortcuts read. */
 export type KeyEvent = Pick<
   KeyboardEvent,
-  'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey' | 'target'
+  'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey' | 'defaultPrevented' | 'target'
 >;
 
 /** One shortcut: the keys that ask for it, how the hint shows it, and what it does. */
@@ -59,6 +59,13 @@ export const SHORTCUTS: readonly Shortcut[] = [
     run: (a) => a.clearRbls(),
   },
   { on: ['Home'], keys: ['HOME'], action: 'RESET PAN', run: (a) => a.recenter() },
+  {
+    on: ['ArrowUp', 'ArrowDown'],
+    keys: ['↑', '↓'],
+    sep: '',
+    action: 'SELECT',
+    run: (a, k) => a.stepSelection(k === 'ArrowUp' ? -1 : 1),
+  },
   ...PANEL_IDS.map((id) => letter(panelKey(id), PANEL_NAMES[id], (a) => a.togglePanel(id))),
   letter('i', 'ABOUT', (a) => a.toggleAbout()),
   letter('?', 'HINT', (a) => a.toggleHint()),
@@ -81,12 +88,12 @@ export function ownsKeys(t: EventTarget | null): boolean {
 }
 
 /**
- * The keyboard's shortcuts; a chord with Ctrl, Cmd or Alt is the browser's, and keys typed into
- * an input or pressed in the lanes or on the ND are left alone.
+ * The keyboard's shortcuts; a chord with Ctrl, Cmd or Alt is the browser's, and a key another
+ * handler has taken, typed into an input or pressed in the lanes or on the ND is left alone.
  */
 export function keyHandler(a: ScopeActions): (e: KeyEvent) => void {
   return (e) => {
-    if (e.altKey || e.ctrlKey || e.metaKey || ownsKeys(e.target)) return;
+    if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || ownsKeys(e.target)) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     SHORTCUTS.find((s) => s.on.includes(k) && (s.shift ?? e.shiftKey) === e.shiftKey)?.run(a, k);
   };

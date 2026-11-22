@@ -44,3 +44,18 @@ export function toggleSort(current: ListSort, key: SortKey): ListSort {
   if (current.key !== key) return { key, dir: 'asc' };
   return { key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
 }
+
+/**
+ * The row one step down (1) or up (-1) the list from `current`, round from either end to the
+ * other; from no row, or one no longer listed, the first going down and the last going up.
+ */
+export function stepThrough(
+  hexes: readonly string[],
+  current: string | null,
+  direction: 1 | -1,
+): string | null {
+  const count = hexes.length;
+  const at = current === null ? -1 : hexes.indexOf(current);
+  const entry = direction === 1 ? 0 : count - 1;
+  return hexes[at === -1 ? entry : (at + direction + count) % count] ?? null;
+}

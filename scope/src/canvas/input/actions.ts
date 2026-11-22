@@ -1,11 +1,18 @@
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
 import { toggleShown } from '../../state/layout';
+import { sortTracks, stepThrough } from '../../state/listSort';
 import {
+  aboutVisible,
+  hintVisible,
+  listSort,
+  menu as openMenu,
   type PanelId,
+  rangeCursor,
   type RangeCursorOrigin,
   rblPending,
   rbls,
+  selected,
   setAboutVisible,
   setHintVisible,
   setHovered,
@@ -27,6 +34,7 @@ import {
   TRAIL_STEPS,
   VECTOR_STEPS,
 } from '../../state/settings';
+import { trackStore } from '../../state/tracks';
 import { anchorAt, blockAt, fixAt, rblAt, targetAt } from '../hit';
 import { rblMenu, scopeMenu, targetMenu } from '../menus';
 import { appendRbl } from '../rbl';
@@ -83,13 +91,18 @@ export interface ScopeActions {
   togglePanel: (id: PanelId) => void;
   toggleHint: () => void;
   toggleAbout: () => void;
+  /** Selects the aircraft one row down (1) or up (-1) the list. */
+  stepSelection: (direction: 1 | -1) => void;
   /** Recentres the scope on the site. */
   recenter: () => void;
   /** Waits for the two ends of a new RBL. */
   startRbl: () => void;
   deleteLastRbl: () => void;
   clearRbls: () => void;
-  /** Abandons a pending RBL or range cursor and closes the menu, the about dialog and the hint. */
+  /**
+   * Abandons a pending RBL or range cursor and closes the menu, the about dialog and the hint;
+   * with none of those, drops the selection.
+   */
   cancel: () => void;
 }
 
@@ -115,7 +128,24 @@ const plain = {
   },
   deleteLastRbl: () => setRbls(rbls().slice(0, -1)),
   clearRbls: () => setRbls([]),
+  stepSelection: (direction: 1 | -1) => {
+    const listed = sortTracks([...trackStore.tracks.values()], listSort());
+    setSelected(
+      stepThrough(
+        listed.map((t) => t.hex),
+        selected(),
+        direction,
+      ),
+    );
+  },
   cancel: () => {
+    const open =
+      rblPending() !== null ||
+      rangeCursor() !== null ||
+      openMenu() !== null ||
+      aboutVisible() ||
+      hintVisible();
+    if (!open) setSelected(null);
     setRblPending(null);
     setRangeCursor(null);
     setModeText(null);
