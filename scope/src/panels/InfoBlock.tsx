@@ -46,6 +46,37 @@ function Line(props: {
   );
 }
 
+/** Line 2's text: when what it shows changes, the old line leaves as the new one enters. */
+function RollingLine(props: { line: InfoLine }) {
+  const roll = createMemo<Roll>((prev) => rolled(prev, props.line));
+  const [gone, setGone] = createSignal<InfoLine | null>(null);
+  const leaving = () => (roll().was === gone() ? null : roll().was);
+  return (
+    <span class={s.text}>
+      <Show when={roll().now.key} keyed>
+        {(_key) => {
+          const enters = roll().was !== null;
+          return <Line line={roll().now} class={enters ? s.enter : undefined} />;
+        }}
+      </Show>
+      <Show when={leaving()} keyed>
+        {(was) => <Line line={was} class={s.leave} leaving={() => setGone(was)} />}
+      </Show>
+    </span>
+  );
+}
+
+/** The three bars, one per page, the current one marked. */
+function Indicator(props: { lit: boolean }) {
+  return (
+    <span class={cx(s.indicator, props.lit && s.lit)} aria-hidden="true">
+      {INFO_PAGES.map((page) => (
+        <span class={cx(s.mark, page === settings.infoPage && s.current)} />
+      ))}
+    </span>
+  );
+}
+
 /** The nav bar's centre: the clock over one status page, which a tap advances. */
 export function InfoBlock() {
   const notice = createMemo(currentNotice);
@@ -65,9 +96,6 @@ export function InfoBlock() {
     setSettings('infoPage', next);
     light.hold(SWITCH_MS);
   };
-  const roll = createMemo<Roll>((prev) => rolled(prev, line()));
-  const [gone, setGone] = createSignal<InfoLine | null>(null);
-  const leaving = () => (roll().was === gone() ? null : roll().was);
   return (
     <button
       type="button"
@@ -80,24 +108,10 @@ export function InfoBlock() {
         <span class={s.clock}>{clockReadout()}</span>
         <span class={s.status}>
           <span class={s.lamp} data-tone={line().lamp ?? undefined} />
-          <span class={s.text}>
-            <Show when={roll().now.key} keyed>
-              {(_key) => {
-                const enters = roll().was !== null;
-                return <Line line={roll().now} class={enters ? s.enter : undefined} />;
-              }}
-            </Show>
-            <Show when={leaving()} keyed>
-              {(was) => <Line line={was} class={s.leave} leaving={() => setGone(was)} />}
-            </Show>
-          </span>
+          <RollingLine line={line()} />
         </span>
       </span>
-      <span class={cx(s.indicator, light.lit() && !notice() && s.lit)} aria-hidden="true">
-        {INFO_PAGES.map((page) => (
-          <span class={cx(s.mark, page === settings.infoPage && s.current)} />
-        ))}
-      </span>
+      <Indicator lit={light.lit() && !notice()} />
     </button>
   );
 }
