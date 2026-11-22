@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { distanceFromSite, sortTracks, stepThrough } from './listSort';
 import { setDeclinationAt } from './magnetic';
 import { resetDeclination } from './sampleFixture';
@@ -91,37 +93,60 @@ describe('sortTracks', () => {
     expect(desc).toEqual(['d0000c', 'd0000a', 'd0000b']);
   });
 
-  it('sorts numeric columns with unknown values last in either direction', () => {
-    // Arrange
-    const tracks = [
-      track('a', { alt: 30000 }),
-      track('b', { alt: undefined }),
-      track('c', { alt: 'ground' }),
-      track('d', { alt: 5000 }),
-    ];
+  it('orders a numeric column either way, ties and unknown values in the order they came, the unknown last', () => {
+    // Arrange: few distinct values, so that ties are common
+    const anyReadings = fc.record({
+      alt: fc.constantFrom(undefined, 'ground' as const, 0, 5000, 30_000),
+      gs: fc.constantFrom(undefined, 0, 250, 460),
+      position: fc.oneof(
+        fc.constant<Track['position']>({ kind: 'none' }),
+        fc.record({
+          kind: fc.constant('live' as const),
+          lat: fc.constant(0),
+          lon: fc.constant(0),
+          x: fc.integer({ min: -2, max: 2 }),
+          y: fc.integer({ min: -2, max: 2 }),
+        }),
+      ),
+    });
+    const anyTracks = fc
+      .array(anyReadings)
+      .map((rows) => rows.map((readings, place) => track(`d${place}`, readings)));
+    /** What each column orders by, a target on the ground below any altitude. */
+    const columns = {
+      alt: (t: Track) => (t.alt === 'ground' ? -Infinity : t.alt),
+      gs: (t: Track) => t.gs,
+      dist: distanceFromSite,
+    };
+    const anySort = fc.record({
+      key: fc.constantFrom('alt' as const, 'gs' as const, 'dist' as const),
+      dir: fc.constantFrom('asc' as const, 'desc' as const),
+    });
 
-    // Act
-    const asc = sortTracks(tracks, { key: 'alt', dir: 'asc' }).map((t) => t.hex);
-    const desc = sortTracks(tracks, { key: 'alt', dir: 'desc' }).map((t) => t.hex);
+    fc.assert(
+      fc.property(anyTracks, anySort, (tracks, sort) => {
+        // Arrange
+        const came = [...tracks];
 
-    // Assert
-    expect(asc).toEqual(['c', 'd', 'a', 'b']);
-    expect(desc).toEqual(['a', 'd', 'c', 'b']);
-  });
+        // Act
+        const sorted = sortTracks(tracks, sort);
 
-  it('sorts by distance from the site', () => {
-    // Arrange
-    const tracks = [
-      track('far', { position: { kind: 'live', lat: 0, lon: 0, x: 30, y: 0 } }),
-      track('none'),
-      track('near', { position: { kind: 'live', lat: 0, lon: 0, x: 0, y: 2 } }),
-    ];
-
-    // Act
-    const out = sortTracks(tracks, { key: 'dist', dir: 'asc' }).map((t) => t.hex);
-
-    // Assert
-    expect(out).toEqual(['near', 'far', 'none']);
+        // Assert
+        const value = columns[sort.key];
+        const inOrder = (a: Track, b: Track): boolean => {
+          const [va, vb] = [value(a), value(b)];
+          if (va === undefined || vb === undefined) return va === vb || vb === undefined;
+          return sort.dir === 'asc' ? va <= vb : va >= vb;
+        };
+        const pairs = sorted.slice(1).map((next, k) => [sorted[k] ?? next, next] as const);
+        expect(tracks).toEqual(came);
+        expect(sorted.toSorted((a, b) => came.indexOf(a) - came.indexOf(b))).toEqual(came);
+        expect(pairs.filter(([a, b]) => !inOrder(a, b))).toEqual([]);
+        expect(
+          pairs.filter(([a, b]) => value(a) === value(b) && came.indexOf(a) > came.indexOf(b)),
+        ).toEqual([]);
+      }),
+    );
   });
 
   it('sorts by magnetic track, as the column reads', () => {
@@ -150,14 +175,37 @@ describe('sortTracks', () => {
 });
 
 describe('stepThrough', () => {
-  it('steps round the list, entering at the top going down and at the bottom going up', () => {
+  it('steps through every row in turn and round from either end to the other, back to where it began', () => {
+    // Arrange
+    const anyList = fc
+      .uniqueArray(fc.string(), { minLength: 1, maxLength: 8 })
+      .chain((hexes) => fc.record({ hexes: fc.constant(hexes), from: fc.nat(hexes.length - 1) }));
+    const anyDirection = fc.constantFrom<1 | -1>(1, -1);
+
+    fc.assert(
+      fc.property(anyList, anyDirection, ({ hexes, from }, direction) => {
+        // Arrange
+        const walk: (string | null)[] = [];
+        let current = hexes[from] ?? null;
+
+        // Act
+        for (let step = 0; step < hexes.length; step++) {
+          current = stepThrough(hexes, current, direction);
+          walk.push(current);
+        }
+
+        // Assert
+        const down = [...hexes.slice(from + 1), ...hexes.slice(0, from + 1)];
+        const up = [...hexes.slice(0, from).toReversed(), ...hexes.slice(from).toReversed()];
+        expect(walk).toEqual(direction === 1 ? down : up);
+      }),
+    );
+  });
+
+  it('enters at the top going down and at the bottom going up, from no row or one no longer listed, and nowhere in an empty list', () => {
     // Arrange
     const hexes = ['a', 'b', 'c'];
     const steps: [readonly string[], string | null, 1 | -1][] = [
-      [hexes, 'a', 1],
-      [hexes, 'b', -1],
-      [hexes, 'c', 1],
-      [hexes, 'a', -1],
       [hexes, null, 1],
       [hexes, 'gone', -1],
       [[], 'a', 1],
@@ -167,6 +215,6 @@ describe('stepThrough', () => {
     const out = steps.map(([list, current, direction]) => stepThrough(list, current, direction));
 
     // Assert
-    expect(out).toEqual(['b', 'a', 'a', 'c', 'a', 'c', null]);
+    expect(out).toEqual(['a', 'c', null]);
   });
 });
