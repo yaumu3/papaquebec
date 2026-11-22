@@ -55,7 +55,11 @@
     overflow-x: auto;
   }
   .body {
-    padding: 0 var(--space-5) var(--space-1);
+    padding: 0 var(--space-5);
+  }
+  .rows {
+    padding-bottom: var(--nav-inset, 0px);
+    scroll-padding-bottom: var(--nav-inset, 0px);
   }
   .header,
   .row {

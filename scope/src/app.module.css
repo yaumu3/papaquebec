@@ -35,9 +35,9 @@
   /* The room a sheet may fill. */
   .column {
     top: var(--topbar-bottom);
-    left: env(safe-area-inset-left);
-    right: env(safe-area-inset-right);
-    bottom: var(--nav-inset, 0px);
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: auto;
     justify-content: flex-end;
     gap: 0;

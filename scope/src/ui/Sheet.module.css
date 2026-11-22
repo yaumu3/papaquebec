@@ -14,7 +14,8 @@
 @media (max-width: 720px) {
   /* At the foot of the room it may fill, as tall as its detent. */
   .sheet {
-    --sheet-medium: 33dvh;
+    /* A third of the screen shows above the nav bar, which the sheet runs behind. */
+    --sheet-medium: calc(33dvh + var(--nav-inset, 0px));
     flex: none;
     height: var(--sheet-height);
     transform: translateY(var(--sheet-shift, 0px));
