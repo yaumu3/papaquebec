@@ -1,3 +1,4 @@
+import { PANEL_IDS, PANEL_NAMES, type PanelId } from '../../../state/settingsDefaults';
 import type { ScopeActions } from '../actions';
 import { listen } from '../dom';
 
@@ -29,6 +30,9 @@ const letter = (k: string, action: string, run: Shortcut['run']): Shortcut => ({
   run,
 });
 
+/** The digit that toggles a panel: its place in the bars, from 1. */
+export const panelKey = (id: PanelId): string => String(PANEL_IDS.indexOf(id) + 1);
+
 const DELETE = ['Delete', 'Backspace'];
 
 /** Every shortcut, in the hint's order. */
@@ -42,8 +46,6 @@ export const SHORTCUTS: readonly Shortcut[] = [
   },
   letter('t', 'TRAIL CYCLE', (a) => a.cycleTrails()),
   letter('v', 'VECTOR CYCLE', (a) => a.cycleVectors()),
-  letter('l', 'LIST', (a) => a.toggleList()),
-  letter('?', 'HINT', (a) => a.toggleHint()),
   letter('r', 'RBL', (a) => a.startRbl()),
   { on: DELETE, shift: false, keys: ['DEL'], action: 'LAST RBL', run: (a) => a.deleteLastRbl() },
   {
@@ -54,6 +56,8 @@ export const SHORTCUTS: readonly Shortcut[] = [
     run: (a) => a.clearRbls(),
   },
   { on: ['Home'], keys: ['HOME'], action: 'RESET PAN', run: (a) => a.recenter() },
+  ...PANEL_IDS.map((id) => letter(panelKey(id), PANEL_NAMES[id], (a) => a.togglePanel(id))),
+  letter('?', 'HINT', (a) => a.toggleHint()),
   { on: ['Escape'], keys: ['ESC'], action: 'CANCEL', run: (a) => a.cancel() },
 ];
 

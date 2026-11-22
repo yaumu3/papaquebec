@@ -39,7 +39,7 @@ export function recordActions({ dragged = false, rbl = false } = {}) {
     stepRange: rec('stepRange'),
     cycleTrails: rec('cycleTrails'),
     cycleVectors: rec('cycleVectors'),
-    toggleList: rec('toggleList'),
+    togglePanel: rec('togglePanel'),
     toggleHint: rec('toggleHint'),
     recenter: rec('recenter'),
     startRbl: rec('startRbl'),

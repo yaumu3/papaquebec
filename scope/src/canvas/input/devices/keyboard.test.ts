@@ -17,7 +17,7 @@ describe('keyHandler', () => {
     // Arrange
     const { calls, actions } = recordActions();
     const onKey = keyHandler(actions);
-    const presses = ['Escape', '?', '[', ']', 't', 'V', 'l', 'R', 'Home', 'x'];
+    const presses = ['Escape', '?', '[', ']', 't', 'V', 'R', 'Home', 'x'];
 
     // Act
     for (const k of presses) onKey(key(k));
@@ -30,9 +30,26 @@ describe('keyHandler', () => {
       ['stepRange', 1],
       ['cycleTrails'],
       ['cycleVectors'],
-      ['toggleList'],
       ['startRbl'],
       ['recenter'],
+    ]);
+  });
+
+  it("toggles each panel with its digit, in the bars' order", () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const presses = ['1', '2', '3', '4', '5', 'l'];
+
+    // Act
+    for (const k of presses) onKey(key(k));
+
+    // Assert
+    expect(calls).toEqual([
+      ['togglePanel', 'display'],
+      ['togglePanel', 'maps'],
+      ['togglePanel', 'list'],
+      ['togglePanel', 'detail'],
     ]);
   });
 
