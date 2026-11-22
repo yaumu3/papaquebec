@@ -82,11 +82,11 @@ export const NM_PER_DEGREE = 60;
 
 /**
  * Equirectangular distance in nautical miles, the short way round the antimeridian. Within 1% of
- * the geodesic over a few nautical miles, at any latitude: enough to rank nearby items or to
+ * the geodesic over a few nautical miles, up to a degree from the poles: enough to rank nearby items or to
  * tell whether two are one.
  */
 export function flatDistanceNm(a: GeoPoint, b: GeoPoint): number {
-  const east = turn(a.lon, b.lon) * Math.cos(a.lat * RAD);
+  const east = turn(a.lon, b.lon) * Math.cos(((a.lat + b.lat) / 2) * RAD);
   return NM_PER_DEGREE * Math.hypot(b.lat - a.lat, east);
 }
 

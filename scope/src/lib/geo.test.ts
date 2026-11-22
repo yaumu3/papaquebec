@@ -136,10 +136,10 @@ describe('nearest', () => {
 });
 
 describe('flatDistanceNm', () => {
-  it('is within 1% of the geodesic over a few nautical miles, up to 85 degrees of latitude and across the antimeridian', () => {
-    // Arrange: nearer the poles the meridians close in faster than one latitude's cosine tells
+  it('is within 1% of the geodesic over a few nautical miles, up to a degree from the poles and across the antimeridian', () => {
+    // Arrange
     const anyFrom = fc.record({
-      lat: anyBetween(-85, 85),
+      lat: anyBetween(-89, 89),
       lon: fc.oneof(anyBetween(-180, 180), anyBetween(179.9, 180), anyBetween(-180, -179.9)),
     });
     const anyBearing = anyBetween(0, 360);
