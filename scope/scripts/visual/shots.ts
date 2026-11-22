@@ -237,6 +237,7 @@ const navBarVisit: Visit = {
 };
 
 export const VISITS: readonly Visit[] = [
+  navBarVisit,
   {
     settings: NEAR_NORMAL,
     chart: EXAMPLE,
@@ -422,5 +423,4 @@ export const VISITS: readonly Visit[] = [
     plotted: ['src', 'rssi', 'msgs', 'age'],
     steps: [detail('lanes/reception', 'TEST13')],
   },
-  navBarVisit,
 ];
