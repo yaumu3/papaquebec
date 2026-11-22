@@ -131,6 +131,71 @@ pub(crate) mod published {
 #[cfg(test)]
 mod tests {
     use super::Bits;
+    use proptest::prelude::*;
+
+    /// 1 to 32 bits of any value.
+    fn some_bits() -> impl Strategy<Value = Bits> {
+        (any::<u32>(), 1..=32_u32).prop_map(|(value, width)| Bits::default().put(value, width))
+    }
+
+    /// A width and a value that fits it in two's complement.
+    fn signed_value() -> impl Strategy<Value = (i32, u32)> {
+        (1..=32_u32).prop_flat_map(|width| {
+            let most = i32::MAX >> (32 - width);
+            (-most - 1..=most, Just(width))
+        })
+    }
+
+    proptest! {
+        #[test]
+        fn bits_are_put_one_after_the_other(
+            before in some_bits(),
+            value: u32,
+            width in 1..=32_u32,
+            after in some_bits(),
+        ) {
+            // Arrange
+            let end = before.len() + width;
+
+            // Act
+            let bits = before.put(value, width).then(after);
+
+            // Assert: only the low bits of what does not fit its width are put
+            let low = u64::from(value) & ((1 << width) - 1);
+            prop_assert_eq!(bits.len(), end + after.len());
+            prop_assert_eq!(bits.field(1, before.len()), before);
+            prop_assert_eq!(u64::from(bits.get(before.len() + 1, end)), low);
+            prop_assert_eq!(bits.field(end + 1, bits.len()), after);
+        }
+
+        #[test]
+        fn flag_is_read_where_it_was_put(before in some_bits(), set: bool, after in some_bits()) {
+            // Arrange
+            let bits = before.put_flag(set).then(after);
+
+            // Act
+            let read = bits.flag(before.len() + 1);
+
+            // Assert
+            prop_assert_eq!(read, set);
+        }
+
+        #[test]
+        fn signed_value_is_read_as_it_was_put(
+            before in some_bits(),
+            (value, width) in signed_value(),
+            after in some_bits(),
+        ) {
+            // Arrange
+            let bits = before.put_signed(value, width).then(after);
+
+            // Act
+            let read = bits.signed(before.len() + 1, before.len() + width);
+
+            // Assert
+            prop_assert_eq!(read, value);
+        }
+    }
 
     #[test]
     fn bits_are_numbered_from_the_first_of_the_first_byte() {
@@ -150,18 +215,6 @@ mod tests {
     }
 
     #[test]
-    fn bits_are_put_one_after_the_other() {
-        // Arrange
-        let first = Bits::default().put(0b101, 3).put_flag(true);
-
-        // Act
-        let bits = first.then(Bits::of(&[0xff])).put(0x1ff, 2);
-
-        // Assert: only the low bits of what does not fit its width are put
-        assert_eq!(bits, Bits::default().put(0b10_1111_1111_1111, 14));
-    }
-
-    #[test]
     fn signed_fields_are_read_in_twos_complement() {
         // Arrange: ten bits of -1, of 1 and of the most negative, then three of -4
         let bits = Bits::of(&[0b1111_1111, 0b1100_0000, 0b0001_1000, 0b0000_0010, 0]);
@@ -176,25 +229,6 @@ mod tests {
 
         // Assert
         assert_eq!(read, [-1, 1, -512, -4]);
-    }
-
-    #[test]
-    fn signed_values_are_put_in_twos_complement() {
-        // Arrange
-        let values = [(-1, 10), (1, 10), (-512, 10), (-4, 3)];
-
-        // Act
-        let bits = values
-            .into_iter()
-            .fold(Bits::default(), |bits, (value, width)| {
-                bits.put_signed(value, width)
-            });
-
-        // Assert
-        assert_eq!(
-            bits.bytes::<5>(),
-            [0b1111_1111, 0b1100_0000, 0b0001_1000, 0b0000_0010, 0]
-        );
     }
 
     #[test]
