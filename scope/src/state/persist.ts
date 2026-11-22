@@ -4,6 +4,7 @@ import { DRAW_STACK, LABEL_DENSITIES, LAYER_GROUPS } from '../lib/layers';
 import { type Filter, FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { isLaneKey, type LaneKey } from './plotted';
 import {
+  INFO_PAGES,
   ND_RANGES_NM,
   type NdRangeNm,
   type Panels,
@@ -130,6 +131,7 @@ const settings = fields<Settings>({
     qnhInHg: numberIn(QNH_MIN_INHG, QNH_MAX_INHG),
   }),
   qnh: fields<QnhSetting>({ auto: flag, station }),
+  infoPage: oneOf(INFO_PAGES),
 });
 
 /** The lanes known, each once; an empty list is a choice to plot nothing. */
