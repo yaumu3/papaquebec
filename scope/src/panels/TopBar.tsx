@@ -2,24 +2,22 @@ import { createMemo, Show } from 'solid-js';
 
 import { panelTip } from '../canvas/input/devices/keyboard';
 import { cx } from '../design/cx';
-import { clockTime } from '../lib/format';
-import { feedNotice, type Tone } from '../state/feedLine';
-import { qnhReport, qnhStation } from '../state/qnh';
-import { qnhStatus } from '../state/qnhStatus';
+import {
+  clockReadout,
+  currentNotice,
+  messageRate,
+  qnhReadout,
+  trackCount,
+} from '../state/barReadouts';
 import {
   aboutVisible,
-  feedStatus,
   type PanelId,
   panels,
   renderError,
   setAboutVisible,
-  snapshotVersion,
-  tick,
   togglePanel,
 } from '../state/scope';
-import { settings } from '../state/settings';
 import { PANEL_IDS } from '../state/settingsDefaults';
-import { trackStore } from '../state/tracks';
 import { Button } from '../ui/Button';
 
 import s from './TopBar.module.css';
@@ -31,59 +29,45 @@ const LABELS: Record<PanelId, string> = {
   detail: 'DETAIL',
 };
 
-function trackCount(): number {
-  snapshotVersion();
-  return trackStore.tracks.size;
-}
-
-function messageRate(): number {
-  snapshotVersion();
-  return Math.round(trackStore.stats.messageRate);
-}
-
-/** Module class of each status tone. */
-const TONES: Record<Tone, string | undefined> = { warn: s.warn, err: s.err };
-const tone = (cls: Tone | null | undefined) => cls && TONES[cls];
-
 export function TopBar() {
-  const qnh = createMemo(() =>
-    qnhStatus({
-      qnhInHg: settings.altimeter.qnhInHg,
-      auto: settings.qnh.auto,
-      station: qnhStation(),
-      report: qnhReport(),
-    }),
-  );
-  const notice = createMemo(() => feedNotice(feedStatus(), tick()));
+  const qnh = createMemo(qnhReadout);
+  const notice = createMemo(currentNotice);
   return (
     <div id="top-bar" class={s.bar}>
-      <div class={s.clock}>{clockTime(tick() / 1000)}Z</div>
+      <div class={s.clock}>{clockReadout()}</div>
       <div class={s.item}>
-        QNH <span class={cx(s.v, tone(qnh().cls))}>{qnh().value}</span>
-        <span class={cx(s.desktopOnly, tone(qnh().cls))}> {qnh().source}</span>
+        QNH{' '}
+        <span class={s.v} data-tone={qnh().cls}>
+          {qnh().value}
+        </span>
+        <span data-tone={qnh().cls}> {qnh().source}</span>
       </div>
-      <div class={cx(s.item, s.feed)}>
-        <span class={cx(s.lamp, tone(notice()?.cls))} />
-        <span class={s.desktopOnly}>FEED </span>
+      <div class={s.item}>
+        <span class={s.lamp} data-tone={notice()?.cls} />
+        {'FEED '}
         <Show
           when={notice()}
           fallback={
             <>
               <span class={s.v}>{trackCount()}</span> TRK
-              <span class={s.desktopOnly}>
-                {' · '}
-                <span class={s.v}>{messageRate()}</span> msg/s
-              </span>
+              {' · '}
+              <span class={s.v}>{messageRate()}</span> msg/s
             </>
           }
         >
-          {(n) => <span class={cx(s.v, tone(n().cls))}>{n().text}</span>}
+          {(n) => (
+            <span class={s.v} data-tone={n().cls}>
+              {n().text}
+            </span>
+          )}
         </Show>
       </div>
       <Show when={renderError()}>
-        <div class={cx(s.item, s.err, s.desktopOnly)}>GPU · {renderError()}</div>
+        <div class={s.item} data-tone="err">
+          GPU · {renderError()}
+        </div>
       </Show>
-      <div class={cx(s.buttons, s.desktopOnly)}>
+      <div class={s.buttons}>
         {PANEL_IDS.map((id) => (
           <Button
             class={s.btn}

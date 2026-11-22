@@ -94,7 +94,7 @@ describe('trackPull', () => {
     expect(p.done.at(-1)).toEqual(['release', 0]);
   });
 
-  it('lets the sheet go only once when a mouse pulls the grip and clicks as it lets go', () => {
+  it('lets the sheet go only once when a mouse pulls the grabber and clicks as it lets go', () => {
     // Arrange
     const p = pull();
     p.down(100, 0);
@@ -110,7 +110,7 @@ describe('trackPull', () => {
     ]);
   });
 
-  it('ignores a pointer moving over the grip without pressing it', () => {
+  it('ignores a pointer moving over the grabber without pressing it', () => {
     // Arrange
     const p = pull();
 

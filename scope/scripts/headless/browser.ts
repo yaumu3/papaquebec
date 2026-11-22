@@ -17,9 +17,20 @@ export interface Sim {
 /** Where the page comes from: the sim, or a URL with `vite preview` started on its port if asked. */
 export type Source = { sim: Sim } | { url: string; preview: boolean };
 
+/** What the page is shown on. */
+export interface Screen {
+  viewport: { width: number; height: number };
+  hasTouch: boolean;
+}
+
+export const DESKTOP: Screen = { viewport: { width: 1600, height: 1000 }, hasTouch: false };
+export const PHONE: Screen = { viewport: { width: 390, height: 844 }, hasTouch: true };
+
 export interface ScopeBrowserOptions {
   from: Source;
   scale: number;
+  /** The desktop's if not given. */
+  screen?: Screen | undefined;
   /** Settings stored before the page loads, as if saved by an earlier visit; the rest default. */
   settings?: Record<string, unknown> | undefined;
   /** The lanes of the detail column, stored with the settings; the default ones if not given. */
@@ -152,7 +163,7 @@ export async function openScope(opt: ScopeBrowserOptions): Promise<ScopeBrowser>
   return stoppedOnFailure(served.stop, async () => {
     const browser = opt.browser ?? (await launch());
     const context = await browser.newContext({
-      viewport: { width: 1600, height: 1000 },
+      ...(opt.screen ?? DESKTOP),
       deviceScaleFactor: opt.scale,
     });
     const stored = storedBy(opt);

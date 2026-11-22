@@ -60,8 +60,3 @@ export function stepRange(direction: 1 | -1): void {
 export function setRange(rangeNm: number): void {
   setSettings('rangeNm', Math.max(RANGE_MIN_NM, Math.min(RANGE_MAX_NM, rangeNm)));
 }
-
-export function cycle(steps: readonly number[], current: number): number {
-  const i = steps.indexOf(current);
-  return steps[(i + 1) % steps.length] ?? 0;
-}

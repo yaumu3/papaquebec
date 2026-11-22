@@ -18,6 +18,8 @@
   --panel-glass: color-mix(in srgb, var(--panel-bg) 86%, transparent);
   --panel-border: #4a4a47;
   --panel-outline: #000;
+  --nav-glass: rgb(30 30 30 / 42%);
+  --nav-border: rgb(255 255 255 / 14%);
   --text: #f2f2ee;
   --text-dim: #96968f;
   --text-muted: #5a5a56;
@@ -61,6 +63,8 @@
   --text-md: 11px;
   --text-lg: 13px;
   --text-xl: 14px;
+  /* The nav bar's clock. */
+  --text-nav-clock: 15px;
   /* The large labels of the ND's compass. */
   --text-nd-label: 12px;
   /* The PFD's speed digits, altitude digits and the labels of its tapes and VSI. */
@@ -83,13 +87,14 @@
   /* Layout */
   --control-height: 20px;
   --topbar-height: 32px;
-  --tabbar-height: 48px;
   /* Where the top bar ends, below any notch. */
   --topbar-bottom: calc(var(--topbar-height) + env(safe-area-inset-top));
   --panel-top: calc(var(--topbar-bottom) + var(--edge));
   --edge: 12px;
+  /* The foot of the screen the nav bar covers; the bar publishes it on the root. */
+  --nav-inset: 0px;
   --z-panel: 10;
-  --z-topbar: 15;
+  --z-bar: 15;
   --z-overlay: 20;
   --z-menu: 1000;
 
@@ -100,6 +105,7 @@
 /* Phone breakpoint: 720px, repeated in each module's media query (custom properties cannot be). */
 @media (max-width: 720px) {
   :root {
-    --topbar-height: 36px;
+    /* No top bar on a phone: the sheet's room and the mode notice start at the safe area. */
+    --topbar-height: 0px;
   }
 }

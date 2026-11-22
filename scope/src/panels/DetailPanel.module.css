@@ -27,6 +27,9 @@
   .head {
     padding-top: 0;
   }
+  .body {
+    padding-bottom: 0;
+  }
 }
 .flight {
   display: flex;

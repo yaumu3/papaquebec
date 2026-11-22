@@ -1,9 +1,10 @@
 import { createSignal } from 'solid-js';
 
+import { cycle } from '../lib/cycle';
 import { panels, togglePanel } from './scope';
 import type { PanelId } from './settingsDefaults';
 
-/** Below this width the panels share one bottom sheet and the top bar shrinks. */
+/** Below this width the panels share one bottom sheet and the nav bar stands in for the top bar. */
 const PHONE_QUERY = '(max-width: 720px)';
 
 /** A page-lifetime listener: the signal is a module singleton, so there is nothing to clean up. */
@@ -71,12 +72,7 @@ export function largestDetent(detents: Detents): Detent {
   return detents.at(-1) ?? detents[0];
 }
 
-/** One detent up, and from the largest back to the smallest, as a tap on the grabber goes. */
-export function cycleDetent(detents: Detents, current: Detent): Detent {
-  return detents[(detents.indexOf(current) + 1) % detents.length] ?? detents[0];
-}
-
-/** Tapping the open panel's tab closes the sheet; any other tab swaps to that panel. */
+/** Tapping the open panel's button closes the sheet; any other button swaps to that panel. */
 export function nextSheet<T extends string>(current: T | null, tapped: T): T | null {
   return current === tapped ? null : tapped;
 }
@@ -104,9 +100,10 @@ export function show(id: PanelId, phone = isPhone()): void {
   if (!isShown(phone, activeSheet(), id, panels()[id])) toggleShown(id, phone);
 }
 
+/** One detent up, and from the largest back to the smallest, as a tap on the grabber goes. */
 export function cycleSheet(): void {
   const id = activeSheet();
-  if (id !== null) setSheetDetent(cycleDetent(DETENTS[id], sheetDetent()));
+  if (id !== null) setSheetDetent(cycle(DETENTS[id], sheetDetent()));
 }
 
 export function closeSheet(): void {

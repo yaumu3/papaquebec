@@ -12,8 +12,8 @@ import { DetailPanel } from './panels/DetailPanel';
 import { DisplayPanel } from './panels/DisplayPanel';
 import { ListPanel } from './panels/ListPanel';
 import { MapsPanel } from './panels/MapsPanel';
+import { NavBar } from './panels/NavBar';
 import { Overlays } from './panels/Overlays';
-import { TabBar } from './panels/TabBar';
 import { TopBar } from './panels/TopBar';
 import { plotted } from './state/lanes';
 import { keepUnscrolled } from './state/layout';
@@ -80,7 +80,7 @@ export function App() {
         <DetailPanel />
         <ListPanel />
       </div>
-      <TabBar />
+      <NavBar />
       <ContextMenu />
       <Overlays />
       <About />

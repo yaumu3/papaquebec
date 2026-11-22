@@ -93,8 +93,3 @@ export function contentMovesSheet(move: {
   if (Math.abs(move.across) >= Math.abs(move.up)) return false;
   return move.up > 0 ? !move.atLargest : move.atTop;
 }
-
-/** Whether a sheet shows its grabber, as SwiftUI's automatic drag indicator: only with detents to go between. */
-export function grabberShown(detents: readonly Detent[]): boolean {
-  return detents.length > 1;
-}

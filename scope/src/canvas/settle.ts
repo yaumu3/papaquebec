@@ -6,7 +6,7 @@ export interface Timer {
   clear: (id: number) => void;
 }
 
-const WINDOW_TIMER: Timer = {
+export const WINDOW_TIMER: Timer = {
   set: (fn, ms) => window.setTimeout(fn, ms),
   clear: (id) => window.clearTimeout(id),
 };

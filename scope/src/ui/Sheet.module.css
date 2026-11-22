@@ -8,13 +8,14 @@
 .sheet.hidden {
   display: none;
 }
-.grip {
+.grabber {
   display: none;
 }
 @media (max-width: 720px) {
   /* At the foot of the room it may fill, as tall as its detent. */
   .sheet {
-    --sheet-medium: 33dvh;
+    /* A third of the screen shows above the nav bar, which the sheet runs behind. */
+    --sheet-medium: calc(33dvh + var(--nav-inset));
     flex: none;
     height: var(--sheet-height);
     transform: translateY(var(--sheet-shift, 0px));
@@ -45,11 +46,7 @@
   .dragging {
     transition: none;
   }
-  /* Room above the content where a grabber would be. */
-  .bare {
-    padding-top: var(--space-6);
-  }
-  .grip {
+  .grabber {
     display: block;
     flex-shrink: 0;
     width: 100%;

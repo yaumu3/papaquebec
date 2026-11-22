@@ -1,0 +1,50 @@
+.bar {
+  display: none;
+}
+@media (max-width: 720px) {
+  /* Floats at the foot of the screen, as wide as its content, never moving. */
+  .bar {
+    position: fixed;
+    inset-inline: 0;
+    bottom: max(var(--edge), env(safe-area-inset-bottom));
+    width: fit-content;
+    max-width: calc(100% - 2 * var(--edge));
+    margin-inline: auto;
+    height: 62px;
+    padding: 0 var(--space-4);
+    display: grid;
+    grid-template-columns: auto minmax(0, auto) auto;
+    column-gap: 18px;
+    align-items: center;
+    background: var(--nav-glass);
+    border: 1px solid var(--nav-border);
+    border-radius: 31px;
+    box-shadow: 0 0 0 1px var(--panel-outline);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    z-index: var(--z-bar);
+  }
+  .pair {
+    display: flex;
+  }
+  /* No hover rule: touch leaves :hover behind, and nothing may outrank .on. */
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+  }
+  .btn circle {
+    fill: var(--control-on-text);
+  }
+  .btn svg {
+    width: 23px;
+    height: 23px;
+  }
+  .on {
+    background: var(--control-on-bg);
+    color: var(--control-on-text);
+  }
+}

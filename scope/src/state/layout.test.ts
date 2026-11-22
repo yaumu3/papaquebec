@@ -3,7 +3,6 @@ import { describe, expect, it } from 'bun:test';
 import {
   activeSheet,
   closeSheet,
-  cycleDetent,
   cycleSheet,
   type Detent,
   detentFor,
@@ -104,7 +103,7 @@ describe('nextSheet', () => {
 });
 
 describe('toggleSheet', () => {
-  it('takes the sheet from the open panel for the one whose tab is tapped', () => {
+  it('takes the sheet from the open panel for the one whose button is tapped', () => {
     // Arrange
     setActiveSheet('list');
 
@@ -231,23 +230,6 @@ describe('largestDetent', () => {
 
     // Assert
     expect(out).toEqual(['large', 'large']);
-  });
-});
-
-describe('cycleDetent', () => {
-  it('goes one detent up, and from the largest back to the smallest', () => {
-    // Arrange
-    const cases: [[Detent, ...Detent[]], Detent][] = [
-      [BOTH, 'medium'],
-      [BOTH, 'large'],
-      [LARGE, 'large'],
-    ];
-
-    // Act
-    const out = cases.map(([detents, current]) => cycleDetent(detents, current));
-
-    // Assert
-    expect(out).toEqual(['large', 'medium', 'large']);
   });
 });
 

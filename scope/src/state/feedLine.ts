@@ -1,4 +1,4 @@
-/** How the top bar and the banner tell the feed's state: by the age of its data. */
+/** How the bars and the banner tell the feed's state: by the age of its data. */
 import type { FeedDown, Wait } from '../feed/push';
 import type { FeedStatus } from './scope';
 

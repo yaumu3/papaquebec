@@ -15,6 +15,10 @@ export type ShownLayers = Record<ScopeLayer, boolean>;
 /** The item keys of each layer that go against its `shownLayers` flag, oldest first. */
 export type Exceptions = Partial<Record<ScopeLayer, ReadonlySet<string>>>;
 
+/** The pages of the nav bar's info block, in the order a tap cycles them. */
+export const INFO_PAGES = ['qnh', 'tracks', 'rate'] as const;
+export type InfoPage = (typeof INFO_PAGES)[number];
+
 export interface Settings {
   /** Radius shown by the shorter canvas edge, NM. */
   rangeNm: number;
@@ -34,6 +38,8 @@ export interface Settings {
   labelDensity: LabelDensity;
   altimeter: Altimeter;
   qnh: QnhSetting;
+  /** The page of the nav bar's info block. */
+  infoPage: InfoPage;
 }
 
 /** Where the altimeter setting comes from: a METAR station, applied automatically or not. */
@@ -62,6 +68,7 @@ export const DEFAULT_SETTINGS: Settings = {
   labelDensity: 'normal',
   altimeter: { ...STANDARD_ALTIMETER },
   qnh: { auto: true, station: '' },
+  infoPage: 'qnh',
 };
 
 export type PanelId = 'display' | 'maps' | 'list' | 'detail';

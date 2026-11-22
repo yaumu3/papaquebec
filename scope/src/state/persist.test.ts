@@ -10,6 +10,8 @@ import { LANE_KEYS } from './plotted';
 import { DEFAULT_SETTINGS, type Settings } from './settings';
 import {
   type Exceptions,
+  INFO_PAGES,
+  type InfoPage,
   ND_RANGES_NM,
   QNH_MAX_INHG,
   QNH_MIN_INHG,
@@ -84,6 +86,8 @@ describe('loadPersisted', () => {
       [{ disabledSets: ['openaip', 'my-fixes'] }, { disabledSets: ['openaip', 'my-fixes'] }],
       [{ disabledSets: ['openaip', 7] }, {}],
       [{ disabledSets: 'openaip' }, {}],
+      [{ infoPage: 'clock' }, {}],
+      [{ infoPage: 3 }, {}],
     ];
 
     // Act
@@ -91,6 +95,22 @@ describe('loadPersisted', () => {
 
     // Assert
     expect(results).toEqual(rows.map(([, kept]) => Object.assign({}, DEFAULT_SETTINGS, kept)));
+  });
+
+  it('keeps a saved info block page, and takes QNH when the key is missing', () => {
+    // Arrange
+    const rows: [Record<string, unknown>, InfoPage][] = [
+      [{}, 'qnh'],
+      [{ infoPage: 'qnh' }, 'qnh'],
+      [{ infoPage: 'tracks' }, 'tracks'],
+      [{ infoPage: 'rate' }, 'rate'],
+    ];
+
+    // Act
+    const pages = rows.map(([settings]) => loaded({ settings }).settings.infoPage);
+
+    // Assert
+    expect(pages).toEqual(rows.map(([, page]) => page));
   });
 
   it('takes both edges of the band from the default when the two make no band', () => {
@@ -181,6 +201,7 @@ describe('savePersisted', () => {
         auto: fc.boolean(),
         station: fc.oneof(fc.constant(''), fc.stringMatching(STATION_RE)),
       }),
+      infoPage: fc.constantFrom(...INFO_PAGES),
     });
     const anyState = fc.record<Persisted>({
       settings: anySettings,
