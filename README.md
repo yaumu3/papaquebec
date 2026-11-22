@@ -272,8 +272,9 @@ Layout:
 
 - **Desktop**: the panels dock in two columns beside the scope, Display and Maps on the left,
   Aircraft and Detail on the right, toggled from the top bar.
-- **Phone** (below 720 px): the columns become one bottom sheet with a tab bar, and the top bar
-  keeps clock, QNH and feed state.
+- **Phone** (below 720 px): the columns become one bottom sheet, and a floating nav bar replaces
+  the top bar. Its buttons open the panels; between them sit the clock and one line of feed state,
+  which a tap steps through QNH, track count and message rate.
 - **Touch**: one finger pans, two pinch-zoom around the fingers, a tap selects, a long press opens
   the menu, a drag off the selected target draws an RBL.
 - **Mouse and keyboard**: hover, right-drag range cursor, drag off the selected target for an RBL,
