@@ -63,6 +63,8 @@
   --text-md: 11px;
   --text-lg: 13px;
   --text-xl: 14px;
+  /* The nav bar's clock. */
+  --text-nav-clock: 15px;
   /* The large labels of the ND's compass. */
   --text-nd-label: 12px;
   /* The PFD's speed digits, altitude digits and the labels of its tapes and VSI. */
@@ -101,6 +103,7 @@
 /* Phone breakpoint: 720px, repeated in each module's media query (custom properties cannot be). */
 @media (max-width: 720px) {
   :root {
-    --topbar-height: 36px;
+    /* No top bar on a phone: the sheet's room and the mode notice start at the safe area. */
+    --topbar-height: 0px;
   }
 }

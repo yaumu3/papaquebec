@@ -1,0 +1,59 @@
+.block {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 44px;
+}
+/* 9px between the trimmed lines puts the clock's cap top 28px above line 2's baseline. */
+.lines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.clock,
+.text {
+  text-box: trim-both cap alphabetic;
+}
+.clock {
+  font-size: var(--text-nav-clock);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-indent: 0.02em;
+}
+.status {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  max-width: 100%;
+  font-size: var(--text-md);
+  font-weight: 400;
+  white-space: nowrap;
+  color: var(--text-dim);
+}
+.lamp {
+  flex: none;
+  align-self: center;
+  width: 5px;
+  height: 5px;
+  background: currentColor;
+}
+.text {
+  min-width: 0;
+  /* Clipped sideways only: the trimmed box would cut the tails of Q and g. */
+  overflow-x: clip;
+  text-overflow: ellipsis;
+}
+.v {
+  color: var(--text);
+}
+/* After .v, which they recolor. */
+.lamp[data-tone='warn'],
+.text[data-tone='warn'] .v {
+  color: var(--color-descend);
+}
+.lamp[data-tone='err'],
+.text[data-tone='err'] .v {
+  color: var(--color-emergency);
+}

@@ -38,20 +38,18 @@ export function TopBar() {
       <div class={s.clock}>{clockTime(tick() / 1000)}Z</div>
       <div class={s.item}>
         QNH <span class={cx(s.v, tone(qnh().cls))}>{qnh().value}</span>
-        <span class={cx(s.desktopOnly, tone(qnh().cls))}> {qnh().source}</span>
+        <span class={cx(tone(qnh().cls))}> {qnh().source}</span>
       </div>
-      <div class={cx(s.item, s.feed)}>
+      <div class={s.item}>
         <span class={cx(s.lamp, tone(notice()?.cls))} />
-        <span class={s.desktopOnly}>FEED </span>
+        {'FEED '}
         <Show
           when={notice()}
           fallback={
             <>
               <span class={s.v}>{trackCount()}</span> TRK
-              <span class={s.desktopOnly}>
-                {' · '}
-                <span class={s.v}>{messageRate()}</span> msg/s
-              </span>
+              {' · '}
+              <span class={s.v}>{messageRate()}</span> msg/s
             </>
           }
         >
@@ -59,9 +57,9 @@ export function TopBar() {
         </Show>
       </div>
       <Show when={renderError()}>
-        <div class={cx(s.item, s.err, s.desktopOnly)}>GPU · {renderError()}</div>
+        <div class={cx(s.item, s.err)}>GPU · {renderError()}</div>
       </Show>
-      <div class={cx(s.buttons, s.desktopOnly)}>
+      <div class={s.buttons}>
         {PANEL_IDS.map((id) => (
           <Button
             class={s.btn}

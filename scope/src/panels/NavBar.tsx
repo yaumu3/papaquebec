@@ -4,6 +4,7 @@ import { cx } from '../design/cx';
 import { activeSheet, toggleSheet } from '../state/layout';
 import { PANEL_IDS, type PanelId } from '../state/settingsDefaults';
 import { trackNavInset } from '../ui/navInset';
+import { InfoBlock } from './InfoBlock';
 import { NAV_ICONS } from './navIcons';
 
 import s from './NavBar.module.css';
@@ -44,6 +45,7 @@ export function NavBar() {
       ref={(node) => onCleanup(trackNavInset(node))}
     >
       <PanelButtons ids={LEFT} />
+      <InfoBlock />
       <PanelButtons ids={RIGHT} />
     </nav>
   );

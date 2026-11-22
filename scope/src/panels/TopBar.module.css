@@ -59,20 +59,9 @@
   width: var(--control-height);
   padding-inline: 0;
 }
+/* A phone has the nav bar instead. */
 @media (max-width: 720px) {
-  /* The clock and the feed at the ends, the altimeter setting in the middle. */
   .bar {
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
-    gap: var(--space-4);
-  }
-  .feed {
-    justify-self: end;
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .desktopOnly {
     display: none;
   }
 }

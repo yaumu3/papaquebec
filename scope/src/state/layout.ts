@@ -3,7 +3,7 @@ import { createSignal } from 'solid-js';
 import { panels, togglePanel } from './scope';
 import type { PanelId } from './settingsDefaults';
 
-/** Below this width the panels share one bottom sheet and the top bar shrinks. */
+/** Below this width the panels share one bottom sheet and the nav bar stands in for the top bar. */
 const PHONE_QUERY = '(max-width: 720px)';
 
 /** A page-lifetime listener: the signal is a module singleton, so there is nothing to clean up. */
