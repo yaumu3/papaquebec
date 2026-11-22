@@ -57,6 +57,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
   },
   { on: ['Home'], keys: ['HOME'], action: 'RESET PAN', run: (a) => a.recenter() },
   ...PANEL_IDS.map((id) => letter(panelKey(id), PANEL_NAMES[id], (a) => a.togglePanel(id))),
+  letter('i', 'ABOUT', (a) => a.toggleAbout()),
   letter('?', 'HINT', (a) => a.toggleHint()),
   { on: ['Escape'], keys: ['ESC'], action: 'CANCEL', run: (a) => a.cancel() },
 ];

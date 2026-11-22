@@ -41,6 +41,7 @@ export function recordActions({ dragged = false, rbl = false } = {}) {
     cycleVectors: rec('cycleVectors'),
     togglePanel: rec('togglePanel'),
     toggleHint: rec('toggleHint'),
+    toggleAbout: rec('toggleAbout'),
     recenter: rec('recenter'),
     startRbl: rec('startRbl'),
     deleteLastRbl: rec('deleteLastRbl'),

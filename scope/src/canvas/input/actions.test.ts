@@ -286,6 +286,18 @@ describe('createActions', () => {
     expect(aboutVisible()).toBe(false);
   });
 
+  it('opens the about dialog, as its button does', () => {
+    // Arrange
+    const a = subject();
+    setAboutVisible(false);
+
+    // Act
+    a.toggleAbout();
+
+    // Assert
+    expect(aboutVisible()).toBe(true);
+  });
+
   it('closes the hint on cancel', () => {
     // Arrange
     const a = subject();

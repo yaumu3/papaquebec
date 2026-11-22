@@ -82,6 +82,7 @@ export interface ScopeActions {
   /** Shows or hides a panel, by the sheet on a phone. */
   togglePanel: (id: PanelId) => void;
   toggleHint: () => void;
+  toggleAbout: () => void;
   /** Recentres the scope on the site. */
   recenter: () => void;
   /** Waits for the two ends of a new RBL. */
@@ -106,6 +107,7 @@ const plain = {
   cycleVectors: () => setSettings('vectorMin', cycle(VECTOR_STEPS, settings.vectorMin)),
   togglePanel: (id: PanelId) => toggleShown(id),
   toggleHint: () => setHintVisible((v) => !v),
+  toggleAbout: () => setAboutVisible((v) => !v),
   recenter: () => setPan({ x: 0, y: 0 }),
   startRbl: () => {
     setRblPending({ a: null });
