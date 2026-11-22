@@ -138,6 +138,6 @@ export const [hintVisible, setHintVisible] = createSignal(false);
 export const [aboutVisible, setAboutVisible] = createSignal(false);
 /** RBL anchor prompt shown center-top; null when idle. */
 export const [modeText, setModeText] = createSignal<string | null>(null);
-/** One-hertz wall clock for the top bar and feed staleness. */
+/** One-hertz wall clock for the bars and feed staleness. */
 export const [tick, setTick] = createSignal(Date.now());
 export const [coast, setCoast] = createSignal<CoastData>({ lines: [] });
