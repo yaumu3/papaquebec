@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import {
   addLane,
   DEFAULT_PLOTTED,
@@ -96,35 +98,32 @@ describe('removeLane', () => {
 });
 
 describe('moveLane', () => {
-  it('moves a lane, the rest keeping their order', () => {
+  it('moves a lane to the place asked, the rest keeping their order', () => {
     // Arrange
-    const plotted: LaneKey[] = ['alt', 'nd', 'gs', 'trk'];
-    const moves: [number, number][] = [
-      [0, 2],
-      [1, 3],
-      [3, 1],
-    ];
+    const anyMove = fc
+      .uniqueArray(fc.constantFrom(...LANE_KEYS), { minLength: 1 })
+      .chain((plotted) =>
+        fc.record({
+          plotted: fc.constant(plotted),
+          from: fc.nat(plotted.length - 1),
+          to: fc.nat(plotted.length - 1),
+        }),
+      );
 
-    // Act
-    const next = moves.map(([from, to]) => moveLane(plotted, from, to));
+    fc.assert(
+      fc.property(anyMove, ({ plotted, from, to }) => {
+        // Act
+        const next = moveLane(plotted, from, to);
 
-    // Assert
-    expect(next).toEqual([
-      ['nd', 'gs', 'alt', 'trk'],
-      ['alt', 'gs', 'trk', 'nd'],
-      ['alt', 'trk', 'nd', 'gs'],
-    ]);
-  });
-
-  it('leaves the order alone when the lane goes where it is', () => {
-    // Arrange
-    const plotted: LaneKey[] = ['alt', 'gs'];
-
-    // Act
-    const next = moveLane(plotted, 1, 1);
-
-    // Assert
-    expect(next).toEqual(['alt', 'gs']);
+        // Assert
+        const moved = plotted[from];
+        expect(next).toHaveLength(plotted.length);
+        expect(next[to]).toBe(moved);
+        expect(next.filter((lane) => lane !== moved)).toEqual(
+          plotted.filter((lane) => lane !== moved),
+        );
+      }),
+    );
   });
 });
 
