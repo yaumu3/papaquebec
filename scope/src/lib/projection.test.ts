@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
+import { anyBetween } from './numberFixture';
 import { createLcc, type Ellipsoid, WGS84 } from './projection';
 
 /** Snyder's worked example uses Clarke 1866. */
@@ -33,26 +36,24 @@ describe('Lambert Conformal Conic (ellipsoidal)', () => {
   });
 
   it('inverts forward to within a micrometer', () => {
-    // Arrange
+    // Arrange: short of the poles, where the cone closes, and of the meridian opposite the reference
     const lcc = createLcc({ lat0: 33.5844, lon0: 130.4517, lat1: 27.5844, lat2: 39.5844 }, WGS84); // RJFF
-    const points = [
-      [33.5844, 130.4517], // RJFF
-      [35.0, 128.0], // Tongyeong, Korea
-      [31.2, 133.7], // Pacific, south of Shikoku
-      [36.9, 126.1], // Yellow Sea, west of Korea
-    ] as const;
+    const anyLat = anyBetween(-60, 80);
+    const anyLon = anyBetween(130.4517 - 170, 130.4517 + 170);
 
-    // Act
-    const roundTripped = points.map(([lat, lon]) => {
-      const p = lcc.forward(lat, lon);
-      return lcc.inverse(p.x, p.y);
-    });
+    fc.assert(
+      fc.property(anyLat, anyLon, (lat, lon) => {
+        // Arrange
+        const p = lcc.forward(lat, lon);
 
-    // Assert
-    roundTripped.forEach((r, i) => {
-      expect(r.lat).toBeCloseTo(points[i]?.[0] ?? Number.NaN, 9);
-      expect(r.lon).toBeCloseTo(points[i]?.[1] ?? Number.NaN, 9);
-    });
+        // Act
+        const back = lcc.inverse(p.x, p.y);
+
+        // Assert
+        expect(back.lat).toBeCloseTo(lat, 9);
+        expect(back.lon).toBeCloseTo(lon, 9);
+      }),
+    );
   });
 
   it('is close to true scale near the standard parallels', () => {
