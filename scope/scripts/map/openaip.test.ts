@@ -301,17 +301,17 @@ describe('toMapSet', () => {
     expect(written).toEqual(table.map(([, limit]) => limit));
   });
 
-  it('leaves out an airspace whose ring closes on fewer than three corners', () => {
+  it('leaves out an airspace whose ring has fewer than three corners, however often it repeats them', () => {
     // Arrange
-    const flat = {
-      ...airspace(7, 'QUEBEC'),
-      geometry: poly([
-        [35.7, 140.1],
-        [35.7, 140.2],
-        [35.7, 140.1],
-      ]),
-    };
-    const set = toMapSet(inputOf({ airspaces: [flat, airspace(7, 'ROMEO')] }), AREA);
+    const a: [number, number] = [35.7, 140.1];
+    const b: [number, number] = [35.7, 140.2];
+    const named = airspace(7, 'QUEBEC');
+    const flat = [
+      [a, b, a],
+      [a, b, b, a],
+      [a, a, a, a],
+    ].map((ring) => Object.assign({}, named, { geometry: poly(ring) }));
+    const set = toMapSet(inputOf({ airspaces: [...flat, airspace(7, 'ROMEO')] }), AREA);
 
     // Act
     const verdict = validateMapSet(set);
@@ -321,6 +321,27 @@ describe('toMapSet', () => {
     expect(set.features.map((f) => ('name' in f.properties ? f.properties.name : null))).toEqual([
       'ROMEO',
     ]);
+  });
+
+  it('closes a ring that is left open', () => {
+    // Arrange
+    const open = {
+      ...airspace(7, 'QUEBEC'),
+      geometry: poly([
+        [35.7, 140.1],
+        [35.7, 140.2],
+        [35.6, 140.2],
+      ]),
+    };
+
+    const closed = toMapSet(inputOf({ airspaces: [airspace(7, 'QUEBEC')] }), AREA);
+
+    // Act
+    const set = toMapSet(inputOf({ airspaces: [open] }), AREA);
+
+    // Assert
+    expect(set).toEqual(closed);
+    expect(set.features).toHaveLength(1);
   });
 
   it('truncates a long name to 64 characters and a long id to 32', () => {

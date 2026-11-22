@@ -132,18 +132,26 @@ function pointOf(v: unknown): LatLon | null {
   return Array.isArray(c) && isNum(c[0]) && isNum(c[1]) ? [c[1], c[0]] : null;
 }
 
-/** The exterior ring as lat/lon, vertices rounded to 4 decimals; none of one too short to close round an area. */
+/**
+ * The exterior ring as lat/lon, closed, its vertices rounded to 4 decimals and none repeated in a
+ * row; none of a ring with fewer than three corners, which encloses nothing.
+ */
 function ringOf(v: unknown): LatLon[] | null {
   if (!isRecord(v) || !isRecord(v.geometry) || v.geometry.type !== 'Polygon') return null;
   const c = v.geometry.coordinates;
   const outer = Array.isArray(c) ? c[0] : null;
   if (!Array.isArray(outer)) return null;
-  const pts: LatLon[] = [];
+  const same = (a: LatLon | undefined, b: LatLon) => a?.[0] === b[0] && a[1] === b[1];
+  const corners: LatLon[] = [];
   for (const p of outer) {
     if (!Array.isArray(p) || !isNum(p[0]) || !isNum(p[1])) return null;
-    pts.push([Number(p[1].toFixed(4)), Number(p[0].toFixed(4))]);
+    const at: LatLon = [Number(p[1].toFixed(4)), Number(p[0].toFixed(4))];
+    if (!same(corners.at(-1), at)) corners.push(at);
   }
-  return pts.length >= 4 ? pts : null;
+  const first = corners[0];
+  if (first && corners.length > 1 && same(corners.at(-1), first)) corners.pop();
+  const distinct = new Set(corners.map(([lat, lon]) => `${lat},${lon}`)).size;
+  return first && distinct >= 3 ? [...corners, first] : null;
 }
 
 /** An openAIP limit as a published string; one the format cannot hold is left out. */
