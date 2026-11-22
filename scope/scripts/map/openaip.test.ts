@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { type ChartItem, chartOf } from '../../src/lib/chart';
+import { direct } from '../../src/lib/geodesic';
 import { parseMapSet, validateMapSet } from '../../src/lib/mapset';
 import { type OpenAipInput, toMapSet, withinRadius } from './openaip';
 
@@ -113,15 +116,26 @@ const FIXTURE = {
 
 describe('withinRadius', () => {
   it('keeps points inside the radius and drops the rest', () => {
-    // Arrange
-    const near: [number, number] = [35.7, 140.1]; // Chiba
-    const far: [number, number] = [43.0, 141.0]; // Sapporo
+    // Arrange: points off the radius by a hundredth or more, which a sphere for the ellipsoid cannot move across it
+    const anyBearing = fc.integer({ min: 0, max: 359 });
+    const anyRadius = fc.integer({ min: 10, max: 600 });
+    const anyShare = fc.oneof(
+      fc.constantFrom(99, 101),
+      fc.integer({ min: 1, max: 300 }).filter((percent) => percent !== 100),
+    );
 
-    // Act
-    const out = [near, far].map(([lat, lon]) => withinRadius(site, 300, lat, lon));
+    fc.assert(
+      fc.property(anyBearing, anyRadius, anyShare, (bearing, radiusNm, percent) => {
+        // Arrange
+        const { lat, lon } = direct(site, bearing, (radiusNm * percent) / 100);
 
-    // Assert
-    expect(out).toEqual([true, false]);
+        // Act
+        const kept = withinRadius(site, radiusNm, lat, lon);
+
+        // Assert
+        expect(kept).toBe(percent < 100);
+      }),
+    );
   });
 });
 
