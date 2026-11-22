@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { recordActions } from '../recordActions';
-import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR } from './keyboard';
+import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR, panelTip } from './keyboard';
 
 const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): KeyEvent => ({
   key: k,
@@ -142,5 +142,18 @@ describe('keyHandler', () => {
 
     // Assert
     expect(calls).toEqual([['cancel']]);
+  });
+});
+
+describe('panelTip', () => {
+  it('names each panel with the key that toggles it', () => {
+    // Arrange
+    const ids = ['display', 'maps', 'list', 'detail'] as const;
+
+    // Act
+    const tips = ids.map(panelTip);
+
+    // Assert
+    expect(tips).toEqual(['DISPLAY · 1', 'MAPS · 2', 'LIST · 3', 'DETAIL · 4']);
   });
 });

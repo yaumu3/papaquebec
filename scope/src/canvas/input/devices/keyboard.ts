@@ -31,7 +31,10 @@ const letter = (k: string, action: string, run: Shortcut['run']): Shortcut => ({
 });
 
 /** The digit that toggles a panel: its place in the bars, from 1. */
-export const panelKey = (id: PanelId): string => String(PANEL_IDS.indexOf(id) + 1);
+const panelKey = (id: PanelId): string => String(PANEL_IDS.indexOf(id) + 1);
+
+/** What a panel's button says of itself: its name and its key. */
+export const panelTip = (id: PanelId): string => `${PANEL_NAMES[id]} · ${panelKey(id)}`;
 
 const DELETE = ['Delete', 'Backspace'];
 

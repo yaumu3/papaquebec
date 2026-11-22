@@ -1,5 +1,6 @@
 import { createMemo, Show } from 'solid-js';
 
+import { panelTip } from '../canvas/input/devices/keyboard';
 import { cx } from '../design/cx';
 import { clockTime } from '../lib/format';
 import { feedNotice, type Tone } from '../state/feedLine';
@@ -84,7 +85,12 @@ export function TopBar() {
       </Show>
       <div class={cx(s.buttons, s.desktopOnly)}>
         {PANEL_IDS.map((id) => (
-          <Button class={s.btn} on={panels()[id]} onClick={() => togglePanel(id)}>
+          <Button
+            class={s.btn}
+            on={panels()[id]}
+            tip={panelTip(id)}
+            onClick={() => togglePanel(id)}
+          >
             {LABELS[id]}
           </Button>
         ))}
@@ -92,6 +98,7 @@ export function TopBar() {
           class={cx(s.btn, s.about)}
           on={aboutVisible()}
           label="About"
+          tip="ABOUT · I"
           onClick={() => setAboutVisible((v) => !v)}
         >
           i
