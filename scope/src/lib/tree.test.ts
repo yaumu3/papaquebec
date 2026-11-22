@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { feat } from '../render/scene/chartFixture';
 import { chartOf } from './chart';
 import { type MapSetData, validateMapSet } from './mapset';
@@ -26,7 +28,7 @@ import {
   type TreeItems,
   type TreeSearch,
 } from './tree';
-import { type LayerState, drawnItemsOf } from './visibility';
+import { type LayerState, drawnItemsOf, isItemShown } from './visibility';
 import { hiddenExcept, plainState, shownExcept } from './visibilityFixture';
 
 /** A text with the pieces a search marks in brackets. */
@@ -322,32 +324,56 @@ describe('afterDot', () => {
     ]);
   });
 
-  it('hides everything of a row that is on', () => {
-    // Arrange
-    const stateOf = statesOf({ fix: shownExcept() });
-    const leaves = [withItems('fix', present)];
+  it('turns a row that is not on on and one that is on off, the items not listed too unless searching', () => {
+    // Arrange: layers with items, of which the tree lists some, and layers that are their own leaf
+    const KEYS = ['a', 'b', 'c'];
+    const anyRowLayer = fc.record({
+      layer: fc.constantFrom<ScopeLayer>('fix', 'navaid', 'ad', 'coast', 'rings'),
+      present: fc.subarray(KEYS),
+      unlisted: fc.subarray(KEYS),
+      mode: fc.boolean(),
+      exceptions: fc.subarray([...KEYS, 'gone']),
+    });
+    const anyRow = fc
+      .uniqueArray(anyRowLayer, { minLength: 1, selector: (row) => row.layer })
+      .map((rows) =>
+        rows.map(({ unlisted, ...row }) => {
+          const kept = row.present.filter((key) => !unlisted.includes(key));
+          return { ...row, listed: kept.length > 0 ? kept : row.present };
+        }),
+      );
 
-    // Act
-    const result = afterDot(leaves, stateOf, false);
+    fc.assert(
+      fc.property(anyRow, fc.boolean(), (rows, searching) => {
+        // Arrange
+        const stateOf = statesOf(
+          Object.fromEntries(
+            rows.map(({ layer, mode, exceptions }) => [
+              layer,
+              { mode, exceptions: new Set(exceptions) },
+            ]),
+          ),
+        );
+        const was = rowStateOf(rows, stateOf);
+        const unlisted = rows.flatMap((row) =>
+          row.present
+            .filter((key) => !row.listed.includes(key))
+            .map((key) => ({ layer: row.layer, key })),
+        );
 
-    // Assert
-    expect(result.map(([layer, next]) => [layer, plainState(next)])).toEqual([
-      ['fix', { mode: false, exceptions: [] }],
-    ]);
-  });
+        // Act
+        const result = afterDot(rows, stateOf, searching);
 
-  it('while searching sets only the items listed and keeps the rest', () => {
-    // Arrange
-    const stateOf = statesOf({ fix: shownExcept('gone') });
-    const leaves = [withItems('fix', present, ['a'])];
-
-    // Act
-    const result = afterDot(leaves, stateOf, true);
-
-    // Assert
-    expect(result.map(([layer, next]) => [layer, plainState(next)])).toEqual([
-      ['fix', { mode: true, exceptions: ['gone', 'a'] }],
-    ]);
+        // Assert
+        const next = statesOf(Object.fromEntries(result));
+        expect(rowStateOf(rows, next)).toBe(was === 'on' ? 'off' : 'on');
+        expect(unlisted.map(({ layer, key }) => isItemShown(next(layer), key))).toEqual(
+          unlisted.map(({ layer, key }) =>
+            searching ? isItemShown(stateOf(layer), key) : was !== 'on',
+          ),
+        );
+      }),
+    );
   });
 
   it('while searching flips a layer whose items are all set the same way', () => {
@@ -361,20 +387,6 @@ describe('afterDot', () => {
     // Assert
     expect(result.map(([layer, next]) => [layer, plainState(next)])).toEqual([
       ['fix', { mode: false, exceptions: [] }],
-    ]);
-  });
-
-  it('while searching sets the mode of a leaf layer', () => {
-    // Arrange
-    const stateOf = statesOf({ coast: shownExcept() });
-    const leaves = [leaf('coast')];
-
-    // Act
-    const result = afterDot(leaves, stateOf, true);
-
-    // Assert
-    expect(result.map(([layer, next]) => [layer, plainState(next)])).toEqual([
-      ['coast', { mode: false, exceptions: [] }],
     ]);
   });
 });
