@@ -38,11 +38,11 @@ const DELETE = ['Delete', 'Backspace'];
 /** Every shortcut, in the hint's order. */
 export const SHORTCUTS: readonly Shortcut[] = [
   {
-    on: ['[', ']'],
-    keys: ['[', ']'],
+    on: ['+', '-'],
+    keys: ['+', '-'],
     sep: '',
-    action: 'RANGE',
-    run: (a, k) => a.stepRange(k === '[' ? -1 : 1),
+    action: 'ZOOM',
+    run: (a, k) => a.stepRange(k === '+' ? -1 : 1),
   },
   letter('t', 'TRAIL CYCLE', (a) => a.cycleTrails()),
   letter('v', 'VECTOR CYCLE', (a) => a.cycleVectors()),

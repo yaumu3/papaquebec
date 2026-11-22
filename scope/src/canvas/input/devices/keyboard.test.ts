@@ -17,7 +17,7 @@ describe('keyHandler', () => {
     // Arrange
     const { calls, actions } = recordActions();
     const onKey = keyHandler(actions);
-    const presses = ['Escape', '?', '[', ']', 't', 'V', 'R', 'Home', 'x'];
+    const presses = ['Escape', '?', '+', '-', 't', 'V', 'R', 'Home', '[', ']'];
 
     // Act
     for (const k of presses) onKey(key(k));
@@ -90,7 +90,7 @@ describe('keyHandler', () => {
     const input = Object.assign(new EventTarget(), { tagName: 'INPUT' });
 
     // Act
-    onKey(key(']', false, input));
+    onKey(key('-', false, input));
 
     // Assert
     expect(calls).toEqual([]);
@@ -121,7 +121,7 @@ describe('keyHandler', () => {
       tagName: 'BUTTON',
       closest: (selector: string) => (selector === ND_SELECTOR ? {} : null),
     });
-    const presses = ['Home', ']', 'Escape'].map((k) => key(k, false, onNd));
+    const presses = ['Home', '-', 'Escape'].map((k) => key(k, false, onNd));
 
     // Act
     for (const press of presses) onKey(press);

@@ -80,7 +80,7 @@ async function atRange(page: Page, rangeNm: number): Promise<void> {
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   });
   const up = RANGE_STEPS.findIndex((step) => step === rangeNm);
-  const keys = [...Array<string>(RANGE_KEYS).fill('['), ...Array<string>(up).fill(']')];
+  const keys = [...Array<string>(RANGE_KEYS).fill('+'), ...Array<string>(up).fill('-')];
   await inSequence(keys, (key) => page.keyboard.press(key));
   await page.waitForTimeout(REST_MS);
 }
@@ -128,10 +128,10 @@ const settle: Scenario = async (page) => {
 
 const range: Scenario = async (page) => {
   await atRange(page, BELOW_THRESHOLD_NM);
-  const crossings = Array.from({ length: CROSSINGS }, (_, i) => (i % 2 === 0 ? ']' : '['));
+  const crossings = Array.from({ length: CROSSINGS }, (_, i) => (i % 2 === 0 ? '-' : '+'));
   return async () => {
     await inSequence(crossings, (key) =>
-      timed(page, key === ']' ? 'out' : 'in', 'keydown', () => page.keyboard.press(key)),
+      timed(page, key === '-' ? 'out' : 'in', 'keydown', () => page.keyboard.press(key)),
     );
   };
 };
