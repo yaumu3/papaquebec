@@ -1,5 +1,6 @@
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
+import { toggleShown } from '../../state/layout';
 import {
   type PanelId,
   type RangeCursorOrigin,
@@ -16,7 +17,6 @@ import {
   setRblPending,
   setRbls,
   setSelected,
-  togglePanel,
 } from '../../state/scope';
 import {
   cycle,
@@ -79,6 +79,7 @@ export interface ScopeActions {
   stepRange: (direction: 1 | -1) => void;
   cycleTrails: () => void;
   cycleVectors: () => void;
+  /** Shows or hides a panel, by the sheet on a phone. */
   togglePanel: (id: PanelId) => void;
   toggleHint: () => void;
   /** Recentres the scope on the site. */
@@ -103,7 +104,7 @@ const plain = {
   stepRange,
   cycleTrails: () => setSettings('trailSec', cycle(TRAIL_STEPS, settings.trailSec)),
   cycleVectors: () => setSettings('vectorMin', cycle(VECTOR_STEPS, settings.vectorMin)),
-  togglePanel,
+  togglePanel: (id: PanelId) => toggleShown(id),
   toggleHint: () => setHintVisible((v) => !v),
   recenter: () => setPan({ x: 0, y: 0 }),
   startRbl: () => {

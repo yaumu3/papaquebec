@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 
+import { togglePanel } from './scope';
 import type { PanelId } from './settingsDefaults';
 
 /** Below this width the panels share one bottom sheet and the top bar shrinks. */
@@ -90,6 +91,12 @@ export function toggleSheet(id: PanelId): void {
   setSheetDetent(detentFor(DETENTS[next], current === null ? null : sheetDetent()));
   setSheetSlides(current === null);
   setActiveSheet(next);
+}
+
+/** Shows or hides a panel the way the viewport shows it: by the sheet on a phone, by its own toggle elsewhere. */
+export function toggleShown(id: PanelId, phone = isPhone()): void {
+  if (phone) toggleSheet(id);
+  else togglePanel(id);
 }
 
 export function cycleSheet(): void {

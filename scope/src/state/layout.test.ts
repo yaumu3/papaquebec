@@ -16,7 +16,9 @@ import {
   sheetDetent,
   sheetSlides,
   toggleSheet,
+  toggleShown,
 } from './layout';
+import { panels } from './scope';
 
 const BOTH: [Detent, Detent] = ['medium', 'large'];
 const LARGE: [Detent] = ['large'];
@@ -110,6 +112,34 @@ describe('toggleSheet', () => {
 
     // Assert
     expect(activeSheet()).toBe('maps');
+  });
+});
+
+describe('toggleShown', () => {
+  it('gives a panel the sheet on a phone, leaving its own toggle alone', () => {
+    // Arrange
+    closeSheet();
+    const toggled = panels().maps;
+
+    // Act
+    toggleShown('maps', true);
+
+    // Assert
+    expect(activeSheet()).toBe('maps');
+    expect(panels().maps).toBe(toggled);
+  });
+
+  it("flips a panel's own toggle elsewhere, leaving the sheet alone", () => {
+    // Arrange
+    closeSheet();
+    const toggled = panels().maps;
+
+    // Act
+    toggleShown('maps', false);
+
+    // Assert
+    expect(panels().maps).toBe(!toggled);
+    expect(activeSheet()).toBeNull();
   });
 });
 
