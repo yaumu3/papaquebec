@@ -91,6 +91,8 @@
   --topbar-bottom: calc(var(--topbar-height) + env(safe-area-inset-top));
   --panel-top: calc(var(--topbar-bottom) + var(--edge));
   --edge: 12px;
+  /* The foot of the screen the nav bar covers; the bar publishes it on the root. */
+  --nav-inset: 0px;
   --z-panel: 10;
   --z-bar: 15;
   --z-overlay: 20;

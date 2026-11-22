@@ -22,7 +22,7 @@
     box-shadow: none;
   }
   .body {
-    padding: 0 var(--space-6) var(--nav-inset, 0px);
-    scroll-padding-bottom: var(--nav-inset, 0px);
+    padding: 0 var(--space-6) var(--nav-inset);
+    scroll-padding-bottom: var(--nav-inset);
   }
 }

@@ -65,8 +65,8 @@
 @media (max-width: 720px) {
   /* Under the nav bar, the lanes scroll up to rest above it. */
   .scroller {
-    padding-bottom: var(--nav-inset, 0px);
-    scroll-padding-bottom: var(--nav-inset, 0px);
+    padding-bottom: var(--nav-inset);
+    scroll-padding-bottom: var(--nav-inset);
   }
 }
 /* Each as tall as it is, the stack overflowing into the scroll. */
