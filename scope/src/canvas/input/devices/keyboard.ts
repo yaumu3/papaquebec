@@ -2,7 +2,10 @@ import type { ScopeActions } from '../actions';
 import { listen } from '../dom';
 
 /** The parts of a `KeyboardEvent` the shortcuts read. */
-export type KeyEvent = Pick<KeyboardEvent, 'key' | 'shiftKey' | 'target'>;
+export type KeyEvent = Pick<
+  KeyboardEvent,
+  'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey' | 'target'
+>;
 
 /** Which key asks for which action; letters match in either case. */
 function bindings(a: ScopeActions): Record<string, (e: KeyEvent) => void> {
@@ -37,11 +40,14 @@ export function ownsKeys(t: EventTarget | null): boolean {
   return [LANES_SELECTOR, ND_SELECTOR].some((sel) => closest(sel) !== null);
 }
 
-/** The keyboard's shortcuts; keys typed into an input or pressed in the lanes or on the ND are left alone. */
+/**
+ * The keyboard's shortcuts; a chord with Ctrl, Cmd or Alt is the browser's, and keys typed into
+ * an input or pressed in the lanes or on the ND are left alone.
+ */
 export function keyHandler(a: ScopeActions): (e: KeyEvent) => void {
   const b = bindings(a);
   return (e) => {
-    if (ownsKeys(e.target)) return;
+    if (e.altKey || e.ctrlKey || e.metaKey || ownsKeys(e.target)) return;
     b[e.key.length === 1 ? e.key.toLowerCase() : e.key]?.(e);
   };
 }

@@ -6,6 +6,9 @@ import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR } from './keyboa
 const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): KeyEvent => ({
   key: k,
   shiftKey,
+  altKey: false,
+  ctrlKey: false,
+  metaKey: false,
   target,
 });
 
@@ -44,6 +47,23 @@ describe('keyHandler', () => {
 
     // Assert
     expect(calls).toEqual([['deleteLastRbl'], ['deleteLastRbl'], ['clearRbls']]);
+  });
+
+  it('leaves a chord with Ctrl, Cmd or Alt to the browser', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const chords: KeyEvent[] = [
+      { ...key('r'), altKey: true },
+      { ...key('r'), ctrlKey: true },
+      { ...key('r'), metaKey: true },
+    ];
+
+    // Act
+    for (const chord of chords) onKey(chord);
+
+    // Assert
+    expect(calls).toEqual([]);
   });
 
   it('ignores keys typed into an input', () => {
