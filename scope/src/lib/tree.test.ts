@@ -475,6 +475,7 @@ describe('matches', () => {
       ['KIN', ['ZAMBU2KINRA'], false],
       ['ZAMBU2.KINRA', ['ZAMBU2.KINRA'], true],
       ['ZA', ['Zambu'], true],
+      ['STRASSE', ['Straße'], true],
       ['ZA', ['BAZAR', 'ZAMBU'], true],
       ['ZA', [], false],
     ];
@@ -501,6 +502,8 @@ describe('markedPieces', () => {
       ['ZAMBU KIN', ['ZA', 'KI'], '[ZA]MBU [KI]N'],
       ['BAZAR', ['ZA'], 'BAZAR'],
       ['straße ab', ['AB'], 'straße [ab]'],
+      ['Straße', ['STRASSE'], '[Straße]'],
+      ['Straße', ['STRAS'], '[Straß]e'],
     ];
 
     // Act
