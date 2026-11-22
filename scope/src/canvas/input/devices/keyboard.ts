@@ -7,23 +7,55 @@ export type KeyEvent = Pick<
   'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey' | 'target'
 >;
 
-/** Which key asks for which action; letters match in either case. */
-function bindings(a: ScopeActions): Record<string, (e: KeyEvent) => void> {
-  const del = (e: KeyEvent) => (e.shiftKey ? a.clearRbls() : a.deleteLastRbl());
-  return {
-    Escape: () => a.cancel(),
-    '?': () => a.toggleHint(),
-    '[': () => a.stepRange(-1),
-    ']': () => a.stepRange(1),
-    t: () => a.cycleTrails(),
-    v: () => a.cycleVectors(),
-    l: () => a.toggleList(),
-    r: () => a.startRbl(),
-    Home: () => a.recenter(),
-    Delete: del,
-    Backspace: del,
-  };
+/** One shortcut: the keys that ask for it, how the hint shows it, and what it does. */
+export interface Shortcut {
+  /** The `KeyboardEvent.key` values that ask for it; letters in lower case match either case. */
+  on: readonly string[];
+  /** Asked only with Shift held, or only without it; with either when absent. */
+  shift?: boolean;
+  /** The caps the hint shows. */
+  keys: readonly string[];
+  /** What joins the caps in the hint; a chord's `+` when absent. */
+  sep?: string;
+  action: string;
+  /** `key` is the one of `on` that was pressed. */
+  run: (a: ScopeActions, key: string) => void;
 }
+
+const letter = (k: string, action: string, run: Shortcut['run']): Shortcut => ({
+  on: [k],
+  keys: [k.toUpperCase()],
+  action,
+  run,
+});
+
+const DELETE = ['Delete', 'Backspace'];
+
+/** Every shortcut, in the hint's order. */
+export const SHORTCUTS: readonly Shortcut[] = [
+  {
+    on: ['[', ']'],
+    keys: ['[', ']'],
+    sep: '',
+    action: 'RANGE',
+    run: (a, k) => a.stepRange(k === '[' ? -1 : 1),
+  },
+  letter('t', 'TRAIL CYCLE', (a) => a.cycleTrails()),
+  letter('v', 'VECTOR CYCLE', (a) => a.cycleVectors()),
+  letter('l', 'LIST', (a) => a.toggleList()),
+  letter('?', 'HINT', (a) => a.toggleHint()),
+  letter('r', 'RBL', (a) => a.startRbl()),
+  { on: DELETE, shift: false, keys: ['DEL'], action: 'LAST RBL', run: (a) => a.deleteLastRbl() },
+  {
+    on: DELETE,
+    shift: true,
+    keys: ['SHIFT', 'DEL'],
+    action: 'ALL RBL',
+    run: (a) => a.clearRbls(),
+  },
+  { on: ['Home'], keys: ['HOME'], action: 'RESET PAN', run: (a) => a.recenter() },
+  { on: ['Escape'], keys: ['ESC'], action: 'CANCEL', run: (a) => a.cancel() },
+];
 
 /** The lanes' root, which handles its own keys. */
 export const LANES_SELECTOR = '[data-lanes]';
@@ -45,10 +77,10 @@ export function ownsKeys(t: EventTarget | null): boolean {
  * an input or pressed in the lanes or on the ND are left alone.
  */
 export function keyHandler(a: ScopeActions): (e: KeyEvent) => void {
-  const b = bindings(a);
   return (e) => {
     if (e.altKey || e.ctrlKey || e.metaKey || ownsKeys(e.target)) return;
-    b[e.key.length === 1 ? e.key.toLowerCase() : e.key]?.(e);
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    SHORTCUTS.find((s) => s.on.includes(k) && (s.shift ?? e.shiftKey) === e.shiftKey)?.run(a, k);
   };
 }
 
