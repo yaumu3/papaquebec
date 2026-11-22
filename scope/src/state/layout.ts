@@ -72,11 +72,6 @@ export function largestDetent(detents: Detents): Detent {
   return detents.at(-1) ?? detents[0];
 }
 
-/** One detent up, and from the largest back to the smallest, as a tap on the grabber goes. */
-export function cycleDetent(detents: Detents, current: Detent): Detent {
-  return cycle(detents, current);
-}
-
 /** Tapping the open panel's button closes the sheet; any other button swaps to that panel. */
 export function nextSheet<T extends string>(current: T | null, tapped: T): T | null {
   return current === tapped ? null : tapped;
@@ -105,9 +100,10 @@ export function show(id: PanelId, phone = isPhone()): void {
   if (!isShown(phone, activeSheet(), id, panels()[id])) toggleShown(id, phone);
 }
 
+/** One detent up, and from the largest back to the smallest, as a tap on the grabber goes. */
 export function cycleSheet(): void {
   const id = activeSheet();
-  if (id !== null) setSheetDetent(cycleDetent(DETENTS[id], sheetDetent()));
+  if (id !== null) setSheetDetent(cycle(DETENTS[id], sheetDetent()));
 }
 
 export function closeSheet(): void {

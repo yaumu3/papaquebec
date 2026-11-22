@@ -13,6 +13,9 @@ describe('cycle', () => {
       [[0, 30, 60, 120], 60, 120],
       [[0, 30, 60, 120], 120, 0],
       [[0, 30, 60, 120], 45, 0],
+      [['medium', 'large'], 'medium', 'large'],
+      [['medium', 'large'], 'large', 'medium'],
+      [['large'], 'large', 'large'],
     ];
 
     // Act
