@@ -392,9 +392,14 @@ impl Field for Velocity {
 
     fn write(&self) -> Bits {
         let step = self.speed_step_kt();
-        let (subtype, speeds) = match self.airspeed {
-            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg, step),
-            None => along_ground(self.ground_speed_kt.zip(self.track_deg), step),
+        let over_ground = self.ground_speed_kt.zip(self.track_deg);
+        // A heading alone is still of the air; one beside a speed over the ground has no place.
+        let of_the_air = self.airspeed.is_some()
+            || (self.magnetic_heading_deg.is_some() && over_ground.is_none());
+        let (subtype, speeds) = if of_the_air {
+            through_air(self.airspeed, self.magnetic_heading_deg, step)
+        } else {
+            along_ground(over_ground, step)
         };
         let rate = self
             .baro_vertical_rate_fpm
@@ -471,17 +476,18 @@ fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
 }
 
 /// The subtype and the 22 bits of an airspeed in steps of `step` on a
-/// magnetic heading.
-fn through_air(airspeed: Airspeed, heading_deg: Option<f64>, step: f64) -> (u32, Bits) {
+/// magnetic heading; of either that is none, not available.
+fn through_air(airspeed: Option<Airspeed>, heading_deg: Option<f64>, step: f64) -> (u32, Bits) {
     let (is_true, speed) = match airspeed {
-        Airspeed::Indicated(speed) => (false, speed),
-        Airspeed::True(speed) => (true, speed),
+        Some(Airspeed::Indicated(speed)) => (false, Some(speed)),
+        Some(Airspeed::True(speed)) => (true, Some(speed)),
+        None => (false, None),
     };
     let bits = Bits::default()
         .put_flag(heading_deg.is_some())
         .put(count(heading_deg.unwrap_or(0.0) * 1024.0 / 360.0), 10)
         .put_flag(is_true)
-        .put(count(speed / step) + 1, 10);
+        .put(speed.map_or(0, |speed| count(speed / step) + 1), 10);
     (3 + u32::from(supersonic(step)), bits)
 }
 
@@ -967,16 +973,14 @@ mod tests {
         #[test]
         fn velocity_is_read_as_it_is_written(me in me(subtypes(19, 1..=4_u32))) {
             // Arrange: but for the most a subsonic subtype counts, which stands
-            // for that much or more and is written by a supersonic one; and
-            // for a heading without an airspeed, which is not written
+            // for that much or more and is written by a supersonic one
             let most = |first, last| me.get(first, last) == 1023;
-            let heading_alone = me.flag(14) && me.get(26, 35) == 0;
-            let not_written = match me.get(6, 8) {
+            let at_most = match me.get(6, 8) {
                 1 => most(15, 24) || most(26, 35),
-                3 => most(26, 35) || heading_alone,
-                _ => heading_alone,
+                3 => most(26, 35),
+                _ => false,
             };
-            prop_assume!(!not_written);
+            prop_assume!(!at_most);
 
             said_again::<Velocity>(me)?;
         }
