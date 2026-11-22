@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import type { LanesWindow } from '../../state/window';
 import { axisStep, chipAt, clearOf, clearOfEnds, clockStep, endLabel, ticks } from './axis';
 
@@ -34,7 +36,30 @@ describe('clockStep', () => {
 });
 
 describe('ticks', () => {
-  it('falls on the multiples of the step inside the interval, its ends included', () => {
+  it('falls on every whole step from the origin inside the interval, its ends included, and nowhere else', () => {
+    // Arrange: whole seconds, an origin before, inside or after the interval
+    const anyInterval = fc
+      .tuple(fc.integer({ min: 0, max: 5000 }), fc.nat(600))
+      .map(([from, length]) => ({ from, to: from + length }));
+    const anyStep = fc.integer({ min: 1, max: 300 });
+    const anyOrigin = fc.integer({ min: -1000, max: 7000 });
+
+    fc.assert(
+      fc.property(anyInterval, anyStep, anyOrigin, (interval, step, origin) => {
+        // Act
+        const at = ticks(interval, step, origin);
+
+        // Assert
+        const inside = Array.from(
+          { length: interval.to - interval.from + 1 },
+          (_, k) => interval.from + k,
+        );
+        expect(at).toEqual(inside.filter((t) => (t - origin) % step === 0));
+      }),
+    );
+  });
+
+  it('counts from zero without an origin', () => {
     // Arrange
     const interval = { from: 1000, to: 1560 };
 
@@ -43,32 +68,6 @@ describe('ticks', () => {
 
     // Assert
     expect(at).toEqual([1080, 1200, 1320, 1440, 1560]);
-  });
-
-  it('falls on whole steps before the origin, so that the grid marks ages', () => {
-    // Arrange
-    const interval = { from: 1000, to: 1560 };
-    const now = 1570;
-
-    // Act
-    const at = ticks(interval, 120, now);
-
-    // Assert
-    expect(at).toEqual([1090, 1210, 1330, 1450]);
-  });
-
-  it('moves with the origin as it grows', () => {
-    // Arrange
-    const interval = { from: 1000, to: 1560 };
-
-    // Act
-    const at = [ticks(interval, 120, 1570), ticks(interval, 120, 1571)];
-
-    // Assert
-    expect(at).toEqual([
-      [1090, 1210, 1330, 1450],
-      [1091, 1211, 1331, 1451],
-    ]);
   });
 });
 
