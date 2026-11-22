@@ -25,6 +25,9 @@ const [closedInSearch, setClosedInSearch] = createSignal<readonly string[]>([]);
 
 export { query };
 
+/** Counts the times the search box was asked for from outside it, as by its shortcut. */
+export const [searchAsked, setSearchAsked] = createSignal(0);
+
 export const terms = () => termsOf(query());
 
 /** Whether the tree is filtered: a query of spaces is none. */

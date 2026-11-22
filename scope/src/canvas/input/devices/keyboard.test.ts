@@ -19,7 +19,7 @@ describe('keyHandler', () => {
     // Arrange
     const { calls, actions } = recordActions();
     const onKey = keyHandler(actions);
-    const presses = ['Escape', '?', '+', '-', 't', 'V', 'R', 'Home', 'i', '[', ']'];
+    const presses = ['Escape', '?', '+', '-', 't', 'V', 'R', 'Home', 'i', '/', '[', ']'];
 
     // Act
     for (const k of presses) onKey(key(k));
@@ -35,6 +35,7 @@ describe('keyHandler', () => {
       ['startRbl'],
       ['recenter'],
       ['toggleAbout'],
+      ['searchMaps'],
     ]);
   });
 

@@ -13,6 +13,7 @@ import {
   nextSheet,
   setActiveSheet,
   setSheetDetent,
+  show,
   sheetDetent,
   sheetSlides,
   toggleSheet,
@@ -140,6 +141,36 @@ describe('toggleShown', () => {
     // Assert
     expect(panels().maps).toBe(!toggled);
     expect(activeSheet()).toBeNull();
+  });
+});
+
+describe('show', () => {
+  it('gives a panel the sheet on a phone, and leaves it there when it has it', () => {
+    // Arrange
+    closeSheet();
+
+    // Act
+    const held = [1, 2].map(() => {
+      show('maps', true);
+      return activeSheet();
+    });
+
+    // Assert
+    expect(held).toEqual(['maps', 'maps']);
+  });
+
+  it("turns a panel's own toggle on elsewhere, and leaves it on", () => {
+    // Arrange
+    if (panels().maps) toggleShown('maps', false);
+
+    // Act
+    const on = [1, 2].map(() => {
+      show('maps', false);
+      return panels().maps;
+    });
+
+    // Assert
+    expect(on).toEqual([true, true]);
   });
 });
 

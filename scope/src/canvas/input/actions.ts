@@ -1,6 +1,7 @@
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
-import { toggleShown } from '../../state/layout';
+import { setSearchAsked } from '../../state/layerTree';
+import { show, toggleShown } from '../../state/layout';
 import { sortTracks, stepThrough } from '../../state/listSort';
 import {
   aboutVisible,
@@ -91,6 +92,8 @@ export interface ScopeActions {
   togglePanel: (id: PanelId) => void;
   toggleHint: () => void;
   toggleAbout: () => void;
+  /** Shows the Maps panel and puts the caret in its search box. */
+  searchMaps: () => void;
   /** Selects the aircraft one row down (1) or up (-1) the list. */
   stepSelection: (direction: 1 | -1) => void;
   /** Recentres the scope on the site. */
@@ -121,6 +124,10 @@ const plain = {
   togglePanel: (id: PanelId) => toggleShown(id),
   toggleHint: () => setHintVisible((v) => !v),
   toggleAbout: () => setAboutVisible((v) => !v),
+  searchMaps: () => {
+    show('maps');
+    setSearchAsked((n) => n + 1);
+  },
   recenter: () => setPan({ x: 0, y: 0 }),
   startRbl: () => {
     setRblPending({ a: null });

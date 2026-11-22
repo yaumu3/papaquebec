@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import type { AircraftReport } from '../../lib/aircraft';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
+import { searchAsked } from '../../state/layerTree';
 import {
   aboutVisible,
   hintVisible,
   hovered,
   menu,
   modeText,
+  panels,
   pointer,
   pan,
   rangeCursor,
@@ -27,6 +29,7 @@ import {
   setRblPending,
   setRbls,
   setSelected,
+  togglePanel,
 } from '../../state/scope';
 import { setRange, setSettings, settings } from '../../state/settings';
 import { trackStore } from '../../state/tracks';
@@ -331,6 +334,20 @@ describe('createActions', () => {
 
     // Assert
     expect(selected()).toBe('d00123');
+  });
+
+  it('shows the Maps panel and asks for its search box', () => {
+    // Arrange
+    const a = subject();
+    if (panels().maps) togglePanel('maps');
+    const asked = searchAsked();
+
+    // Act
+    a.searchMaps();
+
+    // Assert
+    expect(panels().maps).toBe(true);
+    expect(searchAsked()).toBe(asked + 1);
   });
 
   it('opens the about dialog, as its button does', () => {

@@ -74,6 +74,7 @@ export const SHORTCUTS: readonly Shortcut[] = [
     run: (a, k) => a.stepSelection(k === 'ArrowUp' ? -1 : 1),
   },
   ...PANEL_IDS.map((id) => letter(panelKey(id), PANEL_NAMES[id], (a) => a.togglePanel(id))),
+  letter('/', 'MAP SEARCH', (a) => a.searchMaps()),
   letter('i', 'ABOUT', (a) => a.toggleAbout()),
   letter('?', 'HINT', (a) => a.toggleHint()),
   { on: ['Escape'], keys: ['ESC'], action: 'CANCEL', run: (a) => a.cancel() },
