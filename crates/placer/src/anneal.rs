@@ -168,9 +168,10 @@ pub fn anneal<C: FnMut() -> f64, R: FnMut() -> f64>(
 mod tests {
     use super::*;
     use crate::cost::{Scene, Subject, build_tables, evaluate};
-    use crate::geometry::{N, NE, S};
+    use crate::geometry::{DIRECTIONS, N, NE, S};
     use crate::hyper::HYPER;
     use crate::rng::mulberry32;
+    use proptest::prelude::*;
 
     /// Subjects at 10 px to the mile, with nothing else in the way.
     fn scene(subjects: Vec<Subject>) -> Scene {
@@ -224,40 +225,49 @@ mod tests {
         vec![NE; n]
     }
 
-    #[test]
-    fn never_ends_worse_than_it_started() {
-        // Arrange
-        let tables = crowd();
-        let start = all_ne(5);
-        let before = evaluate(&tables, &start);
-
-        // Act
-        let runs: Vec<f64> = (1..=3)
-            .map(|seed| {
-                evaluate(
-                    &tables,
-                    &anneal(&tables, &start, budget(8.0), mulberry32(seed), &HYPER),
-                )
-            })
-            .collect();
-
-        // Assert
-        assert!(runs.iter().all(|&e| e <= before));
+    /// Up to six targets within a block or so of each other, each block in any direction.
+    fn any_crowd() -> impl Strategy<Value = (Tables, Vec<usize>)> {
+        let target = (-60.0..60.0, -60.0..60.0, 0..DIRECTIONS);
+        prop::collection::vec(target, 1..=6).prop_map(|targets| {
+            let subjects = targets.iter().map(|&(cx, cy, _)| subject(cx, cy)).collect();
+            let start = targets.iter().map(|&(_, _, dir)| dir).collect();
+            (build_tables(&scene(subjects), &HYPER.energy), start)
+        })
     }
 
-    #[test]
-    fn is_deterministic_for_a_seed_and_a_clock() {
-        // Arrange
-        let tables = crowd();
+    proptest! {
+        #[test]
+        fn never_ends_worse_than_it_started(
+            (tables, start) in any_crowd(),
+            seeds: (u32, u32),
+            batches in 1.0..12.0,
+        ) {
+            // Arrange: from where a run has settled, which a hot one is likely to leave
+            let start = anneal(&tables, &start, budget(30.0), mulberry32(seeds.0), &HYPER);
+            let before = evaluate(&tables, &start);
 
-        // Act
-        let runs: Vec<Vec<usize>> = [1, 1]
-            .iter()
-            .map(|&seed| anneal(&tables, &all_ne(5), budget(30.0), mulberry32(seed), &HYPER))
-            .collect();
+            // Act
+            let dirs = anneal(&tables, &start, budget(batches), mulberry32(seeds.1), &HYPER);
 
-        // Assert
-        assert_eq!(runs[0], runs[1]);
+            // Assert
+            prop_assert!(evaluate(&tables, &dirs) <= before);
+        }
+
+        #[test]
+        fn is_deterministic_for_a_seed_and_a_clock(
+            (tables, start) in any_crowd(),
+            seed: u32,
+            batches in 1.0..12.0,
+        ) {
+            // Arrange
+            let run = || anneal(&tables, &start, budget(batches), mulberry32(seed), &HYPER);
+
+            // Act
+            let runs = [run(), run()];
+
+            // Assert
+            prop_assert_eq!(&runs[0], &runs[1]);
+        }
     }
 
     #[test]
