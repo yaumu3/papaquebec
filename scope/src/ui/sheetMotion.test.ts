@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import {
   contentMovesSheet,
   FLING_PX_PER_MS,
@@ -8,19 +10,43 @@ import {
   rubberBand,
   settle,
   sheetFrame,
+  type SheetStop,
   sheetStops,
 } from './sheetMotion';
 
 describe('rubberBand', () => {
   it('gives way less with every pixel pulled past the edge, never as far as the pull', () => {
+    // Arrange: pulls a whole number of px apart, from none at all
+    const anyRoom = fc.integer({ min: 200, max: 1200 });
+    const anyPulls = fc
+      .tuple(fc.integer({ min: 1, max: 1000 }), fc.integer({ min: 1, max: 1000 }))
+      .map(([first, step]) => [0, first, first + step, first + 2 * step] as const);
+
+    fc.assert(
+      fc.property(anyPulls, anyRoom, (pulls, room) => {
+        // Act
+        const [none = 0, near = 0, mid = 0, far = 0] = pulls.map((pull) => rubberBand(pull, room));
+
+        // Assert
+        expect(none).toBe(0);
+        expect(near).toBeGreaterThan(0);
+        expect(near).toBeLessThan(pulls[1]);
+        expect(mid - near).toBeGreaterThan(far - mid);
+        expect(far - mid).toBeGreaterThan(0);
+        expect(far).toBeLessThan(room);
+      }),
+    );
+  });
+
+  it('is as stiff as the rubber band of UIScrollView', () => {
     // Arrange
-    const pulls = [0, 50, 100, 200, 400];
+    const pull = 100;
 
     // Act
-    const out = pulls.map((p) => rubberBand(p, 800));
+    const out = rubberBand(pull, 800);
 
     // Assert
-    expect(out.map(Math.round)).toEqual([0, 27, 51, 97, 173]);
+    expect(out).toBeCloseTo(51.46, 2);
   });
 });
 
@@ -83,20 +109,35 @@ describe('settle', () => {
   });
 
   it('never flicks a sheet past the stops either side of where it was let go, short of a fling', () => {
-    // Arrange
-    const flick = FLING_PX_PER_MS * 0.9;
-    const releases: [number, number][] = [
-      [780, -flick],
-      [700, -flick],
-      [350, -1],
-      [100, flick],
-    ];
+    // Arrange: a sheet of any detents, let go anywhere from below closed to above its largest
+    const anyStops = fc
+      .tuple(fc.integer({ min: 100, max: 600 }), fc.integer({ min: 100, max: 600 }))
+      .map(([medium, more]): SheetStop[] => [
+        { detent: null, extent: 0 },
+        { detent: 'medium', extent: medium },
+        { detent: 'large', extent: medium + more },
+      ]);
+    const anyExtent = fc.integer({ min: -100, max: 1400 });
+    const anyFlick = fc.double({
+      min: -FLING_PX_PER_MS,
+      max: FLING_PX_PER_MS,
+      minExcluded: true,
+      maxExcluded: true,
+      noNaN: true,
+    });
 
-    // Act
-    const out = releases.map(([extent, velocity]) => settle(extent, velocity, stops));
+    fc.assert(
+      fc.property(anyStops, anyExtent, anyFlick, (sheet, extent, velocity) => {
+        // Act
+        const detent = settle(extent, velocity, sheet);
 
-    // Assert
-    expect(out).toEqual(['medium', 'medium', null, 'medium']);
+        // Assert: no stop lies between where it was let go and where it rests
+        const rest = sheet.find((stop) => stop.detent === detent)?.extent ?? NaN;
+        const passed = sheet.filter((stop) => (stop.extent - extent) * (stop.extent - rest) < 0);
+        expect(rest).not.toBeNaN();
+        expect(passed).toEqual([]);
+      }),
+    );
   });
 
   it('lets a fling carry a sheet past the next stop', () => {
