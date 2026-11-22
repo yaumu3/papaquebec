@@ -185,6 +185,12 @@ const scrolledToEnd = (page: Page) =>
       scroller?.scrollTo(0, scroller.scrollHeight);
     });
 
+/** Moves the clock `seconds` past the last report, and waits for the bar to say `notice`. */
+async function laterBy(page: Page, seconds: number, notice: string | RegExp): Promise<void> {
+  await page.clock.setFixedTime(new Date(+CLOCK + seconds * 1000));
+  await navBar(page).getByText(notice).waitFor();
+}
+
 const BAR: Clip = { x: 0, y: 744, width: 390, height: 100 };
 const LOWER: Clip = { x: 0, y: 460, width: 390, height: 384 };
 
@@ -193,6 +199,7 @@ const navBarVisit: Visit = {
   screen: PHONE,
   settings: NEAR_NORMAL,
   fleet: FLEET,
+  down: { kind: 'ended' },
   steps: [
     { name: 'nav/rest', act: (page) => indicatorAt(page, '0') },
     {
@@ -218,6 +225,14 @@ const navBarVisit: Visit = {
       act: (page) => page.getByRole('button', { name: 'Resize the sheet' }).tap(),
     },
     { name: 'nav/display', act: (page) => panelButton(page, 'Display').tap() },
+    {
+      act: async (page) => {
+        await panelButton(page, 'Display').tap();
+        await laterBy(page, 12, 'STALE 12s');
+      },
+      crops: [{ name: 'nav/stale', clip: BAR }],
+    },
+    { name: 'nav/dead', act: (page) => laterBy(page, 45, /^DEAD/) },
   ],
 };
 
