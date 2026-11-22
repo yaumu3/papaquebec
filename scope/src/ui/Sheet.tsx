@@ -70,11 +70,11 @@ function dragSheet(detents: () => Detents, onFrame: (frame: Frame | null) => voi
 type SheetDrag = ReturnType<typeof dragSheet>;
 
 /** The grabber, which a tap or a drag works. */
-function Grip(props: { drag: SheetDrag }) {
+function Grabber(props: { drag: SheetDrag }) {
   return (
     <button
       type="button"
-      class={s.grip}
+      class={s.grabber}
       aria-label="Resize the sheet"
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -124,7 +124,7 @@ export function Sheet(props: {
       )}
       style={style()}
     >
-      <Grip drag={drag} />
+      <Grabber drag={drag} />
       {props.children}
     </div>
   );

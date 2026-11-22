@@ -8,7 +8,7 @@
 .sheet.hidden {
   display: none;
 }
-.grip {
+.grabber {
   display: none;
 }
 @media (max-width: 720px) {
@@ -46,7 +46,7 @@
   .dragging {
     transition: none;
   }
-  .grip {
+  .grabber {
     display: block;
     flex-shrink: 0;
     width: 100%;
