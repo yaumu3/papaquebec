@@ -501,9 +501,8 @@ impl Field for Status {
         let status = i32::try_from(me.get(9, 11)).ok()?;
         Some(Self {
             emergency_priority_status: EmergencyPriorityStatus::try_from(status).ok()?,
-            mode_a_code: Some(me.get(12, 24))
-                .filter(|identity| *identity != 0)
-                .map(mode_a_code),
+            // Of an identity code with none of its pulses, whatever lies between them.
+            mode_a_code: Some(mode_a_code(me.get(12, 24))).filter(|code| *code != 0),
         })
     }
 
@@ -984,9 +983,6 @@ mod tests {
 
         #[test]
         fn status_is_read_as_it_is_written(me in me(subtypes(28, Just(1)))) {
-            // Arrange: the bit between the pulses of the code clear, as it is sent
-            let me = with(me, 18, 18, 0);
-
             said_again::<Status>(me)?;
         }
 
