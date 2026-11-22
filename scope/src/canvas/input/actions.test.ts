@@ -16,6 +16,7 @@ import {
   rbls,
   selected,
   setAboutVisible,
+  setHintVisible,
   setHovered,
   setMenu,
   setModeText,
@@ -283,6 +284,18 @@ describe('createActions', () => {
 
     // Assert
     expect(aboutVisible()).toBe(false);
+  });
+
+  it('closes the hint on cancel', () => {
+    // Arrange
+    const a = subject();
+    setHintVisible(true);
+
+    // Act
+    a.cancel();
+
+    // Assert
+    expect(hintVisible()).toBe(false);
   });
 
   it('waits for the first end of a new RBL', () => {

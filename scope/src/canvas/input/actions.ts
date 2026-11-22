@@ -88,7 +88,7 @@ export interface ScopeActions {
   startRbl: () => void;
   deleteLastRbl: () => void;
   clearRbls: () => void;
-  /** Abandons a pending RBL or range cursor and closes the menu and the about dialog. */
+  /** Abandons a pending RBL or range cursor and closes the menu, the about dialog and the hint. */
   cancel: () => void;
 }
 
@@ -119,6 +119,7 @@ const plain = {
     setModeText(null);
     setMenu(null);
     setAboutVisible(false);
+    setHintVisible(false);
   },
 } satisfies Partial<ScopeActions>;
 
