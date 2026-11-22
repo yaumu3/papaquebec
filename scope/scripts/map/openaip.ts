@@ -132,7 +132,7 @@ function pointOf(v: unknown): LatLon | null {
   return Array.isArray(c) && isNum(c[0]) && isNum(c[1]) ? [c[1], c[0]] : null;
 }
 
-/** The exterior ring as lat/lon, vertices rounded to 4 decimals. */
+/** The exterior ring as lat/lon, vertices rounded to 4 decimals; none of one too short to close round an area. */
 function ringOf(v: unknown): LatLon[] | null {
   if (!isRecord(v) || !isRecord(v.geometry) || v.geometry.type !== 'Polygon') return null;
   const c = v.geometry.coordinates;
@@ -143,7 +143,7 @@ function ringOf(v: unknown): LatLon[] | null {
     if (!Array.isArray(p) || !isNum(p[0]) || !isNum(p[1])) return null;
     pts.push([Number(p[1].toFixed(4)), Number(p[0].toFixed(4))]);
   }
-  return pts.length >= 3 ? pts : null;
+  return pts.length >= 4 ? pts : null;
 }
 
 /** An openAIP limit as a published string; one the format cannot hold is left out. */

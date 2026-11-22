@@ -301,6 +301,28 @@ describe('toMapSet', () => {
     expect(written).toEqual(table.map(([, limit]) => limit));
   });
 
+  it('leaves out an airspace whose ring closes on fewer than three corners', () => {
+    // Arrange
+    const flat = {
+      ...airspace(7, 'QUEBEC'),
+      geometry: poly([
+        [35.7, 140.1],
+        [35.7, 140.2],
+        [35.7, 140.1],
+      ]),
+    };
+    const set = toMapSet(inputOf({ airspaces: [flat, airspace(7, 'ROMEO')] }), AREA);
+
+    // Act
+    const verdict = validateMapSet(set);
+
+    // Assert
+    expect(verdict.ok).toBe(true);
+    expect(set.features.map((f) => ('name' in f.properties ? f.properties.name : null))).toEqual([
+      'ROMEO',
+    ]);
+  });
+
   it('truncates a long name to 64 characters and a long id to 32', () => {
     // Arrange
     const input = inputOf({
