@@ -959,9 +959,6 @@ mod tests {
         fn airborne_position_is_read_as_it_is_written(
             me in me(type_codes(prop_oneof![9..=18_u32, 20..=22_u32])),
         ) {
-            // Arrange: the Q bit set, as an altitude is written
-            let me = with(me, 16, 16, 1);
-
             said_again::<AirbornePosition>(me)?;
         }
 
@@ -997,10 +994,6 @@ mod tests {
 
         #[test]
         fn ra_broadcast_is_read_as_it_is_written(me in me(subtypes(28, Just(2)))) {
-            // Arrange: the Q bit of a threat's altitude set, as an altitude is written
-            let placed = me.get(29, 30) == 2;
-            let me = with(me, 39, 39, me.get(39, 39) | u32::from(placed));
-
             said_again::<RaBroadcast>(me)?;
         }
 
