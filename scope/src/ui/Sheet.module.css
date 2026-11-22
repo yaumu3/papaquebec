@@ -46,10 +46,6 @@
   .dragging {
     transition: none;
   }
-  /* Room above the content where a grabber would be. */
-  .bare {
-    padding-top: var(--space-6);
-  }
   .grip {
     display: block;
     flex-shrink: 0;

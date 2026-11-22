@@ -5,7 +5,6 @@ import fc from 'fast-check';
 import {
   contentMovesSheet,
   FLING_PX_PER_MS,
-  grabberShown,
   projectFlick,
   rubberBand,
   settle,
@@ -189,18 +188,5 @@ describe('contentMovesSheet', () => {
 
     // Assert
     expect(out).toEqual([true, false, true, false, false, false]);
-  });
-});
-
-describe('grabberShown', () => {
-  it('shows the grabber only on a sheet with more than one detent to go between', () => {
-    // Arrange
-    const cases = [['medium', 'large'], ['large']] as const;
-
-    // Act
-    const out = cases.map(grabberShown);
-
-    // Assert
-    expect(out).toEqual([true, false]);
   });
 });

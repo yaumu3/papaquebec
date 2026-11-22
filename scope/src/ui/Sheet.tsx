@@ -13,7 +13,7 @@ import {
 } from '../state/layout';
 import { dragFromContent } from './contentDrag';
 import { trackPull } from './pull';
-import { grabberShown, type SheetStop, settle, sheetFrame, sheetStops } from './sheetMotion';
+import { type SheetStop, settle, sheetFrame, sheetStops } from './sheetMotion';
 
 import s from './Sheet.module.css';
 
@@ -106,7 +106,6 @@ export function Sheet(props: {
   const [frame, setFrame] = createSignal<Frame | null>(null);
   const drag = dragSheet(() => props.detents, setFrame);
   const atLargest = () => sheetDetent() === largestDetent(props.detents);
-  const grabber = () => grabberShown(props.detents);
   const style = () => {
     const f = frame();
     return f
@@ -121,12 +120,11 @@ export function Sheet(props: {
         props.class,
         !props.shown && s.hidden,
         sheetSlides() && s.slides,
-        !grabber() && s.bare,
         frame() && s.dragging,
       )}
       style={style()}
     >
-      {grabber() && <Grip drag={drag} />}
+      <Grip drag={drag} />
       {props.children}
     </div>
   );
