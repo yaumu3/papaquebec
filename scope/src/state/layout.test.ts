@@ -117,60 +117,44 @@ describe('toggleSheet', () => {
 });
 
 describe('toggleShown', () => {
-  it('gives a panel the sheet on a phone, leaving its own toggle alone', () => {
+  it('toggles a panel by the sheet on a phone and by its own toggle elsewhere', () => {
     // Arrange
     closeSheet();
     const toggled = panels().maps;
 
     // Act
-    toggleShown('maps', true);
+    const out = [true, false].map((phone) => {
+      toggleShown('maps', phone);
+      return [activeSheet(), panels().maps];
+    });
 
     // Assert
-    expect(activeSheet()).toBe('maps');
-    expect(panels().maps).toBe(toggled);
-  });
-
-  it("flips a panel's own toggle elsewhere, leaving the sheet alone", () => {
-    // Arrange
-    closeSheet();
-    const toggled = panels().maps;
-
-    // Act
-    toggleShown('maps', false);
-
-    // Assert
-    expect(panels().maps).toBe(!toggled);
-    expect(activeSheet()).toBeNull();
+    expect(out).toEqual([
+      ['maps', toggled],
+      ['maps', !toggled],
+    ]);
   });
 });
 
 describe('show', () => {
-  it('gives a panel the sheet on a phone, and leaves it there when it has it', () => {
+  it('shows a hidden panel and leaves a shown one, on a phone and elsewhere', () => {
     // Arrange
     closeSheet();
-
-    // Act
-    const held = [1, 2].map(() => {
-      show('maps', true);
-      return activeSheet();
-    });
-
-    // Assert
-    expect(held).toEqual(['maps', 'maps']);
-  });
-
-  it("turns a panel's own toggle on elsewhere, and leaves it on", () => {
-    // Arrange
     if (panels().maps) toggleShown('maps', false);
 
     // Act
-    const on = [1, 2].map(() => {
-      show('maps', false);
-      return panels().maps;
+    const out = [true, true, false, false].map((phone) => {
+      show('maps', phone);
+      return [activeSheet(), panels().maps];
     });
 
     // Assert
-    expect(on).toEqual([true, true]);
+    expect(out).toEqual([
+      ['maps', false],
+      ['maps', false],
+      ['maps', true],
+      ['maps', true],
+    ]);
   });
 });
 

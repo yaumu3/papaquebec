@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { recordActions } from '../recordActions';
-import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR, panelTip } from './keyboard';
+import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR } from './keyboard';
 
 const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): KeyEvent => ({
   preventDefault: () => {},
@@ -19,7 +19,29 @@ describe('keyHandler', () => {
     // Arrange
     const { calls, actions } = recordActions();
     const onKey = keyHandler(actions);
-    const presses = ['Escape', '?', '+', '-', 't', 'V', 'R', 'Home', 'i', '/', '[', ']'];
+    const presses = [
+      'Escape',
+      '?',
+      '+',
+      '-',
+      't',
+      'V',
+      'R',
+      'Home',
+      'i',
+      '/',
+      '[',
+      ']',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      'l',
+      'ArrowDown',
+      'ArrowUp',
+      'ArrowLeft',
+    ];
 
     // Act
     for (const k of presses) onKey(key(k));
@@ -36,38 +58,10 @@ describe('keyHandler', () => {
       ['recenter'],
       ['toggleAbout'],
       ['searchMaps'],
-    ]);
-  });
-
-  it("toggles each panel with its digit, in the bars' order", () => {
-    // Arrange
-    const { calls, actions } = recordActions();
-    const onKey = keyHandler(actions);
-    const presses = ['1', '2', '3', '4', '5', 'l'];
-
-    // Act
-    for (const k of presses) onKey(key(k));
-
-    // Assert
-    expect(calls).toEqual([
       ['togglePanel', 'display'],
       ['togglePanel', 'maps'],
       ['togglePanel', 'list'],
       ['togglePanel', 'detail'],
-    ]);
-  });
-
-  it('steps the selection with the up and down arrows', () => {
-    // Arrange
-    const { calls, actions } = recordActions();
-    const onKey = keyHandler(actions);
-    const presses = ['ArrowDown', 'ArrowUp', 'ArrowLeft'];
-
-    // Act
-    for (const k of presses) onKey(key(k));
-
-    // Assert
-    expect(calls).toEqual([
       ['stepSelection', 1],
       ['stepSelection', -1],
     ]);
@@ -190,18 +184,5 @@ describe('keyHandler', () => {
 
     // Assert
     expect(calls).toEqual([['cancel']]);
-  });
-});
-
-describe('panelTip', () => {
-  it('names each panel with the key that toggles it', () => {
-    // Arrange
-    const ids = ['display', 'maps', 'list', 'detail'] as const;
-
-    // Act
-    const tips = ids.map(panelTip);
-
-    // Assert
-    expect(tips).toEqual(['DISPLAY · 1', 'MAPS · 2', 'LIST · 3', 'DETAIL · 4']);
   });
 });

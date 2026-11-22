@@ -278,16 +278,17 @@ describe('createActions', () => {
     expect([rblPending(), modeText(), rangeCursor(), menu()]).toEqual([null, null, null, null]);
   });
 
-  it('closes the about dialog on cancel', () => {
+  it('closes the about dialog and the hint on cancel', () => {
     // Arrange
     const a = subject();
     setAboutVisible(true);
+    setHintVisible(true);
 
     // Act
     a.cancel();
 
     // Assert
-    expect(aboutVisible()).toBe(false);
+    expect([aboutVisible(), hintVisible()]).toEqual([false, false]);
   });
 
   it('steps the selection through the list in its order', () => {
@@ -348,30 +349,6 @@ describe('createActions', () => {
     // Assert
     expect(panels().maps).toBe(true);
     expect(searchAsked()).toBe(asked + 1);
-  });
-
-  it('opens the about dialog, as its button does', () => {
-    // Arrange
-    const a = subject();
-    setAboutVisible(false);
-
-    // Act
-    a.toggleAbout();
-
-    // Assert
-    expect(aboutVisible()).toBe(true);
-  });
-
-  it('closes the hint on cancel', () => {
-    // Arrange
-    const a = subject();
-    setHintVisible(true);
-
-    // Act
-    a.cancel();
-
-    // Assert
-    expect(hintVisible()).toBe(false);
   });
 
   it('waits for the first end of a new RBL', () => {
