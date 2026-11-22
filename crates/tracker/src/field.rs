@@ -345,7 +345,8 @@ impl Velocity {
         });
         let supersonic = over_ground
             .or(through_air)
-            .is_some_and(|fastest| fastest > SUBSONIC_KT);
+            // As the steps count it: a speed told apart east and north may come out a hair over.
+            .is_some_and(|fastest| fastest.round() > SUBSONIC_KT);
         if supersonic {
             Self::SUPERSONIC_STEP_KT
         } else {
@@ -966,10 +967,9 @@ mod tests {
         #[test]
         fn velocity_is_read_as_it_is_written(me in me(subtypes(19, 1..=4_u32))) {
             // Arrange: but for the most a subsonic subtype counts, which stands
-            // for that much or more and is written by a supersonic one, as the
-            // step before it may be once a speed is told apart east and north;
-            // and for a heading without an airspeed, which is not written
-            let most = |first, last| me.get(first, last) >= 1022;
+            // for that much or more and is written by a supersonic one; and
+            // for a heading without an airspeed, which is not written
+            let most = |first, last| me.get(first, last) == 1023;
             let heading_alone = me.flag(14) && me.get(26, 35) == 0;
             let not_written = match me.get(6, 8) {
                 1 => most(15, 24) || most(26, 35),
