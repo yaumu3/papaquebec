@@ -89,7 +89,7 @@
   --panel-top: calc(var(--topbar-bottom) + var(--edge));
   --edge: 12px;
   --z-panel: 10;
-  --z-topbar: 15;
+  --z-bar: 15;
   --z-overlay: 20;
   --z-menu: 1000;
 
