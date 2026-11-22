@@ -145,6 +145,7 @@ fn longitude_correction(
 #[cfg(test)]
 mod tests {
     use super::{Leg, direct, inverse};
+    use proptest::prelude::*;
 
     const METRES_IN_NM: f64 = 1852.0;
 
@@ -223,30 +224,26 @@ mod tests {
         assert!(lon_off.abs() * 3600.0 < 0.0001, "{lon_deg}");
     }
 
-    #[test]
-    fn direct_comes_back_through_the_inverse_on_the_same_leg() {
-        // Arrange
-        let from = (35.5, 139.8);
-        let legs = [(0.0, 200.0), (90.0, 200.0), (225.0, 37.5), (313.0, 400.0)].map(
-            |(bearing_deg, distance_nm)| Leg {
+    proptest! {
+        #[test]
+        fn direct_comes_back_through_the_inverse_on_the_same_leg(
+            from in (-80.0..80.0, -180.0..180.0),
+            bearing_deg in 0.0..360.0,
+            distance_nm in 1.0..500.0,
+        ) {
+            // Arrange
+            let leg = Leg {
                 distance_nm,
                 bearing_deg,
-            },
-        );
+            };
 
-        // Act
-        let back = legs.map(|leg| inverse(from, direct(from, leg)));
+            // Act
+            let back = inverse(from, direct(from, leg));
 
-        // Assert
-        for (back, leg) in back.iter().zip(legs) {
-            assert!(
-                (back.distance_nm - leg.distance_nm).abs() < 1e-6,
-                "{back:?}"
-            );
-            assert!(
-                (back.bearing_deg - leg.bearing_deg).abs() < 1e-6,
-                "{back:?}"
-            );
+            // Assert: the bearing the short way round the compass
+            let off_course = (back.bearing_deg - leg.bearing_deg + 180.0).rem_euclid(360.0) - 180.0;
+            prop_assert!((back.distance_nm - leg.distance_nm).abs() < 1e-6, "{back:?}");
+            prop_assert!(off_course.abs() < 1e-6, "{back:?}");
         }
     }
 }
