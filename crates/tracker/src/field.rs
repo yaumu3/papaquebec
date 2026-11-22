@@ -343,8 +343,9 @@ impl Velocity {
         let through_air = self.airspeed.map(|airspeed| match airspeed {
             Airspeed::Indicated(speed) | Airspeed::True(speed) => speed,
         });
-        let supersonic = over_ground
-            .or(through_air)
+        // The airspeed is the one written when there are both.
+        let supersonic = through_air
+            .or(over_ground)
             // As the steps count it: a speed told apart east and north may come out a hair over.
             .is_some_and(|fastest| fastest.round() > SUBSONIC_KT);
         if supersonic {
@@ -1307,6 +1308,27 @@ mod tests {
             geometric_minus_baro_ft: None,
         };
         assert_eq!(read, Some(expected));
+    }
+
+    #[test]
+    fn airspeed_beside_a_slower_ground_speed_is_written_in_its_own_steps() {
+        // Arrange: supersonic through the air, where only the airspeed is written
+        let sent = Velocity {
+            ground_speed_kt: Some(300.0),
+            track_deg: Some(90.0),
+            airspeed: Some(Airspeed::True(1200.0)),
+            magnetic_heading_deg: None,
+            baro_vertical_rate_fpm: None,
+            geometric_vertical_rate_fpm: None,
+            geometric_minus_baro_ft: None,
+        };
+
+        // Act
+        let read = reread(&sent);
+
+        // Assert
+        let airspeed = read.and_then(|read| read.airspeed);
+        assert_eq!(airspeed, Some(Airspeed::True(1200.0)));
     }
 
     #[test]
