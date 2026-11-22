@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 
+import { cycle } from '../lib/cycle';
 import { panels, togglePanel } from './scope';
 import type { PanelId } from './settingsDefaults';
 
@@ -73,7 +74,7 @@ export function largestDetent(detents: Detents): Detent {
 
 /** One detent up, and from the largest back to the smallest, as a tap on the grabber goes. */
 export function cycleDetent(detents: Detents, current: Detent): Detent {
-  return detents[(detents.indexOf(current) + 1) % detents.length] ?? detents[0];
+  return cycle(detents, current);
 }
 
 /** Tapping the open panel's button closes the sheet; any other button swaps to that panel. */

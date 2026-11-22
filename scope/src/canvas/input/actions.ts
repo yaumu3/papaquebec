@@ -1,3 +1,4 @@
+import { cycle } from '../../lib/cycle';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
 import { setSearchAsked } from '../../state/layerTree';
@@ -27,7 +28,6 @@ import {
   setSelected,
 } from '../../state/scope';
 import {
-  cycle,
   setRange,
   setSettings,
   settings,

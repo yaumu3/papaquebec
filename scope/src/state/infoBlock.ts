@@ -1,3 +1,4 @@
+import { cycle } from '../lib/cycle';
 import type { Notice, Tone } from './feedLine';
 import type { QnhStatus } from './qnhStatus';
 import { INFO_PAGES, type InfoPage } from './settingsDefaults';
@@ -66,14 +67,9 @@ export function infoLine(page: InfoPage, r: Readouts, notice: Notice | null): In
   };
 }
 
-/** The page after this one; the first after the last. */
-export function nextInfoPage(page: InfoPage): InfoPage {
-  return INFO_PAGES[(INFO_PAGES.indexOf(page) + 1) % INFO_PAGES.length] ?? INFO_PAGES[0];
-}
-
 /** What a tap on the info block leaves the page as: the next, unless a notice holds the line. */
 export function tapInfoBlock(page: InfoPage, notice: Notice | null): InfoPage {
-  return notice ? page : nextInfoPage(page);
+  return notice ? page : cycle(INFO_PAGES, page);
 }
 
 export function infoBlockLabel(clock: string, line: InfoLine): string {

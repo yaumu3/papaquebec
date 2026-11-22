@@ -5,13 +5,12 @@ import {
   infoBlockLabel,
   type InfoLine,
   infoLine,
-  nextInfoPage,
   type Roll,
   rolled,
   tapInfoBlock,
 } from './infoBlock';
 import type { QnhStatus } from './qnhStatus';
-import { INFO_PAGES, type InfoPage } from './settingsDefaults';
+import type { InfoPage } from './settingsDefaults';
 
 const qnh: QnhStatus = { value: '30.18', source: 'RJTT 0030Z', cls: null };
 const readouts = { qnh, tracks: 10, rate: 412 };
@@ -167,19 +166,6 @@ describe('infoLine', () => {
 
     // Assert
     expect(lines).toEqual(rows.map(([, , , , line]) => line));
-  });
-});
-
-describe('nextInfoPage', () => {
-  it('goes on to the next page and wraps from the last to the first', () => {
-    // Arrange
-    const pages = [...INFO_PAGES];
-
-    // Act
-    const next = pages.map(nextInfoPage);
-
-    // Assert
-    expect(next).toEqual(['tracks', 'rate', 'qnh']);
   });
 });
 
