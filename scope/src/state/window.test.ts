@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import {
   contactOf,
   DEFAULT_WINDOW,
@@ -8,6 +10,7 @@ import {
   keyWindow,
   type Interval,
   type LanesWindow,
+  lengthOf,
   MIN_WINDOW_SEC,
   readsPast,
   panWindow,
@@ -92,15 +95,27 @@ describe('resolveWindow', () => {
 });
 
 describe('xOf and timeAt', () => {
-  it('map a time across the width and back', () => {
-    // Arrange
-    const visible: Interval = { from: 1000, to: 1200 };
+  it('map a time to its share of the width and back', () => {
+    // Arrange: times of the day's size, where a double still tells microseconds apart
+    const anyInterval = fc
+      .tuple(fc.integer({ min: 0, max: 86_400 }), fc.integer({ min: MIN_WINDOW_SEC, max: 7200 }))
+      .map(([from, length]) => ({ from, to: from + length }));
+    const anyShare = fc.integer({ min: -1000, max: 2000 }).map((n) => n / 1000);
+    const anyWidth = fc.integer({ min: 100, max: 2000 });
 
-    // Act
-    const [x, t] = [xOf(1050, visible, 300), timeAt(75, visible, 300)];
+    fc.assert(
+      fc.property(anyInterval, anyShare, anyWidth, (visible, share, width) => {
+        // Arrange
+        const t = visible.from + share * lengthOf(visible);
 
-    // Assert
-    expect([x, t]).toEqual([75, 1050]);
+        // Act
+        const x = xOf(t, visible, width);
+
+        // Assert
+        expect(x).toBeCloseTo(share * width, 6);
+        expect(timeAt(x, visible, width)).toBeCloseTo(t, 6);
+      }),
+    );
   });
 });
 
@@ -217,24 +232,30 @@ describe('zoomWindow', () => {
     expect(zoomed).toEqual([live(200), live(50)]);
   });
 
-  it('keeps the instant under the pointer in place for a held window', () => {
-    // Arrange
-    const held: LanesWindow = { kind: 'held', from: 1000, to: 1200 };
-    const rows = [
-      { pivot: 1100, factor: 0.5 },
-      { pivot: 1000, factor: 2 },
-    ];
+  it('scales a held window about the instant under the pointer, which stays in place', () => {
+    // Arrange: held far from either end of a long contact, and never zoomed down to the minimum
+    const long: Interval = { from: 0, to: 1_000_000 };
+    const anyHeld = fc
+      .tuple(fc.integer({ min: 400_000, max: 500_000 }), fc.integer({ min: 300, max: 3000 }))
+      .map(([from, length]) => ({ from, to: from + length }));
+    const anyFactor = fc.double({ min: 0.1, max: 10, noNaN: true });
+    const anyShare = fc.integer({ min: 0, max: 1000 }).map((n) => n / 1000);
 
-    // Act
-    const zoomed = rows.map((r) =>
-      zoomWindow(held, { from: 1000, to: 1200 }, r.factor, r.pivot, contact),
+    fc.assert(
+      fc.property(anyHeld, anyFactor, anyShare, (visible, factor, share) => {
+        // Arrange
+        const pivot = timeAt(share, visible, 1);
+
+        // Act
+        const zoomed = zoomWindow(holdWindow(visible), visible, factor, pivot, long);
+
+        // Assert
+        const shown = resolveWindow(zoomed, long);
+        expect(zoomed.kind).toBe('held');
+        expect(lengthOf(shown)).toBeCloseTo(lengthOf(visible) * factor, 6);
+        expect(xOf(pivot, shown, 1)).toBeCloseTo(share, 6);
+      }),
     );
-
-    // Assert
-    expect(zoomed).toEqual([
-      { kind: 'held', from: 1050, to: 1150 },
-      { kind: 'held', from: 1000, to: 1400 },
-    ]);
   });
 
   it('goes live when a held window reaches now, keeping its length', () => {
@@ -331,35 +352,47 @@ describe('selectWindow', () => {
   const contact: Interval = { from: 0, to: 2000 };
   const visible: Interval = { from: 1000, to: 1500 };
 
-  it('holds the span between its ends, whichever way it was dragged', () => {
+  it('holds the span between its ends', () => {
     // Arrange
-    const rows = [
-      { t0: 1100, t1: 1200 },
-      { t0: 1200, t1: 1100 },
-    ];
+    const [t0, t1] = [1100, 1200];
 
     // Act
-    const windows = rows.map((r) => selectWindow(r.t0, r.t1, visible, contact));
+    const w = selectWindow(t0, t1, visible, contact);
 
     // Assert
-    expect(windows).toEqual([heldWindow(1100, 1200), heldWindow(1100, 1200)]);
+    expect(w).toEqual(heldWindow(1100, 1200));
   });
 
   it('grows a span shorter than the minimum from its earlier end', () => {
     // Arrange
-    const rows = [
-      { t0: 1100, t1: 1110 },
-      { t0: 1110, t1: 1100 },
-    ];
+    const [t0, t1] = [1100, 1110];
 
     // Act
-    const windows = rows.map((r) => selectWindow(r.t0, r.t1, visible, contact));
+    const w = selectWindow(t0, t1, visible, contact);
 
     // Assert
-    expect(windows).toEqual([
-      heldWindow(1100, 1100 + MIN_WINDOW_SEC),
-      heldWindow(1100, 1100 + MIN_WINDOW_SEC),
-    ]);
+    expect(w).toEqual(heldWindow(1100, 1100 + MIN_WINDOW_SEC));
+  });
+
+  it('makes the same window whichever way the span was dragged', () => {
+    // Arrange: instants in and around the visible window, up to now
+    const anyInstant = fc.integer({ min: 900, max: 2100 });
+
+    fc.assert(
+      fc.property(anyInstant, anyInstant, fc.boolean(), (t0, t1, atNow) => {
+        // Arrange
+        const shown = atNow ? { from: 1700, to: 2000 } : visible;
+
+        // Act
+        const windows = [
+          selectWindow(t0, t1, shown, contact),
+          selectWindow(t1, t0, shown, contact),
+        ];
+
+        // Assert
+        expect(windows[0]).toEqual(windows[1]);
+      }),
+    );
   });
 
   it('stays held to the right edge of a held window, and live to the right edge of a live one', () => {
@@ -454,19 +487,106 @@ describe('pinchWindow', () => {
     // Assert
     expect(w).toEqual(live(200));
   });
+});
 
-  it('stays within the minimum and the whole contact', () => {
-    // Arrange
-    const spread = [140, 160, 0, 300] as const;
-    const closed = [0, 300, 140, 160] as const;
+/** What the pointer, the wheel or the fingers ask of the window. */
+type Gesture =
+  | { kind: 'zoom'; factor: number; share: number }
+  | { kind: 'pan'; lengths: number }
+  | { kind: 'select'; share0: number; share1: number }
+  | { kind: 'pinch'; a0: number; b0: number; a: number; b: number };
 
-    // Act
-    const windows = [spread, closed].map(([a0, b0, a, b]) =>
-      pinchWindow(heldStart, a0, b0, a, b, width, contact),
+/** The window `gesture` makes of `w`, the shares counted across what it shows of the contact. */
+function after(gesture: Gesture, w: LanesWindow, contact: Interval): LanesWindow {
+  const visible = resolveWindow(w, contact);
+  switch (gesture.kind) {
+    case 'zoom':
+      return zoomWindow(w, visible, gesture.factor, timeAt(gesture.share, visible, 1), contact);
+    case 'pan':
+      return panWindow(w, visible, gesture.lengths * lengthOf(visible), contact);
+    case 'select':
+      return selectWindow(
+        timeAt(gesture.share0, visible, 1),
+        timeAt(gesture.share1, visible, 1),
+        visible,
+        contact,
+      );
+    default:
+      return pinchWindow(
+        { w, visible },
+        gesture.a0,
+        gesture.b0,
+        gesture.a,
+        gesture.b,
+        300,
+        contact,
+      );
+  }
+}
+
+describe('a gesture on the window', () => {
+  it('stays within the minimum and the whole contact, held short of now or live', () => {
+    // Arrange: a contact longer than the minimum, often not by much, and a window already within it
+    const anyShare = fc.integer({ min: 0, max: 1000 }).map((n) => n / 1000);
+    const anyLength = fc.oneof(
+      fc.integer({ min: 2 * MIN_WINDOW_SEC, max: 10 * MIN_WINDOW_SEC }),
+      fc.integer({ min: 2 * MIN_WINDOW_SEC, max: 7200 }),
     );
+    const anyContact = fc
+      .tuple(fc.integer({ min: 0, max: 86_400 }), anyLength)
+      .map(([from, length]): Interval => ({ from, to: from + length }));
+    const anyWindowIn = (contact: Interval) => {
+      const room = lengthOf(contact) - MIN_WINDOW_SEC - 1;
+      return fc.oneof(
+        fc.constant(DEFAULT_WINDOW),
+        anyShare.map((share) => live(MIN_WINDOW_SEC + share * room)),
+        fc.tuple(anyShare, anyShare).map(([lengthShare, fromShare]) => {
+          const length = MIN_WINDOW_SEC + lengthShare * room;
+          const from = contact.from + fromShare * (lengthOf(contact) - length - 1);
+          return heldWindow(from, from + length);
+        }),
+      );
+    };
+    const anyCase = anyContact.chain((contact) =>
+      fc.record({ contact: fc.constant(contact), w: anyWindowIn(contact) }),
+    );
+    const anyPx = fc.integer({ min: -50, max: 350 });
+    const anyGesture = fc.oneof(
+      fc.record({
+        kind: fc.constant('zoom' as const),
+        factor: fc.double({ min: 0.01, max: 100, noNaN: true }),
+        share: anyShare,
+      }),
+      fc.record({
+        kind: fc.constant('pan' as const),
+        lengths: fc.integer({ min: -300, max: 300 }).map((n) => n / 100),
+      }),
+      fc.record({
+        kind: fc.constant('select' as const),
+        share0: fc.integer({ min: -200, max: 1200 }).map((n) => n / 1000),
+        share1: fc.integer({ min: -200, max: 1200 }).map((n) => n / 1000),
+      }),
+      fc.record({ kind: fc.constant('pinch' as const), a0: anyPx, b0: anyPx, a: anyPx, b: anyPx }),
+    );
+    /** The slack of the arithmetic on instants of a day's size. */
+    const slack = 1e-6;
 
-    // Assert
-    expect(windows).toEqual([heldWindow(1135, 1165), live(Infinity)]);
+    fc.assert(
+      fc.property(anyCase, anyGesture, ({ contact, w }, gesture) => {
+        // Act
+        const next = after(gesture, w, contact);
+
+        // Assert
+        if (next.kind === 'held') {
+          expect(next.from).toBeGreaterThanOrEqual(contact.from);
+          expect(next.to).toBeLessThan(contact.to);
+          expect(lengthOf(next)).toBeGreaterThanOrEqual(MIN_WINDOW_SEC - slack);
+        } else if (next.sec !== Infinity) {
+          expect(next.sec).toBeGreaterThanOrEqual(MIN_WINDOW_SEC - slack);
+          expect(next.sec).toBeLessThan(lengthOf(contact));
+        }
+      }),
+    );
   });
 });
 
