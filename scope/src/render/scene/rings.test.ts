@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { CIRCLE_SEGMENTS } from './paths';
 import { ringPaths, ringRadii, ringStepNm } from './rings';
 
@@ -15,38 +17,28 @@ describe('range rings', () => {
     expect(steps).toEqual([5, 5, 10, 10, 20, 50, 50, 50]);
   });
 
-  it('lists every ring radius up to and including the range', () => {
-    // Arrange
-    const range = 40;
+  it('lists every ring radius at the spacing of the range, up to and including the extent', () => {
+    // Arrange: an extent on a ring or just short of or past one, as often as anywhere else
+    const anyRange = fc.double({ min: 1, max: 500, noNaN: true });
+    const anyExtent = fc.oneof(
+      fc.double({ min: 0, max: 600, noNaN: true }),
+      fc
+        .tuple(fc.integer({ min: 0, max: 120 }), fc.constantFrom(-0.5, 0, 0.5))
+        .map(([fives, off]) => fives * 5 + off),
+    );
 
-    // Act
-    const radii = ringRadii(range, range);
+    fc.assert(
+      fc.property(anyRange, anyExtent, (range, extent) => {
+        // Act
+        const radii = ringRadii(range, extent);
 
-    // Assert
-    expect(radii).toEqual([10, 20, 30, 40]);
-  });
-
-  it('handles ranges between presets, stopping at the last full step', () => {
-    // Arrange
-    const range = 35;
-
-    // Act
-    const radii = ringRadii(range, range);
-
-    // Assert
-    expect(radii).toEqual([10, 20, 30]);
-  });
-
-  it('keeps the range spacing for rings out to a wider extent', () => {
-    // Arrange
-    const range = 40;
-    const extent = 65;
-
-    // Act
-    const radii = ringRadii(range, extent);
-
-    // Assert
-    expect(radii).toEqual([10, 20, 30, 40, 50, 60]);
+        // Assert
+        const step = ringStepNm(range);
+        expect(radii).toEqual(radii.map((_, i) => (i + 1) * step));
+        expect(radii.length * step).toBeLessThanOrEqual(Math.max(extent, 0));
+        expect((radii.length + 1) * step).toBeGreaterThan(extent);
+      }),
+    );
   });
 });
 

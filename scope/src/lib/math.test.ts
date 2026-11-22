@@ -1,29 +1,47 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { clamp, onCircle } from './math';
 
 describe('clamp', () => {
-  it('holds a value within its bounds', () => {
+  it('holds a value within its bounds, as it is when already within', () => {
     // Arrange
-    const values = [-1, 3, 12];
+    const anyValue = fc.double({ noNaN: true });
+    const anyBounds = fc
+      .tuple(fc.double({ noNaN: true }), fc.double({ noNaN: true }))
+      .map(([a, b]) => [Math.min(a, b), Math.max(a, b)] as const);
 
-    // Act
-    const held = values.map((v) => clamp(v, 0, 10));
+    fc.assert(
+      fc.property(anyValue, anyBounds, (v, [lo, hi]) => {
+        // Act
+        const held = clamp(v, lo, hi);
 
-    // Assert
-    expect(held).toEqual([0, 3, 10]);
+        // Assert: adding zero, as a zero of either sign is the same value
+        expect(held).toBeGreaterThanOrEqual(lo);
+        expect(held).toBeLessThanOrEqual(hi);
+        expect(held + 0).toBe((v < lo ? lo : v > hi ? hi : v) + 0);
+      }),
+    );
   });
 });
 
 describe('onCircle', () => {
   it('wraps a value into 0 up to but not including the circle, whichever way round', () => {
-    // Arrange
-    const values = [-370, -10, 0, 360, 725];
+    // Arrange: whole numbers, which wrap exactly
+    const anyValue = fc.integer({ min: -1e9, max: 1e9 });
+    const anyCircle = fc.integer({ min: 1, max: 100_000 });
 
-    // Act
-    const wrapped = values.map((v) => onCircle(v, 360));
+    fc.assert(
+      fc.property(anyValue, anyCircle, (v, wrap) => {
+        // Act
+        const wrapped = onCircle(v, wrap);
 
-    // Assert
-    expect(wrapped).toEqual([350, 350, 0, 0, 5]);
+        // Assert
+        expect(wrapped).toBeGreaterThanOrEqual(0);
+        expect(wrapped).toBeLessThan(wrap);
+        expect(Number.isInteger((v - wrapped) / wrap)).toBe(true);
+      }),
+    );
   });
 });

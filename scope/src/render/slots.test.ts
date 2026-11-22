@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import type { BatchKind } from './protocol';
-import { drawSteps, LABEL_SLOTS, type SlotName } from './slots';
+import { drawSteps, LABEL_SLOTS, SLOT_ORDER, type SlotName } from './slots';
 
 const held = (entries: [SlotName, BatchKind[]][]) =>
   new Map(entries.map(([slot, kinds]) => [slot, kinds.map((kind) => ({ kind }))]));
@@ -20,16 +22,28 @@ describe('drawSteps', () => {
   ]);
 
   it('draws the halos of every label before any label glyph', () => {
-    // Arrange
-    const labelled = LABEL_SLOTS.filter((slot) => slots.has(slot));
+    // Arrange: any slots held, each with a few batches of any kind
+    const anyKinds = fc.array(fc.constantFrom<BatchKind>('lines', 'markers', 'text'), {
+      maxLength: 3,
+    });
+    const anyHeld = fc
+      .array(fc.tuple(fc.constantFrom(...SLOT_ORDER), anyKinds))
+      .map((entries) => held(entries));
 
-    // Act
-    const steps = drawSteps(slots);
+    fc.assert(
+      fc.property(anyHeld, (heldSlots) => {
+        // Act
+        const steps = drawSteps(heldSlots);
 
-    // Assert
-    const passes = steps.filter((s) => isLabel(s.slot)).map((s) => s.pass);
-    expect(passes.filter((pass) => pass === 'halo')).toHaveLength(labelled.length);
-    expect(passes.lastIndexOf('halo')).toBeLessThan(passes.indexOf('text'));
+        // Assert: a halo for each glyph batch of the labels, and no glyph batch before the last of them
+        const ofLabels = steps.filter((s) => isLabel(s.slot));
+        const batches = (pass: string) =>
+          ofLabels.filter((s) => s.pass === pass).map((s) => `${s.slot}/${s.index}`);
+        const passes = ofLabels.map((s) => s.pass).filter((pass) => pass !== 'lines');
+        expect(batches('halo')).toEqual(batches('text'));
+        expect(passes.slice(0, batches('halo').length)).not.toContain('text');
+      }),
+    );
   });
 
   it('keeps every other batch in slot order, the lines of a label slot between its halos and glyphs', () => {

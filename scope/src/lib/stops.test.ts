@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import type { Position } from '../render/scene/chartFixture';
 import { airway } from '../render/scene/chartFixture';
 import type { PointLayer } from './mapsetFormat';
@@ -56,49 +58,48 @@ describe('stopCuts', () => {
   });
 });
 
-const line: Position[] = [
-  [130.1, 33.7],
-  [130.2, 33.7],
-  [130.3, 33.7],
-  [130.4, 33.7],
-  [130.5, 33.7],
-];
+/** Positions a grid cell or more apart along a parallel, as many as asked for. */
+const lineOf = (length: number): Position[] =>
+  Array.from({ length }, (_, i) => [130.1 + i / 10, 33.7]);
 
 const routeOf = (coordinates: Position[]) => [airway('conv', 'R', ...coordinates)];
 
-const span = (from: number, to: number, cutBack: number, cutAhead: number) => ({
-  from,
-  to,
-  cutBack,
-  cutAhead,
-});
-
 describe('spansOf', () => {
   it('splits a route at its stops, and gives a stop at an end to the span there', () => {
-    // Arrange
-    const { routes } = topologyOf(routeOf(line));
-    const [path] = routes.paths;
-    const cutsAt = (...stops: [number, number][]): Cuts =>
-      new Map(stops.map(([i, cut]) => [path?.vertices[i] ?? -1, cut]));
-    const rows: [string, Cuts, ReturnType<typeof span>[]][] = [
-      ['no stop', NO_CUTS, [span(0, 4, 0, 0)]],
-      ['a stop inside', cutsAt([2, 7]), [span(0, 2, 0, 7), span(2, 4, 7, 0)]],
-      ['a stop at the start', cutsAt([0, 7]), [span(0, 4, 7, 0)]],
-      ['a stop at the end', cutsAt([4, 7]), [span(0, 4, 0, 7)]],
-      ['stops at both ends', cutsAt([0, 7], [4, 8]), [span(0, 4, 7, 8)]],
-      [
-        'two neighbouring stops',
-        cutsAt([1, 7], [2, 8]),
-        [span(0, 1, 0, 7), span(1, 2, 7, 8), span(2, 4, 8, 0)],
-      ],
-      ['a point off the route', new Map([[10_000, 7]]), [span(0, 4, 0, 0)]],
-    ];
+    // Arrange: stops at any of the route's positions, and one off the route
+    const anyRoute = fc.integer({ min: 2, max: 8 }).chain((length) =>
+      fc.record({
+        length: fc.constant(length),
+        stops: fc.uniqueArray(
+          fc.tuple(fc.nat({ max: length - 1 }), fc.integer({ min: 1, max: 9 })),
+          { selector: ([i]) => i },
+        ),
+      }),
+    );
 
-    // Act
-    const spans = rows.map(([, cuts]) => (path ? spansOf(path, cuts) : []));
+    fc.assert(
+      fc.property(anyRoute, ({ length, stops }) => {
+        // Arrange
+        const [path] = topologyOf(routeOf(lineOf(length))).routes.paths;
+        if (!path) throw new Error('no path');
+        const cutAt = new Map(stops);
+        const cuts: Cuts = new Map([
+          ...stops.map(([i, cut]): [number, number] => [path.vertices[i] ?? -1, cut]),
+          [10_000, 7],
+        ]);
 
-    // Assert
-    expect(spans).toEqual(rows.map(([, , expected]) => expected));
+        // Act
+        const spans = spansOf(path, cuts);
+
+        // Assert
+        const inside = stops.map(([i]) => i).filter((i) => i > 0 && i < length - 1);
+        expect(spans.map((s) => s.from)).toEqual([0, ...inside.toSorted((a, b) => a - b)]);
+        expect(spans.map((s) => s.to)).toEqual([...spans.slice(1).map((s) => s.from), length - 1]);
+        expect(spans.map((s) => [s.cutBack, s.cutAhead])).toEqual(
+          spans.map((s) => [cutAt.get(s.from) ?? 0, cutAt.get(s.to) ?? 0]),
+        );
+      }),
+    );
   });
 
   it('gives a path with no edges no span', () => {
@@ -122,30 +123,28 @@ describe('spansOf', () => {
 describe('spanIdentity', () => {
   it('names a span by its positions in either direction, and tells partial overlaps apart', () => {
     // Arrange
-    const a: Position = [130.1, 33.7];
-    const b: Position = [130.2, 33.7];
-    const c: Position = [130.3, 33.7];
-    const d: Position = [130.4, 33.7];
-    const routes: Position[][] = [
-      [a, b, c],
-      [c, b, a],
-      [a, b, c, d],
-      [a, c, b],
-      [d, c, b],
-      [a, b, c],
-    ];
-    const chart = routes.map((coordinates, i) => airway('conv', `R${i}`, ...coordinates));
-    const { paths } = topologyOf(chart).routes;
-    const whole = (i: number) => ({ from: 0, to: (paths[i]?.vertices.length ?? 1) - 1 });
+    const anyLength = fc.integer({ min: 3, max: 8 });
 
-    // Act
-    const identity = paths.map((path, i) => spanIdentity(path, whole(i)));
+    fc.assert(
+      fc.property(anyLength, (length) => {
+        // Arrange
+        const there = lineOf(length);
+        const swapped = [...there.slice(0, -2), ...there.slice(-2).toReversed()];
+        const routes = [there, there.toReversed(), there.slice(0, -1), swapped, there];
+        const chart = routes.map((coordinates, i) => airway('conv', `R${i}`, ...coordinates));
+        const { paths } = topologyOf(chart).routes;
+        const whole = (i: number) => ({ from: 0, to: (paths[i]?.vertices.length ?? 1) - 1 });
 
-    // Assert
-    expect(identity[0]).toBe(identity[1]);
-    expect(identity[0]).not.toBe(identity[2]);
-    expect(identity[0]).not.toBe(identity[3]);
-    expect(identity[0]).not.toBe(identity[4]);
-    expect(identity[0]).toBe(identity[5]);
+        // Act
+        const [plain, back, shorter, reordered, again] = paths.map((path, i) =>
+          spanIdentity(path, whole(i)),
+        );
+
+        // Assert
+        expect([back, again]).toEqual([plain, plain]);
+        expect(shorter).not.toBe(plain);
+        expect(reordered).not.toBe(plain);
+      }),
+    );
   });
 });

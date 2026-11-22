@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import {
   altitudeProfile,
   axisTicks,
@@ -16,13 +18,23 @@ const limits = { min: 0, max: 600, gap: 10 };
 describe('fraction', () => {
   it('maps a level to its share of the axis, clamped to the ends', () => {
     // Arrange
-    const values = [0, 150, 600, 700, -10];
+    const anyLimits = fc
+      .tuple(fc.integer({ min: -500, max: 500 }), fc.integer({ min: 1, max: 1000 }))
+      .map(([min, range]) => ({ min, max: min + range, gap: 1 }));
+    const anyShare = fc.integer({ min: -1000, max: 2000 }).map((n) => n / 1000);
 
-    // Act
-    const out = values.map((v) => fraction(v, limits));
+    fc.assert(
+      fc.property(anyLimits, anyShare, (l, share) => {
+        // Arrange
+        const level = l.min + share * (l.max - l.min);
 
-    // Assert
-    expect(out).toEqual([0, 0.25, 1, 1, 0]);
+        // Act
+        const at = fraction(level, l);
+
+        // Assert
+        expect(at).toBeCloseTo(share < 0 ? 0 : share > 1 ? 1 : share, 9);
+      }),
+    );
   });
 });
 
@@ -129,15 +141,30 @@ describe('groundCount', () => {
 });
 
 describe('binIndex', () => {
-  it('places a level in its profile bin, with anything past the top in the last one', () => {
-    // Arrange
-    const levels = [0, 19, 20, 599, 600, 900];
+  it('places a level in the bin that holds it, with anything past either stop in the bin at that end', () => {
+    // Arrange: an axis of whole bins
+    const anyAxis = fc
+      .record({
+        min: fc.integer({ min: -100, max: 100 }),
+        bin: fc.integer({ min: 1, max: 50 }),
+        bins: fc.integer({ min: 1, max: 40 }),
+      })
+      .map(({ min, bin, bins }) => ({ l: { min, max: min + bin * bins, gap: bin }, bin, bins }));
+    const anyLevel = fc.integer({ min: -500, max: 3000 });
 
-    // Act
-    const out = levels.map((v) => binIndex(v, limits, 20));
+    fc.assert(
+      fc.property(anyAxis, anyLevel, ({ l, bin, bins }, level) => {
+        // Act
+        const k = binIndex(level, l, bin);
 
-    // Assert
-    expect(out).toEqual([0, 0, 1, 29, 29, 29]);
+        // Assert
+        const held = Math.min(Math.max(level, l.min), l.max - 1);
+        expect(Number.isInteger(k)).toBe(true);
+        expect(l.min + k * bin).toBeLessThanOrEqual(held);
+        expect(l.min + (k + 1) * bin).toBeGreaterThan(held);
+        expect(k).toBeLessThan(bins);
+      }),
+    );
   });
 });
 

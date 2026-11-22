@@ -142,8 +142,9 @@ fn longitude_zones(lat_deg: f64) -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{Cpr, airborne, airborne_near, global, surface, surface_near};
+    use super::{Cpr, airborne, airborne_near, global, longitude_zones, surface, surface_near};
     use crate::position::Position;
+    use proptest::prelude::*;
 
     /// "The 1090 Megahertz Riddle", airborne position: the even and the odd message.
     const EVEN: Cpr = Cpr {
@@ -161,17 +162,6 @@ mod tests {
         lat_deg: 52.257_20,
         lon_deg: 3.919_37,
     };
-
-    /// Latitudes from pole to pole and longitudes around the globe, off any round number.
-    fn places() -> Vec<Position> {
-        let lats = (0..25).map(|step| -89.3 + 7.43 * f64::from(step));
-        let lons = (0..12).map(|step| -179.1 + 29.87 * f64::from(step));
-        lats.flat_map(|lat_deg| {
-            lons.clone()
-                .map(move |lon_deg| Position { lat_deg, lon_deg })
-        })
-        .collect()
-    }
 
     /// How far apart two positions are along the worse axis, in degrees of arc.
     fn apart(a: Position, b: Position) -> f64 {
@@ -243,64 +233,6 @@ mod tests {
     }
 
     #[test]
-    fn global_position_is_where_the_later_message_was_sent_from() {
-        // Arrange: the odd message sent a little further on than the even one
-        let pairs = places().into_iter().map(|at| {
-            let further = Position {
-                lat_deg: at.lat_deg + 0.01,
-                lon_deg: at.lon_deg + 0.01,
-            };
-            (airborne(at, false), airborne(further, true), further)
-        });
-
-        // Act
-        let decoded: Vec<_> = pairs
-            .map(|(even, odd, further)| (global(even, odd), further))
-            .collect();
-
-        // Assert: but where the two messages fall in different zones of longitude
-        let apart: Vec<_> = decoded
-            .iter()
-            .filter_map(|(position, further)| position.map(|position| apart(position, *further)))
-            .collect();
-        assert!(
-            apart.len() > decoded.len() * 9 / 10,
-            "{} decoded",
-            apart.len()
-        );
-        assert!(apart.iter().all(|apart| *apart < 1e-4), "{apart:?}");
-    }
-
-    #[test]
-    fn global_position_is_where_either_format_was_sent_from_later() {
-        // Arrange
-        let places = places();
-
-        // Act
-        let decoded: Vec<_> = places
-            .iter()
-            .flat_map(|at| {
-                let (even, odd) = (airborne(*at, false), airborne(*at, true));
-                [global(even, odd), global(odd, even)]
-            })
-            .collect();
-
-        // Assert
-        let sent = places.iter().flat_map(|at| [*at; 2]);
-        let apart: Vec<_> = decoded
-            .iter()
-            .zip(sent)
-            .map(|(position, at)| position.map(|position| apart(position, at)))
-            .collect();
-        assert!(
-            apart
-                .iter()
-                .all(|apart| apart.is_some_and(|apart| apart < 1e-4)),
-            "{apart:?}"
-        );
-    }
-
-    #[test]
     fn two_messages_of_one_format_give_no_global_position() {
         // Arrange
         let (earlier, later) = (EVEN, EVEN);
@@ -331,69 +263,95 @@ mod tests {
         assert_eq!(position, None);
     }
 
-    #[test]
-    fn position_near_a_reference_is_where_it_was_sent_from() {
-        // Arrange: each place seen from 100 NM to its south, where there is a south
-        let places: Vec<_> = places()
-            .into_iter()
-            .filter(|at| at.lat_deg > -88.0)
-            .collect();
-        let from = |at: &Position| Position {
-            lat_deg: at.lat_deg - 100.0 / 60.0,
-            ..*at
-        };
-
-        // Act
-        let decoded: Vec<_> = places
-            .iter()
-            .flat_map(|at| [false, true].map(|odd| airborne_near(airborne(*at, odd), from(at))))
-            .collect();
-
-        // Assert
-        let sent = places.iter().flat_map(|at| [*at; 2]);
-        let apart: Vec<_> = decoded
-            .iter()
-            .zip(sent)
-            .map(|(position, at)| position.map(|position| apart(position, at)))
-            .collect();
-        assert!(
-            apart
-                .iter()
-                .all(|apart| apart.is_some_and(|apart| apart < 1e-4)),
-            "{apart:?}"
-        );
+    /// Anywhere but the last tenth of a degree before a pole, where no message
+    /// can tell the longitude.
+    fn place() -> impl Strategy<Value = Position> {
+        (-89.9..89.9, -180.0..180.0).prop_map(|(lat_deg, lon_deg)| Position { lat_deg, lon_deg })
     }
 
-    #[test]
-    fn surface_position_near_a_reference_is_where_it_was_sent_from() {
-        // Arrange: each place seen from 20 NM to its north, where there is a north
-        let places: Vec<_> = places()
-            .into_iter()
-            .filter(|at| at.lat_deg < 88.0)
-            .collect();
-        let from = |at: &Position| Position {
-            lat_deg: at.lat_deg + 20.0 / 60.0,
-            ..*at
-        };
+    /// A place whose latitude has as many zones of longitude as those 0.03 degrees either side.
+    fn place_within_one_count_of_zones() -> impl Strategy<Value = Position> {
+        place().prop_filter("at a change of zones", |at| {
+            longitude_zones(at.lat_deg - 0.03) == longitude_zones(at.lat_deg + 0.03)
+        })
+    }
 
-        // Act
-        let decoded: Vec<_> = places
-            .iter()
-            .flat_map(|at| [false, true].map(|odd| surface_near(surface(*at, odd), from(at))))
-            .collect();
+    /// Where a place is seen from: so far north and east of it in degrees of
+    /// arc, its longitude written any of three ways round the globe.
+    fn offset(most_deg: f64) -> impl Strategy<Value = (f64, f64, f64)> {
+        let turns = prop_oneof![Just(-360.0), Just(0.0), Just(360.0)];
+        (-most_deg..most_deg, -most_deg..most_deg, turns)
+    }
 
-        // Assert
-        let sent = places.iter().flat_map(|at| [*at; 2]);
-        let apart: Vec<_> = decoded
-            .iter()
-            .zip(sent)
-            .map(|(position, at)| position.map(|position| apart(position, at)))
-            .collect();
-        assert!(
-            apart
-                .iter()
-                .all(|apart| apart.is_some_and(|apart| apart < 3e-5)),
-            "{apart:?}"
-        );
+    /// The reference at the offset from the place, which near a pole comes to
+    /// `most_lon_deg` of longitude at most.
+    fn reference(at: Position, offset: (f64, f64, f64), most_lon_deg: f64) -> Position {
+        let (north_deg, east_deg, turn_deg) = offset;
+        let along = east_deg / at.lat_deg.to_radians().cos();
+        Position {
+            lat_deg: at.lat_deg + north_deg,
+            lon_deg: at.lon_deg + along.clamp(-most_lon_deg, most_lon_deg) + turn_deg,
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn global_position_is_where_the_later_message_was_sent_from(
+            at in place_within_one_count_of_zones(),
+            north_deg in -0.02..0.02,
+            east_deg in -0.02..0.02,
+            later_odd: bool,
+        ) {
+            // Arrange: the later message sent a little way off the earlier one
+            let further = Position {
+                lat_deg: at.lat_deg + north_deg,
+                lon_deg: at.lon_deg + east_deg,
+            };
+            let (earlier, later) = (airborne(at, !later_odd), airborne(further, later_odd));
+
+            // Act
+            let position = global(earlier, later);
+
+            // Assert
+            let position = position.expect("decodes");
+            prop_assert!(apart(position, further) < 1e-4, "{position:?}");
+            prop_assert!((-180.0..180.0).contains(&position.lon_deg), "{position:?}");
+        }
+
+        #[test]
+        fn position_near_a_reference_is_where_it_was_sent_from(
+            at in place(),
+            offset in offset(2.9),
+            odd: bool,
+        ) {
+            // Arrange: seen from up to 174 NM away along either axis
+            let reference = reference(at, offset, 170.0);
+
+            // Act
+            let position = airborne_near(airborne(at, odd), reference);
+
+            // Assert
+            let position = position.expect("decodes");
+            prop_assert!(apart(position, at) < 1e-4, "{position:?}");
+            prop_assert!((-180.0..180.0).contains(&position.lon_deg), "{position:?}");
+        }
+
+        #[test]
+        fn surface_position_near_a_reference_is_where_it_was_sent_from(
+            at in place(),
+            offset in offset(0.7),
+            odd: bool,
+        ) {
+            // Arrange: seen from up to 42 NM away along either axis
+            let reference = reference(at, offset, 42.0);
+
+            // Act
+            let position = surface_near(surface(at, odd), reference);
+
+            // Assert
+            let position = position.expect("decodes");
+            prop_assert!(apart(position, at) < 3e-5, "{position:?}");
+            prop_assert!((-180.0..180.0).contains(&position.lon_deg), "{position:?}");
+        }
     }
 }

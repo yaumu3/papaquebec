@@ -3,6 +3,8 @@ import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import fc from 'fast-check';
+
 import { budgetsFrom, complaintsOf, loadBudgets, saveBudgets } from './mapBudgets';
 
 const BUDGETS = { tolerance: 3, medianMs: { topology: 10, labels: 20 } };
@@ -43,15 +45,48 @@ describe('complaintsOf', () => {
 });
 
 describe('budgetsFrom', () => {
+  // Medians to the hundredth of a millisecond.
+  const anyMedian = fc.nat(50_000).map((hundredths) => hundredths / 100);
+  const anyMedians = fc.dictionary(fc.constantFrom('topology', 'labels', 'highlight'), anyMedian);
+  const anyTolerance = fc.integer({ min: 1, max: 5 });
+
   it('takes the medians rounded up, a millisecond at the least', () => {
-    // Arrange
-    const medians = { topology: 10.2, labels: 0.3, highlight: 0 };
+    fc.assert(
+      fc.property(anyMedians, anyTolerance, (medians, tolerance) => {
+        // Act
+        const budgets = budgetsFrom(medians, tolerance);
 
-    // Act
-    const budgets = budgetsFrom(medians, 4);
+        // Assert
+        const steps = Object.keys(medians);
+        const budgeted = steps.map((step) => ({
+          median: medians[step] ?? NaN,
+          ms: budgets.medianMs[step] ?? NaN,
+        }));
+        expect(budgets.tolerance).toBe(tolerance);
+        expect(Object.keys(budgets.medianMs)).toEqual(steps);
+        expect(
+          budgeted.every(
+            ({ median, ms }) =>
+              Number.isInteger(ms) && ms >= 1 && ms >= median && (ms === 1 || ms - median < 1),
+          ),
+        ).toBe(true);
+      }),
+    );
+  });
 
-    // Assert
-    expect(budgets).toEqual({ tolerance: 4, medianMs: { topology: 11, labels: 1, highlight: 1 } });
+  it('gives budgets that the medians they were taken from pass', () => {
+    fc.assert(
+      fc.property(anyMedians, anyTolerance, (medians, tolerance) => {
+        // Arrange
+        const budgets = budgetsFrom(medians, tolerance);
+
+        // Act
+        const complaints = complaintsOf(medians, budgets);
+
+        // Assert
+        expect(complaints).toEqual([]);
+      }),
+    );
   });
 });
 
@@ -80,17 +115,5 @@ describe('saveBudgets', () => {
     expect(readFileSync(file, 'utf8')).toBe(
       '{\n  "tolerance": 3,\n  "medianMs": {\n    "topology": 11\n  }\n}\n',
     );
-  });
-
-  it('passes the medians it was updated from', () => {
-    // Arrange
-    const medians = { topology: 10.2, labels: 0.3 };
-    saveBudgets(file, budgetsFrom(medians, 3));
-
-    // Act
-    const complaints = complaintsOf(medians, loadBudgets(file));
-
-    // Assert
-    expect(complaints).toEqual([]);
   });
 });

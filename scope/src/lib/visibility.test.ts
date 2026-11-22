@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import type { Chart, ChartItem } from './chart';
 import type { Layer } from './mapsetFormat';
 import {
@@ -47,70 +49,31 @@ describe('everyItemSet', () => {
 describe('itemsSetTo', () => {
   const present = ['a', 'b', 'c'];
 
-  it('hides the layer when the last shown item is hidden', () => {
-    // Arrange
-    const layer = shownExcept('a', 'b');
+  it('shows or hides the items named and leaves the others, flipping the mode once every item goes against it', () => {
+    // Arrange: a few keys, so that a set often reaches the last item of the chart
+    const KEYS = ['a', 'b', 'c', 'd', 'e'];
+    const anyLayer = fc.record({
+      mode: fc.boolean(),
+      exceptions: fc.subarray([...KEYS, 'gone1', 'gone2']).map((keys) => new Set(keys)),
+    });
+    const anyItems = fc
+      .subarray(KEYS, { minLength: 1 })
+      .chain((inChart) => fc.record({ inChart: fc.constant(inChart), keys: fc.subarray(inChart) }));
 
-    // Act
-    const result = itemsSetTo(layer, ['c'], false, present);
+    fc.assert(
+      fc.property(anyLayer, anyItems, fc.boolean(), (layer, { inChart, keys }, on) => {
+        // Act
+        const result = itemsSetTo(layer, keys, on, inChart);
 
-    // Assert
-    expect(plainState(result)).toEqual({ mode: false, exceptions: [] });
-  });
-
-  it('leaves a hidden layer hidden when its last shown item is hidden', () => {
-    // Arrange
-    const layer = hiddenExcept('a');
-
-    // Act
-    const result = itemsSetTo(layer, ['a'], false, present);
-
-    // Assert
-    expect(plainState(result)).toEqual({ mode: false, exceptions: [] });
-  });
-
-  it('shows the layer when the last hidden item is shown', () => {
-    // Arrange
-    const layer = hiddenExcept('a', 'b');
-
-    // Act
-    const result = itemsSetTo(layer, ['c'], true, present);
-
-    // Assert
-    expect(plainState(result)).toEqual({ mode: true, exceptions: [] });
-  });
-
-  it('stores one key to show an item of a hidden layer', () => {
-    // Arrange
-    const layer = hiddenExcept();
-
-    // Act
-    const result = itemsSetTo(layer, ['b'], true, present);
-
-    // Assert
-    expect(plainState(result)).toEqual({ mode: false, exceptions: ['b'] });
-  });
-
-  it('clears the exception of an item set back to the mode, and stores none for one already there', () => {
-    // Arrange
-    const layer = shownExcept('a');
-
-    // Act
-    const result = itemsSetTo(layer, ['a', 'b'], true, present);
-
-    // Assert
-    expect(plainState(result)).toEqual({ mode: true, exceptions: [] });
-  });
-
-  it('sets several keys one way and leaves the others', () => {
-    // Arrange
-    const layer = shownExcept('c');
-
-    // Act
-    const result = itemsSetTo(layer, ['a', 'b'], false, [...present, 'd']);
-
-    // Assert
-    expect(plainState(result)).toEqual({ mode: true, exceptions: ['c', 'a', 'b'] });
+        // Assert
+        const others = inChart.filter((key) => !keys.includes(key));
+        expect(keys.map((key) => isItemShown(result, key))).toEqual(keys.map(() => on));
+        expect(others.map((key) => isItemShown(result, key))).toEqual(
+          others.map((key) => isItemShown(layer, key)),
+        );
+        expect(inChart.every((key) => result.exceptions.has(key))).toBe(false);
+      }),
+    );
   });
 
   it('keeps the exception of an absent item through a set', () => {
@@ -159,28 +122,26 @@ describe('capped', () => {
     expect(result).toBe(exceptions);
   });
 
-  it('drops absent keys, oldest first, and no more than needed', () => {
+  it('drops absent keys, oldest first, no more than needed, and never a key of the chart', () => {
     // Arrange
-    const exceptions = new Set(['old', 'a', 'mid', 'new']);
-    const present = new Set(['a']);
+    const KEYS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    const anyExceptions = fc.shuffledSubarray(KEYS);
+    const anyPresent = fc.subarray(KEYS).map((keys) => new Set(keys));
+    const anyMax = fc.nat({ max: KEYS.length });
 
-    // Act
-    const result = capped(exceptions, present, 3);
+    fc.assert(
+      fc.property(anyExceptions, anyPresent, anyMax, (exceptions, present, max) => {
+        // Act
+        const result = capped(new Set(exceptions), present, max);
 
-    // Assert
-    expect([...result]).toEqual(['a', 'mid', 'new']);
-  });
-
-  it('never drops a key of the chart', () => {
-    // Arrange
-    const exceptions = new Set(['a', 'b', 'c', 'd']);
-    const present = new Set(['a', 'b', 'c', 'd']);
-
-    // Act
-    const result = capped(exceptions, present, 2);
-
-    // Assert
-    expect([...result]).toEqual(['a', 'b', 'c', 'd']);
+        // Assert
+        const absent = exceptions.filter((key) => !present.has(key));
+        const dropped = exceptions.filter((key) => !result.has(key));
+        const over = Math.max(0, exceptions.length - max);
+        expect([...result]).toEqual(exceptions.filter((key) => result.has(key)));
+        expect(dropped).toEqual(absent.slice(0, Math.min(over, absent.length)));
+      }),
+    );
   });
 });
 

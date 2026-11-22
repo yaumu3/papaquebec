@@ -343,9 +343,11 @@ impl Velocity {
         let through_air = self.airspeed.map(|airspeed| match airspeed {
             Airspeed::Indicated(speed) | Airspeed::True(speed) => speed,
         });
-        let supersonic = over_ground
-            .or(through_air)
-            .is_some_and(|fastest| fastest > SUBSONIC_KT);
+        // The airspeed is the one written when there are both.
+        let supersonic = through_air
+            .or(over_ground)
+            // As the steps count it: a speed told apart east and north may come out a hair over.
+            .is_some_and(|fastest| fastest.round() > SUBSONIC_KT);
         if supersonic {
             Self::SUPERSONIC_STEP_KT
         } else {
@@ -391,9 +393,14 @@ impl Field for Velocity {
 
     fn write(&self) -> Bits {
         let step = self.speed_step_kt();
-        let (subtype, speeds) = match self.airspeed {
-            Some(airspeed) => through_air(airspeed, self.magnetic_heading_deg, step),
-            None => along_ground(self.ground_speed_kt.zip(self.track_deg), step),
+        let over_ground = self.ground_speed_kt.zip(self.track_deg);
+        // A heading alone is still of the air; one beside a speed over the ground has no place.
+        let of_the_air = self.airspeed.is_some()
+            || (self.magnetic_heading_deg.is_some() && over_ground.is_none());
+        let (subtype, speeds) = if of_the_air {
+            through_air(self.airspeed, self.magnetic_heading_deg, step)
+        } else {
+            along_ground(over_ground, step)
         };
         let rate = self
             .baro_vertical_rate_fpm
@@ -470,17 +477,18 @@ fn airspeed(me: Bits, step: f64) -> Option<Airspeed> {
 }
 
 /// The subtype and the 22 bits of an airspeed in steps of `step` on a
-/// magnetic heading.
-fn through_air(airspeed: Airspeed, heading_deg: Option<f64>, step: f64) -> (u32, Bits) {
+/// magnetic heading; of either that is none, not available.
+fn through_air(airspeed: Option<Airspeed>, heading_deg: Option<f64>, step: f64) -> (u32, Bits) {
     let (is_true, speed) = match airspeed {
-        Airspeed::Indicated(speed) => (false, speed),
-        Airspeed::True(speed) => (true, speed),
+        Some(Airspeed::Indicated(speed)) => (false, Some(speed)),
+        Some(Airspeed::True(speed)) => (true, Some(speed)),
+        None => (false, None),
     };
     let bits = Bits::default()
         .put_flag(heading_deg.is_some())
         .put(count(heading_deg.unwrap_or(0.0) * 1024.0 / 360.0), 10)
         .put_flag(is_true)
-        .put(count(speed / step) + 1, 10);
+        .put(speed.map_or(0, |speed| count(speed / step) + 1), 10);
     (3 + u32::from(supersonic(step)), bits)
 }
 
@@ -501,9 +509,8 @@ impl Field for Status {
         let status = i32::try_from(me.get(9, 11)).ok()?;
         Some(Self {
             emergency_priority_status: EmergencyPriorityStatus::try_from(status).ok()?,
-            mode_a_code: Some(me.get(12, 24))
-                .filter(|identity| *identity != 0)
-                .map(mode_a_code),
+            // Of an identity code with none of its pulses, whatever lies between them.
+            mode_a_code: Some(mode_a_code(me.get(12, 24))).filter(|code| *code != 0),
         })
     }
 
@@ -884,8 +891,9 @@ mod tests {
     use crate::cpr::Cpr;
     use crate::proto::{
         Advisory, EmergencyPriorityStatus, EmitterCategory, Modes,
-        advisory::{Corrections, Resolution, Threat, ThreatPosition},
+        advisory::{Resolution, Threat, ThreatPosition},
     };
+    use proptest::prelude::*;
 
     /// What is read of a field of one kind and written again.
     type Rewritten = fn(Bits) -> Option<Bits>;
@@ -897,6 +905,148 @@ mod tests {
     /// What is written of a field and read again.
     fn reread<F: Field>(field: &F) -> Option<F> {
         F::read(field.write())
+    }
+
+    /// Any 56 bits after one of the heads: the type code and the three bits that follow it.
+    fn me(heads: impl Strategy<Value = u32>) -> impl Strategy<Value = Bits> {
+        (heads, 0..1_u32 << 16, any::<u32>())
+            .prop_map(|(head, next, rest)| Bits::default().put(head, 8).put(next, 16).put(rest, 32))
+    }
+
+    /// The heads of the type codes, whatever follows each.
+    fn type_codes(codes: impl Strategy<Value = u32>) -> impl Strategy<Value = u32> {
+        (codes, 0..8_u32).prop_map(|(code, next)| code << 3 | next)
+    }
+
+    /// The head of the type code and the subtype.
+    fn subtypes(code: u32, subtypes: impl Strategy<Value = u32>) -> impl Strategy<Value = u32> {
+        subtypes.prop_map(move |subtype| code << 3 | subtype)
+    }
+
+    /// An identification of eight characters, each blank, unassigned or, more often, assigned.
+    fn identification_me() -> impl Strategy<Value = Bits> {
+        let character = prop_oneof![
+            4 => prop::sample::select(b"ABCXYZ0189".map(u32::from).to_vec()).prop_map(|c| c & 0x3f),
+            1 => Just(32_u32),
+            1 => 0..64_u32,
+        ];
+        (type_codes(1..=4_u32), prop::collection::vec(character, 8)).prop_map(|(head, codes)| {
+            let head = Bits::default().put(head, 8);
+            codes.into_iter().fold(head, |bits, code| bits.put(code, 6))
+        })
+    }
+
+    /// What the field says; a field that says nothing is not one of the kind.
+    fn said<F: Field>(me: Bits) -> Result<F, TestCaseError> {
+        F::read(me).ok_or_else(|| TestCaseError::reject("of another kind"))
+    }
+
+    proptest! {
+        #[test]
+        fn identification_is_read_as_it_is_written(me in identification_me()) {
+            // Arrange
+            let field = said::<Identification>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
+
+        #[test]
+        fn airborne_position_is_read_as_it_is_written(
+            me in me(type_codes(prop_oneof![9..=18_u32, 20..=22_u32])),
+        ) {
+            // Arrange
+            let field = said::<AirbornePosition>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
+
+        #[test]
+        fn surface_position_is_read_as_it_is_written(me in me(type_codes(5..=8_u32))) {
+            // Arrange
+            let field = said::<SurfacePosition>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
+
+        #[test]
+        fn velocity_is_read_as_it_is_written(me in me(subtypes(19, 1..=4_u32))) {
+            // Arrange: but for the most a subsonic subtype counts, which stands
+            // for that much or more and is written by a supersonic one
+            let most = |first, last| me.get(first, last) == 1023;
+            let at_most = match me.get(6, 8) {
+                1 => most(15, 24) || most(26, 35),
+                3 => most(26, 35),
+                _ => false,
+            };
+            prop_assume!(!at_most);
+            let field = said::<Velocity>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
+
+        #[test]
+        fn status_is_read_as_it_is_written(me in me(subtypes(28, Just(1)))) {
+            // Arrange
+            let field = said::<Status>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
+
+        #[test]
+        fn target_state_is_read_as_it_is_written(me in me(subtypes(29, 2..=3_u32))) {
+            // Arrange
+            let field = said::<TargetStateAndStatus>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
+
+        #[test]
+        fn ra_broadcast_is_read_as_it_is_written(me in me(subtypes(28, Just(2)))) {
+            // Arrange
+            let field = said::<RaBroadcast>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
+
+        #[test]
+        fn operational_status_is_read_as_it_is_written(me in me(subtypes(31, 0..=1_u32))) {
+            // Arrange
+            let field = said::<OperationalStatus>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
+        }
     }
 
     const CPR: Cpr = Cpr {
@@ -966,32 +1116,6 @@ mod tests {
     }
 
     #[test]
-    fn identification_is_read_as_it_is_written() {
-        // Arrange: a category of each set, and no callsign
-        let categories = [
-            EmitterCategory::A3Large,
-            EmitterCategory::B1Glider,
-            EmitterCategory::C1SurfaceEmergencyVehicle,
-            EmitterCategory::D7Reserved,
-        ];
-        let named = categories.map(|emitter_category| Identification {
-            identification: Some("TEST01".into()),
-            emitter_category,
-        });
-        let nameless = Identification {
-            identification: None,
-            emitter_category: EmitterCategory::A5Heavy,
-        };
-        let written: Vec<_> = named.into_iter().chain([nameless]).collect();
-
-        // Act
-        let read: Vec<_> = written.iter().map(reread).collect();
-
-        // Assert
-        assert_eq!(read, written.into_iter().map(Some).collect::<Vec<_>>());
-    }
-
-    #[test]
     fn identification_with_a_character_the_alphabet_does_not_assign_is_none() {
         // Arrange: the code 0 in place of the first character
         let sent = Identification {
@@ -1050,36 +1174,6 @@ mod tests {
             position(true, 74_158, 50_194),
         ];
         assert_eq!(read, expected);
-    }
-
-    #[test]
-    fn airborne_position_is_read_as_it_is_written() {
-        // Arrange: pressure altitudes from the lowest, a GNSS height, and no altitude
-        let by_pressure = [-1000, -975, 0, 2500, 38_000, 50_175].map(|altitude| AirbornePosition {
-            cpr: CPR,
-            baro_altitude_ft: Some(altitude),
-            geometric_altitude_ft: None,
-            type_code: 11,
-            nic_supplement_b: false,
-        });
-        let by_gnss = AirbornePosition {
-            geometric_altitude_ft: Some(2500),
-            baro_altitude_ft: None,
-            type_code: 20,
-            ..by_pressure[0]
-        };
-        let without = AirbornePosition {
-            baro_altitude_ft: None,
-            nic_supplement_b: true,
-            ..by_pressure[0]
-        };
-        let written: Vec<_> = by_pressure.into_iter().chain([by_gnss, without]).collect();
-
-        // Act
-        let read: Vec<_> = written.iter().map(reread).collect();
-
-        // Assert
-        assert_eq!(read, written.into_iter().map(Some).collect::<Vec<_>>());
     }
 
     #[test]
@@ -1159,30 +1253,6 @@ mod tests {
     }
 
     #[test]
-    fn surface_position_is_read_as_it_is_written() {
-        // Arrange: a speed from each range of steps, and neither speed nor track
-        let speeds = [0.0, 0.25, 1.5, 6.0, 18.0, 70.0, 120.0, 175.0];
-        let moving = speeds.map(|speed| SurfacePosition {
-            cpr: CPR,
-            ground_speed_kt: Some(speed),
-            track_deg: Some(340.3125),
-            type_code: 7,
-        });
-        let unknown = SurfacePosition {
-            ground_speed_kt: None,
-            track_deg: None,
-            ..moving[0]
-        };
-        let written: Vec<_> = moving.into_iter().chain([unknown]).collect();
-
-        // Act
-        let read: Vec<_> = written.iter().map(reread).collect();
-
-        // Assert
-        assert_eq!(read, written.into_iter().map(Some).collect::<Vec<_>>());
-    }
-
-    #[test]
     fn surface_speed_is_written_in_the_steps_of_its_range() {
         // Arrange
         let at = |speed| SurfacePosition {
@@ -1241,50 +1311,24 @@ mod tests {
     }
 
     #[test]
-    fn velocity_is_read_as_it_is_written() {
-        // Arrange: due north and due west, where the track is exact; both
-        // kinds of airspeed, the second supersonic; and nothing known at all
-        let unknown = Velocity {
-            ground_speed_kt: None,
-            track_deg: None,
-            airspeed: None,
+    fn airspeed_beside_a_slower_ground_speed_is_written_in_its_own_steps() {
+        // Arrange: supersonic through the air, where only the airspeed is written
+        let sent = Velocity {
+            ground_speed_kt: Some(300.0),
+            track_deg: Some(90.0),
+            airspeed: Some(Airspeed::True(1200.0)),
             magnetic_heading_deg: None,
             baro_vertical_rate_fpm: None,
             geometric_vertical_rate_fpm: None,
             geometric_minus_baro_ft: None,
         };
-        let written = [
-            Velocity {
-                ground_speed_kt: Some(290.0),
-                track_deg: Some(0.0),
-                baro_vertical_rate_fpm: Some(-1216),
-                geometric_minus_baro_ft: Some(-25),
-                ..unknown
-            },
-            Velocity {
-                ground_speed_kt: Some(1200.0),
-                track_deg: Some(270.0),
-                geometric_vertical_rate_fpm: Some(1856),
-                ..unknown
-            },
-            Velocity {
-                airspeed: Some(Airspeed::Indicated(250.0)),
-                magnetic_heading_deg: None,
-                ..unknown
-            },
-            Velocity {
-                airspeed: Some(Airspeed::True(1200.0)),
-                magnetic_heading_deg: Some(243.984_375),
-                ..unknown
-            },
-            unknown,
-        ];
 
         // Act
-        let read = written.each_ref().map(reread);
+        let read = reread(&sent);
 
         // Assert
-        assert_eq!(read, written.map(Some));
+        let airspeed = read.and_then(|read| read.airspeed);
+        assert_eq!(airspeed, Some(Airspeed::True(1200.0)));
     }
 
     #[test]
@@ -1395,23 +1439,6 @@ mod tests {
     }
 
     #[test]
-    fn status_is_read_as_it_is_written() {
-        // Arrange: every pulse of the code on its own and together, and no code
-        let codes = [0o7700, 0o1200, 0o2431, 0o0001, 0o4000, 0o7777].map(Some);
-        let written = codes.into_iter().chain([None]).map(|mode_a_code| Status {
-            emergency_priority_status: EmergencyPriorityStatus::GeneralEmergency,
-            mode_a_code,
-        });
-        let written: Vec<_> = written.collect();
-
-        // Act
-        let read: Vec<_> = written.iter().map(reread).collect();
-
-        // Assert
-        assert_eq!(read, written.into_iter().map(Some).collect::<Vec<_>>());
-    }
-
-    #[test]
     fn target_state_is_read_as_published() {
         // Arrange: from the tests of pyModeS
         let me = published("8DA05629EA21485CBF3F8CADAEEB");
@@ -1437,104 +1464,6 @@ mod tests {
             .into(),
         };
         assert_eq!(read, Some(TargetStateAndStatus { target, nac_p: 9 }));
-    }
-
-    #[test]
-    fn target_state_is_read_as_it_is_written() {
-        // Arrange: selected by the flight management system, with the modes that
-        // the published one leaves out; and nothing selected at all
-        let target = TargetState {
-            selected_altitude_mcp_ft: None,
-            selected_altitude_fms_ft: Some(20_992),
-            selected_heading_deg: Some(270.0),
-            baro_setting_hpa: Some(1013.6),
-            modes: Modes {
-                altitude_hold: true,
-                approach: true,
-                ..Modes::default()
-            }
-            .into(),
-        };
-        let written = [
-            TargetStateAndStatus { target, nac_p: 10 },
-            TargetStateAndStatus {
-                target: TargetState::default(),
-                nac_p: 0,
-            },
-        ];
-
-        // Act
-        let read = written.each_ref().map(reread);
-
-        // Assert
-        assert_eq!(read, written.map(Some));
-    }
-
-    #[test]
-    fn ra_broadcast_is_read_as_it_is_written() {
-        // Arrange: one threat with every flag, several threats, one ended; the
-        // threat named by its address, placed on the steps of the fields, and
-        // placed with no estimate
-        let resolution = Resolution {
-            corrective: true,
-            downward: true,
-            increased_rate: true,
-            sense_reversal: true,
-            altitude_crossing: true,
-            positive: true,
-        };
-        let corrections = Corrections {
-            upward: true,
-            positive_climb: false,
-            downward: true,
-            positive_descent: true,
-            crossing: false,
-            sense_reversal: true,
-        };
-        let placed = ThreatPosition {
-            altitude_ft: Some(38_000),
-            range_nm: Some(4.5),
-            bearing_deg: Some(117.0),
-        };
-        let written = [
-            Advisory {
-                multiple_threats: true,
-                resolution: Some(resolution),
-                ..Advisory::default()
-            },
-            Advisory {
-                multiple_threats: true,
-                corrections: Some(corrections),
-                ..Advisory::default()
-            },
-            Advisory {
-                resolution: Some(Resolution::default()),
-                terminated: true,
-                ..Advisory::default()
-            },
-            Advisory {
-                resolution: Some(resolution),
-                threat: Some(Threat::ThreatAddress(0x0048_40d6)),
-                ..Advisory::default()
-            },
-            Advisory {
-                resolution: Some(resolution),
-                threat: Some(Threat::ThreatPosition(placed)),
-                ..Advisory::default()
-            },
-            Advisory {
-                resolution: Some(resolution),
-                threat: Some(Threat::ThreatPosition(ThreatPosition::default())),
-                ..Advisory::default()
-            },
-        ]
-        .map(|advisory| RaBroadcast { advisory });
-
-        // Act
-        let read = written.each_ref().map(reread);
-
-        // Assert
-        assert_eq!(read, written.map(Some));
     }
 
     #[test]
@@ -1644,31 +1573,6 @@ mod tests {
             bearing_deg: Some(357.0),
         };
         assert_eq!(read, Some(Threat::ThreatPosition(most)));
-    }
-
-    #[test]
-    fn operational_status_is_read_as_it_is_written() {
-        // Arrange: in the air, on the ground with both supplements, of version 1
-        // with one, and of version 0, which has neither them nor an accuracy
-        let status = |on_ground, version, supplement_a, supplement_c, nac_p| OperationalStatus {
-            on_ground,
-            version,
-            nic_supplement_a: supplement_a,
-            nic_supplement_c: supplement_c,
-            nac_p,
-        };
-        let written = [
-            status(false, 2, false, false, Some(9)),
-            status(true, 2, true, true, Some(10)),
-            status(false, 1, true, false, Some(8)),
-            status(false, 0, false, false, None),
-        ];
-
-        // Act
-        let read = written.each_ref().map(reread);
-
-        // Assert
-        assert_eq!(read, written.map(Some));
     }
 
     #[test]

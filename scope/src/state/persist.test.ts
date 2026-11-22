@@ -1,8 +1,27 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
+import { DRAW_STACK, LABEL_DENSITIES, LAYER_GROUPS } from '../lib/layers';
+import { FL_MAX, FL_MIN, type SquawkFilter } from './filter';
 import { memoryStorage } from './memoryStorage';
 import { loadPersisted, PERSIST_KEY, savePersisted, type Persisted } from './persist';
+import { LANE_KEYS } from './plotted';
 import { DEFAULT_SETTINGS, type Settings } from './settings';
+import {
+  type Exceptions,
+  ND_RANGES_NM,
+  QNH_MAX_INHG,
+  QNH_MIN_INHG,
+  RANGE_MAX_NM,
+  RANGE_MIN_NM,
+  SORT_DIRS,
+  SORT_KEYS,
+  STATION_RE,
+  TRAIL_STEPS,
+  TRANSITION_ALT_MAX_FT,
+  VECTOR_STEPS,
+} from './settingsDefaults';
 
 const DEFAULTS: Persisted = {
   settings: DEFAULT_SETTINGS,
@@ -114,32 +133,84 @@ describe('loadPersisted', () => {
   });
 });
 
+/** The exceptions of each layer as a list, which tells their order as a set does not. */
+const inOrder = (kept: Exceptions) =>
+  Object.fromEntries(Object.entries(kept).map(([layer, keys]) => [layer, [...keys]]));
+
 describe('savePersisted', () => {
-  it('round-trips through storage, the exceptions in their order', () => {
+  it('round-trips through storage whatever is set, the exceptions in their order', () => {
     // Arrange
-    const storage = memoryStorage();
-    const state: Persisted = {
-      settings: {
-        ...DEFAULT_SETTINGS,
-        rangeNm: 20,
-        labelDensity: 'dense',
-        exceptions: { fix: new Set(['z', 'a']), ctr: new Set(['q']) },
-        openGroups: ['POINTS', 'AIRSPACE'],
-        openLayers: ['fix'],
-        disabledSets: ['openaip'],
-      },
-      panels: { ...DEFAULTS.panels, maps: false },
-      listSort: { key: 'alt', dir: 'desc' },
-      plotted: ['alt', 'gs', 'trk', 'ias', 'vs', 'roll'],
-      ndRangeNm: 80,
-    };
-    savePersisted(storage, state);
+    const anyFilter = fc
+      .record({
+        ground: fc.boolean(),
+        squawk: fc.constantFrom<SquawkFilter>('all', 'nonvfr', 'emergency'),
+        lowerFl: fc.integer({ min: FL_MIN, max: FL_MAX - 1 }),
+        width: fc.integer({ min: 1, max: FL_MAX }),
+      })
+      .map(({ ground, squawk, lowerFl, width }) => ({
+        ground,
+        squawk,
+        lowerFl,
+        upperFl: Math.min(FL_MAX, lowerFl + width),
+      }));
+    const anyKeys = fc.uniqueArray(fc.string()).map((keys) => new Set(keys));
+    const anyExceptions = fc
+      .subarray([...DRAW_STACK])
+      .chain((layers) => fc.tuple(...layers.map((layer) => fc.tuple(fc.constant(layer), anyKeys))))
+      .map((entries): Exceptions => Object.fromEntries(entries));
+    const anyShownLayers = fc
+      .tuple(...DRAW_STACK.map((layer) => fc.tuple(fc.constant(layer), fc.boolean())))
+      .map((entries) => Object.assign({}, shownLayers, Object.fromEntries(entries)));
+    // The open rows are read back in the order the tree lists them.
+    const anySettings = fc.record<Settings>({
+      rangeNm: fc.double({ min: RANGE_MIN_NM, max: RANGE_MAX_NM, noNaN: true }),
+      vectorMin: fc.constantFrom(...VECTOR_STEPS),
+      trailSec: fc.constantFrom(...TRAIL_STEPS),
+      filter: anyFilter,
+      shownLayers: anyShownLayers,
+      exceptions: anyExceptions,
+      disabledSets: fc.array(fc.string()),
+      openGroups: fc.subarray(LAYER_GROUPS.map((group) => group.title)),
+      openLayers: fc.subarray<string>([...DRAW_STACK]),
+      labelDensity: fc.constantFrom(...LABEL_DENSITIES),
+      altimeter: fc.record({
+        transitionAltFt: fc.integer({ min: 0, max: TRANSITION_ALT_MAX_FT }),
+        qnhInHg: fc.double({ min: QNH_MIN_INHG, max: QNH_MAX_INHG, noNaN: true }),
+      }),
+      qnh: fc.record({
+        auto: fc.boolean(),
+        station: fc.oneof(fc.constant(''), fc.stringMatching(STATION_RE)),
+      }),
+    });
+    const anyState = fc.record<Persisted>({
+      settings: anySettings,
+      panels: fc.record({
+        display: fc.boolean(),
+        maps: fc.boolean(),
+        list: fc.boolean(),
+        detail: fc.boolean(),
+      }),
+      listSort: fc.record({
+        key: fc.constantFrom(...SORT_KEYS),
+        dir: fc.constantFrom(...SORT_DIRS),
+      }),
+      plotted: fc.uniqueArray(fc.constantFrom(...LANE_KEYS)),
+      ndRangeNm: fc.constantFrom(...ND_RANGES_NM),
+    });
 
-    // Act
-    const back = loadPersisted(storage, DEFAULTS);
+    fc.assert(
+      fc.property(anyState, (state) => {
+        // Arrange
+        const storage = memoryStorage();
+        savePersisted(storage, state);
 
-    // Assert
-    expect(back).toEqual(state);
-    expect([...(back.settings.exceptions.fix ?? [])]).toEqual(['z', 'a']);
+        // Act
+        const back = loadPersisted(storage, DEFAULTS);
+
+        // Assert
+        expect(back).toEqual(state);
+        expect(inOrder(back.settings.exceptions)).toEqual(inOrder(state.settings.exceptions));
+      }),
+    );
   });
 });

@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { type ChartItem, chartOf } from '../../src/lib/chart';
+import { direct } from '../../src/lib/geodesic';
 import { parseMapSet, validateMapSet } from '../../src/lib/mapset';
 import { type OpenAipInput, toMapSet, withinRadius } from './openaip';
 
@@ -113,15 +116,26 @@ const FIXTURE = {
 
 describe('withinRadius', () => {
   it('keeps points inside the radius and drops the rest', () => {
-    // Arrange
-    const near: [number, number] = [35.7, 140.1]; // Chiba
-    const far: [number, number] = [43.0, 141.0]; // Sapporo
+    // Arrange: points off the radius by a hundredth or more, which a sphere for the ellipsoid cannot move across it
+    const anyBearing = fc.integer({ min: 0, max: 359 });
+    const anyRadius = fc.integer({ min: 10, max: 600 });
+    const anyShare = fc.oneof(
+      fc.constantFrom(99, 101),
+      fc.integer({ min: 1, max: 300 }).filter((percent) => percent !== 100),
+    );
 
-    // Act
-    const out = [near, far].map(([lat, lon]) => withinRadius(site, 300, lat, lon));
+    fc.assert(
+      fc.property(anyBearing, anyRadius, anyShare, (bearing, radiusNm, percent) => {
+        // Arrange
+        const { lat, lon } = direct(site, bearing, (radiusNm * percent) / 100);
 
-    // Assert
-    expect(out).toEqual([true, false]);
+        // Act
+        const kept = withinRadius(site, radiusNm, lat, lon);
+
+        // Assert
+        expect(kept).toBe(percent < 100);
+      }),
+    );
   });
 });
 
@@ -285,6 +299,49 @@ describe('toMapSet', () => {
 
     // Assert
     expect(written).toEqual(table.map(([, limit]) => limit));
+  });
+
+  it('leaves out an airspace whose ring has fewer than three corners, however often it repeats them', () => {
+    // Arrange
+    const a: [number, number] = [35.7, 140.1];
+    const b: [number, number] = [35.7, 140.2];
+    const named = airspace(7, 'QUEBEC');
+    const flat = [
+      [a, b, a],
+      [a, b, b, a],
+      [a, a, a, a],
+    ].map((ring) => Object.assign({}, named, { geometry: poly(ring) }));
+    const set = toMapSet(inputOf({ airspaces: [...flat, airspace(7, 'ROMEO')] }), AREA);
+
+    // Act
+    const verdict = validateMapSet(set);
+
+    // Assert
+    expect(verdict.ok).toBe(true);
+    expect(set.features.map((f) => ('name' in f.properties ? f.properties.name : null))).toEqual([
+      'ROMEO',
+    ]);
+  });
+
+  it('closes a ring that is left open', () => {
+    // Arrange
+    const open = {
+      ...airspace(7, 'QUEBEC'),
+      geometry: poly([
+        [35.7, 140.1],
+        [35.7, 140.2],
+        [35.6, 140.2],
+      ]),
+    };
+
+    const closed = toMapSet(inputOf({ airspaces: [airspace(7, 'QUEBEC')] }), AREA);
+
+    // Act
+    const set = toMapSet(inputOf({ airspaces: [open] }), AREA);
+
+    // Assert
+    expect(set).toEqual(closed);
+    expect(set.features).toHaveLength(1);
   });
 
   it('truncates a long name to 64 characters and a long id to 32', () => {

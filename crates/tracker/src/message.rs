@@ -255,6 +255,7 @@ mod tests {
     use crate::field::{Field, Identification, OperationalStatus, RaBroadcast};
     use crate::proto::{Address, AddressType, Advisory, EmitterCategory, advisory::Resolution};
     use crate::register::Register;
+    use proptest::prelude::*;
 
     /// Made up: from a block ICAO reserves for future use.
     const ADDRESS: u32 = 0x00d0_0001;
@@ -587,17 +588,22 @@ mod tests {
         assert_eq!(heard, None);
     }
 
-    #[test]
-    fn damaged_message_says_nothing() {
-        // Arrange
-        let mut message = squitter(ADDRESS, identification("TEST01").write());
-        message[5] ^= 0x01;
+    proptest! {
+        #[test]
+        fn message_damaged_in_any_bit_after_its_format_says_nothing(
+            address in 0..1_u32 << 24,
+            bit in 5..112_usize,
+        ) {
+            // Arrange
+            let mut message = squitter(address, identification("TEST01").write());
+            message[bit / 8] ^= 0x80 >> (bit % 8);
 
-        // Act
-        let heard = read(&message);
+            // Act
+            let heard = read(&message);
 
-        // Assert
-        assert_eq!(heard, None);
+            // Assert
+            prop_assert_eq!(heard, None);
+        }
     }
 
     #[test]

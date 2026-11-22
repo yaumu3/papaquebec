@@ -174,12 +174,28 @@ const WORD_BREAKS = ' ./-()';
 /** The query's terms: upper-cased, split at spaces, none empty. */
 export const termsOf = (query: string): string[] => query.toUpperCase().split(' ').filter(Boolean);
 
-/** Every index at which `term` starts a word of `text`, compared in upper case. */
-function wordStarts(text: string, term: string): number[] {
-  const upper = text.toUpperCase();
-  const starts: number[] = [];
+/** A stretch of a text, from an index up to but not including another. */
+interface Stretch {
+  from: number;
+  to: number;
+}
+
+/** Every stretch of `text` at which `term` starts a word, compared in upper case. */
+function wordStarts(text: string, term: string): Stretch[] {
+  // The upper case of a letter may be longer, as SS of ß: each of its characters keeps where it came from.
+  const origins: number[] = [];
+  let upper = '';
+  for (const [i, char] of text.split('').entries()) {
+    const raised = char.toUpperCase();
+    upper += raised;
+    for (let k = 0; k < raised.length; k++) origins.push(i);
+  }
+  const starts: Stretch[] = [];
   for (let at = upper.indexOf(term); at >= 0; at = upper.indexOf(term, at + 1)) {
-    if (at === 0 || WORD_BREAKS.includes(upper.charAt(at - 1))) starts.push(at);
+    const last = origins[at + term.length - 1];
+    const from = origins[at];
+    const starting = at === 0 || WORD_BREAKS.includes(upper.charAt(at - 1));
+    if (starting && from !== undefined && last !== undefined) starts.push({ from, to: last + 1 });
   }
   return starts;
 }
@@ -197,7 +213,7 @@ interface Piece {
 export function markedPieces(text: string, terms: readonly string[]): Piece[] {
   const marks = Array.from({ length: text.length }, () => false);
   for (const term of terms) {
-    for (const at of wordStarts(text, term)) marks.fill(true, at, at + term.length);
+    for (const { from, to } of wordStarts(text, term)) marks.fill(true, from, to);
   }
   const pieces: Piece[] = [];
   for (const [i, char] of text.split('').entries()) {

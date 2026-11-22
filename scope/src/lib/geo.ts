@@ -1,5 +1,7 @@
-/** A point on the projected plane, in nautical miles: x east, y north. */
+import { onCircle } from './math';
 import { RAD } from './units';
+
+/** A point on the projected plane, in nautical miles: x east, y north. */
 export interface Vec2 {
   x: number;
   y: number;
@@ -9,8 +11,7 @@ export const NM_IN_METERS = 1852;
 
 /** True bearing to magnetic, given declination in degrees east positive. */
 export function trueToMagnetic(trueDeg: number, declinationDeg: number): number {
-  const m = (trueDeg - declinationDeg) % 360;
-  return m < 0 ? m + 360 : m;
+  return onCircle(trueDeg - declinationDeg, 360);
 }
 
 /** Magnetic bearing to true, given declination in degrees east positive. */
@@ -19,7 +20,7 @@ export function magneticToTrue(magneticDeg: number, declinationDeg: number): num
 }
 
 /** Degrees from `from` round to `to` the short way, to the right positive. */
-export const turn = (from: number, to: number): number => ((to - from + 540) % 360) - 180;
+export const turn = (from: number, to: number): number => onCircle(to - from + 180, 360) - 180;
 
 /** Velocity components in knots from ground speed and true track. */
 export function velocityNm(gsKt: number, trackDeg: number): Vec2 {
@@ -51,7 +52,10 @@ export function splitByCircle(
   const f = { x: p.x - c.x, y: p.y - c.y };
   const a = d.x * d.x + d.y * d.y;
   const b = 2 * (f.x * d.x + f.y * d.y);
-  const disc = b * b - 4 * a * (f.x * f.x + f.y * f.y - r * r);
+  const beyond = f.x * f.x + f.y * f.y - r * r;
+  // A segment of no length is the point it starts at.
+  if (a === 0 && beyond < 0) return { outside: [], inside: [[p, q]] };
+  const disc = b * b - 4 * a * beyond;
   if (a === 0 || disc <= 0) return { outside: [[p, q]], inside: [] };
   const t1 = Math.max((-b - Math.sqrt(disc)) / (2 * a), 0);
   const t2 = Math.min((-b + Math.sqrt(disc)) / (2 * a), 1);
@@ -78,11 +82,11 @@ export const NM_PER_DEGREE = 60;
 
 /**
  * Equirectangular distance in nautical miles, the short way round the antimeridian. Within 1% of
- * the geodesic over a few nautical miles, at any latitude: enough to rank nearby items or to
+ * the geodesic over a few nautical miles, up to a degree from the poles: enough to rank nearby items or to
  * tell whether two are one.
  */
 export function flatDistanceNm(a: GeoPoint, b: GeoPoint): number {
-  const east = turn(a.lon, b.lon) * Math.cos(a.lat * RAD);
+  const east = turn(a.lon, b.lon) * Math.cos(((a.lat + b.lat) / 2) * RAD);
   return NM_PER_DEGREE * Math.hypot(b.lat - a.lat, east);
 }
 

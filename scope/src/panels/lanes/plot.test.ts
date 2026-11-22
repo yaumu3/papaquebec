@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { LAPSE_SEC } from '../../lib/reports';
+import { READING_KEYS } from '../../state/plotted';
 import {
   ALL,
   AROUND_LAPSE,
@@ -20,12 +23,10 @@ import {
   scaleLabels,
   snapped,
 } from './plot';
-import type { Range } from './trace';
+import { PLOTS, type PlotSpec } from './plots';
 
 /** The metres a power of ten stands for, to six figures. */
 const metres = (v: number) => Number((10 ** v).toPrecision(6));
-/** A range as flat as one value. */
-const flat = (v: number): Range => ({ lo: v, hi: v });
 
 describe('laneTraces', () => {
   it('draws the lane its own reading first, then each intent plotted in it with its dash if any, marked as one', () => {
@@ -257,86 +258,96 @@ function farthest(d: string, x: number, y: number): number {
 describe('reach', () => {
   it('holds every barb whole, its stroke too, whatever the direction and speed', () => {
     // Arrange
-    const winds = [0, 30, 45, 60, 135, 225, 300].flatMap((dir) =>
-      [5, 10, 15, 50, 65, 100].map((speed) => ({ dir, speed })),
+    const anyDirection = fc.integer({ min: 0, max: 3599 }).map((n) => n / 10);
+    const anySpeed = fc.integer({ min: 0, max: 2000 }).map((n) => n / 10);
+
+    fc.assert(
+      fc.property(anyDirection, anySpeed, (dir, speed) => {
+        // Act
+        const reach = farthest(barbPath(100, 50, dir, speed, 16), 100, 50);
+
+        // Assert: half the 1.2 px stroke the barbs are drawn with on top of the farthest vertex
+        expect(reach + 0.6).toBeLessThanOrEqual(barbReach(16));
+      }),
     );
+  });
+
+  it('reaches past the staff with a full barb at its tip', () => {
+    // Arrange
+    const wind = { dir: 45, speed: 10 };
 
     // Act
-    const reaches = winds.map((w) => farthest(barbPath(100, 50, w.dir, w.speed, 16), 100, 50));
+    const reach = farthest(barbPath(100, 50, wind.dir, wind.speed, 16), 100, 50);
 
-    // Assert: half the 1.2 px stroke the barbs are drawn with on top of the farthest vertex
-    expect(Math.max(...reaches) + 0.6).toBeLessThanOrEqual(barbReach(16));
-    expect(Math.max(...reaches)).toBeGreaterThan(16);
+    // Assert
+    expect(reach).toBeGreaterThan(16);
   });
 
   it('holds every heading glyph whole, its strokes too', () => {
     // Arrange
-    const marks = [0, 45, 100, 200, 315].flatMap((deg) => [
-      { trk: deg, hdg: deg + 10, sel: deg + 90 },
-      { trk: deg, hdg: undefined, sel: deg + 90 },
-    ]);
-
-    // Act
-    const reaches = marks.map((h) => {
-      const g = headingGlyph(100, 50, h);
-      return Math.max(
-        ...[g.aircraft, g.vector, g.arrow, g.tick].map((d) => (d ? farthest(d, 100, 50) : 0)),
-      );
+    const anyBearing = fc.integer({ min: 0, max: 3599 }).map((n) => n / 10);
+    const anyMark = fc.record({
+      trk: fc.option(anyBearing, { nil: undefined }),
+      hdg: fc.option(anyBearing, { nil: undefined }),
+      sel: fc.option(anyBearing, { nil: undefined }),
     });
 
-    // Assert: half the 1.8 px stroke the widest of them is drawn with
-    expect(Math.max(...reaches) + 0.9).toBeLessThanOrEqual(GLYPH_REACH_PX);
+    fc.assert(
+      fc.property(anyMark, (mark) => {
+        // Act
+        const g = headingGlyph(100, 50, mark);
+
+        // Assert: half the 1.8 px stroke the widest of them is drawn with
+        const reach = Math.max(
+          ...[g.aircraft, g.vector, g.arrow, g.tick].map((d) => (d ? farthest(d, 100, 50) : 0)),
+        );
+        expect(reach + 0.9).toBeLessThanOrEqual(GLYPH_REACH_PX);
+      }),
+    );
   });
 });
 
+/** The lanes whose scale is bounded on multiples of a step, each with its step. */
+const QUANTA = READING_KEYS.flatMap((lane) => {
+  const spec: PlotSpec = PLOTS[lane];
+  return 'quantum' in spec && spec.quantum !== undefined ? [{ lane, quantum: spec.quantum }] : [];
+});
+
 describe('snapped', () => {
-  it("bounds a lane's data by multiples of its quantum, a flat trace on a step one quantum below the top", () => {
-    // Arrange
-    const rows = [
-      { lane: 'alt', r: flat(29_400) },
-      { lane: 'alt', r: flat(30_000) },
-      { lane: 'alt', r: { lo: 26_200, hi: 33_700 } },
-      { lane: 'vs', r: { lo: 0, hi: 1800 } },
-      { lane: 'vs', r: flat(0) },
-      { lane: 'gs', r: flat(290.4) },
-      { lane: 'gs', r: flat(290) },
-      { lane: 'gs', r: { lo: 434, hi: 458 } },
-      { lane: 'qnh', r: flat(29.93) },
-      { lane: 'mach', r: { lo: 0.762, hi: 0.781 } },
-      { lane: 'oat', r: flat(-45.3) },
-      { lane: 'rssi', r: { lo: -15.3, hi: -9.3 } },
-      { lane: 'rssi', r: { lo: -12.4, hi: -11.6 } },
-      { lane: 'msgs', r: { lo: 1.2, hi: 3.8 } },
-      { lane: 'msgs', r: { lo: 6.2, hi: 11.3 } },
-      { lane: 'age', r: { lo: 0.4, hi: 5.4 } },
-      { lane: 'roll', r: { lo: -3, hi: 4 } },
-      { lane: 'roll', r: flat(0) },
-    ] as const;
+  it("bounds a lane's data by the multiples of its quantum nearest outside it, a flat trace on a step one quantum below the top", () => {
+    // Arrange: bounds in hundredths of a quantum, often on a step, a whole number of them apart or flat
+    const anyLane = fc.constantFrom(...QUANTA);
+    const anyLow = fc.oneof(
+      fc.integer({ min: -5000, max: 40_000 }),
+      fc.integer({ min: -50, max: 400 }).map((steps) => steps * 100),
+    );
+    const anySpan = fc.oneof(
+      fc.constant(0),
+      fc.integer({ min: 0, max: 500 }),
+      fc.integer({ min: 1, max: 5 }).map((steps) => steps * 100),
+    );
+    /** The slack of the arithmetic, in quanta. */
+    const slack = 1e-6;
 
-    // Act
-    const ranges = rows.map(({ lane, r }) => snapped(r, lane));
+    fc.assert(
+      fc.property(anyLane, anyLow, anySpan, ({ lane, quantum }, low, span) => {
+        // Arrange
+        const r = { lo: (low / 100) * quantum, hi: ((low + span) / 100) * quantum };
 
-    // Assert
-    expect(ranges).toEqual([
-      { lo: 29_000, hi: 30_000 },
-      { lo: 30_000, hi: 31_000 },
-      { lo: 26_000, hi: 34_000 },
-      { lo: 0, hi: 2000 },
-      { lo: 0, hi: 500 },
-      { lo: 290, hi: 300 },
-      { lo: 290, hi: 300 },
-      { lo: 430, hi: 460 },
-      { lo: 29.93, hi: 29.94 },
-      { lo: 0.76, hi: 0.79 },
-      { lo: -46, hi: -45 },
-      { lo: -20, hi: -5 },
-      { lo: -15, hi: -10 },
-      { lo: 0, hi: 5 },
-      { lo: 5, hi: 15 },
-      { lo: 0, hi: 6 },
-      { lo: -10, hi: 10 },
-      { lo: 0, hi: 10 },
-    ]);
+        // Act
+        const range = snapped(r, lane);
+
+        // Assert
+        const [below, above] = [(r.lo - range.lo) / quantum, (range.hi - r.hi) / quantum];
+        const steps = [range.lo / quantum, range.hi / quantum];
+        expect(steps.map((n) => Math.abs(n - Math.round(n)) < slack)).toEqual([true, true]);
+        expect(below).toBeGreaterThanOrEqual(-slack);
+        expect(below).toBeLessThan(1 - slack);
+        expect(above).toBeGreaterThanOrEqual(-slack);
+        expect(above).toBeLessThan(span === 0 && low % 100 === 0 ? 1 + slack : 1 - slack);
+        expect(range.hi).toBeGreaterThan(range.lo);
+      }),
+    );
   });
 
   it('snaps a bound on a log scale outward to 1, 2, 5 × 10ⁿ metres, or of nautical miles from 0.1 NM', () => {

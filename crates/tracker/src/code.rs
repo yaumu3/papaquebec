@@ -21,9 +21,13 @@ pub(crate) fn identity(mode_a_code: u32) -> u32 {
 }
 
 /// The 13-bit altitude code of an altitude: steps of 25 ft from -1000 ft
-/// around the M bit, clear, and the Q bit, set, which says so.
+/// around the M bit, clear, and the Q bit, set, which says so; or beyond
+/// what those count, to 50 175 ft, the Gillham code.
 pub(crate) fn altitude_code(altitude_ft: i32) -> u32 {
-    let steps = u32::try_from((altitude_ft + 1012).div_euclid(25)).unwrap_or(0);
+    let steps = u32::try_from((altitude_ft + 1012).div_euclid(25)).ok();
+    let Some(steps) = steps.filter(|steps| *steps <= 0x7ff) else {
+        return gillham_code(altitude_ft);
+    };
     (steps & 0x7e0) << 2 | (steps & 0x10) << 1 | 0x10 | steps & 0xf
 }
 
@@ -55,13 +59,17 @@ pub(crate) fn altitude(code: u32) -> Option<i32> {
     Some(i32::try_from(steps).ok()? * 25 - 1000)
 }
 
+/// Where the pulses of a Gillham code lie in an altitude code, from its
+/// last bit, which holds them as C1 A1 C2 A2 C4 A4 M B1 Q B2 D2 B4 D4: those
+/// that count 500 ft, D2 D4 A1 A2 A4 B1 B2 B4, and those that count the
+/// 100 ft within, C1 C2 C4.
+const FIVE_HUNDREDS: [u32; 8] = [2, 0, 11, 9, 7, 5, 3, 1];
+const HUNDREDS: [u32; 3] = [12, 10, 8];
+
 /// The altitude in feet of a Gillham code, the pulses of a Mode C reply:
 /// D2 D4 A1 A2 A4 B1 B2 B4 count 500 ft in Gray code, and C1 C2 C4 count the
 /// 100 ft within, up and then back down.
 fn gillham(code: u32) -> Option<i32> {
-    // The pulses lie in the code as C1 A1 C2 A2 C4 A4 M B1 Q B2 D2 B4 D4.
-    const FIVE_HUNDREDS: [u32; 8] = [2, 0, 11, 9, 7, 5, 3, 1];
-    const HUNDREDS: [u32; 3] = [12, 10, 8];
     let binary = |pulses: &[u32]| {
         let gray = pulses.iter().map(|pulse| code >> pulse & 1);
         let bits = gray.scan(0, |bit, pulse| {
@@ -82,4 +90,21 @@ fn gillham(code: u32) -> Option<i32> {
         6 - within
     };
     Some(five_hundreds * 500 + hundreds * 100 - 1300)
+}
+
+/// The Gillham code of an altitude, to the nearest 100 ft of those it
+/// counts, -1200 to 126 700 ft.
+fn gillham_code(altitude_ft: i32) -> u32 {
+    let hundreds = u32::try_from((altitude_ft + 1350).div_euclid(100)).unwrap_or(0);
+    let hundreds = hundreds.clamp(1, 1280);
+    let five_hundreds = (hundreds - 1) / 5;
+    let up = hundreds - five_hundreds * 5;
+    let within = if five_hundreds % 2 == 0 { up } else { 6 - up };
+    let pulses = |pulses: &[u32], binary: u32| {
+        let gray = binary ^ binary >> 1;
+        let bits = pulses.iter().rev().zip(0..);
+        bits.fold(0, |code, (pulse, bit)| code | (gray >> bit & 1) << pulse)
+    };
+    // The fifth step within is told by all three pulses.
+    pulses(&FIVE_HUNDREDS, five_hundreds) | pulses(&HUNDREDS, if within == 5 { 7 } else { within })
 }

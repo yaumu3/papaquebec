@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import type { View } from '../protocol';
 import { toScreen, toWorld } from './view';
 
@@ -27,14 +29,31 @@ describe('toScreen / toWorld', () => {
 
   it('inverts toScreen', () => {
     // Arrange
-    const p = { x: -3.25, y: 7.5 };
-    const s = toScreen(view, p.x, p.y);
+    const anyView = fc.record({
+      centerX: fc.double({ min: -1000, max: 1000, noNaN: true }),
+      centerY: fc.double({ min: -1000, max: 1000, noNaN: true }),
+      pxPerNm: fc.double({ min: 0.1, max: 200, noNaN: true }),
+      widthPx: fc.integer({ min: 100, max: 4000 }),
+      heightPx: fc.integer({ min: 100, max: 4000 }),
+      dpr: fc.constantFrom(1, 2, 3),
+    });
+    const anyPoint = fc.record({
+      x: fc.double({ min: -2000, max: 2000, noNaN: true }),
+      y: fc.double({ min: -2000, max: 2000, noNaN: true }),
+    });
 
-    // Act
-    const back = toWorld(view, s.cx, s.cy);
+    fc.assert(
+      fc.property(anyView, anyPoint, (v, p) => {
+        // Arrange
+        const s = toScreen(v, p.x, p.y);
 
-    // Assert
-    expect(back.x).toBeCloseTo(p.x, 9);
-    expect(back.y).toBeCloseTo(p.y, 9);
+        // Act
+        const back = toWorld(v, s.cx, s.cy);
+
+        // Assert
+        expect(back.x).toBeCloseTo(p.x, 6);
+        expect(back.y).toBeCloseTo(p.y, 6);
+      }),
+    );
   });
 });

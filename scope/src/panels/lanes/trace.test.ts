@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { LAPSE_SEC } from '../../lib/reports';
 import { ALL, AROUND_LAPSE, makeSample as sample } from '../../state/sampleFixture';
 import type { Sample } from '../../state/track';
@@ -270,53 +272,66 @@ describe('gapsIn', () => {
     expect(gaps).toEqual([[], [{ from: 1000, to: 1030 }], [{ from: 1000, to: 1030.1 }]]);
   });
 
-  it('finds the stretches between samples further apart than the limit, cut to the interval', () => {
-    // Arrange
-    const samples = [sample(100), sample(101), sample(200), sample(201), sample(300)];
+  it('cuts the gaps of the whole contact to the interval, and leaves out those outside it', () => {
+    // Arrange: half seconds within the fixture's window, spaced either side of the lapse, cut often at a sample
+    const anyTimes = fc
+      .array(fc.integer({ min: 1, max: 4 * LAPSE_SEC }), { minLength: 1, maxLength: 8 })
+      .map((spacings) => {
+        let t = 0;
+        return spacings.map((spacing) => (t += spacing / 2));
+      });
+    const anyCase = anyTimes.chain((times) => {
+      const anyEnd = fc.oneof(
+        fc.constantFrom(...times),
+        fc.integer({ min: 0, max: 1200 }).map((halves) => halves / 2),
+      );
+      return fc.record({ times: fc.constant(times), a: anyEnd, b: anyEnd, lost: fc.boolean() });
+    });
 
-    // Act
-    const gaps = gapsIn(samples, { from: 150, to: 250 });
+    fc.assert(
+      fc.property(anyCase, ({ times, a, b, lost }) => {
+        // Arrange
+        const samples = times.map((t) => sample(t));
+        const i = { from: Math.min(a, b), to: Math.max(a, b) };
 
-    // Assert
-    expect(gaps).toEqual([
-      { from: 150, to: 200 },
-      { from: 201, to: 250 },
-    ]);
+        // Act
+        const gaps = gapsIn(samples, i, lost);
+
+        // Assert
+        const cut = gapsIn(samples, ALL, lost)
+          .map((g) => ({ from: Math.max(g.from, i.from), to: Math.min(g.to, i.to) }))
+          .filter((g) => g.from < g.to);
+        expect(gaps).toEqual(cut);
+      }),
+    );
   });
 });
 
+/** Samples oldest first, no two at one time, on even seconds so that an odd one is often as near to two. */
+const anySamples = fc
+  .uniqueArray(fc.integer({ min: -10, max: 10 }))
+  .map((times) => times.toSorted((a, b) => a - b).map((t) => sample(2 * t)));
+const anyInterval = fc
+  .tuple(fc.integer({ min: -25, max: 25 }), fc.integer({ min: -25, max: 25 }))
+  .map(([a, b]) => ({ from: Math.min(a, b), to: Math.max(a, b) }));
+
 describe('nearestSample', () => {
-  it('snaps to the sample nearest in time among those inside the interval', () => {
+  it('snaps to the sample nearest in time among those inside the interval, its ends included, the earlier of two as near, none among none', () => {
     // Arrange
-    const samples = [sample(100), sample(110), sample(120), sample(130)];
+    const anyTime = fc.integer({ min: -30, max: 30 });
 
-    // Act
-    const found = [
-      nearestSample(samples, 114, { from: 105, to: 125 }),
-      nearestSample(samples, 100, { from: 105, to: 125 }),
-      nearestSample(samples, 114, { from: 140, to: 150 }),
-    ];
+    fc.assert(
+      fc.property(anySamples, anyTime, anyInterval, (samples, t, i) => {
+        // Act
+        const found = nearestSample(samples, t, i);
 
-    // Assert
-    expect(found.map((s) => s?.t)).toEqual([110, 110, undefined]);
-  });
-
-  it("takes the earlier of two as near, the window's own ends included, none among none", () => {
-    // Arrange
-    const samples = [sample(100), sample(110), sample(120), sample(130)];
-    const rows = [
-      { from: samples, t: 115, i: { from: 100, to: 130 } },
-      { from: samples, t: 90, i: { from: 100, to: 130 } },
-      { from: samples, t: 140, i: { from: 100, to: 130 } },
-      { from: samples, t: 125, i: { from: 111, to: 119 } },
-      { from: [], t: 115, i: { from: 100, to: 130 } },
-    ];
-
-    // Act
-    const found = rows.map((r) => nearestSample(r.from, r.t, r.i));
-
-    // Assert
-    expect(found.map((s) => s?.t)).toEqual([110, 100, 130, undefined, undefined]);
+        // Assert
+        const inside = samples.filter((s) => s.t >= i.from && s.t <= i.to);
+        const nearest = Math.min(...inside.map((s) => Math.abs(s.t - t)));
+        const earliest = inside.find((s) => Math.abs(s.t - t) === nearest);
+        expect(found?.t).toBe(earliest?.t);
+      }),
+    );
   });
 });
 
@@ -383,41 +398,40 @@ describe('barsOf', () => {
 });
 
 describe('barbMarks', () => {
-  it('reads the speed to the nearest five knots as pennants, barbs and half barbs', () => {
+  it('reads the speed to the nearest five knots as pennants of 50, then barbs of 10, then a half barb of 5', () => {
     // Arrange
-    const speeds = [2, 3, 12, 25, 48, 65, 110];
+    const anySpeed = fc.integer({ min: 0, max: 3000 }).map((n) => n / 10);
+    const knots = { pennant: 50, full: 10, half: 5 };
 
-    // Act
-    const marks = speeds.map(barbMarks);
+    fc.assert(
+      fc.property(anySpeed, (speed) => {
+        // Act
+        const marks = barbMarks(speed);
 
-    // Assert
-    expect(marks).toEqual([
-      [],
-      ['half'],
-      ['full'],
-      ['full', 'full', 'half'],
-      ['pennant'],
-      ['pennant', 'full', 'half'],
-      ['pennant', 'pennant', 'full'],
-    ]);
+        // Assert
+        const each = marks.map((mark) => knots[mark]);
+        const read = each.reduce((sum, kt) => sum + kt, 0);
+        expect(Math.abs(read - speed)).toBeLessThanOrEqual(2.5);
+        expect(each).toEqual(each.toSorted((a, b) => b - a));
+        expect(marks.filter((mark) => mark === 'full').length).toBeLessThanOrEqual(4);
+        expect(marks.filter((mark) => mark === 'half').length).toBeLessThanOrEqual(1);
+      }),
+    );
   });
 });
 
 describe('newestSample', () => {
   it('is the last sample inside the window, none when it holds none', () => {
-    // Arrange
-    const samples = [sample(100), sample(110), sample(120), sample(130)];
-    const windows = [
-      { from: 100, to: 130 },
-      { from: 100, to: 125 },
-      { from: 111, to: 119 },
-    ];
+    fc.assert(
+      fc.property(anySamples, anyInterval, (samples, i) => {
+        // Act
+        const found = newestSample(samples, i);
 
-    // Act
-    const found = windows.map((i) => newestSample(samples, i));
-
-    // Assert
-    expect(found.map((s) => s?.t)).toEqual([130, 120, undefined]);
+        // Assert
+        const inside = samples.filter((s) => s.t >= i.from && s.t <= i.to);
+        expect(found?.t).toBe(inside.at(-1)?.t);
+      }),
+    );
   });
 });
 
@@ -500,17 +514,26 @@ describe('peekAt', () => {
   });
 
   it('has no sample exactly where gapsIn shades', () => {
-    // Arrange
-    const samples = [sample(100), sample(131), sample(140), sample(200)];
-    const window = { from: 0, to: 300 };
-    const times = [99, 100, 100.5, 115, 130.9, 131, 135, 140, 150, 199.9, 200, 250];
-    const gaps = gapsIn(samples, window, true);
+    // Arrange: a plot as wide as its window is long, and that a power of two, so a point is its time
+    const width = 1024;
+    const window = { from: 0, to: width };
+    const anyContact = fc
+      .array(fc.integer({ min: 1, max: 4 * LAPSE_SEC }), { minLength: 1, maxLength: 8 })
+      .map((spacings) => {
+        let t = 0;
+        return spacings.map((spacing) => sample((t += spacing / 2)));
+      });
+    const anyTime = fc.integer({ min: 0, max: 4 * width - 1 }).map((quarters) => quarters / 4);
 
-    // Act
-    const found = times.map((t) => peekAt(samples, t, window, 300, true)?.sample === null);
+    fc.assert(
+      fc.property(anyContact, anyTime, fc.boolean(), (samples, t, lost) => {
+        // Act
+        const peek = peekAt(samples, t, window, width, lost);
 
-    // Assert
-    const shaded = times.map((t) => gaps.some((g) => t > g.from && t < g.to));
-    expect(found).toEqual(shaded);
+        // Assert
+        const gaps = gapsIn(samples, window, lost);
+        expect(peek?.sample === null).toBe(gaps.some((g) => t > g.from && t < g.to));
+      }),
+    );
   });
 });

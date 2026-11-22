@@ -1,21 +1,35 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { direct, geodesicCircle, geodesicLine, geodesicPath, inverse } from './geodesic';
 
 describe('geodesicCircle', () => {
-  it('closes a ring of points, starting due north', () => {
-    // Arrange
-    const center = { lat: 35.5, lon: 139.8 };
+  it('closes a ring of points at its radius, starting due north', () => {
+    // Arrange: a centre whose ring stays short of the poles
+    const anyCenter = fc.record({
+      lat: fc.integer({ min: -80, max: 80 }),
+      lon: fc.integer({ min: -179, max: 179 }),
+    });
+    const anyRadius = fc.integer({ min: 1, max: 300 });
+    const anySegments = fc.integer({ min: 1, max: 96 });
 
-    // Act
-    const ring = geodesicCircle(center, 120, 96);
+    fc.assert(
+      fc.property(anyCenter, anyRadius, anySegments, (center, radiusNm, segments) => {
+        // Act
+        const ring = geodesicCircle(center, radiusNm, segments);
 
-    // Assert
-    expect(ring.length).toBe(97);
-    expect(ring[96]?.lat).toBeCloseTo(ring[0]?.lat ?? 0, 12);
-    expect(ring[96]?.lon).toBeCloseTo(ring[0]?.lon ?? 0, 12);
-    expect(ring[0]?.lon).toBeCloseTo(center.lon, 12);
-    expect(ring[0]?.lat).toBeGreaterThan(center.lat);
+        // Assert
+        const radii = ring.map((point) => inverse(center, point).distanceNm);
+        expect(ring.length).toBe(segments + 1);
+        expect(ring[segments]).toEqual(ring[0] ?? center);
+        expect(ring[0]?.lon).toBeCloseTo(center.lon, 9);
+        expect(ring[0]?.lat).toBeGreaterThan(center.lat);
+        expect(radii.map((radius) => Math.abs(radius - radiusNm) < 1e-6)).toEqual(
+          ring.map(() => true),
+        );
+      }),
+    );
   });
 });
 

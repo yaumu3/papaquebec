@@ -205,6 +205,7 @@ mod tests {
     use super::{Frame, Reader};
     use crate::bits::published::bytes;
     use crate::proto::Source;
+    use proptest::prelude::*;
 
     /// An identification message, from the examples of "The 1090 Megahertz Riddle".
     const LONG: [u8; 14] = [
@@ -228,6 +229,69 @@ mod tests {
 
     fn long(timestamp: u64, signal: u8, message: [u8; 14]) -> Frame {
         Frame::new(timestamp, signal, &message).expect("a long message")
+    }
+
+    /// A byte that is the escape as often as not.
+    fn byte() -> impl Strategy<Value = u8> {
+        prop_oneof![Just(0x1a), any::<u8>()]
+    }
+
+    /// The timestamp, the signal and the message of a frame, short or long.
+    fn parts() -> impl Strategy<Value = ([u8; 6], u8, Vec<u8>)> {
+        let message = prop_oneof![
+            prop::collection::vec(byte(), 7),
+            prop::collection::vec(byte(), 14)
+        ];
+        (prop::array::uniform6(byte()), byte(), message)
+    }
+
+    fn frame_of((timestamp, signal, message): &([u8; 6], u8, Vec<u8>)) -> Frame {
+        let ticks = timestamp
+            .iter()
+            .fold(0, |ticks, &byte| ticks << 8 | u64::from(byte));
+        Frame::new(ticks, *signal, message).expect("a short or a long message")
+    }
+
+    fn framed_of((timestamp, signal, message): &([u8; 6], u8, Vec<u8>)) -> Vec<u8> {
+        let r#type = if message.len() == 7 { b'2' } else { b'3' };
+        framed(r#type, *timestamp, *signal, message)
+    }
+
+    proptest! {
+        #[test]
+        fn frame_is_written_as_it_is_read(parts in parts()) {
+            // Arrange
+            let frame = frame_of(&parts);
+
+            // Act
+            let written = frame.write();
+
+            // Assert
+            prop_assert_eq!(written, framed_of(&parts));
+        }
+
+        #[test]
+        fn frames_are_read_however_the_stream_is_cut(
+            parts in prop::collection::vec(parts(), 1..4),
+            cuts in prop::collection::vec(any::<prop::sample::Index>(), 0..4),
+        ) {
+            // Arrange
+            let bytes: Vec<u8> = parts.iter().flat_map(framed_of).collect();
+            let mut cuts: Vec<usize> = cuts.iter().map(|cut| cut.index(bytes.len() + 1)).collect();
+            cuts.extend([0, bytes.len()]);
+            cuts.sort_unstable();
+            let mut reader = Reader::default();
+
+            // Act
+            let frames: Vec<Frame> = cuts
+                .windows(2)
+                .flat_map(|cut| reader.read(&bytes[cut[0]..cut[1]]))
+                .collect();
+
+            // Assert
+            let sent: Vec<Frame> = parts.iter().map(frame_of).collect();
+            prop_assert_eq!(frames, sent);
+        }
     }
 
     #[test]
@@ -270,44 +334,6 @@ mod tests {
     }
 
     #[test]
-    fn frame_cut_anywhere_is_completed_by_the_next_read() {
-        // Arrange
-        let mut message = LONG;
-        message[5] = 0x1a;
-        let bytes = framed(b'3', TIMESTAMP, 128, &message);
-
-        // Act
-        let frames: Vec<_> = (1..bytes.len())
-            .map(|cut| {
-                let mut reader = Reader::default();
-                let early = reader.read(&bytes[..cut]);
-                (early, reader.read(&bytes[cut..]))
-            })
-            .collect();
-
-        // Assert
-        let whole = (vec![], vec![long(0x0001_0203_0405, 128, message)]);
-        assert_eq!(frames, vec![whole; bytes.len() - 1]);
-    }
-
-    #[test]
-    fn frames_follow_each_other_in_one_read() {
-        // Arrange
-        let bytes = [
-            framed(b'3', TIMESTAMP, 1, &LONG),
-            framed(b'2', TIMESTAMP, 2, &SHORT),
-        ]
-        .concat();
-
-        // Act
-        let frames = Reader::default().read(&bytes);
-
-        // Assert
-        let signals: Vec<_> = frames.iter().map(|frame| frame.signal).collect();
-        assert_eq!(signals, [1, 2]);
-    }
-
-    #[test]
     fn mode_ac_and_status_frames_are_left_out() {
         // Arrange
         let bytes = [
@@ -343,29 +369,6 @@ mod tests {
         // Assert
         let signals: Vec<_> = frames.iter().map(|frame| frame.signal).collect();
         assert_eq!(signals, [2]);
-    }
-
-    #[test]
-    fn frame_is_written_as_it_is_read() {
-        // Arrange: a long message, a short one, and one full of the escape
-        let mut escaped = LONG;
-        escaped[5] = 0x1a;
-        let frames = [
-            Frame::new(0x0001_0203_0405, 128, &LONG),
-            Frame::new(0x0001_0203_0405, 128, &SHORT),
-            Frame::new(0x1a1a_1a1a_1a1a, 0x1a, &escaped),
-        ];
-
-        // Act
-        let written = frames.map(|frame| frame.map(|frame| frame.write()));
-
-        // Assert
-        let expected = [
-            framed(b'3', TIMESTAMP, 128, &LONG),
-            framed(b'2', TIMESTAMP, 128, &SHORT),
-            framed(b'3', [0x1a; 6], 0x1a, &escaped),
-        ];
-        assert_eq!(written, expected.map(Some));
     }
 
     #[test]
