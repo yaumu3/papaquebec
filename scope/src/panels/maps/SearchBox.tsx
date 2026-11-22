@@ -1,7 +1,6 @@
 import { createEffect, on, Show } from 'solid-js';
 
 import { query, searchAsked, setQuery, typeQuery } from '../../state/layerTree';
-import { searchEscape } from './treeKeys';
 
 import s from './SearchBox.module.css';
 
@@ -53,7 +52,8 @@ export function SearchBox(props: {
           } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            if (searchEscape(e.currentTarget.value) === 'clear') setQuery('');
+            // Clears what the box holds, then leaves it.
+            if (e.currentTarget.value) setQuery('');
             else e.currentTarget.blur();
           }
         }}

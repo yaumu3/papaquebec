@@ -136,14 +136,8 @@ const plain = {
   deleteLastRbl: () => setRbls(rbls().slice(0, -1)),
   clearRbls: () => setRbls([]),
   stepSelection: (direction: 1 | -1) => {
-    const listed = sortTracks([...trackStore.tracks.values()], listSort());
-    setSelected(
-      stepThrough(
-        listed.map((t) => t.hex),
-        selected(),
-        direction,
-      ),
-    );
+    const hexes = sortTracks([...trackStore.tracks.values()], listSort()).map((t) => t.hex);
+    setSelected(stepThrough(hexes, selected(), direction));
   },
   cancel: () => {
     const open =

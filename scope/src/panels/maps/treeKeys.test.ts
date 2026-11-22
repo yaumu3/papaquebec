@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { searchEscape, type TreeMove, treeMove } from './treeKeys';
+import { type TreeMove, treeMove } from './treeKeys';
 
 describe('treeMove', () => {
   it('moves by the arrow keys, by whether the row is open, closed or opens nothing', () => {
@@ -28,18 +28,5 @@ describe('treeMove', () => {
 
     // Assert
     expect(moves).toEqual(rows.map(([, , expected]) => expected));
-  });
-});
-
-describe('searchEscape', () => {
-  it('clears a search that has text, and leaves the box once it is empty', () => {
-    // Arrange
-    const values = ['NIMBA', ' ', ''];
-
-    // Act
-    const out = values.map(searchEscape);
-
-    // Assert
-    expect(out).toEqual(['clear', 'clear', 'leave']);
   });
 });
