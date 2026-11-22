@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import type { Fix } from '../../state/track';
 import { decimateTrail, fixNearest, TRAIL_DECIMATION_SEC, TRAIL_TARGET_GAP_SEC } from './trails';
 
@@ -7,60 +9,57 @@ function fixes(times: number[]): Fix[] {
   return times.map((t) => ({ lat: 0, lon: 0, x: t, y: 0, t, alt: undefined }));
 }
 
+/** The decimation slot of the clock a fix falls in. */
+const slotOf = (f: Fix) => Math.floor(f.t / TRAIL_DECIMATION_SEC);
+
+/** A history in whole seconds a few apart, so that a slot often holds several fixes and straddles an edge. */
+const anyHistory = fc
+  .array(fc.integer({ min: 0, max: 9 }), { minLength: 10, maxLength: 60 })
+  .map((gaps) => fixes(gaps.map((_, i) => gaps.slice(0, i + 1).reduce((t, gap) => t + gap, 0))));
+
 describe('decimateTrail', () => {
   it('emits one fix per decimation slot of the clock, newest first, within the window', () => {
     // Arrange
-    const history = fixes([
-      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-    ]);
-    const now = 20;
-    const windowSec = 60;
+    const anyNow = fc.integer({ min: 0, max: 100 });
+    const anyWindow = fc.integer({ min: 0, max: 60 });
 
-    // Act
-    const out = decimateTrail(history, now, windowSec);
+    fc.assert(
+      fc.property(anyHistory, anyNow, anyWindow, (history, now, windowSec) => {
+        // Act
+        const out = decimateTrail(history, now, windowSec);
 
-    // Assert
-    expect(out.map((f) => f.t)).toEqual([2 * TRAIL_DECIMATION_SEC, TRAIL_DECIMATION_SEC, 0]);
-    expect(out.every((f) => f.t <= now - TRAIL_TARGET_GAP_SEC)).toBe(true);
+        // Assert: the first fix of each slot, as long as that one is in the window and clear of the target
+        const firsts = history.filter(
+          (f, i) => history.findIndex((g) => slotOf(g) === slotOf(f)) === i,
+        );
+        const marked = firsts.filter(
+          (f) => f.t >= now - windowSec && f.t <= now - TRAIL_TARGET_GAP_SEC,
+        );
+        expect(out).toEqual(marked.toReversed());
+      }),
+    );
   });
 
   it('keeps the same marks as time passes, only adding new ones and dropping stale ones', () => {
     // Arrange
-    const history = fixes(Array.from({ length: 41 }, (_, i) => i));
+    const anyTimes = fc
+      .tuple(fc.integer({ min: 0, max: 100 }), fc.integer({ min: 0, max: 40 }))
+      .map(([now, passed]) => [now, now + passed] as const);
+    const anyWindow = fc.integer({ min: 0, max: 60 });
 
-    // Act
-    const earlier = decimateTrail(history, 30, 60);
-    const later = decimateTrail(history, 40, 60);
+    fc.assert(
+      fc.property(anyHistory, anyTimes, anyWindow, (history, [earlier, later], windowSec) => {
+        // Act
+        const [before = [], after = []] = [earlier, later].map((now) =>
+          decimateTrail(history, now, windowSec),
+        );
 
-    // Assert
-    expect(later.slice(later.length - earlier.length)).toEqual(earlier);
-    expect(later.length).toBeGreaterThan(earlier.length);
-  });
-
-  it('drops the oldest mark whole once its slot starts before the window, never shifting it', () => {
-    // Arrange
-    const history = fixes(Array.from({ length: 41 }, (_, i) => i));
-
-    // Act
-    const midSlot = decimateTrail(history, 45, 40);
-    const onEdge = decimateTrail(history, 48, 40);
-
-    // Assert
-    expect(midSlot.at(-1)?.t).toBe(TRAIL_DECIMATION_SEC);
-    expect(onEdge.at(-1)?.t).toBe(TRAIL_DECIMATION_SEC);
-  });
-
-  it('stops at the window edge', () => {
-    // Arrange
-    const history = fixes([0, 10, 20, 30, 40, 50, 60]);
-    const now = 60;
-
-    // Act
-    const out = decimateTrail(history, now, 30);
-
-    // Assert
-    expect(out.every((f) => f.t >= 30)).toBe(true);
-    expect(out.length).toBeGreaterThan(0);
+        // Assert: a slot marked before is marked by the same fix after, or not at all
+        const slots = new Set(before.map(slotOf));
+        const stillInWindow = before.filter((f) => f.t >= later - windowSec);
+        expect(after.filter((f) => slots.has(slotOf(f)))).toEqual(stillInWindow);
+      }),
+    );
   });
 
   it('returns nothing for a window of zero', () => {
