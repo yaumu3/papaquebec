@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 
-import { distanceFromSite, sortTracks } from './listSort';
+import { distanceFromSite, sortTracks, stepThrough } from './listSort';
 import { setDeclinationAt } from './magnetic';
 import { resetDeclination } from './sampleFixture';
 import type { Track } from './track';
@@ -146,5 +146,27 @@ describe('sortTracks', () => {
 
     // Assert
     expect(tracks.map((t) => t.hex)).toEqual(['b', 'a']);
+  });
+});
+
+describe('stepThrough', () => {
+  it('steps round the list, entering at the top going down and at the bottom going up', () => {
+    // Arrange
+    const hexes = ['a', 'b', 'c'];
+    const steps: [readonly string[], string | null, 1 | -1][] = [
+      [hexes, 'a', 1],
+      [hexes, 'b', -1],
+      [hexes, 'c', 1],
+      [hexes, 'a', -1],
+      [hexes, null, 1],
+      [hexes, 'gone', -1],
+      [[], 'a', 1],
+    ];
+
+    // Act
+    const out = steps.map(([list, current, direction]) => stepThrough(list, current, direction));
+
+    // Assert
+    expect(out).toEqual(['b', 'a', 'a', 'c', 'a', 'c', null]);
   });
 });

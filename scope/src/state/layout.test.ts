@@ -13,10 +13,13 @@ import {
   nextSheet,
   setActiveSheet,
   setSheetDetent,
+  show,
   sheetDetent,
   sheetSlides,
   toggleSheet,
+  toggleShown,
 } from './layout';
+import { panels } from './scope';
 
 const BOTH: [Detent, Detent] = ['medium', 'large'];
 const LARGE: [Detent] = ['large'];
@@ -110,6 +113,48 @@ describe('toggleSheet', () => {
 
     // Assert
     expect(activeSheet()).toBe('maps');
+  });
+});
+
+describe('toggleShown', () => {
+  it('toggles a panel by the sheet on a phone and by its own toggle elsewhere', () => {
+    // Arrange
+    closeSheet();
+    const toggled = panels().maps;
+
+    // Act
+    const out = [true, false].map((phone) => {
+      toggleShown('maps', phone);
+      return [activeSheet(), panels().maps];
+    });
+
+    // Assert
+    expect(out).toEqual([
+      ['maps', toggled],
+      ['maps', !toggled],
+    ]);
+  });
+});
+
+describe('show', () => {
+  it('shows a hidden panel and leaves a shown one, on a phone and elsewhere', () => {
+    // Arrange
+    closeSheet();
+    if (panels().maps) toggleShown('maps', false);
+
+    // Act
+    const out = [true, true, false, false].map((phone) => {
+      show('maps', phone);
+      return [activeSheet(), panels().maps];
+    });
+
+    // Assert
+    expect(out).toEqual([
+      ['maps', false],
+      ['maps', false],
+      ['maps', true],
+      ['maps', true],
+    ]);
   });
 });
 

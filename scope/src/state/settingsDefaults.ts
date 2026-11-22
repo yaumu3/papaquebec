@@ -68,6 +68,14 @@ export type PanelId = 'display' | 'maps' | 'list' | 'detail';
 export type Panels = Record<PanelId, boolean>;
 /** Every panel, in the order the bars list them. */
 export const PANEL_IDS: readonly PanelId[] = ['display', 'maps', 'list', 'detail'];
+
+/** What each panel is called where there is room for its whole name. */
+export const PANEL_NAMES: Record<PanelId, string> = {
+  display: 'DISPLAY',
+  maps: 'MAPS',
+  list: 'LIST',
+  detail: 'DETAIL',
+};
 export const DEFAULT_PANELS: Panels = { display: true, maps: true, list: true, detail: true };
 
 /** The ranges of the ND, in nautical miles, from the closest in. */

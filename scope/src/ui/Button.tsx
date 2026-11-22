@@ -10,6 +10,8 @@ export function Button(props: {
   class?: string | undefined;
   /** Read out in place of the content, for a button that shows a glyph. */
   label?: string;
+  /** Shown on hover, as the key that does the same. */
+  tip?: string;
   onClick: () => void;
   children: JSX.Element;
 }) {
@@ -18,6 +20,7 @@ export function Button(props: {
       type="button"
       class={cx(s.button, props.class, props.on && s.on)}
       aria-label={props.label}
+      title={props.tip}
       onClick={() => props.onClick()}
     >
       {props.children}

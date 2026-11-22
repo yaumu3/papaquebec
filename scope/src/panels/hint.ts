@@ -1,3 +1,5 @@
+import { SHORTCUTS } from '../canvas/input/devices/keyboard';
+
 /** Caps pressed together, joined by `sep` (a chord by default), and what they do. */
 export interface Binding {
   keys: readonly string[];
@@ -14,26 +16,11 @@ export interface HintBlock {
 
 const key = (k: string, action: string): Binding => ({ keys: [k], action });
 
+/** The shortcuts in two columns, the first no shorter than the second. */
+const half = Math.ceil(SHORTCUTS.length / 2);
+
 export const HINT: readonly HintBlock[] = [
-  {
-    title: 'KEYBOARD',
-    columns: [
-      [
-        { keys: ['[', ']'], action: 'RANGE', sep: '' },
-        key('T', 'TRAIL CYCLE'),
-        key('V', 'VECTOR CYCLE'),
-        key('L', 'LIST'),
-        key('?', 'HINT'),
-      ],
-      [
-        key('R', 'RBL'),
-        key('DEL', 'LAST RBL'),
-        { keys: ['SHIFT', 'DEL'], action: 'ALL RBL' },
-        key('HOME', 'RESET PAN'),
-        key('ESC', 'CANCEL'),
-      ],
-    ],
-  },
+  { title: 'KEYBOARD', columns: [SHORTCUTS.slice(0, half), SHORTCUTS.slice(half)] },
   {
     title: 'LANES',
     columns: [

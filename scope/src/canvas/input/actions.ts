@@ -1,9 +1,19 @@
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
+import { setSearchAsked } from '../../state/layerTree';
+import { show, toggleShown } from '../../state/layout';
+import { sortTracks, stepThrough } from '../../state/listSort';
 import {
+  aboutVisible,
+  hintVisible,
+  listSort,
+  menu as openMenu,
+  type PanelId,
+  rangeCursor,
   type RangeCursorOrigin,
   rblPending,
   rbls,
+  selected,
   setAboutVisible,
   setHintVisible,
   setHovered,
@@ -15,7 +25,6 @@ import {
   setRblPending,
   setRbls,
   setSelected,
-  togglePanel,
 } from '../../state/scope';
 import {
   cycle,
@@ -26,6 +35,7 @@ import {
   TRAIL_STEPS,
   VECTOR_STEPS,
 } from '../../state/settings';
+import { trackStore } from '../../state/tracks';
 import { anchorAt, blockAt, fixAt, rblAt, targetAt } from '../hit';
 import { rblMenu, scopeMenu, targetMenu } from '../menus';
 import { appendRbl } from '../rbl';
@@ -78,15 +88,24 @@ export interface ScopeActions {
   stepRange: (direction: 1 | -1) => void;
   cycleTrails: () => void;
   cycleVectors: () => void;
-  toggleList: () => void;
+  /** Shows or hides a panel, by the sheet on a phone. */
+  togglePanel: (id: PanelId) => void;
   toggleHint: () => void;
+  toggleAbout: () => void;
+  /** Shows the Maps panel and puts the caret in its search box. */
+  searchMaps: () => void;
+  /** Selects the aircraft one row down (1) or up (-1) the list. */
+  stepSelection: (direction: 1 | -1) => void;
   /** Recentres the scope on the site. */
   recenter: () => void;
   /** Waits for the two ends of a new RBL. */
   startRbl: () => void;
   deleteLastRbl: () => void;
   clearRbls: () => void;
-  /** Abandons a pending RBL or range cursor and closes the menu and the about dialog. */
+  /**
+   * Abandons a pending RBL or range cursor and closes the menu, the about dialog and the hint;
+   * with none of those, drops the selection.
+   */
   cancel: () => void;
 }
 
@@ -102,8 +121,13 @@ const plain = {
   stepRange,
   cycleTrails: () => setSettings('trailSec', cycle(TRAIL_STEPS, settings.trailSec)),
   cycleVectors: () => setSettings('vectorMin', cycle(VECTOR_STEPS, settings.vectorMin)),
-  toggleList: () => togglePanel('list'),
+  togglePanel: (id: PanelId) => toggleShown(id),
   toggleHint: () => setHintVisible((v) => !v),
+  toggleAbout: () => setAboutVisible((v) => !v),
+  searchMaps: () => {
+    show('maps');
+    setSearchAsked((n) => n + 1);
+  },
   recenter: () => setPan({ x: 0, y: 0 }),
   startRbl: () => {
     setRblPending({ a: null });
@@ -111,12 +135,24 @@ const plain = {
   },
   deleteLastRbl: () => setRbls(rbls().slice(0, -1)),
   clearRbls: () => setRbls([]),
+  stepSelection: (direction: 1 | -1) => {
+    const hexes = sortTracks([...trackStore.tracks.values()], listSort()).map((t) => t.hex);
+    setSelected(stepThrough(hexes, selected(), direction));
+  },
   cancel: () => {
+    const open =
+      rblPending() !== null ||
+      rangeCursor() !== null ||
+      openMenu() !== null ||
+      aboutVisible() ||
+      hintVisible();
+    if (!open) setSelected(null);
     setRblPending(null);
     setRangeCursor(null);
     setModeText(null);
     setMenu(null);
     setAboutVisible(false);
+    setHintVisible(false);
   },
 } satisfies Partial<ScopeActions>;
 

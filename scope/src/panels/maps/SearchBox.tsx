@@ -1,6 +1,6 @@
-import { Show } from 'solid-js';
+import { createEffect, on, Show } from 'solid-js';
 
-import { query, setQuery, typeQuery } from '../../state/layerTree';
+import { query, searchAsked, setQuery, typeQuery } from '../../state/layerTree';
 
 import s from './SearchBox.module.css';
 
@@ -15,6 +15,18 @@ export function SearchBox(props: {
     setQuery('');
     input?.focus();
   };
+  // After the panel that was just shown has been laid out, as a hidden box takes no focus.
+  createEffect(
+    on(
+      searchAsked,
+      () =>
+        queueMicrotask(() => {
+          input?.focus();
+          input?.select();
+        }),
+      { defer: true },
+    ),
+  );
   return (
     <div class={s.search}>
       <input
@@ -37,10 +49,12 @@ export function SearchBox(props: {
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             props.onDown();
-          } else if (e.key === 'Escape' && e.currentTarget.value) {
+          } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            setQuery('');
+            // Clears what the box holds, then leaves it.
+            if (e.currentTarget.value) setQuery('');
+            else e.currentTarget.blur();
           }
         }}
       />

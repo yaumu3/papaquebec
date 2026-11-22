@@ -3,12 +3,14 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import type { AircraftReport } from '../../lib/aircraft';
 import type { View } from '../../render/protocol';
 import { toWorld } from '../../render/scene/view';
+import { searchAsked } from '../../state/layerTree';
 import {
   aboutVisible,
   hintVisible,
   hovered,
   menu,
   modeText,
+  panels,
   pointer,
   pan,
   rangeCursor,
@@ -16,7 +18,9 @@ import {
   rbls,
   selected,
   setAboutVisible,
+  setHintVisible,
   setHovered,
+  setListSort,
   setMenu,
   setModeText,
   setPointer,
@@ -25,6 +29,7 @@ import {
   setRblPending,
   setRbls,
   setSelected,
+  togglePanel,
 } from '../../state/scope';
 import { setRange, setSettings, settings } from '../../state/settings';
 import { trackStore } from '../../state/tracks';
@@ -273,16 +278,77 @@ describe('createActions', () => {
     expect([rblPending(), modeText(), rangeCursor(), menu()]).toEqual([null, null, null, null]);
   });
 
-  it('closes the about dialog on cancel', () => {
+  it('closes the about dialog and the hint on cancel', () => {
     // Arrange
     const a = subject();
     setAboutVisible(true);
+    setHintVisible(true);
 
     // Act
     a.cancel();
 
     // Assert
-    expect(aboutVisible()).toBe(false);
+    expect([aboutVisible(), hintVisible()]).toEqual([false, false]);
+  });
+
+  it('steps the selection through the list in its order', () => {
+    // Arrange
+    const a = subject();
+    trackStore.ingest({
+      now: 1000,
+      messages: 0,
+      aircraft: [aircraft('d00123'), aircraft('d00456')],
+    });
+    setListSort({ key: 'id', dir: 'desc' });
+    const steps = [1, 1, 1, -1] as const;
+
+    // Act
+    const visited = steps.map((direction) => {
+      a.stepSelection(direction);
+      return selected();
+    });
+
+    // Assert
+    expect(visited).toEqual(['d00456', 'd00123', 'd00456', 'd00123']);
+  });
+
+  it('drops the selection on cancel when nothing else is open', () => {
+    // Arrange
+    const a = subject();
+    setSelected('d00123');
+
+    // Act
+    a.cancel();
+
+    // Assert
+    expect(selected()).toBeNull();
+  });
+
+  it('keeps the selection on a cancel that closes something', () => {
+    // Arrange
+    const a = subject();
+    setSelected('d00123');
+    setMenu({ x: 0, y: 0, items: [] });
+
+    // Act
+    a.cancel();
+
+    // Assert
+    expect(selected()).toBe('d00123');
+  });
+
+  it('shows the Maps panel and asks for its search box', () => {
+    // Arrange
+    const a = subject();
+    if (panels().maps) togglePanel('maps');
+    const asked = searchAsked();
+
+    // Act
+    a.searchMaps();
+
+    // Assert
+    expect(panels().maps).toBe(true);
+    expect(searchAsked()).toBe(asked + 1);
   });
 
   it('waits for the first end of a new RBL', () => {

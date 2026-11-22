@@ -4,8 +4,13 @@ import { recordActions } from '../recordActions';
 import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR } from './keyboard';
 
 const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): KeyEvent => ({
+  preventDefault: () => {},
   key: k,
   shiftKey,
+  altKey: false,
+  ctrlKey: false,
+  metaKey: false,
+  defaultPrevented: false,
   target,
 });
 
@@ -14,7 +19,29 @@ describe('keyHandler', () => {
     // Arrange
     const { calls, actions } = recordActions();
     const onKey = keyHandler(actions);
-    const presses = ['Escape', '?', '[', ']', 't', 'V', 'l', 'R', 'Home', 'x'];
+    const presses = [
+      'Escape',
+      '?',
+      '+',
+      '-',
+      't',
+      'V',
+      'R',
+      'Home',
+      'i',
+      '/',
+      '[',
+      ']',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      'l',
+      'ArrowDown',
+      'ArrowUp',
+      'ArrowLeft',
+    ];
 
     // Act
     for (const k of presses) onKey(key(k));
@@ -27,10 +54,46 @@ describe('keyHandler', () => {
       ['stepRange', 1],
       ['cycleTrails'],
       ['cycleVectors'],
-      ['toggleList'],
       ['startRbl'],
       ['recenter'],
+      ['toggleAbout'],
+      ['searchMaps'],
+      ['togglePanel', 'display'],
+      ['togglePanel', 'maps'],
+      ['togglePanel', 'list'],
+      ['togglePanel', 'detail'],
+      ['stepSelection', 1],
+      ['stepSelection', -1],
     ]);
+  });
+
+  it('keeps a key it handles from the browser, and no other', () => {
+    // Arrange
+    const { actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const kept: string[] = [];
+    const press = (k: string): KeyEvent =>
+      Object.assign(key(k), { preventDefault: () => kept.push(k) });
+    const presses = [press('ArrowDown'), press('x')];
+
+    // Act
+    for (const pressed of presses) onKey(pressed);
+
+    // Assert
+    expect(kept).toEqual(['ArrowDown']);
+  });
+
+  it('leaves a key another handler has already taken', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const taken = { ...key('ArrowDown'), defaultPrevented: true };
+
+    // Act
+    onKey(taken);
+
+    // Assert
+    expect(calls).toEqual([]);
   });
 
   it('deletes the last RBL, or all of them with Shift', () => {
@@ -46,6 +109,23 @@ describe('keyHandler', () => {
     expect(calls).toEqual([['deleteLastRbl'], ['deleteLastRbl'], ['clearRbls']]);
   });
 
+  it('leaves a chord with Ctrl, Cmd or Alt to the browser', () => {
+    // Arrange
+    const { calls, actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const chords: KeyEvent[] = [
+      { ...key('r'), altKey: true },
+      { ...key('r'), ctrlKey: true },
+      { ...key('r'), metaKey: true },
+    ];
+
+    // Act
+    for (const chord of chords) onKey(chord);
+
+    // Assert
+    expect(calls).toEqual([]);
+  });
+
   it('ignores keys typed into an input', () => {
     // Arrange
     const { calls, actions } = recordActions();
@@ -53,7 +133,7 @@ describe('keyHandler', () => {
     const input = Object.assign(new EventTarget(), { tagName: 'INPUT' });
 
     // Act
-    onKey(key(']', false, input));
+    onKey(key('-', false, input));
 
     // Assert
     expect(calls).toEqual([]);
@@ -84,7 +164,7 @@ describe('keyHandler', () => {
       tagName: 'BUTTON',
       closest: (selector: string) => (selector === ND_SELECTOR ? {} : null),
     });
-    const presses = ['Home', ']', 'Escape'].map((k) => key(k, false, onNd));
+    const presses = ['Home', '-', 'Escape'].map((k) => key(k, false, onNd));
 
     // Act
     for (const press of presses) onKey(press);
