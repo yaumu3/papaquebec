@@ -7,11 +7,11 @@ import type { Locator, Page } from 'playwright';
 import type { FeedDown } from '../../src/feed/push';
 import { DRAW_STACK, LAYER_GROUPS } from '../../src/lib/layers';
 import { FL_MAX } from '../../src/state/filter';
-import type { Chart, Screen } from '../headless/browser';
+import { type Chart, PHONE, type Screen } from '../headless/browser';
 import { cellOf, onScope, type Place, type Sheet } from './grid';
 import type { Clip } from './imageDiff';
 import { SPECIMEN_TITLE, specimenSheet } from './specimens';
-import { DRIFTING, FLEET, type Flight, LONE, LONE_FLIGHTS, placeOf } from './traffic';
+import { DRIFTING, FLEET, type Flight, LONE, LONE_FLIGHTS, listedAs, placeOf } from './traffic';
 
 /** The example set's date: the scope's clock stands still at it. */
 export const CLOCK = new Date('2026-10-29T00:00:00Z');
@@ -149,6 +149,77 @@ const heldBlock = (name: string, dx: number, dy: number): Visit => ({
 });
 
 const { set: specimens, crops: elementCrops } = specimenSheet(EXAMPLE_SET, SITE);
+
+const navBar = (page: Page) => page.getByRole('navigation', { name: 'Panels and status' });
+const infoBlock = (page: Page) => navBar(page).getByRole('button', { name: /^\d\d:\d\d:\d\dZ/ });
+const indicator = (page: Page) => infoBlock(page).locator('> span[aria-hidden="true"]');
+const panelButton = (page: Page, name: string) =>
+  navBar(page).getByRole('button', { name, exact: true });
+
+/** Waits for the indicator's opacity to read `opacity`: its light goes out on a timer. */
+async function indicatorAt(page: Page, opacity: '0' | '1', tries = 100): Promise<void> {
+  const read = await indicator(page).evaluate((el) => getComputedStyle(el).opacity);
+  if (read === opacity) return;
+  if (tries === 0) throw new Error(`the indicator stays at ${read}, not ${opacity}`);
+  await Bun.sleep(50);
+  return indicatorAt(page, opacity, tries - 1);
+}
+
+/** Stops the page's timers at the instant they stand at: nothing turns the indicator off. */
+const frozen = (page: Page) => page.clock.pauseAt(CLOCK);
+
+const tapInfoBlock = async (page: Page) => {
+  await infoBlock(page).tap();
+  await indicatorAt(page, '1');
+};
+
+const scrolledToEnd = (page: Page) =>
+  page
+    .getByText(listedAs(FLEET[0] as Flight), { exact: true })
+    .first()
+    .evaluate((row) => {
+      let scroller = row.parentElement;
+      while (scroller && !/auto|scroll/.test(getComputedStyle(scroller).overflowY)) {
+        scroller = scroller.parentElement;
+      }
+      scroller?.scrollTo(0, scroller.scrollHeight);
+    });
+
+const BAR: Clip = { x: 0, y: 744, width: 390, height: 100 };
+const LOWER: Clip = { x: 0, y: 460, width: 390, height: 384 };
+
+/** The nav bar on a phone, in each state that has an image. */
+const navBarVisit: Visit = {
+  screen: PHONE,
+  settings: NEAR_NORMAL,
+  fleet: FLEET,
+  steps: [
+    { name: 'nav/rest', act: (page) => indicatorAt(page, '0') },
+    {
+      act: async (page) => {
+        await frozen(page);
+        await tapInfoBlock(page);
+      },
+      crops: [{ name: 'nav/tracks', clip: BAR }],
+    },
+    { act: tapInfoBlock, crops: [{ name: 'nav/rate', clip: BAR }] },
+    {
+      name: 'nav/list-medium',
+      act: async (page) => {
+        await tapInfoBlock(page);
+        await page.clock.resume();
+        await panelButton(page, 'List').tap();
+        await indicatorAt(page, '0');
+      },
+    },
+    { act: scrolledToEnd, crops: [{ name: 'nav/list-end', clip: LOWER }] },
+    {
+      name: 'nav/list-large',
+      act: (page) => page.getByRole('button', { name: 'Resize the sheet' }).tap(),
+    },
+    { name: 'nav/display', act: (page) => panelButton(page, 'Display').tap() },
+  ],
+};
 
 export const VISITS: readonly Visit[] = [
   {
@@ -336,4 +407,5 @@ export const VISITS: readonly Visit[] = [
     plotted: ['src', 'rssi', 'msgs', 'age'],
     steps: [detail('lanes/reception', 'TEST13')],
   },
+  navBarVisit,
 ];
