@@ -500,6 +500,7 @@ describe('markedPieces', () => {
       ['ZAMBU', ['ZA', 'ZAMB'], '[ZAMB]U'],
       ['ZAMBU KIN', ['ZA', 'KI'], '[ZA]MBU [KI]N'],
       ['BAZAR', ['ZA'], 'BAZAR'],
+      ['straße ab', ['AB'], 'straße [ab]'],
     ];
 
     // Act

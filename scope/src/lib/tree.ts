@@ -174,9 +174,16 @@ const WORD_BREAKS = ' ./-()';
 /** The query's terms: upper-cased, split at spaces, none empty. */
 export const termsOf = (query: string): string[] => query.toUpperCase().split(' ').filter(Boolean);
 
+/** `text` in upper case character for character: one whose upper case is longer, as ß, stays. */
+const upperInPlace = (text: string): string =>
+  Array.from(text, (char) => {
+    const upper = char.toUpperCase();
+    return upper.length === char.length ? upper : char;
+  }).join('');
+
 /** Every index at which `term` starts a word of `text`, compared in upper case. */
 function wordStarts(text: string, term: string): number[] {
-  const upper = text.toUpperCase();
+  const upper = upperInPlace(text);
   const starts: number[] = [];
   for (let at = upper.indexOf(term); at >= 0; at = upper.indexOf(term, at + 1)) {
     if (at === 0 || WORD_BREAKS.includes(upper.charAt(at - 1))) starts.push(at);
