@@ -11,7 +11,7 @@
     max-width: calc(100% - 2 * var(--edge));
     margin-inline: auto;
     height: 62px;
-    padding: 0 var(--space-6);
+    padding: 0 var(--space-4);
     display: grid;
     grid-template-columns: auto minmax(0, auto) auto;
     column-gap: 18px;
