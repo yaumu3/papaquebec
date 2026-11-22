@@ -79,3 +79,15 @@ export function tapInfoBlock(page: InfoPage, notice: Notice | null): InfoPage {
 export function infoBlockLabel(clock: string, line: InfoLine): string {
   return `${clock}, ${line.spoken}`;
 }
+
+/** The line showing and the one it took over from, which rolls away. */
+export interface Roll {
+  now: InfoLine;
+  was: InfoLine | null;
+}
+
+/** The roll after a new line: the old line rolls away only when what the line shows has changed. */
+export function rolled(prev: Roll | undefined, line: InfoLine): Roll {
+  if (!prev) return { now: line, was: null };
+  return { now: line, was: prev.now.key === line.key ? prev.was : prev.now };
+}

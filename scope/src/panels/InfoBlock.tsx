@@ -1,14 +1,42 @@
-import { createMemo } from 'solid-js';
+import { createMemo, createSignal, Show } from 'solid-js';
 
+import { cx } from '../design/cx';
 import { clockTime } from '../lib/format';
 import { currentNotice, messageRate, qnhReadout, trackCount } from '../state/barReadouts';
-import { infoBlockLabel, infoLine, tapInfoBlock } from '../state/infoBlock';
+import {
+  infoBlockLabel,
+  type InfoLine,
+  infoLine,
+  type Roll,
+  rolled,
+  tapInfoBlock,
+} from '../state/infoBlock';
 import { tick } from '../state/scope';
 import { setSettings, settings } from '../state/settings';
 
 import s from './InfoBlock.module.css';
 
 const clock = () => `${clockTime(tick() / 1000)}Z`;
+
+/** One line's text, its value in its tone. */
+function Line(props: {
+  line: InfoLine;
+  class?: string | undefined;
+  leaving?: (() => void) | undefined;
+}) {
+  return (
+    <span
+      class={cx(s.line, props.class)}
+      data-tone={props.line.cls ?? undefined}
+      aria-hidden={props.leaving ? true : undefined}
+      onAnimationEnd={props.leaving}
+    >
+      {props.line.label && `${props.line.label} `}
+      <span class={s.v}>{props.line.value}</span>
+      {props.line.unit && ` ${props.line.unit}`}
+    </span>
+  );
+}
 
 /** The nav bar's centre: the clock over one status page, which a tap advances. */
 export function InfoBlock() {
@@ -20,6 +48,9 @@ export function InfoBlock() {
       notice(),
     ),
   );
+  const roll = createMemo<Roll>((prev) => rolled(prev, line()));
+  const [gone, setGone] = createSignal<InfoLine | null>(null);
+  const leaving = () => (roll().was === gone() ? null : roll().was);
   return (
     <button
       type="button"
@@ -32,10 +63,16 @@ export function InfoBlock() {
         <span class={s.clock}>{clock()}</span>
         <span class={s.status}>
           <span class={s.lamp} data-tone={line().lamp ?? undefined} />
-          <span class={s.text} data-tone={line().cls ?? undefined}>
-            {line().label && `${line().label} `}
-            <span class={s.v}>{line().value}</span>
-            {line().unit && ` ${line().unit}`}
+          <span class={s.text}>
+            <Show when={roll().now.key} keyed>
+              {(_key) => {
+                const enters = roll().was !== null;
+                return <Line line={roll().now} class={enters ? s.enter : undefined} />;
+              }}
+            </Show>
+            <Show when={leaving()} keyed>
+              {(was) => <Line line={was} class={s.leave} leaving={() => setGone(was)} />}
+            </Show>
           </span>
         </span>
       </span>
