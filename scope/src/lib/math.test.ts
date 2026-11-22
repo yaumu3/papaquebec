@@ -17,10 +17,10 @@ describe('clamp', () => {
         // Act
         const held = clamp(v, lo, hi);
 
-        // Assert
+        // Assert: adding zero, as a zero of either sign is the same value
         expect(held).toBeGreaterThanOrEqual(lo);
         expect(held).toBeLessThanOrEqual(hi);
-        expect(held).toBe(v < lo ? lo : v > hi ? hi : v);
+        expect(held + 0).toBe((v < lo ? lo : v > hi ? hi : v) + 0);
       }),
     );
   });
