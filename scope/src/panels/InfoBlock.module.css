@@ -4,6 +4,9 @@
   align-items: center;
   min-width: 0;
   min-height: 44px;
+  /* The indicator's 2px and its gap, mirrored on the left so the clock never shifts. */
+  padding-inline: 9px 0;
+  gap: 7px;
 }
 /* 9px between the trimmed lines puts the clock's cap top 28px above line 2's baseline. */
 .lines {
@@ -100,4 +103,25 @@
   to {
     opacity: 0;
   }
+}
+.indicator {
+  display: flex;
+  flex-direction: column;
+  align-self: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 300ms;
+}
+.lit {
+  opacity: 1;
+  transition-duration: 0s;
+}
+.mark {
+  width: 2px;
+  height: 4px;
+  background: var(--text-muted);
+}
+.current {
+  height: 12px;
+  background: var(--control-on-bg);
 }

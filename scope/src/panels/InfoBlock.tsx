@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show } from 'solid-js';
+import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
 import { clockTime } from '../lib/format';
@@ -13,8 +13,14 @@ import {
 } from '../state/infoBlock';
 import { tick } from '../state/scope';
 import { setSettings, settings } from '../state/settings';
+import { INFO_PAGES } from '../state/settingsDefaults';
+import { createHold } from '../ui/hold';
 
 import s from './InfoBlock.module.css';
+
+/** How long the indicator shows after the page loads, and after a switch. */
+const LOAD_MS = 1500;
+const SWITCH_MS = 1000;
 
 const clock = () => `${clockTime(tick() / 1000)}Z`;
 
@@ -48,6 +54,15 @@ export function InfoBlock() {
       notice(),
     ),
   );
+  const light = createHold();
+  onMount(() => light.hold(LOAD_MS));
+  onCleanup(light.drop);
+  const tap = () => {
+    const next = tapInfoBlock(settings.infoPage, notice());
+    if (next === settings.infoPage) return;
+    setSettings('infoPage', next);
+    light.hold(SWITCH_MS);
+  };
   const roll = createMemo<Roll>((prev) => rolled(prev, line()));
   const [gone, setGone] = createSignal<InfoLine | null>(null);
   const leaving = () => (roll().was === gone() ? null : roll().was);
@@ -57,7 +72,7 @@ export function InfoBlock() {
       class={s.block}
       aria-label={infoBlockLabel(clock(), line())}
       aria-disabled={notice() !== null}
-      onClick={() => setSettings('infoPage', tapInfoBlock(settings.infoPage, notice()))}
+      onClick={tap}
     >
       <span class={s.lines}>
         <span class={s.clock}>{clock()}</span>
@@ -75,6 +90,11 @@ export function InfoBlock() {
             </Show>
           </span>
         </span>
+      </span>
+      <span class={cx(s.indicator, light.lit() && !notice() && s.lit)} aria-hidden="true">
+        {INFO_PAGES.map((page) => (
+          <span class={cx(s.mark, page === settings.infoPage && s.current)} />
+        ))}
       </span>
     </button>
   );
