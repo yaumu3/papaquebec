@@ -5,7 +5,14 @@ import { listen } from '../dom';
 /** The parts of a `KeyboardEvent` the shortcuts read. */
 export type KeyEvent = Pick<
   KeyboardEvent,
-  'key' | 'shiftKey' | 'altKey' | 'ctrlKey' | 'metaKey' | 'defaultPrevented' | 'target'
+  | 'key'
+  | 'shiftKey'
+  | 'altKey'
+  | 'ctrlKey'
+  | 'metaKey'
+  | 'defaultPrevented'
+  | 'preventDefault'
+  | 'target'
 >;
 
 /** One shortcut: the keys that ask for it, how the hint shows it, and what it does. */
@@ -88,14 +95,18 @@ export function ownsKeys(t: EventTarget | null): boolean {
 }
 
 /**
- * The keyboard's shortcuts; a chord with Ctrl, Cmd or Alt is the browser's, and a key another
- * handler has taken, typed into an input or pressed in the lanes or on the ND is left alone.
+ * The keyboard's shortcuts, each kept from the browser; a chord with Ctrl, Cmd or Alt is the
+ * browser's, and a key another handler has taken, typed into an input or pressed in the lanes or
+ * on the ND is left alone.
  */
 export function keyHandler(a: ScopeActions): (e: KeyEvent) => void {
   return (e) => {
     if (e.defaultPrevented || e.altKey || e.ctrlKey || e.metaKey || ownsKeys(e.target)) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
-    SHORTCUTS.find((s) => s.on.includes(k) && (s.shift ?? e.shiftKey) === e.shiftKey)?.run(a, k);
+    const asked = SHORTCUTS.find((s) => s.on.includes(k) && (s.shift ?? e.shiftKey) === e.shiftKey);
+    if (!asked) return;
+    e.preventDefault();
+    asked.run(a, k);
   };
 }
 

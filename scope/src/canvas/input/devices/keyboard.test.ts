@@ -4,6 +4,7 @@ import { recordActions } from '../recordActions';
 import { type KeyEvent, keyHandler, LANES_SELECTOR, ND_SELECTOR, panelTip } from './keyboard';
 
 const key = (k: string, shiftKey = false, target: KeyEvent['target'] = null): KeyEvent => ({
+  preventDefault: () => {},
   key: k,
   shiftKey,
   altKey: false,
@@ -69,6 +70,22 @@ describe('keyHandler', () => {
       ['stepSelection', 1],
       ['stepSelection', -1],
     ]);
+  });
+
+  it('keeps a key it handles from the browser, and no other', () => {
+    // Arrange
+    const { actions } = recordActions();
+    const onKey = keyHandler(actions);
+    const kept: string[] = [];
+    const press = (k: string): KeyEvent =>
+      Object.assign(key(k), { preventDefault: () => kept.push(k) });
+    const presses = [press('ArrowDown'), press('x')];
+
+    // Act
+    for (const pressed of presses) onKey(pressed);
+
+    // Assert
+    expect(kept).toEqual(['ArrowDown']);
   });
 
   it('leaves a key another handler has already taken', () => {
