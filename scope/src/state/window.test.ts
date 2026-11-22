@@ -95,14 +95,14 @@ describe('resolveWindow', () => {
 });
 
 describe('xOf and timeAt', () => {
-  it('map a time to its share of the width and back', () => {
-    // Arrange: times of the day's size, where a double still tells microseconds apart
-    const anyInterval = fc
-      .tuple(fc.integer({ min: 0, max: 86_400 }), fc.integer({ min: MIN_WINDOW_SEC, max: 7200 }))
-      .map(([from, length]) => ({ from, to: from + length }));
-    const anyShare = fc.integer({ min: -1000, max: 2000 }).map((n) => n / 1000);
-    const anyWidth = fc.integer({ min: 100, max: 2000 });
+  // Times of the day's size, where a double still tells microseconds apart.
+  const anyInterval = fc
+    .tuple(fc.integer({ min: 0, max: 86_400 }), fc.integer({ min: MIN_WINDOW_SEC, max: 7200 }))
+    .map(([from, length]) => ({ from, to: from + length }));
+  const anyShare = fc.integer({ min: -1000, max: 2000 }).map((n) => n / 1000);
+  const anyWidth = fc.integer({ min: 100, max: 2000 });
 
+  it('map a time to its share of the width', () => {
     fc.assert(
       fc.property(anyInterval, anyShare, anyWidth, (visible, share, width) => {
         // Arrange
@@ -113,7 +113,22 @@ describe('xOf and timeAt', () => {
 
         // Assert
         expect(x).toBeCloseTo(share * width, 6);
-        expect(timeAt(x, visible, width)).toBeCloseTo(t, 6);
+      }),
+    );
+  });
+
+  it('map the place of a time across the width back to the time', () => {
+    fc.assert(
+      fc.property(anyInterval, anyShare, anyWidth, (visible, share, width) => {
+        // Arrange
+        const t = visible.from + share * lengthOf(visible);
+        const x = xOf(t, visible, width);
+
+        // Act
+        const back = timeAt(x, visible, width);
+
+        // Assert
+        expect(back).toBeCloseTo(t, 6);
       }),
     );
   });

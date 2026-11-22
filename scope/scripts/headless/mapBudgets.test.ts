@@ -45,12 +45,12 @@ describe('complaintsOf', () => {
 });
 
 describe('budgetsFrom', () => {
-  it('takes the medians rounded up, a millisecond at the least, which the medians then pass', () => {
-    // Arrange: medians to the hundredth of a millisecond
-    const anyMedian = fc.nat(50_000).map((hundredths) => hundredths / 100);
-    const anyMedians = fc.dictionary(fc.constantFrom('topology', 'labels', 'highlight'), anyMedian);
-    const anyTolerance = fc.integer({ min: 1, max: 5 });
+  // Medians to the hundredth of a millisecond.
+  const anyMedian = fc.nat(50_000).map((hundredths) => hundredths / 100);
+  const anyMedians = fc.dictionary(fc.constantFrom('topology', 'labels', 'highlight'), anyMedian);
+  const anyTolerance = fc.integer({ min: 1, max: 5 });
 
+  it('takes the medians rounded up, a millisecond at the least', () => {
     fc.assert(
       fc.property(anyMedians, anyTolerance, (medians, tolerance) => {
         // Act
@@ -70,7 +70,21 @@ describe('budgetsFrom', () => {
               Number.isInteger(ms) && ms >= 1 && ms >= median && (ms === 1 || ms - median < 1),
           ),
         ).toBe(true);
-        expect(complaintsOf(medians, budgets)).toEqual([]);
+      }),
+    );
+  });
+
+  it('gives budgets that the medians they were taken from pass', () => {
+    fc.assert(
+      fc.property(anyMedians, anyTolerance, (medians, tolerance) => {
+        // Arrange
+        const budgets = budgetsFrom(medians, tolerance);
+
+        // Act
+        const complaints = complaintsOf(medians, budgets);
+
+        // Assert
+        expect(complaints).toEqual([]);
       }),
     );
   });
