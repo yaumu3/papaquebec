@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 
-import { createHoldWith } from './hold';
+import { createHold } from './hold';
 
 function fakeTimers() {
   const pending = new Map<number, { ms: number; fn: () => void }>();
@@ -20,10 +20,10 @@ function fakeTimers() {
   };
 }
 
-describe('createHoldWith', () => {
+describe('createHold', () => {
   it('is off before it is lit', () => {
     // Arrange
-    const hold = createHoldWith(fakeTimers());
+    const hold = createHold(fakeTimers());
 
     // Act
     const lit = hold.lit();
@@ -35,7 +35,7 @@ describe('createHoldWith', () => {
   it('is lit for the time it is held', () => {
     // Arrange
     const timers = fakeTimers();
-    const hold = createHoldWith(timers);
+    const hold = createHold(timers);
 
     // Act
     hold.hold(1500);
@@ -47,7 +47,7 @@ describe('createHoldWith', () => {
   it('goes off when the time is up', () => {
     // Arrange
     const timers = fakeTimers();
-    const hold = createHoldWith(timers);
+    const hold = createHold(timers);
     hold.hold(1500);
 
     // Act
@@ -60,7 +60,7 @@ describe('createHoldWith', () => {
   it('starts the time over when it is held again', () => {
     // Arrange
     const timers = fakeTimers();
-    const hold = createHoldWith(timers);
+    const hold = createHold(timers);
     hold.hold(1500);
 
     // Act
@@ -77,7 +77,7 @@ describe('createHoldWith', () => {
   it('goes off when the second time is up', () => {
     // Arrange
     const timers = fakeTimers();
-    const hold = createHoldWith(timers);
+    const hold = createHold(timers);
     hold.hold(1500);
     hold.hold(1000);
 
@@ -91,7 +91,7 @@ describe('createHoldWith', () => {
   it('drops the pending time and goes off', () => {
     // Arrange
     const timers = fakeTimers();
-    const hold = createHoldWith(timers);
+    const hold = createHold(timers);
     hold.hold(1500);
 
     // Act
