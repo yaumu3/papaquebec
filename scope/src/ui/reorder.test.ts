@@ -1,18 +1,38 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
+import { clamp } from '../lib/math';
 import { EDGE_PX, EDGE_SPEED_PX, edgeSpeed, placeOf, reorderKey, slotAt } from './reorder';
+
+/** How tall `items` stand, one under another. */
+const tall = (items: readonly number[]) => items.reduce((sum, h) => sum + h, 0);
 
 describe('slotAt', () => {
   it("reads the slot under the pointer by each item's height, kept among the places there are", () => {
-    // Arrange
-    const heights = [85, 251, 61, 85];
-    const ys = [-1, 0, 84, 85, 335, 336, 396, 397, 481, 482, 9999];
+    // Arrange: whole heights, which add up exactly, and a pointer at or beside the edge of an item
+    const anyHeights = fc.array(fc.integer({ min: 1, max: 300 }), { minLength: 1, maxLength: 12 });
+    const anyPointer = anyHeights.chain((heights) =>
+      fc.record({
+        heights: fc.constant(heights),
+        y: fc
+          .tuple(fc.nat({ max: heights.length }), fc.integer({ min: -2, max: 2 }))
+          .map(([edge, off]) => tall(heights.slice(0, edge)) + off),
+      }),
+    );
 
-    // Act
-    const slots = ys.map((y) => slotAt(y, heights));
+    fc.assert(
+      fc.property(anyPointer, ({ heights, y }) => {
+        // Act
+        const slot = slotAt(y, heights);
 
-    // Assert
-    expect(slots).toEqual([0, 0, 0, 1, 1, 2, 2, 3, 3, 3, 3]);
+        // Assert
+        const within = clamp(y, 0, tall(heights) - 1);
+        expect(Number.isInteger(slot)).toBe(true);
+        expect(tall(heights.slice(0, slot))).toBeLessThanOrEqual(within);
+        expect(tall(heights.slice(0, slot + 1))).toBeGreaterThan(within);
+      }),
+    );
   });
 
   it('is the first slot with no items', () => {
@@ -29,22 +49,27 @@ describe('slotAt', () => {
 
 describe('placeOf', () => {
   it('puts the held item in the slot and closes the others up around it', () => {
-    // Arrange
-    const holds = [
-      { from: 0, slot: 2 },
-      { from: 3, slot: 1 },
-      { from: 1, slot: 1 },
-    ];
+    // Arrange: a list of some length, one of its items held over one of its slots
+    const anyHold = fc.integer({ min: 1, max: 20 }).chain((count) =>
+      fc.record({
+        count: fc.constant(count),
+        from: fc.nat({ max: count - 1 }),
+        slot: fc.nat({ max: count - 1 }),
+      }),
+    );
 
-    // Act
-    const places = holds.map(({ from, slot }) => [0, 1, 2, 3].map((i) => placeOf(i, from, slot)));
+    fc.assert(
+      fc.property(anyHold, ({ count, from, slot }) => {
+        // Act
+        const places = Array.from({ length: count }, (_, i) => placeOf(i, from, slot));
 
-    // Assert
-    expect(places).toEqual([
-      [2, 0, 1, 3],
-      [0, 2, 3, 1],
-      [0, 1, 2, 3],
-    ]);
+        // Assert
+        const others = places.filter((_, i) => i !== from);
+        const free = Array.from({ length: count }, (_, place) => place).filter((p) => p !== slot);
+        expect(places[from]).toBe(slot);
+        expect(others).toEqual(free);
+      }),
+    );
   });
 });
 
