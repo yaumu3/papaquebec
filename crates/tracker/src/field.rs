@@ -935,36 +935,48 @@ mod tests {
         })
     }
 
-    /// Whether what the field says is said again by what is written of it;
-    /// a field that says nothing is not one of the kind.
-    fn said_again<F: Field + PartialEq + std::fmt::Debug>(me: Bits) -> Result<(), TestCaseError> {
-        // Arrange
-        let field = F::read(me).ok_or_else(|| TestCaseError::reject("of another kind"))?;
-
-        // Act
-        let read = reread(&field);
-
-        // Assert
-        prop_assert_eq!(read, Some(field));
-        Ok(())
+    /// What the field says; a field that says nothing is not one of the kind.
+    fn said<F: Field>(me: Bits) -> Result<F, TestCaseError> {
+        F::read(me).ok_or_else(|| TestCaseError::reject("of another kind"))
     }
 
     proptest! {
         #[test]
         fn identification_is_read_as_it_is_written(me in identification_me()) {
-            said_again::<Identification>(me)?;
+            // Arrange
+            let field = said::<Identification>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
 
         #[test]
         fn airborne_position_is_read_as_it_is_written(
             me in me(type_codes(prop_oneof![9..=18_u32, 20..=22_u32])),
         ) {
-            said_again::<AirbornePosition>(me)?;
+            // Arrange
+            let field = said::<AirbornePosition>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
 
         #[test]
         fn surface_position_is_read_as_it_is_written(me in me(type_codes(5..=8_u32))) {
-            said_again::<SurfacePosition>(me)?;
+            // Arrange
+            let field = said::<SurfacePosition>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
 
         #[test]
@@ -978,28 +990,61 @@ mod tests {
                 _ => false,
             };
             prop_assume!(!at_most);
+            let field = said::<Velocity>(me)?;
 
-            said_again::<Velocity>(me)?;
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
 
         #[test]
         fn status_is_read_as_it_is_written(me in me(subtypes(28, Just(1)))) {
-            said_again::<Status>(me)?;
+            // Arrange
+            let field = said::<Status>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
 
         #[test]
         fn target_state_is_read_as_it_is_written(me in me(subtypes(29, 2..=3_u32))) {
-            said_again::<TargetStateAndStatus>(me)?;
+            // Arrange
+            let field = said::<TargetStateAndStatus>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
 
         #[test]
         fn ra_broadcast_is_read_as_it_is_written(me in me(subtypes(28, Just(2)))) {
-            said_again::<RaBroadcast>(me)?;
+            // Arrange
+            let field = said::<RaBroadcast>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
 
         #[test]
         fn operational_status_is_read_as_it_is_written(me in me(subtypes(31, 0..=1_u32))) {
-            said_again::<OperationalStatus>(me)?;
+            // Arrange
+            let field = said::<OperationalStatus>(me)?;
+
+            // Act
+            let read = reread(&field);
+
+            // Assert
+            prop_assert_eq!(read, Some(field));
         }
     }
 
