@@ -107,7 +107,7 @@ export function InfoBlock() {
       <span class={s.lines}>
         <span class={s.clock}>{clockReadout()}</span>
         <span class={s.status}>
-          <span class={s.lamp} data-tone={line().lamp ?? undefined} />
+          <span class={s.lamp} data-tone={notice()?.cls} />
           <RollingLine line={line()} />
         </span>
       </span>

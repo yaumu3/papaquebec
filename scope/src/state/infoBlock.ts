@@ -21,18 +21,14 @@ export interface InfoLine {
   unit: string;
   /** The value's tone. */
   cls: Tone | null;
-  /** The lamp's tone: the feed notice's, or none. */
-  lamp: Tone | null;
   /** The line for assistive tech, values spelled out. */
   spoken: string;
 }
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-const NO_TONE = { cls: null, lamp: null };
-
 function pageLine(page: InfoPage, r: Readouts): InfoLine {
-  const base = { key: page, label: '', unit: '', ...NO_TONE };
+  const base = { key: page, label: '', unit: '', cls: null };
   if (page === 'qnh') {
     const { value, cls } = r.qnh;
     return { ...base, label: 'QNH', value, cls, spoken: `QNH ${value} inches` };
@@ -62,7 +58,6 @@ export function infoLine(page: InfoPage, r: Readouts, notice: Notice | null): In
     value: notice.text,
     unit: '',
     cls: notice.cls,
-    lamp: notice.cls,
     spoken: notice.text,
   };
 }
