@@ -1,4 +1,4 @@
-/** The tree's arrow keys: which way a key moves from a row, and the moving. */
+/** The tree's keys: which way an arrow moves from a row, the moving, and the search box's Escape. */
 
 import { batch } from 'solid-js';
 
@@ -19,6 +19,11 @@ export function treeMove(key: string, expanded: boolean | null): TreeMove | null
     default:
       return null;
   }
+}
+
+/** What Escape does in the search box: clears what it holds, then leaves it. */
+export function searchEscape(value: string): 'clear' | 'leave' {
+  return value ? 'clear' : 'leave';
 }
 
 const HEAD = '[data-head]';

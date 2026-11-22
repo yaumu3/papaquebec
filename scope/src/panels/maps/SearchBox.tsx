@@ -1,6 +1,7 @@
 import { createEffect, on, Show } from 'solid-js';
 
 import { query, searchAsked, setQuery, typeQuery } from '../../state/layerTree';
+import { searchEscape } from './treeKeys';
 
 import s from './SearchBox.module.css';
 
@@ -49,10 +50,11 @@ export function SearchBox(props: {
           if (e.key === 'ArrowDown') {
             e.preventDefault();
             props.onDown();
-          } else if (e.key === 'Escape' && e.currentTarget.value) {
+          } else if (e.key === 'Escape') {
             e.preventDefault();
             e.stopPropagation();
-            setQuery('');
+            if (searchEscape(e.currentTarget.value) === 'clear') setQuery('');
+            else e.currentTarget.blur();
           }
         }}
       />
