@@ -83,6 +83,17 @@ describe('parseEdge', () => {
 });
 
 describe('draggedEdge', () => {
+  it('lands on zero itself from a drag that rounds up onto it', () => {
+    // Arrange
+    const l = { min: -4, max: 0, gap: 1 };
+
+    // Act
+    const edge = draggedEdge(0, 0.125, 50, l, 1);
+
+    // Assert
+    expect(Object.is(edge, 0)).toBe(true);
+  });
+
   it('turns pointer travel up the axis into whole steps from where the drag began, as far as the stops', () => {
     // Arrange: stops and a start on whole steps, and travel within half a step of whole steps
     const anyDrag = fc
@@ -107,9 +118,9 @@ describe('draggedEdge', () => {
         // Act
         const edge = draggedEdge(start, dyPx, trackPx, l, step);
 
-        // Assert: a step rounded up onto zero is -0, which is zero to all that read it
+        // Assert
         const asked = start + steps * step;
-        expect(edge + 0).toBe(asked < l.min ? l.min : asked > l.max ? l.max : asked);
+        expect(edge).toBe(asked < l.min ? l.min : asked > l.max ? l.max : asked);
       }),
     );
   });

@@ -58,5 +58,6 @@ export function draggedEdge(
   step: number,
 ): number {
   const raw = start - (dyPx / trackPx) * (l.max - l.min);
-  return clamp(Math.round(raw / step) * step, l.min, l.max);
+  // Adding zero turns the -0 that a step rounded up onto zero leaves into zero.
+  return clamp(Math.round(raw / step) * step + 0, l.min, l.max);
 }
