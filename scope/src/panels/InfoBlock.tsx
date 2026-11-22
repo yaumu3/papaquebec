@@ -1,8 +1,13 @@
 import { createMemo, createSignal, onCleanup, onMount, Show } from 'solid-js';
 
 import { cx } from '../design/cx';
-import { clockTime } from '../lib/format';
-import { currentNotice, messageRate, qnhReadout, trackCount } from '../state/barReadouts';
+import {
+  clockReadout,
+  currentNotice,
+  messageRate,
+  qnhReadout,
+  trackCount,
+} from '../state/barReadouts';
 import {
   infoBlockLabel,
   type InfoLine,
@@ -11,7 +16,6 @@ import {
   rolled,
   tapInfoBlock,
 } from '../state/infoBlock';
-import { tick } from '../state/scope';
 import { setSettings, settings } from '../state/settings';
 import { INFO_PAGES } from '../state/settingsDefaults';
 import { createHold } from '../ui/hold';
@@ -21,8 +25,6 @@ import s from './InfoBlock.module.css';
 /** How long the indicator shows after the page loads, and after a switch. */
 const LOAD_MS = 1500;
 const SWITCH_MS = 1000;
-
-const clock = () => `${clockTime(tick() / 1000)}Z`;
 
 /** One line's text, its value in its tone. */
 function Line(props: {
@@ -70,12 +72,12 @@ export function InfoBlock() {
     <button
       type="button"
       class={s.block}
-      aria-label={infoBlockLabel(clock(), line())}
+      aria-label={infoBlockLabel(clockReadout(), line())}
       aria-disabled={notice() !== null}
       onClick={tap}
     >
       <span class={s.lines}>
-        <span class={s.clock}>{clock()}</span>
+        <span class={s.clock}>{clockReadout()}</span>
         <span class={s.status}>
           <span class={s.lamp} data-tone={line().lamp ?? undefined} />
           <span class={s.text}>

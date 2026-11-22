@@ -2,8 +2,13 @@ import { createMemo, Show } from 'solid-js';
 
 import { panelTip } from '../canvas/input/devices/keyboard';
 import { cx } from '../design/cx';
-import { clockTime } from '../lib/format';
-import { currentNotice, messageRate, qnhReadout, trackCount } from '../state/barReadouts';
+import {
+  clockReadout,
+  currentNotice,
+  messageRate,
+  qnhReadout,
+  trackCount,
+} from '../state/barReadouts';
 import type { Tone } from '../state/feedLine';
 import {
   aboutVisible,
@@ -11,7 +16,6 @@ import {
   panels,
   renderError,
   setAboutVisible,
-  tick,
   togglePanel,
 } from '../state/scope';
 import { PANEL_IDS } from '../state/settingsDefaults';
@@ -35,7 +39,7 @@ export function TopBar() {
   const notice = createMemo(currentNotice);
   return (
     <div id="top-bar" class={s.bar}>
-      <div class={s.clock}>{clockTime(tick() / 1000)}Z</div>
+      <div class={s.clock}>{clockReadout()}</div>
       <div class={s.item}>
         QNH <span class={cx(s.v, tone(qnh().cls))}>{qnh().value}</span>
         <span class={cx(tone(qnh().cls))}> {qnh().source}</span>

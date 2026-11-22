@@ -1,4 +1,6 @@
 /** What both bars read: plain reactive reads, for the caller to memo. */
+
+import { clockTime } from '../lib/format';
 import { type Notice, feedNotice } from './feedLine';
 import { qnhReport, qnhStation } from './qnh';
 import { type QnhStatus, qnhStatus } from './qnhStatus';
@@ -13,6 +15,11 @@ export function qnhReadout(): QnhStatus {
     station: qnhStation(),
     report: qnhReport(),
   });
+}
+
+/** The clock as both bars show it: the UTC time with its Z. */
+export function clockReadout(): string {
+  return `${clockTime(tick() / 1000)}Z`;
 }
 
 export function trackCount(): number {
