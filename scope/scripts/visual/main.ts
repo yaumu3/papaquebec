@@ -24,14 +24,13 @@ import { parseArgs } from 'node:util';
 import type { Browser, BrowserContext, Page, Route } from 'playwright';
 import { PNG } from 'pngjs';
 
+import type { FeedDown } from '../../src/feed/push';
 import { importChart, launch, openScope, startPreview } from '../headless/browser';
 import { compareImages, cropImage, type Image, type Limits } from './imageDiff';
 import { filterOf, orphansAmong, settled, unknownFilters } from './run';
-import { SITE, type Step, type Visit, VISITS } from './shots';
+import { CLOCK, SITE, type Step, type Visit, VISITS } from './shots';
 import { fixedPlacer, type Flight, listedAs, replayWorker, trafficEvents } from './traffic';
 
-/** The example set's date: the scope's clock stands still at it. */
-const CLOCK = new Date('2026-10-29T00:00:00Z');
 const FEED_WORKER = '**/assets/feedWorker-*.js';
 const PLACER_WORKER = '**/assets/placerWorker-*.js';
 const SERVED = '/tmp/visual-dist';
@@ -70,9 +69,16 @@ function replayOf(fleet: readonly Flight[]): string {
   return replay;
 }
 
+const endedBy = (fleet: readonly Flight[], reason: FeedDown): string =>
+  replayWorker([...trafficEvents(fleet, SITE, CLOCK), { type: 'down', reason }]);
+
 /** Stands in for the feed worker and the placer's: the build flies `fleet`, its blocks fixed. */
-async function fly(context: BrowserContext, fleet: readonly Flight[]): Promise<void> {
-  await context.route(FEED_WORKER, workerOf(replayOf(fleet)));
+async function fly(
+  context: BrowserContext,
+  fleet: readonly Flight[],
+  down: FeedDown | undefined,
+): Promise<void> {
+  await context.route(FEED_WORKER, workerOf(down ? endedBy(fleet, down) : replayOf(fleet)));
   await context.route(PLACER_WORKER, workerOf(fixedPlacer(fleet)));
 }
 
@@ -103,7 +109,9 @@ async function taken(page: Page, step: Step, style: string): Promise<Taken[]> {
 /** Waits for what the page starts from: the fleet in the list, or the chart in the Maps panel. */
 async function readied(page: Page, visit: Visit): Promise<void> {
   const [first] = visit.fleet ?? [];
-  if (first) await page.getByText(listedAs(first), { exact: true }).first().waitFor();
+  if (first) {
+    await page.getByText(listedAs(first), { exact: true }).first().waitFor({ state: 'attached' });
+  }
   if (visit.chart) await importChart(page, visit.chart);
 }
 
@@ -112,11 +120,12 @@ async function capture(visit: Visit, browser: Browser): Promise<Taken[]> {
     browser,
     from: { url: `${URL_SERVED}?site=${SITE.lat},${SITE.lon}`, preview: false },
     scale: 1,
+    screen: visit.screen,
     settings: visit.settings,
     plotted: visit.plotted,
     prepare: async (context) => {
       await context.clock.setFixedTime(CLOCK);
-      if (visit.fleet) await fly(context, visit.fleet);
+      if (visit.fleet) await fly(context, visit.fleet, visit.down);
     },
   });
   try {

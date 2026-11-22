@@ -4,13 +4,17 @@
  */
 import type { Locator, Page } from 'playwright';
 
+import type { FeedDown } from '../../src/feed/push';
 import { DRAW_STACK, LAYER_GROUPS } from '../../src/lib/layers';
 import { FL_MAX } from '../../src/state/filter';
-import type { Chart } from '../headless/browser';
+import type { Chart, Screen } from '../headless/browser';
 import { cellOf, onScope, type Place, type Sheet } from './grid';
 import type { Clip } from './imageDiff';
 import { SPECIMEN_TITLE, specimenSheet } from './specimens';
 import { DRIFTING, FLEET, type Flight, LONE, LONE_FLIGHTS, placeOf } from './traffic';
+
+/** The example set's date: the scope's clock stands still at it. */
+export const CLOCK = new Date('2026-10-29T00:00:00Z');
 
 /** XQPA, the example set's aerodrome. */
 export const SITE = { lat: 33.5859, lon: 130.4508 };
@@ -42,6 +46,10 @@ export interface Visit {
   fleet?: readonly Flight[];
   /** The lanes of the detail column, if not the default ones. */
   plotted?: readonly string[];
+  /** What the page is shown on, if not the desktop. */
+  screen?: Screen;
+  /** Why the feed says it is down, told after the fleet; shows once the feed is dead. */
+  down?: FeedDown;
   steps: readonly Step[];
 }
 
