@@ -1,20 +1,30 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
+import { lengthOf } from '../../lib/polyline';
 import { type Batch, LINE_STRIDE, MARKER_STRIDE, Shape, TEXT_STRIDE } from '../protocol';
 import { LineBatch, MarkerBatch, parseColor, TextBatch, type TextStyle } from './pack';
 
 describe('parseColor', () => {
   it('turns #rrggbb and #rrggbbaa into unit floats', () => {
-    // Arrange
-    const inputs = ['#ff0000', '#00ff0080'];
+    // Arrange: red, green and blue bytes, with or without one for alpha
+    const anyBytes = fc.array(fc.integer({ min: 0, max: 255 }), { minLength: 3, maxLength: 4 });
 
-    // Act
-    const out = inputs.map((c) => parseColor(c));
+    fc.assert(
+      fc.property(anyBytes, (bytes) => {
+        // Arrange
+        const hex = `#${bytes.map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
 
-    // Assert
-    expect(out[0]).toEqual([1, 0, 0, 1]);
-    expect(out[1]?.[1]).toBe(1);
-    expect(out[1]?.[3]).toBeCloseTo(128 / 255, 6);
+        // Act
+        const rgba = parseColor(hex);
+
+        // Assert: opaque where no alpha is given
+        const [red = 0, green = 0, blue = 0, alpha = 255] = bytes;
+        expect(rgba.map((unit) => unit * 255)).toEqual([red, green, blue, alpha]);
+        expect(Math.max(...rgba)).toBeLessThanOrEqual(1);
+      }),
+    );
   });
 });
 
@@ -36,6 +46,8 @@ const spans = ({ count, data }: Batch) =>
 
 describe('LineBatch', () => {
   const white = '#ffffff';
+  const anyCoordinate = fc.integer({ min: -1000, max: 1000 });
+  const anyAnchor = fc.record({ x: anyCoordinate, y: anyCoordinate });
 
   it('packs one instance per segment with the documented layout', () => {
     // Arrange
@@ -128,54 +140,29 @@ describe('LineBatch', () => {
     expect(batch.data[8]).toBe(0.5);
   });
 
-  it('starts a lone segment at distance 0', () => {
-    // Arrange
-    const [a, c] = [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-    ];
+  it('carries the world distance along a polyline to each segment, starting every polyline at 0', () => {
+    // Arrange: whole coordinates, which a batch holds exactly
+    const anyPolylines = fc.array(fc.array(anyAnchor, { minLength: 2, maxLength: 8 }), {
+      minLength: 1,
+      maxLength: 3,
+    });
 
-    // Act
-    const batch = lines((b) => b.segment(a, c, white));
+    fc.assert(
+      fc.property(anyPolylines, (paths) => {
+        // Act
+        const along = distances(
+          lines((b) => {
+            for (const path of paths) b.polyline(path, white);
+          }),
+        );
 
-    // Assert
-    expect(batch.data[9]).toBe(0);
-  });
-
-  it('carries the world distance along a polyline to each segment', () => {
-    // Arrange
-    const path = [
-      { x: 0, y: 0 },
-      { x: 3, y: 0 },
-      { x: 3, y: 4 },
-      { x: 0, y: 4 },
-    ];
-
-    // Act
-    const along = distances(lines((b) => b.polyline(path, white)));
-
-    // Assert
-    expect(along).toEqual([0, 3, 7]);
-  });
-
-  it('starts every polyline at distance 0', () => {
-    // Arrange
-    const path = [
-      { x: 0, y: 0 },
-      { x: 5, y: 0 },
-      { x: 5, y: 5 },
-    ];
-
-    // Act
-    const along = distances(
-      lines((b) => {
-        b.polyline(path, white);
-        b.polyline(path, white);
+        // Assert
+        const walked = paths.flatMap((path) =>
+          path.slice(1).map((_, i) => Math.fround(lengthOf(path.slice(0, i + 1)))),
+        );
+        expect(along).toEqual(walked);
       }),
     );
-
-    // Assert
-    expect(along).toEqual([0, 5, 0, 5]);
   });
 
   it('accepts pixel offsets on either end', () => {
@@ -191,19 +178,32 @@ describe('LineBatch', () => {
     expect(batch.data[8]).toBe(1);
   });
 
-  it('grows past its initial capacity', () => {
-    // Arrange
-    const initial = 2;
+  it('grows past its initial capacity, each lone segment starting at distance 0', () => {
+    // Arrange: more segments than a batch of a small capacity starts with room for
+    const anyCapacity = fc.integer({ min: 0, max: 4 });
+    const anySegments = fc.array(fc.tuple(anyAnchor, anyAnchor), { maxLength: 100 });
 
-    // Act
-    const batch = lines((b) => {
-      for (let i = 0; i < 100; i++) b.segment({ x: i, y: 0 }, { x: i, y: 1 }, white);
-    }, initial);
+    fc.assert(
+      fc.property(anyCapacity, anySegments, (capacity, segments) => {
+        // Act
+        const batch = lines((b) => {
+          for (const [from, to] of segments) b.segment(from, to, white);
+        }, capacity);
 
-    // Assert
-    expect(batch.count).toBe(100);
-    expect(batch.data.length).toBe(100 * LINE_STRIDE);
-    expect(batch.data[99 * LINE_STRIDE]).toBe(99);
+        // Assert
+        const ends = segments.map((_, i) => {
+          const [ax, ay, , , bx, by] = batch.data.subarray(i * LINE_STRIDE);
+          return [
+            { x: ax, y: ay },
+            { x: bx, y: by },
+          ];
+        });
+        expect(batch.count).toBe(segments.length);
+        expect(batch.data.length).toBe(segments.length * LINE_STRIDE);
+        expect(ends).toEqual(segments);
+        expect(distances(batch)).toEqual(segments.map(() => 0));
+      }),
+    );
   });
 });
 
