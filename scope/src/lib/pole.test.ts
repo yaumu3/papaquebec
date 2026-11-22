@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import { box, itemOf, line, partOf, point, polygon, project } from '../render/scene/chartFixture';
 import { distanceToSegment, type Vec2 } from './geo';
 import { footprintOf } from './labelStacks';
+import { anyBetween } from './numberFixture';
 import { areaPlaceOf, poleOf, ringArea, type RoomAt, roomsAmong } from './pole';
 
 const ring = (...points: [number, number][]): Vec2[] => points.map(([x, y]) => ({ x, y }));
@@ -24,32 +27,67 @@ const inside = (p: Vec2, rings: Rings): boolean =>
     2 ===
   1;
 
+const everyEdge: RoomAt = (rings) => (p) => {
+  const room = distanceToEdges(p, rings);
+  return inside(p, rings) ? room : -room;
+};
+
+/** A ring that goes once round the origin, so that it does not cross itself, its corners at any `radius`. */
+const anyRingOf = (radius: fc.Arbitrary<number>, edges: fc.ArrayConstraints) =>
+  fc.array(fc.record({ turn: anyBetween(0, 2 * Math.PI), radius }), edges).map((spokes) =>
+    spokes
+      .toSorted((a, b) => a.turn - b.turn)
+      .map((spoke) => ({
+        x: spoke.radius * Math.cos(spoke.turn),
+        y: spoke.radius * Math.sin(spoke.turn),
+      })),
+  );
+
 describe('poleOf', () => {
   const square = ring([0, 0], [1, 0], [1, 1], [0, 1]);
-  const el = ring([0, 0], [3, 0], [3, 1], [1, 1], [1, 3], [0, 3]);
   const outer = ring([0, 0], [10, 0], [10, 10], [0, 10]);
   const hole = ring([4, 4], [6, 4], [6, 6], [4, 6]);
-  const strip = ring([0, 0], [100, 95], [100, 100], [0, 5]);
 
   it('finds a point inside, as far from every edge as the ring allows', () => {
+    // Arrange: rings that enclose some area, and a grid over them to look for more room on
+    const anyRing = anyRingOf(anyBetween(10, 100), { minLength: 3, maxLength: 24 }).filter(
+      (points) => ringArea(points) > 100,
+    );
+    const grid = Array.from({ length: 41 * 41 }, (_, i) => ({
+      x: -100 + (i % 41) * 5,
+      y: -100 + Math.floor(i / 41) * 5,
+    }));
+
+    fc.assert(
+      fc.property(anyRing, (points) => {
+        // Arrange
+        const rings = [points];
+        const roomAt = everyEdge(rings);
+        const xs = points.map((p) => p.x);
+        const ys = points.map((p) => p.y);
+        const side = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+
+        // Act
+        const pole = poleOf(rings);
+
+        // Assert
+        expect(pole && inside(pole.at, rings)).toBe(true);
+        expect(pole?.room).toBeCloseTo(pole ? distanceToEdges(pole.at, rings) : NaN, 9);
+        expect(pole?.room ?? 0).toBeGreaterThanOrEqual(Math.max(...grid.map(roomAt)) - side / 100);
+      }),
+    );
+  });
+
+  it('keeps the pole out of a hole', () => {
     // Arrange
-    const polygons: [Vec2[][], number][] = [
-      [[square], 0.5],
-      [[el], 0.5],
-      [[outer, hole], 2],
-      [[strip], 1.7],
-    ];
+    const rings = [outer, hole];
 
     // Act
-    const poles = polygons.map(([rings]) => poleOf(rings));
+    const pole = poleOf(rings);
 
     // Assert
-    poles.forEach((pole, i) => {
-      const [rings, room] = polygons[i] ?? [[], 0];
-      expect(pole && inside(pole.at, rings)).toBe(true);
-      expect(pole?.room).toBeCloseTo(pole ? distanceToEdges(pole.at, rings) : NaN, 9);
-      expect(pole?.room ?? 0).toBeGreaterThan(room * 0.95);
-    });
+    expect(pole && inside(pole.at, rings)).toBe(true);
+    expect(pole?.room ?? 0).toBeGreaterThan(2 * 0.95);
   });
 
   it('puts the pole of a square at its centre', () => {
@@ -75,11 +113,6 @@ describe('poleOf', () => {
     expect(pole).toBeUndefined();
   });
 });
-
-const everyEdge: RoomAt = (rings) => (p) => {
-  const room = distanceToEdges(p, rings);
-  return inside(p, rings) ? room : -room;
-};
 
 describe('the edge index', () => {
   /** A cog: many short edges, as a sector has, around a deep notch. */
@@ -112,19 +145,37 @@ describe('the edge index', () => {
   });
 
   it('measures the room at any point as every edge does, inside and out', () => {
-    // Arrange
-    const plain = everyEdge([cog, notch]);
-    const indexed = roomsAmong([cog, notch]);
-    const points = Array.from({ length: 900 }, (_, i) => ({
-      x: -120 + (i % 30) * 8.1,
-      y: -120 + Math.floor(i / 30) * 8.1,
-    }));
+    // Arrange: an outline of many short edges, as a sector has, around a hole
+    const anyOutline = anyRingOf(anyBetween(40, 100), {
+      minLength: 20,
+      maxLength: 120,
+    });
+    const anyHole = anyRingOf(anyBetween(1, 20), {
+      minLength: 3,
+      maxLength: 40,
+    });
+    const anyRings = fc.tuple(anyOutline, anyHole);
+    const anyPoint = fc.record({
+      x: anyBetween(-120, 120),
+      y: anyBetween(-120, 120),
+    });
 
-    // Act
-    const rooms = points.map(indexed);
+    fc.assert(
+      fc.property(
+        anyRings,
+        fc.array(anyPoint, { minLength: 20, maxLength: 40 }),
+        (rings, points) => {
+          // Arrange
+          const plain = everyEdge(rings);
 
-    // Assert
-    expect(rooms).toEqual(points.map(plain));
+          // Act
+          const rooms = points.map(roomsAmong(rings));
+
+          // Assert
+          expect(rooms).toEqual(points.map(plain));
+        },
+      ),
+    );
   });
 });
 
@@ -144,19 +195,52 @@ describe('the edge index, in a box that holds the point', () => {
 });
 
 describe('ringArea', () => {
-  it('is the area a ring encloses, whichever way it winds', () => {
+  it('is the area a ring encloses, whichever way it winds and wherever it starts', () => {
+    // Arrange: whole numbers, whose sums are exact in any order
+    const anyRing = fc.array(
+      fc.record({
+        x: fc.integer({ min: -1000, max: 1000 }),
+        y: fc.integer({ min: -1000, max: 1000 }),
+      }),
+      { minLength: 3, maxLength: 12 },
+    );
+
+    fc.assert(
+      fc.property(anyRing, fc.nat(), (points, turns) => {
+        // Arrange
+        const start = turns % points.length;
+        const turned = [...points.slice(start), ...points.slice(0, start)];
+
+        // Act
+        const areas = [points, points.toReversed(), turned].map(ringArea);
+
+        // Assert
+        expect(areas).toEqual(areas.map(() => areas[0] ?? NaN));
+      }),
+    );
+  });
+
+  it('is the product of the sides of a rectangle, and nothing for a ring on one line', () => {
     // Arrange
-    const rings = [
-      ring([0, 0], [2, 0], [2, 3], [0, 3]),
-      ring([0, 3], [2, 3], [2, 0], [0, 0]),
-      ring([0, 0], [1, 1], [2, 2]),
-    ];
+    const anyCorner = fc.record({
+      x: fc.integer({ min: -1000, max: 1000 }),
+      y: fc.integer({ min: -1000, max: 1000 }),
+    });
+    const anySide = fc.integer({ min: 1, max: 1000 });
 
-    // Act
-    const areas = rings.map(ringArea);
+    fc.assert(
+      fc.property(anyCorner, anySide, anySide, ({ x, y }, w, h) => {
+        // Arrange
+        const rectangle = ring([x, y], [x + w, y], [x + w, y + h], [x, y + h]);
+        const flat = ring([x, y], [x + w, y + h], [x + 2 * w, y + 2 * h]);
 
-    // Assert
-    expect(areas).toEqual([6, 6, 0]);
+        // Act
+        const areas = [rectangle, flat].map(ringArea);
+
+        // Assert
+        expect(areas).toEqual([w * h, 0]);
+      }),
+    );
   });
 });
 
