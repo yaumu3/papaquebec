@@ -192,8 +192,11 @@ const lengthOf = ([a, b]: [Vec2, Vec2]) => Math.hypot(b.x - a.x, b.y - a.y);
 
 describe('splitByCircle', () => {
   it('cuts a segment where it enters and leaves a circle, if it does', () => {
-    // Arrange: a segment of some length; one of none inside the circle is reported outside it
-    const anySegment = fc.tuple(anyPoint, anyPoint).filter(([p, q]) => p.x !== q.x || p.y !== q.y);
+    // Arrange: a segment that is often of no length
+    const anySegment = fc.oneof(
+      fc.tuple(anyPoint, anyPoint),
+      anyPoint.map((p) => [p, { ...p }] as const),
+    );
     const anyRadius = fc.integer({ min: 1, max: 20 });
 
     fc.assert(

@@ -52,7 +52,10 @@ export function splitByCircle(
   const f = { x: p.x - c.x, y: p.y - c.y };
   const a = d.x * d.x + d.y * d.y;
   const b = 2 * (f.x * d.x + f.y * d.y);
-  const disc = b * b - 4 * a * (f.x * f.x + f.y * f.y - r * r);
+  const beyond = f.x * f.x + f.y * f.y - r * r;
+  // A segment of no length is the point it starts at.
+  if (a === 0 && beyond < 0) return { outside: [], inside: [[p, q]] };
+  const disc = b * b - 4 * a * beyond;
   if (a === 0 || disc <= 0) return { outside: [[p, q]], inside: [] };
   const t1 = Math.max((-b - Math.sqrt(disc)) / (2 * a), 0);
   const t2 = Math.min((-b + Math.sqrt(disc)) / (2 * a), 1);
