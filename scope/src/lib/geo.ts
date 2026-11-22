@@ -1,5 +1,7 @@
-/** A point on the projected plane, in nautical miles: x east, y north. */
+import { onCircle } from './math';
 import { RAD } from './units';
+
+/** A point on the projected plane, in nautical miles: x east, y north. */
 export interface Vec2 {
   x: number;
   y: number;
@@ -9,8 +11,7 @@ export const NM_IN_METERS = 1852;
 
 /** True bearing to magnetic, given declination in degrees east positive. */
 export function trueToMagnetic(trueDeg: number, declinationDeg: number): number {
-  const m = (trueDeg - declinationDeg) % 360;
-  return m < 0 ? m + 360 : m;
+  return onCircle(trueDeg - declinationDeg, 360);
 }
 
 /** Magnetic bearing to true, given declination in degrees east positive. */
@@ -19,7 +20,7 @@ export function magneticToTrue(magneticDeg: number, declinationDeg: number): num
 }
 
 /** Degrees from `from` round to `to` the short way, to the right positive. */
-export const turn = (from: number, to: number): number => ((to - from + 540) % 360) - 180;
+export const turn = (from: number, to: number): number => onCircle(to - from + 180, 360) - 180;
 
 /** Velocity components in knots from ground speed and true track. */
 export function velocityNm(gsKt: number, trackDeg: number): Vec2 {

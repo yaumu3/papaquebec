@@ -18,6 +18,7 @@ import {
   splitByCircle,
 } from './geo';
 import { direct } from './geodesic';
+import { onCircle } from './math';
 import { anyBetween } from './numberFixture';
 
 describe('trueToMagnetic', () => {
@@ -35,6 +36,25 @@ describe('trueToMagnetic', () => {
 
     // Assert
     results.forEach((m, i) => expect(m).toBeCloseTo(cases[i]?.[2] ?? NaN, 9));
+  });
+});
+
+describe('turn', () => {
+  it('is the short way round from one bearing to another, however many times round either is written', () => {
+    // Arrange
+    const anyBearing = fc.integer({ min: -1080, max: 1080 });
+
+    fc.assert(
+      fc.property(anyBearing, anyBearing, (from, to) => {
+        // Act
+        const turned = turn(from, to);
+
+        // Assert
+        expect(turned).toBeGreaterThanOrEqual(-180);
+        expect(turned).toBeLessThan(180);
+        expect(onCircle(from + turned, 360)).toBe(onCircle(to, 360));
+      }),
+    );
   });
 });
 
@@ -203,9 +223,9 @@ describe('splitByCircle', () => {
 
 describe('magneticToTrue', () => {
   it('undoes trueToMagnetic, wrapping into 0..360', () => {
-    // Arrange: quarters of a degree, which add exactly; a sum a hair under 0 wraps to 360 itself
-    const anyBearing = fc.integer({ min: -2880, max: 2880 }).map((quarters) => quarters / 4);
-    const anyDeclination = fc.integer({ min: -720, max: 720 }).map((quarters) => quarters / 4);
+    // Arrange: a declination too small to tell as often as any other, which leaves a sum a hair under 0
+    const anyBearing = anyBetween(-720, 720);
+    const anyDeclination = fc.oneof(anyBetween(-180, 180), fc.constantFrom(1e-20, -1e-20));
 
     fc.assert(
       fc.property(anyBearing, anyDeclination, (bearing, declination) => {
@@ -220,7 +240,7 @@ describe('magneticToTrue', () => {
         expect(magnetic).toBeLessThan(360);
         expect(back).toBeGreaterThanOrEqual(0);
         expect(back).toBeLessThan(360);
-        expect(Number.isInteger((bearing - back) / 360)).toBe(true);
+        expect(Math.abs(onCircle(back - bearing + 180, 360) - 180)).toBeLessThan(1e-9);
       }),
     );
   });
