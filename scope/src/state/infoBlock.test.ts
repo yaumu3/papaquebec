@@ -18,135 +18,68 @@ const stale: Notice = { cls: 'warn', text: 'STALE 7s' };
 const connecting: Notice = { cls: 'warn', text: 'CONNECTING' };
 const dead: Notice = { cls: 'err', text: 'DEAD · no data' };
 
+/** An expected line: no label, unit or tone unless the row says so. */
+const expected = (
+  key: InfoLine['key'],
+  value: string,
+  spoken: string,
+  over: Partial<InfoLine> = {},
+): InfoLine => ({ key, label: '', value, unit: '', cls: null, spoken, ...over });
+
 describe('infoLine', () => {
   it('tells the line of each page, a notice taking the place of the page value', () => {
     // Arrange
     const rows: [string, InfoPage, Partial<typeof readouts>, Notice | null, InfoLine][] = [
-      [
-        'qnh',
-        'qnh',
-        {},
-        null,
-        {
-          key: 'qnh',
-          label: 'QNH',
-          value: '30.18',
-          unit: '',
-          cls: null,
-          spoken: 'QNH 30.18 inches',
-        },
-      ],
+      ['qnh', 'qnh', {}, null, expected('qnh', '30.18', 'QNH 30.18 inches', { label: 'QNH' })],
       [
         'qnh warn',
         'qnh',
         { qnh: { ...qnh, cls: 'warn' } },
         null,
-        {
-          key: 'qnh',
-          label: 'QNH',
-          value: '30.18',
-          unit: '',
-          cls: 'warn',
-          spoken: 'QNH 30.18 inches',
-        },
+        expected('qnh', '30.18', 'QNH 30.18 inches', { label: 'QNH', cls: 'warn' }),
       ],
-      [
-        'tracks',
-        'tracks',
-        {},
-        null,
-        {
-          key: 'tracks',
-          label: '',
-          value: '10',
-          unit: 'TRK',
-          cls: null,
-          spoken: '10 tracks',
-        },
-      ],
+      ['tracks', 'tracks', {}, null, expected('tracks', '10', '10 tracks', { unit: 'TRK' })],
       [
         'one track',
         'tracks',
         { tracks: 1 },
         null,
-        {
-          key: 'tracks',
-          label: '',
-          value: '1',
-          unit: 'TRK',
-          cls: null,
-          spoken: '1 track',
-        },
+        expected('tracks', '1', '1 track', { unit: 'TRK' }),
       ],
       [
         'rate',
         'rate',
         {},
         null,
-        {
-          key: 'rate',
-          label: '',
-          value: '412',
-          unit: 'msg/s',
-          cls: null,
-          spoken: '412 messages per second',
-        },
+        expected('rate', '412', '412 messages per second', { unit: 'msg/s' }),
       ],
       [
         'one message',
         'rate',
         { rate: 1 },
         null,
-        {
-          key: 'rate',
-          label: '',
-          value: '1',
-          unit: 'msg/s',
-          cls: null,
-          spoken: '1 message per second',
-        },
+        expected('rate', '1', '1 message per second', { unit: 'msg/s' }),
       ],
       [
         'stale over qnh',
         'qnh',
         {},
         stale,
-        {
-          key: 'notice',
-          label: '',
-          value: 'STALE 7s',
-          unit: '',
-          cls: 'warn',
-          spoken: 'STALE 7s',
-        },
+        expected('notice', 'STALE 7s', 'STALE 7s', { cls: 'warn' }),
       ],
       [
         'connecting over tracks',
         'tracks',
         {},
         connecting,
-        {
-          key: 'notice',
-          label: '',
-          value: 'CONNECTING',
-          unit: '',
-          cls: 'warn',
-          spoken: 'CONNECTING',
-        },
+        expected('notice', 'CONNECTING', 'CONNECTING', { cls: 'warn' }),
       ],
       [
         'dead over rate',
         'rate',
         {},
         dead,
-        {
-          key: 'notice',
-          label: '',
-          value: 'DEAD · no data',
-          unit: '',
-          cls: 'err',
-          spoken: 'DEAD · no data',
-        },
+        expected('notice', 'DEAD · no data', 'DEAD · no data', { cls: 'err' }),
       ],
     ];
 
