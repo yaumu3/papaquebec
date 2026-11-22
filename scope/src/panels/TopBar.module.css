@@ -29,7 +29,6 @@
   color: var(--text);
   font-weight: 500;
 }
-/* Before the tones, which recolor it. */
 .lamp {
   display: inline-block;
   width: 8px;
@@ -38,10 +37,10 @@
   background: currentColor;
   color: var(--control-on-bg);
 }
-.warn {
+.bar [data-tone='warn'] {
   color: var(--color-descend);
 }
-.err {
+.bar [data-tone='err'] {
   color: var(--color-emergency);
 }
 .buttons {

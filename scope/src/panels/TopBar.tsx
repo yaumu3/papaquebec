@@ -9,7 +9,6 @@ import {
   qnhReadout,
   trackCount,
 } from '../state/barReadouts';
-import type { Tone } from '../state/feedLine';
 import {
   aboutVisible,
   type PanelId,
@@ -30,10 +29,6 @@ const LABELS: Record<PanelId, string> = {
   detail: 'DETAIL',
 };
 
-/** Module class of each status tone. */
-const TONES: Record<Tone, string | undefined> = { warn: s.warn, err: s.err };
-const tone = (cls: Tone | null | undefined) => cls && TONES[cls];
-
 export function TopBar() {
   const qnh = createMemo(qnhReadout);
   const notice = createMemo(currentNotice);
@@ -41,11 +36,14 @@ export function TopBar() {
     <div id="top-bar" class={s.bar}>
       <div class={s.clock}>{clockReadout()}</div>
       <div class={s.item}>
-        QNH <span class={cx(s.v, tone(qnh().cls))}>{qnh().value}</span>
-        <span class={cx(tone(qnh().cls))}> {qnh().source}</span>
+        QNH{' '}
+        <span class={s.v} data-tone={qnh().cls}>
+          {qnh().value}
+        </span>
+        <span data-tone={qnh().cls}> {qnh().source}</span>
       </div>
       <div class={s.item}>
-        <span class={cx(s.lamp, tone(notice()?.cls))} />
+        <span class={s.lamp} data-tone={notice()?.cls} />
         {'FEED '}
         <Show
           when={notice()}
@@ -57,11 +55,17 @@ export function TopBar() {
             </>
           }
         >
-          {(n) => <span class={cx(s.v, tone(n().cls))}>{n().text}</span>}
+          {(n) => (
+            <span class={s.v} data-tone={n().cls}>
+              {n().text}
+            </span>
+          )}
         </Show>
       </div>
       <Show when={renderError()}>
-        <div class={cx(s.item, s.err)}>GPU · {renderError()}</div>
+        <div class={s.item} data-tone="err">
+          GPU · {renderError()}
+        </div>
       </Show>
       <div class={s.buttons}>
         {PANEL_IDS.map((id) => (

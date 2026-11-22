@@ -35,7 +35,7 @@ function Line(props: {
   return (
     <span
       class={cx(s.line, props.class)}
-      data-tone={props.line.cls ?? undefined}
+      data-tone={props.line.cls}
       aria-hidden={props.leaving ? true : undefined}
       onAnimationEnd={props.leaving}
     >
