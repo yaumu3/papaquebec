@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { create, fromBinary } from '@bufbuild/protobuf';
+import fc from 'fast-check';
 
 import type { AircraftReport, Heard } from '../lib/aircraft';
 import { messageOf } from './decode';
@@ -215,16 +216,27 @@ describe('messageOf', () => {
 
   it('names the threat of an advisory by its address, the six hex digits', () => {
     // Arrange
-    const advisory = { threat: { case: 'threatAddress' as const, value: 0x4840d6 } };
-    const frame = create(FrameSchema, {
-      body: { case: 'snapshot', value: { aircraft: [{ advisory }] } },
-    });
+    const anyAddress = fc.integer({ min: 0, max: 0xffffff });
 
-    // Act
-    const read = aircraftOf(frame);
+    fc.assert(
+      fc.property(anyAddress, (address) => {
+        // Arrange
+        const advisory = { threat: { case: 'threatAddress' as const, value: address } };
+        const frame = create(FrameSchema, {
+          body: { case: 'snapshot', value: { aircraft: [{ advisory }] } },
+        });
 
-    // Assert
-    expect(read.map((a) => a.ra?.threat)).toEqual([{ address: '4840d6' }]);
+        // Act
+        const read = aircraftOf(frame);
+
+        // Assert
+        const named = read.map((a) =>
+          a.ra?.threat && 'address' in a.ra.threat ? a.ra.threat.address : '',
+        );
+        expect(named).toEqual([expect.stringMatching(/^[0-9a-f]{6}$/)]);
+        expect(named.map((digits) => Number.parseInt(digits, 16))).toEqual([address]);
+      }),
+    );
   });
 
   it('reads a threat placed without any estimate as no threat', () => {
