@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 
+import fc from 'fast-check';
+
 import type { Recording } from './recorder';
 import { pct, rowsOf, summarize } from './report';
 
@@ -16,14 +18,24 @@ const recording = (over: Partial<Recording>): Recording => ({
 
 describe('pct', () => {
   it('reads the value that share of the way up, whatever the order', () => {
-    // Arrange
-    const xs = [40, 10, 30, 20];
+    // Arrange: few values, so that some repeat
+    const anyValues = fc.array(fc.integer({ min: 0, max: 20 }), { minLength: 1, maxLength: 12 });
+    const anyShare = fc.integer({ min: 0, max: 100 });
 
-    // Act
-    const read = [pct(xs, 0), pct(xs, 50), pct(xs, 95), pct(xs, 100)];
+    fc.assert(
+      fc.property(anyValues, anyShare, (xs, p) => {
+        // Act
+        const read = pct(xs, p);
 
-    // Assert
-    expect(read).toEqual([10, 30, 40, 40]);
+        // Assert
+        const below = xs.filter((x) => x < read).length;
+        const upTo = xs.filter((x) => x <= read).length;
+        const wayUp = Math.min(xs.length - 1, Math.floor((p / 100) * xs.length));
+        expect(xs).toContain(read);
+        expect(below).toBeLessThanOrEqual(wayUp);
+        expect(upTo).toBeGreaterThan(wayUp);
+      }),
+    );
   });
 
   it('reads nothing as 0', () => {
