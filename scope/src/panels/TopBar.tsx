@@ -3,23 +3,18 @@ import { createMemo, Show } from 'solid-js';
 import { panelTip } from '../canvas/input/devices/keyboard';
 import { cx } from '../design/cx';
 import { clockTime } from '../lib/format';
-import { feedNotice, type Tone } from '../state/feedLine';
-import { qnhReport, qnhStation } from '../state/qnh';
-import { qnhStatus } from '../state/qnhStatus';
+import { currentNotice, messageRate, qnhReadout, trackCount } from '../state/barReadouts';
+import type { Tone } from '../state/feedLine';
 import {
   aboutVisible,
-  feedStatus,
   type PanelId,
   panels,
   renderError,
   setAboutVisible,
-  snapshotVersion,
   tick,
   togglePanel,
 } from '../state/scope';
-import { settings } from '../state/settings';
 import { PANEL_IDS } from '../state/settingsDefaults';
-import { trackStore } from '../state/tracks';
 import { Button } from '../ui/Button';
 
 import s from './TopBar.module.css';
@@ -31,30 +26,13 @@ const LABELS: Record<PanelId, string> = {
   detail: 'DETAIL',
 };
 
-function trackCount(): number {
-  snapshotVersion();
-  return trackStore.tracks.size;
-}
-
-function messageRate(): number {
-  snapshotVersion();
-  return Math.round(trackStore.stats.messageRate);
-}
-
 /** Module class of each status tone. */
 const TONES: Record<Tone, string | undefined> = { warn: s.warn, err: s.err };
 const tone = (cls: Tone | null | undefined) => cls && TONES[cls];
 
 export function TopBar() {
-  const qnh = createMemo(() =>
-    qnhStatus({
-      qnhInHg: settings.altimeter.qnhInHg,
-      auto: settings.qnh.auto,
-      station: qnhStation(),
-      report: qnhReport(),
-    }),
-  );
-  const notice = createMemo(() => feedNotice(feedStatus(), tick()));
+  const qnh = createMemo(qnhReadout);
+  const notice = createMemo(currentNotice);
   return (
     <div id="top-bar" class={s.bar}>
       <div class={s.clock}>{clockTime(tick() / 1000)}Z</div>

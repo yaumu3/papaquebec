@@ -23,7 +23,7 @@ export interface QnhStatus {
   cls: Tone | null;
 }
 
-/** Top-bar readout of the altimeter setting and where it came from. */
+/** The bars' readout of the altimeter setting and where it came from. */
 export function qnhStatus(s: QnhStatusInput): QnhStatus {
   const value = s.qnhInHg.toFixed(2);
   if (!s.auto) return { value, source: 'MAN', cls: null };
