@@ -104,7 +104,7 @@ describe('nextSheet', () => {
 });
 
 describe('toggleSheet', () => {
-  it('takes the sheet from the open panel for the one whose tab is tapped', () => {
+  it('takes the sheet from the open panel for the one whose button is tapped', () => {
     // Arrange
     setActiveSheet('list');
 

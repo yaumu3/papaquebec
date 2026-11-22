@@ -18,6 +18,8 @@
   --panel-glass: color-mix(in srgb, var(--panel-bg) 86%, transparent);
   --panel-border: #4a4a47;
   --panel-outline: #000;
+  --nav-glass: rgb(30 30 30 / 42%);
+  --nav-border: rgb(255 255 255 / 14%);
   --text: #f2f2ee;
   --text-dim: #96968f;
   --text-muted: #5a5a56;
@@ -83,7 +85,6 @@
   /* Layout */
   --control-height: 20px;
   --topbar-height: 32px;
-  --tabbar-height: 48px;
   /* Where the top bar ends, below any notch. */
   --topbar-bottom: calc(var(--topbar-height) + env(safe-area-inset-top));
   --panel-top: calc(var(--topbar-bottom) + var(--edge));

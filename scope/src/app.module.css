@@ -1,4 +1,4 @@
-/* Two docked columns over the scope on desktop; one bottom sheet plus a tab bar on a phone. */
+/* Two docked columns over the scope on desktop; one bottom sheet under a nav bar on a phone. */
 .column {
   position: fixed;
   top: var(--panel-top);
@@ -37,7 +37,7 @@
     top: var(--topbar-bottom);
     left: env(safe-area-inset-left);
     right: env(safe-area-inset-right);
-    bottom: calc(var(--tabbar-height) + env(safe-area-inset-bottom));
+    bottom: var(--nav-inset, 0px);
     width: auto;
     justify-content: flex-end;
     gap: 0;

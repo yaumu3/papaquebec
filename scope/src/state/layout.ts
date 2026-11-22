@@ -76,7 +76,7 @@ export function cycleDetent(detents: Detents, current: Detent): Detent {
   return detents[(detents.indexOf(current) + 1) % detents.length] ?? detents[0];
 }
 
-/** Tapping the open panel's tab closes the sheet; any other tab swaps to that panel. */
+/** Tapping the open panel's button closes the sheet; any other button swaps to that panel. */
 export function nextSheet<T extends string>(current: T | null, tapped: T): T | null {
   return current === tapped ? null : tapped;
 }
