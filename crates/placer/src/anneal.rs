@@ -161,7 +161,12 @@ pub fn anneal<C: FnMut() -> f64, R: FnMut() -> f64>(
             }
         }
     }
-    best
+    // The running sum of the changes may take a tie for better by rounding.
+    if evaluate(tables, &best) <= evaluate(tables, start) {
+        best
+    } else {
+        start.to_vec()
+    }
 }
 
 #[cfg(test)]
