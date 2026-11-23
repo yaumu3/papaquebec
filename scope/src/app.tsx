@@ -23,6 +23,7 @@ import { ndRangeNm } from './state/nd';
 import { qnhReport } from './state/qnh';
 import { listSort, panels, setCoast, setTick } from './state/scope';
 import { persist, setSettings, settings } from './state/settings';
+import { keepAwake, screenLocks } from './ui/keepAwake';
 
 import s from './app.module.css';
 
@@ -37,10 +38,12 @@ export function App() {
     const clock = setInterval(() => setTick(Date.now()), 1000);
     const disconnect = connectFeed(feedOptionsFromUrl(location.search));
     const unscroll = keepUnscrolled(window);
+    const sleep = keepAwake(document, screenLocks(window));
     onCleanup(() => {
       clearInterval(clock);
       disconnect();
       unscroll();
+      void sleep();
     });
     void loadJson('./map/coast.json')
       .then((raw) => setCoast(parseCoast(raw)))
