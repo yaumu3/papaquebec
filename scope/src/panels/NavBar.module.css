@@ -6,11 +6,11 @@
   .bar {
     position: fixed;
     inset-inline: 0;
-    bottom: max(var(--edge), env(safe-area-inset-bottom));
+    bottom: var(--nav-bottom);
     width: fit-content;
     max-width: calc(100% - 2 * var(--edge));
     margin-inline: auto;
-    height: 62px;
+    height: var(--nav-height);
     padding: 0 var(--space-4);
     display: grid;
     grid-template-columns: auto minmax(0, auto) auto;

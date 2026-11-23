@@ -91,7 +91,10 @@
   --topbar-bottom: calc(var(--topbar-height) + env(safe-area-inset-top));
   --panel-top: calc(var(--topbar-bottom) + var(--edge));
   --edge: 12px;
-  /* The foot of the screen the nav bar covers; the bar publishes it on the root. */
+  --nav-height: 62px;
+  /* How far the nav bar floats above the foot of the screen. */
+  --nav-bottom: max(var(--edge), env(safe-area-inset-bottom));
+  /* The foot of the screen the nav bar covers; none where there is no bar. */
   --nav-inset: 0px;
   --z-panel: 10;
   --z-bar: 15;
@@ -107,5 +110,6 @@
   :root {
     /* No top bar on a phone: the sheet's room and the mode notice start at the safe area. */
     --topbar-height: 0px;
+    --nav-inset: calc(var(--nav-height) + var(--nav-bottom));
   }
 }
