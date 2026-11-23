@@ -43,7 +43,7 @@ export function keepUnscrolled(win: ScrollHost): () => void {
 /** The panel that holds the sheet on a phone; null when the sheet is closed. Not persisted. */
 export const [activeSheet, setActiveSheet] = createSignal<PanelId | null>(null);
 
-/** A height the sheet rests at, as SwiftUI's presentation detents: a third of the screen, or all of it. */
+/** A height the sheet rests at, as SwiftUI's presentation detents: two fifths of the screen, or all of it. */
 export type Detent = 'medium' | 'large';
 
 /** The detents a sheet rests at, smallest first; never none. */
