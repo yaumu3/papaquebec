@@ -91,7 +91,7 @@
   --topbar-bottom: calc(var(--topbar-height) + env(safe-area-inset-top));
   --panel-top: calc(var(--topbar-bottom) + var(--edge));
   --edge: 12px;
-  --nav-height: 62px;
+  --nav-height: 54px;
   /* How far the nav bar floats above the foot of the screen. */
   --nav-bottom: max(var(--edge), env(safe-area-inset-bottom));
   /* The foot of the screen the nav bar covers; none where there is no bar. */
